@@ -16,8 +16,177 @@
 
 package com.caoccao.qjs4j.core;
 
+import java.util.Objects;
+
 /**
- * Represents a property key (can be string or symbol).
+ * Represents a property key (can be string, symbol, or integer index).
+ * Based on ECMAScript property keys and QuickJS atom system.
+ *
+ * In JavaScript, property keys can be:
+ * - Strings (most common)
+ * - Symbols (for unique properties)
+ * - Integer indices (for array-like objects)
  */
-public record PropertyKey(Object value) {
+public final class PropertyKey {
+    private final Object value; // String, Integer, or JSSymbol
+    private final int atomIndex; // -1 if not interned
+
+    private PropertyKey(Object value, int atomIndex) {
+        this.value = value;
+        this.atomIndex = atomIndex;
+    }
+
+    /**
+     * Create a property key from a string.
+     */
+    public static PropertyKey fromString(String str) {
+        return new PropertyKey(str, -1);
+    }
+
+    /**
+     * Create a property key from an interned string (atom).
+     */
+    public static PropertyKey fromAtom(String str, int atomIndex) {
+        return new PropertyKey(str, atomIndex);
+    }
+
+    /**
+     * Create a property key from an integer index.
+     */
+    public static PropertyKey fromIndex(int index) {
+        return new PropertyKey(index, -1);
+    }
+
+    /**
+     * Create a property key from a symbol.
+     */
+    public static PropertyKey fromSymbol(JSSymbol symbol) {
+        return new PropertyKey(symbol, -1);
+    }
+
+    /**
+     * Create a property key from a JSValue.
+     * Converts the value to an appropriate key.
+     */
+    public static PropertyKey fromValue(JSValue value) {
+        if (value instanceof JSString s) {
+            return fromString(s.getValue());
+        }
+        if (value instanceof JSSymbol s) {
+            return fromSymbol(s);
+        }
+        if (value instanceof JSNumber n) {
+            // Check if it's an array index
+            double d = n.value();
+            if (d >= 0 && d < 0xFFFFFFFFL && d == Math.floor(d)) {
+                return fromIndex((int) d);
+            }
+        }
+        // Convert to string for other types
+        JSString str = JSTypeConversions.toString(value);
+        return fromString(str.getValue());
+    }
+
+    public Object getValue() {
+        return value;
+    }
+
+    public int getAtomIndex() {
+        return atomIndex;
+    }
+
+    /**
+     * Check if this key is interned.
+     */
+    public boolean isInterned() {
+        return atomIndex >= 0;
+    }
+
+    /**
+     * Check if this key is a string.
+     */
+    public boolean isString() {
+        return value instanceof String;
+    }
+
+    /**
+     * Check if this key is an integer index.
+     */
+    public boolean isIndex() {
+        return value instanceof Integer;
+    }
+
+    /**
+     * Check if this key is a symbol.
+     */
+    public boolean isSymbol() {
+        return value instanceof JSSymbol;
+    }
+
+    /**
+     * Get the string value (if this is a string key).
+     */
+    public String asString() {
+        return value instanceof String s ? s : null;
+    }
+
+    /**
+     * Get the integer value (if this is an index key).
+     */
+    public int asIndex() {
+        return value instanceof Integer i ? i : -1;
+    }
+
+    /**
+     * Get the symbol value (if this is a symbol key).
+     */
+    public JSSymbol asSymbol() {
+        return value instanceof JSSymbol s ? s : null;
+    }
+
+    /**
+     * Convert to a string representation.
+     */
+    public String toPropertyString() {
+        if (value instanceof String s) {
+            return s;
+        }
+        if (value instanceof Integer i) {
+            return i.toString();
+        }
+        if (value instanceof JSSymbol s) {
+            return "Symbol(" + (s.getDescription() != null ? s.getDescription() : "") + ")";
+        }
+        return value.toString();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (!(obj instanceof PropertyKey other)) return false;
+
+        // Fast path: if both have atom indices, compare them
+        if (atomIndex >= 0 && other.atomIndex >= 0) {
+            return atomIndex == other.atomIndex;
+        }
+
+        // Compare values
+        return Objects.equals(value, other.value);
+    }
+
+    @Override
+    public int hashCode() {
+        // Use atom index for faster hashing if available
+        if (atomIndex >= 0) {
+            return atomIndex;
+        }
+        return Objects.hashCode(value);
+    }
+
+    @Override
+    public String toString() {
+        return "PropertyKey{" + toPropertyString() +
+                (atomIndex >= 0 ? ", atom=" + atomIndex : "") +
+                "}";
+    }
 }

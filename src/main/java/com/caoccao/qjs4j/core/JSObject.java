@@ -16,53 +16,286 @@
 
 package com.caoccao.qjs4j.core;
 
-import java.util.Map;
+import java.util.*;
 
 /**
  * Represents a JavaScript object.
- * Uses shape-based property storage for efficiency.
+ * Based on QuickJS object implementation with shape-based optimization.
+ *
+ * Uses a shape (hidden class) system for efficient property access:
+ * - Shape tracks property names and their offsets
+ * - Property values stored in parallel array indexed by offset
+ * - Sparse properties (numeric indices) stored separately
+ *
+ * This design enables:
+ * - Fast property access (O(1) with inline caching)
+ * - Memory efficiency (shapes shared across objects)
+ * - Optimized for objects with similar structure
  */
 public non-sealed class JSObject implements JSValue {
-    private JSShape shape;
-    private JSValue[] propertyValues;
-    private Map<Integer, JSValue> sparseProperties;
-    private JSObject prototype;
+    protected JSShape shape;
+    protected JSValue[] propertyValues;
+    protected Map<Integer, JSValue> sparseProperties; // For array indices
+    protected JSObject prototype;
 
+    /**
+     * Create an empty object with no prototype.
+     */
     public JSObject() {
+        this.shape = JSShape.getRoot();
+        this.propertyValues = new JSValue[0];
+        this.sparseProperties = null;
+        this.prototype = null;
     }
 
+    /**
+     * Create an object with a specific prototype.
+     */
     public JSObject(JSObject prototype) {
+        this();
         this.prototype = prototype;
     }
 
     // Property operations
+
+    /**
+     * Get a property value by string name.
+     */
     public JSValue get(String propertyName) {
-        return null;
+        return get(PropertyKey.fromString(propertyName));
     }
 
-    public JSValue get(int propertyKey) {
-        return null;
+    /**
+     * Get a property value by integer index.
+     */
+    public JSValue get(int index) {
+        // Check sparse properties first
+        if (sparseProperties != null) {
+            JSValue value = sparseProperties.get(index);
+            if (value != null) {
+                return value;
+            }
+        }
+
+        // Fall back to string property
+        return get(PropertyKey.fromIndex(index));
     }
 
+    /**
+     * Get a property value by property key.
+     */
+    public JSValue get(PropertyKey key) {
+        // Look in own properties
+        int offset = shape.getPropertyOffset(key);
+        if (offset >= 0) {
+            return propertyValues[offset];
+        }
+
+        // Look in prototype chain
+        if (prototype != null) {
+            return prototype.get(key);
+        }
+
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Set a property value by string name.
+     */
     public void set(String propertyName, JSValue value) {
+        set(PropertyKey.fromString(propertyName), value);
     }
 
-    public void set(int propertyKey, JSValue value) {
+    /**
+     * Set a property value by integer index.
+     */
+    public void set(int index, JSValue value) {
+        // Use sparse storage for large indices
+        if (index >= 100 || (sparseProperties != null && sparseProperties.containsKey(index))) {
+            if (sparseProperties == null) {
+                sparseProperties = new HashMap<>();
+            }
+            sparseProperties.put(index, value);
+            return;
+        }
+
+        set(PropertyKey.fromIndex(index), value);
     }
 
+    /**
+     * Set a property value by property key.
+     */
+    public void set(PropertyKey key, JSValue value) {
+        // Check if property already exists
+        int offset = shape.getPropertyOffset(key);
+        if (offset >= 0) {
+            // Property exists, just update the value
+            PropertyDescriptor desc = shape.getDescriptorAt(offset);
+            if (!desc.isWritable()) {
+                // In strict mode, this would throw TypeError
+                return;
+            }
+            propertyValues[offset] = value;
+            return;
+        }
+
+        // Property doesn't exist, add it
+        defineProperty(key, PropertyDescriptor.defaultData(value));
+    }
+
+    /**
+     * Define a new property with a descriptor.
+     */
+    public void defineProperty(PropertyKey key, PropertyDescriptor descriptor) {
+        // Transition to new shape
+        JSShape newShape = shape.addProperty(key, descriptor);
+
+        // Allocate new property array
+        JSValue[] newValues = Arrays.copyOf(propertyValues, newShape.getPropertyCount());
+
+        // Set the new property value
+        if (descriptor.hasValue()) {
+            newValues[newShape.getPropertyCount() - 1] = descriptor.getValue();
+        } else {
+            newValues[newShape.getPropertyCount() - 1] = JSUndefined.INSTANCE;
+        }
+
+        // Update shape and values
+        this.shape = newShape;
+        this.propertyValues = newValues;
+    }
+
+    /**
+     * Check if object has an own property.
+     */
+    public boolean hasOwnProperty(String propertyName) {
+        return hasOwnProperty(PropertyKey.fromString(propertyName));
+    }
+
+    /**
+     * Check if object has an own property by key.
+     */
+    public boolean hasOwnProperty(PropertyKey key) {
+        if (shape.hasProperty(key)) {
+            return true;
+        }
+        if (key.isIndex() && sparseProperties != null) {
+            return sparseProperties.containsKey(key.asIndex());
+        }
+        return false;
+    }
+
+    /**
+     * Check if object has a property (including prototype chain).
+     */
     public boolean has(String propertyName) {
+        return has(PropertyKey.fromString(propertyName));
+    }
+
+    /**
+     * Check if object has a property by key (including prototype chain).
+     */
+    public boolean has(PropertyKey key) {
+        if (hasOwnProperty(key)) {
+            return true;
+        }
+        if (prototype != null) {
+            return prototype.has(key);
+        }
         return false;
     }
 
+    /**
+     * Delete a property.
+     * Returns true if deletion was successful.
+     */
     public boolean delete(String propertyName) {
-        return false;
+        return delete(PropertyKey.fromString(propertyName));
     }
 
-    public JSValue[] ownPropertyKeys() {
-        return new JSValue[0];
+    /**
+     * Delete a property by key.
+     */
+    public boolean delete(PropertyKey key) {
+        // Check if property exists
+        int offset = shape.getPropertyOffset(key);
+        if (offset < 0) {
+            // Check sparse properties
+            if (key.isIndex() && sparseProperties != null) {
+                return sparseProperties.remove(key.asIndex()) != null;
+            }
+            return true; // Property doesn't exist, deletion successful
+        }
+
+        // Check if property is configurable
+        PropertyDescriptor desc = shape.getDescriptorAt(offset);
+        if (!desc.isConfigurable()) {
+            return false; // Cannot delete non-configurable property
+        }
+
+        // For simplicity, we don't actually remove from shape
+        // In a full implementation, we'd need to create a new shape without this property
+        // For now, just set to undefined
+        propertyValues[offset] = JSUndefined.INSTANCE;
+        return true;
+    }
+
+    /**
+     * Get all own property keys.
+     */
+    public PropertyKey[] ownPropertyKeys() {
+        List<PropertyKey> keys = new ArrayList<>();
+
+        // Add shape properties
+        PropertyKey[] shapeKeys = shape.getPropertyKeys();
+        for (PropertyKey key : shapeKeys) {
+            keys.add(key);
+        }
+
+        // Add sparse properties
+        if (sparseProperties != null) {
+            for (Integer index : sparseProperties.keySet()) {
+                keys.add(PropertyKey.fromIndex(index));
+            }
+        }
+
+        return keys.toArray(new PropertyKey[0]);
+    }
+
+    /**
+     * Get own enumerable property keys.
+     */
+    public PropertyKey[] enumerableKeys() {
+        List<PropertyKey> keys = new ArrayList<>();
+
+        PropertyKey[] allKeys = shape.getPropertyKeys();
+        PropertyDescriptor[] descriptors = shape.getDescriptors();
+
+        for (int i = 0; i < allKeys.length; i++) {
+            if (descriptors[i].isEnumerable()) {
+                keys.add(allKeys[i]);
+            }
+        }
+
+        // Sparse properties are enumerable by default
+        if (sparseProperties != null) {
+            for (Integer index : sparseProperties.keySet()) {
+                keys.add(PropertyKey.fromIndex(index));
+            }
+        }
+
+        return keys.toArray(new PropertyKey[0]);
+    }
+
+    /**
+     * Get the property descriptor for a property.
+     */
+    public PropertyDescriptor getOwnPropertyDescriptor(PropertyKey key) {
+        return shape.getDescriptor(key);
     }
 
     // Prototype chain
+
     public JSObject getPrototype() {
         return prototype;
     }
@@ -70,6 +303,8 @@ public non-sealed class JSObject implements JSValue {
     public void setPrototype(JSObject prototype) {
         this.prototype = prototype;
     }
+
+    // JSValue implementation
 
     @Override
     public JSValueType type() {
@@ -79,5 +314,10 @@ public non-sealed class JSObject implements JSValue {
     @Override
     public Object toJavaObject() {
         return this;
+    }
+
+    @Override
+    public String toString() {
+        return "[object Object]";
     }
 }
