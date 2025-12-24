@@ -16,37 +16,219 @@
 
 package com.caoccao.qjs4j.util;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
 /**
- * Auto-growing byte buffer similar to C's DynBuf.
+ * Auto-growing byte buffer similar to QuickJS's DynBuf.
+ * Based on cutils.c implementation.
  */
 public final class DynamicBuffer {
     private byte[] buffer;
     private int size;
+    private boolean error;
 
+    /**
+     * Create a new dynamic buffer with default initial capacity (64 bytes).
+     */
     public DynamicBuffer() {
-        this.buffer = new byte[64];
+        this(64);
+    }
+
+    /**
+     * Create a new dynamic buffer with specified initial capacity.
+     */
+    public DynamicBuffer(int initialCapacity) {
+        this.buffer = new byte[Math.max(initialCapacity, 16)];
         this.size = 0;
+        this.error = false;
     }
 
+    /**
+     * Append a single byte to the buffer.
+     */
     public void append(byte b) {
+        ensureCapacity(size + 1);
+        if (!error) {
+            buffer[size++] = b;
+        }
     }
 
+    /**
+     * Append a byte array to the buffer.
+     */
     public void append(byte[] bytes) {
+        if (bytes != null && bytes.length > 0) {
+            append(bytes, 0, bytes.length);
+        }
     }
 
+    /**
+     * Append part of a byte array to the buffer.
+     */
     public void append(byte[] bytes, int offset, int length) {
+        if (bytes == null || length == 0) {
+            return;
+        }
+
+        if (offset < 0 || length < 0 || offset + length > bytes.length) {
+            throw new IndexOutOfBoundsException("Invalid offset or length");
+        }
+
+        ensureCapacity(size + length);
+        if (!error) {
+            System.arraycopy(bytes, offset, buffer, size, length);
+            size += length;
+        }
     }
 
+    /**
+     * Append a string encoded as UTF-8.
+     */
+    public void appendString(String str) {
+        if (str != null && !str.isEmpty()) {
+            byte[] bytes = str.getBytes(StandardCharsets.UTF_8);
+            append(bytes);
+        }
+    }
+
+    /**
+     * Append an unsigned 8-bit value.
+     */
+    public void appendU8(int value) {
+        append((byte) value);
+    }
+
+    /**
+     * Append an unsigned 16-bit value (little-endian).
+     */
+    public void appendU16(int value) {
+        ensureCapacity(size + 2);
+        if (!error) {
+            buffer[size++] = (byte) value;
+            buffer[size++] = (byte) (value >> 8);
+        }
+    }
+
+    /**
+     * Append an unsigned 32-bit value (little-endian).
+     */
+    public void appendU32(long value) {
+        ensureCapacity(size + 4);
+        if (!error) {
+            buffer[size++] = (byte) value;
+            buffer[size++] = (byte) (value >> 8);
+            buffer[size++] = (byte) (value >> 16);
+            buffer[size++] = (byte) (value >> 24);
+        }
+    }
+
+    /**
+     * Append an unsigned 64-bit value (little-endian).
+     */
+    public void appendU64(long value) {
+        ensureCapacity(size + 8);
+        if (!error) {
+            buffer[size++] = (byte) value;
+            buffer[size++] = (byte) (value >> 8);
+            buffer[size++] = (byte) (value >> 16);
+            buffer[size++] = (byte) (value >> 24);
+            buffer[size++] = (byte) (value >> 32);
+            buffer[size++] = (byte) (value >> 40);
+            buffer[size++] = (byte) (value >> 48);
+            buffer[size++] = (byte) (value >> 56);
+        }
+    }
+
+    /**
+     * Get a copy of the buffer contents.
+     */
     public byte[] toByteArray() {
-        byte[] result = new byte[size];
-        System.arraycopy(buffer, 0, result, 0, size);
-        return result;
+        return Arrays.copyOf(buffer, size);
     }
 
+    /**
+     * Get a ByteBuffer view of the contents (read-only).
+     */
+    public ByteBuffer toByteBuffer() {
+        return ByteBuffer.wrap(buffer, 0, size).asReadOnlyBuffer();
+    }
+
+    /**
+     * Get the current size of the buffer.
+     */
     public int size() {
         return size;
     }
 
+    /**
+     * Get the current capacity of the buffer.
+     */
+    public int capacity() {
+        return buffer.length;
+    }
+
+    /**
+     * Check if an error occurred during buffer operations.
+     */
+    public boolean hasError() {
+        return error;
+    }
+
+    /**
+     * Clear the buffer.
+     */
+    public void clear() {
+        size = 0;
+        error = false;
+    }
+
+    /**
+     * Reset the buffer and optionally resize.
+     */
+    public void reset(int newCapacity) {
+        if (newCapacity > 0) {
+            buffer = new byte[newCapacity];
+        }
+        size = 0;
+        error = false;
+    }
+
+    /**
+     * Ensure the buffer has enough capacity for the required size.
+     * Grows the buffer by doubling if necessary.
+     */
     private void ensureCapacity(int required) {
+        if (required <= buffer.length) {
+            return;
+        }
+
+        try {
+            // Calculate new capacity (at least double, or required size)
+            int newCapacity = Math.max(buffer.length * 2, required);
+
+            // Limit maximum capacity to avoid OutOfMemoryError
+            if (newCapacity < 0 || newCapacity > Integer.MAX_VALUE - 8) {
+                newCapacity = required;
+            }
+
+            buffer = Arrays.copyOf(buffer, newCapacity);
+        } catch (OutOfMemoryError e) {
+            error = true;
+        }
+    }
+
+    /**
+     * Get the internal buffer (for advanced use only).
+     * Note: The returned array may be larger than size().
+     */
+    byte[] getInternalBuffer() {
+        return buffer;
+    }
+
+    @Override
+    public String toString() {
+        return "DynamicBuffer{size=" + size + ", capacity=" + buffer.length + ", error=" + error + "}";
     }
 }

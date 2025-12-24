@@ -22,7 +22,7 @@ import java.util.Map;
  * Represents a JavaScript object.
  * Uses shape-based property storage for efficiency.
  */
-public class JSObject implements JSValue {
+public non-sealed class JSObject implements JSValue {
     private JSShape shape;
     private JSValue[] propertyValues;
     private Map<Integer, JSValue> sparseProperties;

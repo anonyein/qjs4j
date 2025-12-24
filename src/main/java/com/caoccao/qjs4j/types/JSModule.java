@@ -24,8 +24,9 @@ import java.util.Map;
 
 /**
  * Represents a JavaScript module.
+ * Note: A module is not itself a JSValue - it's a container for module state.
  */
-public final class JSModule implements JSValue {
+public final class JSModule {
     private final String url;
     private final Map<String, JSValue> exports;
     private final Map<String, ImportBinding> imports;
@@ -51,16 +52,6 @@ public final class JSModule implements JSValue {
 
     public Map<String, JSValue> getExports() {
         return exports;
-    }
-
-    @Override
-    public com.caoccao.qjs4j.core.JSValueType type() {
-        return com.caoccao.qjs4j.core.JSValueType.OBJECT;
-    }
-
-    @Override
-    public Object toJavaObject() {
-        return this;
     }
 
     public interface ModuleResolver {
