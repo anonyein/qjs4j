@@ -18,48 +18,215 @@ package com.caoccao.qjs4j.compiler;
 
 import com.caoccao.qjs4j.core.JSValue;
 import com.caoccao.qjs4j.util.AtomTable;
+import com.caoccao.qjs4j.vm.Bytecode;
 import com.caoccao.qjs4j.vm.Opcode;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Emits bytecode instructions.
+ * Handles encoding of opcodes, operands, and manages constant/atom pools.
  */
 public final class BytecodeEmitter {
     private final ByteArrayOutputStream code;
     private final List<JSValue> constantPool;
     private final AtomTable atoms;
+    private final Map<JSValue, Integer> constantIndexCache;
+    private final List<String> atomPool;
 
     public BytecodeEmitter() {
         this.code = new ByteArrayOutputStream();
         this.constantPool = new ArrayList<>();
         this.atoms = new AtomTable();
+        this.constantIndexCache = new HashMap<>();
+        this.atomPool = new ArrayList<>();
     }
 
+    /**
+     * Emit a single opcode.
+     */
     public void emitOpcode(Opcode op) {
+        code.write(op.getCode());
     }
 
+    /**
+     * Emit an unsigned 8-bit value.
+     */
     public void emitU8(int value) {
+        code.write(value & 0xFF);
     }
 
+    /**
+     * Emit an unsigned 16-bit value (big-endian).
+     */
     public void emitU16(int value) {
+        code.write((value >> 8) & 0xFF);
+        code.write(value & 0xFF);
     }
 
+    /**
+     * Emit an unsigned 32-bit value (big-endian).
+     */
     public void emitU32(int value) {
+        code.write((value >> 24) & 0xFF);
+        code.write((value >> 16) & 0xFF);
+        code.write((value >> 8) & 0xFF);
+        code.write(value & 0xFF);
     }
 
-    public void emitAtom(String str) {
+    /**
+     * Emit a signed 32-bit integer value.
+     */
+    public void emitI32(int value) {
+        emitU32(value);
     }
 
-    public void emitConstant(JSValue value) {
+    /**
+     * Emit an atom (interned string) reference.
+     * Returns the atom index.
+     */
+    public int emitAtom(String str) {
+        int index = atomPool.indexOf(str);
+        if (index == -1) {
+            index = atomPool.size();
+            atomPool.add(str);
+        }
+        emitU32(index);
+        return index;
     }
 
+    /**
+     * Add a constant to the constant pool and emit its index.
+     * Returns the constant index.
+     */
+    public int emitConstant(JSValue value) {
+        Integer cached = constantIndexCache.get(value);
+        if (cached != null) {
+            emitU32(cached);
+            return cached;
+        }
+
+        int index = constantPool.size();
+        constantPool.add(value);
+        constantIndexCache.put(value, index);
+        emitU32(index);
+        return index;
+    }
+
+    /**
+     * Get the current bytecode offset.
+     */
     public int currentOffset() {
         return code.size();
     }
 
+    /**
+     * Reserve space for a jump offset and return the position to patch later.
+     */
+    public int emitJump(Opcode jumpOp) {
+        emitOpcode(jumpOp);
+        int jumpPos = currentOffset();
+        emitU32(0xFFFFFFFF); // Placeholder
+        return jumpPos;
+    }
+
+    /**
+     * Patch a previously emitted jump instruction with the target offset.
+     */
     public void patchJump(int offset, int target) {
+        byte[] bytes = code.toByteArray();
+        int jumpDistance = target - (offset + 4);
+
+        bytes[offset] = (byte) ((jumpDistance >> 24) & 0xFF);
+        bytes[offset + 1] = (byte) ((jumpDistance >> 16) & 0xFF);
+        bytes[offset + 2] = (byte) ((jumpDistance >> 8) & 0xFF);
+        bytes[offset + 3] = (byte) (jumpDistance & 0xFF);
+
+        // Reset stream with patched bytes
+        code.reset();
+        code.write(bytes, 0, bytes.length);
+    }
+
+    /**
+     * Emit an opcode with an atom operand.
+     */
+    public void emitOpcodeAtom(Opcode op, String atom) {
+        emitOpcode(op);
+        emitAtom(atom);
+    }
+
+    /**
+     * Emit an opcode with a constant operand.
+     */
+    public void emitOpcodeConstant(Opcode op, JSValue constant) {
+        emitOpcode(op);
+        emitConstant(constant);
+    }
+
+    /**
+     * Emit an opcode with a u8 operand.
+     */
+    public void emitOpcodeU8(Opcode op, int value) {
+        emitOpcode(op);
+        emitU8(value);
+    }
+
+    /**
+     * Emit an opcode with a u16 operand.
+     */
+    public void emitOpcodeU16(Opcode op, int value) {
+        emitOpcode(op);
+        emitU16(value);
+    }
+
+    /**
+     * Emit an opcode with a u32 operand.
+     */
+    public void emitOpcodeU32(Opcode op, int value) {
+        emitOpcode(op);
+        emitU32(value);
+    }
+
+    /**
+     * Build the final Bytecode object.
+     */
+    public Bytecode build() {
+        byte[] instructions = code.toByteArray();
+        JSValue[] constants = constantPool.toArray(new JSValue[0]);
+        String[] atoms = atomPool.toArray(new String[0]);
+
+        return new Bytecode(instructions, constants, atoms);
+    }
+
+    /**
+     * Get the constant pool.
+     */
+    public List<JSValue> getConstantPool() {
+        return constantPool;
+    }
+
+    /**
+     * Get the atom pool.
+     */
+    public List<String> getAtomPool() {
+        return atomPool;
+    }
+
+    /**
+     * Get the current bytecode as array.
+     */
+    public byte[] getCode() {
+        return code.toByteArray();
+    }
+
+    /**
+     * Get code size in bytes.
+     */
+    public int getCodeSize() {
+        return code.size();
     }
 }

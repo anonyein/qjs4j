@@ -290,4 +290,39 @@ public final class JSTypeChecking {
     public static JSObject requireObject(JSValue value) {
         return requireType(value, JSObject.class, "Expected object");
     }
+
+    /**
+     * Get the typeof string for a value.
+     * ES2020 13.5.3
+     */
+    public static String typeof(JSValue value) {
+        if (value instanceof JSUndefined) {
+            return "undefined";
+        }
+        if (value instanceof JSNull) {
+            return "object"; // typeof null === "object" (historical quirk)
+        }
+        if (value instanceof JSBoolean) {
+            return "boolean";
+        }
+        if (value instanceof JSNumber) {
+            return "number";
+        }
+        if (value instanceof JSString) {
+            return "string";
+        }
+        if (value instanceof JSSymbol) {
+            return "symbol";
+        }
+        if (value instanceof JSBigInt) {
+            return "bigint";
+        }
+        if (value instanceof JSFunction) {
+            return "function";
+        }
+        if (value instanceof JSObject) {
+            return "object";
+        }
+        return "undefined";
+    }
 }

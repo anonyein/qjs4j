@@ -72,10 +72,104 @@ public enum Opcode {
     APPLY_EVAL(48, 3, 2, 1),
     REGEXP(49, 1, 0, 1),
     GET_SUPER(50, 1, 1, 1),
-    IMPORT(51, 1, 1, 1);
+    IMPORT(51, 1, 1, 1),
 
-    // Additional opcodes will be added here...
-    // This is a simplified set - QuickJS has 244 opcodes total
+    // Arithmetic operations
+    ADD(52, 1, 2, 1),
+    SUB(53, 1, 2, 1),
+    MUL(54, 1, 2, 1),
+    DIV(55, 1, 2, 1),
+    MOD(56, 1, 2, 1),
+    EXP(57, 1, 2, 1),
+    PLUS(58, 1, 1, 1),
+    NEG(59, 1, 1, 1),
+    INC(60, 1, 1, 1),
+    DEC(61, 1, 1, 1),
+    POST_INC(62, 1, 1, 1),
+    POST_DEC(63, 1, 1, 1),
+
+    // Bitwise operations
+    SHL(64, 1, 2, 1),
+    SAR(65, 1, 2, 1),
+    SHR(66, 1, 2, 1),
+    AND(67, 1, 2, 1),
+    OR(68, 1, 2, 1),
+    XOR(69, 1, 2, 1),
+    NOT(70, 1, 1, 1),
+
+    // Comparison operations
+    EQ(71, 1, 2, 1),
+    NEQ(72, 1, 2, 1),
+    STRICT_EQ(73, 1, 2, 1),
+    STRICT_NEQ(74, 1, 2, 1),
+    LT(75, 1, 2, 1),
+    LTE(76, 1, 2, 1),
+    GT(77, 1, 2, 1),
+    GTE(78, 1, 2, 1),
+    INSTANCEOF(79, 1, 2, 1),
+    IN(80, 1, 2, 1),
+
+    // Logical operations
+    LOGICAL_NOT(81, 1, 1, 1),
+    LOGICAL_AND(82, 1, 2, 1),
+    LOGICAL_OR(83, 1, 2, 1),
+    NULLISH_COALESCE(84, 1, 2, 1),
+
+    // Variable access
+    GET_VAR(85, 5, 0, 1),
+    PUT_VAR(86, 5, 1, 0),
+    SET_VAR(87, 5, 1, 1),
+    GET_LOCAL(88, 3, 0, 1),
+    PUT_LOCAL(89, 3, 1, 0),
+    SET_LOCAL(90, 3, 1, 1),
+    GET_ARG(91, 3, 0, 1),
+    PUT_ARG(92, 3, 1, 0),
+    SET_ARG(93, 3, 1, 1),
+
+    // Property access
+    GET_FIELD(94, 5, 1, 1),
+    GET_FIELD2(95, 5, 1, 1),
+    PUT_FIELD(96, 5, 2, 0),
+    GET_ARRAY_EL(97, 1, 2, 1),
+    PUT_ARRAY_EL(98, 1, 3, 0),
+    GET_SUPER_VALUE(99, 1, 2, 1),
+    PUT_SUPER_VALUE(100, 1, 3, 0),
+
+    // Control flow
+    IF_FALSE(101, 5, 1, 0),
+    IF_TRUE(102, 5, 1, 0),
+    GOTO(103, 5, 0, 0),
+    CATCH(104, 5, 0, 1),
+    GOSUB(105, 5, 0, 0),
+    RET(106, 1, 1, 0),
+
+    // Function operations
+    DEFINE_FUNC(107, 5, 0, 1),
+    DEFINE_METHOD(108, 5, 2, 1),
+    DEFINE_CLASS(109, 5, 2, 1),
+
+    // Array/Object operations
+    ARRAY_NEW(110, 1, 0, 1),
+    PUSH_ARRAY(111, 1, 2, 1),
+    OBJECT_NEW(112, 1, 0, 1),
+    DEFINE_PROP(113, 1, 3, 1),
+
+    // Type operations
+    TYPEOF(114, 1, 1, 1),
+    DELETE(115, 1, 2, 1),
+    TO_OBJECT(116, 1, 1, 1),
+    TO_PROPKEY(117, 1, 1, 1),
+    TO_PROPKEY2(118, 1, 2, 2),
+
+    // Scope operations
+    WITH_GET_VAR(119, 10, 0, 1),
+    WITH_PUT_VAR(120, 10, 1, 0),
+    WITH_DELETE_VAR(121, 10, 0, 1),
+    WITH_MAKE_REF(122, 10, 0, 2),
+    WITH_GET_REF(123, 10, 1, 0),
+    WITH_GET_REF_UNDEF(124, 10, 1, 0);
+
+    // This is a subset of QuickJS opcodes - full implementation would have ~244 opcodes
 
     private final int code;
     private final int size;

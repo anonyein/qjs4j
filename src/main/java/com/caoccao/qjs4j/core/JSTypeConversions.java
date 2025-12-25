@@ -371,6 +371,109 @@ public final class JSTypeConversions {
     }
 
     /**
+     * Abstract Equality Comparison (==).
+     * ES2020 7.2.14
+     */
+    public static boolean abstractEquals(JSValue x, JSValue y) {
+        // Same type comparison
+        if (x.getClass() == y.getClass()) {
+            return strictEquals(x, y);
+        }
+
+        // null == undefined
+        if ((x instanceof JSNull && y instanceof JSUndefined) ||
+                (x instanceof JSUndefined && y instanceof JSNull)) {
+            return true;
+        }
+
+        // Number comparison
+        if (x instanceof JSNumber && y instanceof JSString) {
+            return abstractEquals(x, toNumber(y));
+        }
+        if (x instanceof JSString && y instanceof JSNumber) {
+            return abstractEquals(toNumber(x), y);
+        }
+
+        // Boolean to number
+        if (x instanceof JSBoolean) {
+            return abstractEquals(toNumber(x), y);
+        }
+        if (y instanceof JSBoolean) {
+            return abstractEquals(x, toNumber(y));
+        }
+
+        return false;
+    }
+
+    /**
+     * Strict Equality Comparison (===).
+     * ES2020 7.2.15
+     */
+    public static boolean strictEquals(JSValue x, JSValue y) {
+        // Different types
+        if (x.getClass() != y.getClass()) {
+            return false;
+        }
+
+        // Undefined and null
+        if (x instanceof JSUndefined || x instanceof JSNull) {
+            return true;
+        }
+
+        // Numbers
+        if (x instanceof JSNumber xNum && y instanceof JSNumber yNum) {
+            double xVal = xNum.value();
+            double yVal = yNum.value();
+
+            // NaN is not equal to anything, including itself
+            if (Double.isNaN(xVal) || Double.isNaN(yVal)) {
+                return false;
+            }
+
+            return xVal == yVal;
+        }
+
+        // Strings
+        if (x instanceof JSString xStr && y instanceof JSString yStr) {
+            return xStr.getValue().equals(yStr.getValue());
+        }
+
+        // Booleans
+        if (x instanceof JSBoolean xBool && y instanceof JSBoolean yBool) {
+            return xBool == yBool;
+        }
+
+        // Objects (reference equality)
+        return x == y;
+    }
+
+    /**
+     * Less Than Comparison (x < y).
+     * ES2020 7.2.13
+     */
+    public static boolean lessThan(JSValue x, JSValue y) {
+        // Convert to primitives
+        JSValue px = toPrimitive(x, PreferredType.NUMBER);
+        JSValue py = toPrimitive(y, PreferredType.NUMBER);
+
+        // If both are strings, compare lexicographically
+        if (px instanceof JSString xStr && py instanceof JSString yStr) {
+            return xStr.getValue().compareTo(yStr.getValue()) < 0;
+        }
+
+        // Otherwise, convert to numbers and compare
+        double nx = toNumber(px).value();
+        double ny = toNumber(py).value();
+
+        // If either is NaN, return false
+        if (Double.isNaN(nx) || Double.isNaN(ny)) {
+            return false;
+        }
+
+        return nx < ny;
+    }
+
+    /**
      * Preferred type for ToPrimitive operation.
      */
     public enum PreferredType {

@@ -51,12 +51,24 @@ public final class Bytecode {
                 (instructions[offset + 3] & 0xFF);
     }
 
+    public int readI32(int offset) {
+        return readU32(offset);
+    }
+
     public JSValue getConstant(int index) {
         return constantPool[index];
     }
 
     public String getAtom(int index) {
         return atomPool[index];
+    }
+
+    public JSValue[] getConstants() {
+        return constantPool;
+    }
+
+    public String[] getAtoms() {
+        return atomPool;
     }
 
     public byte[] getInstructions() {
