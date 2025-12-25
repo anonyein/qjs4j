@@ -16,6 +16,8 @@
 
 package com.caoccao.qjs4j.vm;
 
+import com.caoccao.qjs4j.builtins.BigIntConstructor;
+import com.caoccao.qjs4j.builtins.SymbolConstructor;
 import com.caoccao.qjs4j.core.*;
 
 /**
@@ -805,6 +807,26 @@ public final class VirtualMachine {
         // Pop callee (method)
         JSValue callee = valueStack.pop();
 
+        // Special handling for Symbol constructor (must be called without new)
+        if (callee instanceof JSObject calleeObj) {
+            JSValue isSymbolCtor = calleeObj.get("[[SymbolConstructor]]");
+            if (isSymbolCtor instanceof JSBoolean && ((JSBoolean) isSymbolCtor).value()) {
+                // Call Symbol() function
+                JSValue result = SymbolConstructor.call(context, receiver, args);
+                valueStack.push(result);
+                return;
+            }
+
+            // Special handling for BigInt constructor (must be called without new)
+            JSValue isBigIntCtor = calleeObj.get("[[BigIntConstructor]]");
+            if (isBigIntCtor instanceof JSBoolean && ((JSBoolean) isBigIntCtor).value()) {
+                // Call BigInt() function
+                JSValue result = BigIntConstructor.call(context, receiver, args);
+                valueStack.push(result);
+                return;
+            }
+        }
+
         if (callee instanceof JSFunction function) {
             if (function instanceof JSNativeFunction nativeFunc) {
                 // Call native function with receiver as thisArg
@@ -879,6 +901,22 @@ public final class VirtualMachine {
                 }
 
                 valueStack.push(dateObj);
+                return;
+            }
+
+            // Check for Symbol constructor (throws error when used with new)
+            JSValue isSymbolCtor = ctorObj.get("[[SymbolConstructor]]");
+            if (isSymbolCtor instanceof JSBoolean && ((JSBoolean) isSymbolCtor).value()) {
+                context.throwError("TypeError", "Symbol is not a constructor");
+                valueStack.push(JSUndefined.INSTANCE);
+                return;
+            }
+
+            // Check for BigInt constructor (throws error when used with new)
+            JSValue isBigIntCtor = ctorObj.get("[[BigIntConstructor]]");
+            if (isBigIntCtor instanceof JSBoolean && ((JSBoolean) isBigIntCtor).value()) {
+                context.throwError("TypeError", "BigInt is not a constructor");
+                valueStack.push(JSUndefined.INSTANCE);
                 return;
             }
 

@@ -71,6 +71,8 @@ public final class GlobalObject {
         initializeFunctionConstructor(ctx, global);
         initializeDateConstructor(ctx, global);
         initializeRegExpConstructor(ctx, global);
+        initializeSymbolConstructor(ctx, global);
+        initializeBigIntConstructor(ctx, global);
         initializeMathObject(ctx, global);
         initializeJSONObject(ctx, global);
 
@@ -302,6 +304,60 @@ public final class GlobalObject {
         regexpConstructor.set("[[RegExpConstructor]]", JSBoolean.TRUE); // Mark as RegExp constructor
 
         global.set("RegExp", regexpConstructor);
+    }
+
+    /**
+     * Initialize Symbol constructor and static methods.
+     */
+    private static void initializeSymbolConstructor(JSContext ctx, JSObject global) {
+        // Create Symbol.prototype
+        JSObject symbolPrototype = new JSObject();
+        symbolPrototype.set("toString", createNativeFunction(ctx, "toString", SymbolPrototype::toString, 0));
+        symbolPrototype.set("valueOf", createNativeFunction(ctx, "valueOf", SymbolPrototype::valueOf, 0));
+        // Symbol.prototype.description is a getter, set as property for now
+        symbolPrototype.set("description", JSUndefined.INSTANCE);
+        symbolPrototype.set("[Symbol.toPrimitive]", createNativeFunction(ctx, "[Symbol.toPrimitive]", SymbolPrototype::toPrimitive, 1));
+        symbolPrototype.set("[Symbol.toStringTag]", new JSString("Symbol"));
+
+        // Create Symbol constructor
+        JSObject symbolConstructor = new JSObject();
+        symbolConstructor.set("prototype", symbolPrototype);
+        symbolConstructor.set("[[SymbolConstructor]]", JSBoolean.TRUE); // Mark as Symbol constructor
+
+        // Symbol static methods
+        symbolConstructor.set("for", createNativeFunction(ctx, "for", SymbolConstructor::symbolFor, 1));
+        symbolConstructor.set("keyFor", createNativeFunction(ctx, "keyFor", SymbolConstructor::keyFor, 1));
+
+        // Well-known symbols
+        symbolConstructor.set("iterator", JSSymbol.ITERATOR);
+        symbolConstructor.set("toStringTag", JSSymbol.TO_STRING_TAG);
+        symbolConstructor.set("hasInstance", JSSymbol.HAS_INSTANCE);
+        symbolConstructor.set("isConcatSpreadable", JSSymbol.IS_CONCAT_SPREADABLE);
+        symbolConstructor.set("toPrimitive", JSSymbol.TO_PRIMITIVE);
+
+        global.set("Symbol", symbolConstructor);
+    }
+
+    /**
+     * Initialize BigInt constructor and static methods.
+     */
+    private static void initializeBigIntConstructor(JSContext ctx, JSObject global) {
+        // Create BigInt.prototype
+        JSObject bigIntPrototype = new JSObject();
+        bigIntPrototype.set("toString", createNativeFunction(ctx, "toString", BigIntPrototype::toString, 1));
+        bigIntPrototype.set("valueOf", createNativeFunction(ctx, "valueOf", BigIntPrototype::valueOf, 0));
+        bigIntPrototype.set("toLocaleString", createNativeFunction(ctx, "toLocaleString", BigIntPrototype::toLocaleString, 0));
+
+        // Create BigInt constructor
+        JSObject bigIntConstructor = new JSObject();
+        bigIntConstructor.set("prototype", bigIntPrototype);
+        bigIntConstructor.set("[[BigIntConstructor]]", JSBoolean.TRUE); // Mark as BigInt constructor
+
+        // BigInt static methods
+        bigIntConstructor.set("asIntN", createNativeFunction(ctx, "asIntN", BigIntConstructor::asIntN, 2));
+        bigIntConstructor.set("asUintN", createNativeFunction(ctx, "asUintN", BigIntConstructor::asUintN, 2));
+
+        global.set("BigInt", bigIntConstructor);
     }
 
     /**
