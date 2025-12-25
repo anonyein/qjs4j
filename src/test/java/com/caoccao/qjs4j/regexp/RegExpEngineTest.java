@@ -188,12 +188,13 @@ public class RegExpEngineTest extends BaseTest {
     @Test
     public void testUnicodeCharacters() {
         RegExpCompiler compiler = new RegExpCompiler();
-        RegExpBytecode bytecode = compiler.compile("🚀", "");
+        RegExpBytecode bytecode = compiler.compile("😀🌟🚀", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
-        RegExpEngine.MatchResult result = engine.exec("🚀", 0);
+        RegExpEngine.MatchResult result = engine.exec("😀🌟🚀", 0);
         assertNotNull(result);
         assertTrue(result.matched());
-        assertEquals("🚀", result.getMatch());
+        assertEquals("😀🌟🚀", result.getMatch());
+        assertTrue(engine.test("😀🌟🚀"));
     }
 
     @Test
