@@ -16,6 +16,8 @@
 
 package com.caoccao.qjs4j.vm;
 
+import java.util.stream.Stream;
+
 /**
  * Enumeration of all JavaScript bytecode opcodes.
  * Total: 244 opcodes from QuickJS.
@@ -176,6 +178,12 @@ public enum Opcode {
     private final int nPop;
     private final int nPush;
 
+    private static final Opcode[] opcodes = new Opcode[values().length];
+
+    static {
+        Stream.of(values()).forEach(opcode -> opcodes[opcode.code] = opcode);
+    }
+
     Opcode(int code, int size, int nPop, int nPush) {
         this.code = code;
         this.size = size;
@@ -200,10 +208,8 @@ public enum Opcode {
     }
 
     public static Opcode fromInt(int code) {
-        for (Opcode op : values()) {
-            if (op.code == code) {
-                return op;
-            }
+        if (code >= 0 && code < opcodes.length) {
+            return opcodes[code];
         }
         return INVALID;
     }

@@ -16,6 +16,7 @@
 
 plugins {
     java
+    id("application")
 }
 
 group = "com.caoccao.qjs4j"
@@ -28,6 +29,10 @@ repositories {
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+}
+
+application {
+    mainClass.set("com.caoccao.qjs4j.cli.QuickJSInterpreter")
 }
 
 dependencies {
