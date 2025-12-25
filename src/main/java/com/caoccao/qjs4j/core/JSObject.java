@@ -186,6 +186,26 @@ public non-sealed class JSObject implements JSValue {
     }
 
     /**
+     * Get all own property keys (not including prototype chain).
+     */
+    public List<PropertyKey> getOwnPropertyKeys() {
+        List<PropertyKey> keys = new ArrayList<>();
+
+        // Add shaped properties
+        PropertyKey[] shapeKeys = shape.getPropertyKeys();
+        keys.addAll(Arrays.asList(shapeKeys));
+
+        // Add sparse properties (array indices)
+        if (sparseProperties != null) {
+            for (Integer index : sparseProperties.keySet()) {
+                keys.add(PropertyKey.fromIndex(index));
+            }
+        }
+
+        return keys;
+    }
+
+    /**
      * Check if object has a property (including prototype chain).
      */
     public boolean has(String propertyName) {

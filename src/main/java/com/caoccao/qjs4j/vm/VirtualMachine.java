@@ -352,8 +352,11 @@ public final class VirtualMachine {
                         int getFieldAtom = bytecode.readU32(pc + 1);
                         String fieldName = bytecode.getAtoms()[getFieldAtom];
                         JSValue obj = valueStack.pop();
-                        if (obj instanceof JSObject jsObj) {
-                            valueStack.push(jsObj.get(PropertyKey.fromString(fieldName)));
+
+                        // Auto-box primitives to access their prototype methods
+                        JSObject targetObj = toObject(obj);
+                        if (targetObj != null) {
+                            valueStack.push(targetObj.get(PropertyKey.fromString(fieldName)));
                         } else {
                             valueStack.push(JSUndefined.INSTANCE);
                         }
@@ -478,8 +481,10 @@ public final class VirtualMachine {
 
                     // ==================== Exception Handling ====================
                     case THROW:
-                        pendingException = valueStack.pop();
-                        throw new VMException("Exception thrown: " + pendingException);
+                        JSValue exception = valueStack.pop();
+                        pendingException = exception;
+                        context.setPendingException(exception);
+                        throw new VMException("Exception thrown: " + exception);
 
                     case CATCH:
                         // Set up exception handler - simplified
@@ -787,23 +792,27 @@ public final class VirtualMachine {
     // ==================== Function Call Handlers ====================
 
     private void handleCall(int argCount) {
+        // Stack layout (bottom to top): method, receiver, arg1, arg2, ...
         // Pop arguments from stack
         JSValue[] args = new JSValue[argCount];
         for (int i = argCount - 1; i >= 0; i--) {
             args[i] = valueStack.pop();
         }
 
-        // Pop callee
+        // Pop receiver (thisArg)
+        JSValue receiver = valueStack.pop();
+
+        // Pop callee (method)
         JSValue callee = valueStack.pop();
 
         if (callee instanceof JSFunction function) {
             if (function instanceof JSNativeFunction nativeFunc) {
-                // Call native function
-                JSValue result = nativeFunc.call(context, JSUndefined.INSTANCE, args);
+                // Call native function with receiver as thisArg
+                JSValue result = nativeFunc.call(context, receiver, args);
                 valueStack.push(result);
             } else if (function instanceof JSBytecodeFunction bytecodeFunc) {
-                // Recursive call
-                JSValue result = execute(bytecodeFunc, JSUndefined.INSTANCE, args);
+                // Recursive call with receiver as thisArg
+                JSValue result = execute(bytecodeFunc, receiver, args);
                 valueStack.push(result);
             } else {
                 valueStack.push(JSUndefined.INSTANCE);
@@ -835,9 +844,101 @@ public final class VirtualMachine {
             }
 
             valueStack.push(newObj);
+        } else if (constructor instanceof JSObject ctorObj) {
+            // Handle Error constructors (and other placeholder constructors)
+            JSValue errorNameValue = ctorObj.get("[[ErrorName]]");
+            if (errorNameValue instanceof JSString errorName) {
+                // Create Error object
+                JSObject errorObj = new JSObject();
+
+                // Get prototype
+                JSValue prototypeValue = ctorObj.get("prototype");
+                if (prototypeValue instanceof JSObject prototype) {
+                    errorObj.setPrototype(prototype);
+                }
+
+                // Set name
+                errorObj.set("name", errorName);
+
+                // Set message from first argument
+                if (args.length > 0 && !(args[0] instanceof JSUndefined)) {
+                    JSString message = JSTypeConversions.toString(args[0]);
+                    errorObj.set("message", message);
+                } else {
+                    errorObj.set("message", new JSString(""));
+                }
+
+                valueStack.push(errorObj);
+            } else {
+                throw new VMException("Cannot construct non-function value");
+            }
         } else {
             throw new VMException("Cannot construct non-function value");
         }
+    }
+
+    /**
+     * Convert a value to an object (auto-boxing for primitives).
+     * Returns null for null and undefined.
+     */
+    private JSObject toObject(JSValue value) {
+        if (value instanceof JSObject jsObj) {
+            return jsObj;
+        }
+
+        if (value instanceof JSNull || value instanceof JSUndefined) {
+            return null;
+        }
+
+        // Auto-box primitives
+        if (value instanceof JSString str) {
+            // Get String.prototype from global object
+            JSObject global = context.getGlobalObject();
+            JSValue stringCtor = global.get("String");
+            if (stringCtor instanceof JSObject ctorObj) {
+                JSValue prototype = ctorObj.get("prototype");
+                if (prototype instanceof JSObject protoObj) {
+                    // Create a temporary wrapper object with String.prototype
+                    JSObject wrapper = new JSObject();
+                    wrapper.setPrototype(protoObj);
+                    // Store the primitive value
+                    wrapper.set("[[PrimitiveValue]]", str);
+                    return wrapper;
+                }
+            }
+        }
+
+        if (value instanceof JSNumber num) {
+            // Get Number.prototype from global object
+            JSObject global = context.getGlobalObject();
+            JSValue numberCtor = global.get("Number");
+            if (numberCtor instanceof JSObject ctorObj) {
+                JSValue prototype = ctorObj.get("prototype");
+                if (prototype instanceof JSObject protoObj) {
+                    JSObject wrapper = new JSObject();
+                    wrapper.setPrototype(protoObj);
+                    wrapper.set("[[PrimitiveValue]]", num);
+                    return wrapper;
+                }
+            }
+        }
+
+        if (value instanceof JSBoolean bool) {
+            // Get Boolean.prototype from global object
+            JSObject global = context.getGlobalObject();
+            JSValue booleanCtor = global.get("Boolean");
+            if (booleanCtor instanceof JSObject ctorObj) {
+                JSValue prototype = ctorObj.get("prototype");
+                if (prototype instanceof JSObject protoObj) {
+                    JSObject wrapper = new JSObject();
+                    wrapper.setPrototype(protoObj);
+                    wrapper.set("[[PrimitiveValue]]", bool);
+                    return wrapper;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

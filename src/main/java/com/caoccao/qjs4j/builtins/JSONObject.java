@@ -435,10 +435,16 @@ public final class JSONObject {
     }
 
     private static String stringifyObject(JSObject obj, String indent, String currentIndent) {
-        // Get all property keys (simplified - assumes properties are accessible)
+        // Get all own property keys
+        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
         List<String> keys = new ArrayList<>();
-        // Note: In a full implementation, we would iterate over object properties
-        // For now, this is a placeholder that would need object property enumeration
+
+        // Convert PropertyKeys to strings, filtering out non-enumerable properties
+        for (PropertyKey key : propertyKeys) {
+            if (key.isString()) {
+                keys.add(key.asString());
+            }
+        }
 
         if (keys.isEmpty()) {
             return "{}";

@@ -31,11 +31,13 @@ public final class BytecodeCompiler {
     private final BytecodeEmitter emitter;
     private final Deque<Scope> scopes;
     private final Deque<LoopContext> loopStack;
+    private boolean inGlobalScope;
 
     public BytecodeCompiler() {
         this.emitter = new BytecodeEmitter();
         this.scopes = new ArrayDeque<>();
         this.loopStack = new ArrayDeque<>();
+        this.inGlobalScope = false;
     }
 
     /**
@@ -53,25 +55,49 @@ public final class BytecodeCompiler {
     // ==================== Program Compilation ====================
 
     private void compileProgram(Program program) {
+        inGlobalScope = true;
         enterScope();
 
-        for (Statement stmt : program.body()) {
-            compileStatement(stmt);
+        List<Statement> body = program.body();
+        int lastIndex = body.size() - 1;
+        boolean lastIsExpression = false;
+
+        for (int i = 0; i < body.size(); i++) {
+            boolean isLast = (i == lastIndex);
+            Statement stmt = body.get(i);
+
+            if (isLast && stmt instanceof ExpressionStatement) {
+                lastIsExpression = true;
+            }
+
+            compileStatement(stmt, isLast);
         }
 
-        // Implicit return undefined at end of program
-        emitter.emitOpcode(Opcode.UNDEFINED);
+        // If last statement wasn't an expression, push undefined
+        if (!lastIsExpression) {
+            emitter.emitOpcode(Opcode.UNDEFINED);
+        }
+
+        // Return the value on top of stack
         emitter.emitOpcode(Opcode.RETURN);
 
         exitScope();
+        inGlobalScope = false;
     }
 
     // ==================== Statement Compilation ====================
 
     private void compileStatement(Statement stmt) {
+        compileStatement(stmt, false);
+    }
+
+    private void compileStatement(Statement stmt, boolean isLastInProgram) {
         if (stmt instanceof ExpressionStatement exprStmt) {
             compileExpression(exprStmt.expression());
-            emitter.emitOpcode(Opcode.DROP); // Discard expression result
+            // Only drop the result if this is not the last statement in the program
+            if (!isLastInProgram) {
+                emitter.emitOpcode(Opcode.DROP);
+            }
         } else if (stmt instanceof BlockStatement block) {
             compileBlockStatement(block);
         } else if (stmt instanceof IfStatement ifStmt) {
@@ -394,8 +420,14 @@ public final class BytecodeCompiler {
             }
 
             // Store to variable
-            int localIndex = currentScope().declareLocal(varName);
-            emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
+            if (inGlobalScope) {
+                // Global variables go to the global object
+                emitter.emitOpcodeAtom(Opcode.PUT_VAR, varName);
+            } else {
+                // Local variables use local slots
+                int localIndex = currentScope().declareLocal(varName);
+                emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
+            }
         }
     }
 
@@ -460,13 +492,20 @@ public final class BytecodeCompiler {
 
     private void compileIdentifier(Identifier id) {
         String name = id.name();
-        Integer localIndex = currentScope().getLocal(name);
 
-        if (localIndex != null) {
-            emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
-        } else {
-            // Try outer scopes or global
+        if (inGlobalScope) {
+            // In global scope, always use GET_VAR
             emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
+        } else {
+            // In function scope, check locals first
+            Integer localIndex = currentScope().getLocal(name);
+
+            if (localIndex != null) {
+                emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
+            } else {
+                // Try outer scopes or global
+                emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
+            }
         }
     }
 
@@ -653,16 +692,54 @@ public final class BytecodeCompiler {
     }
 
     private void compileCallExpression(CallExpression callExpr) {
-        // Push callee
-        compileExpression(callExpr.callee());
+        // Check if this is a method call (callee is a member expression)
+        if (callExpr.callee() instanceof MemberExpression memberExpr) {
+            // For method calls: obj.method()
+            // We need to preserve obj as the 'this' value
 
-        // Push arguments
-        for (Expression arg : callExpr.arguments()) {
-            compileExpression(arg);
+            // Push object (receiver)
+            compileExpression(memberExpr.object());
+
+            // Duplicate it (one copy for 'this', one for property access)
+            emitter.emitOpcode(Opcode.DUP);
+
+            // Get the method
+            if (memberExpr.computed()) {
+                // obj[expr]
+                compileExpression(memberExpr.property());
+                emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+            } else if (memberExpr.property() instanceof Identifier propId) {
+                // obj.prop
+                emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
+            }
+
+            // Now stack is: receiver, method
+            // Swap so method is on top: method, receiver
+            emitter.emitOpcode(Opcode.SWAP);
+
+            // Push arguments
+            for (Expression arg : callExpr.arguments()) {
+                compileExpression(arg);
+            }
+
+            // Call with argument count (will use receiver as thisArg)
+            emitter.emitOpcodeU16(Opcode.CALL, callExpr.arguments().size());
+        } else {
+            // Regular function call: func()
+            // Push callee
+            compileExpression(callExpr.callee());
+
+            // Push undefined as receiver (thisArg for regular calls)
+            emitter.emitOpcode(Opcode.UNDEFINED);
+
+            // Push arguments
+            for (Expression arg : callExpr.arguments()) {
+                compileExpression(arg);
+            }
+
+            // Call with argument count
+            emitter.emitOpcodeU16(Opcode.CALL, callExpr.arguments().size());
         }
-
-        // Call with argument count
-        emitter.emitOpcodeU16(Opcode.CALL, callExpr.arguments().size());
     }
 
     private void compileMemberExpression(MemberExpression memberExpr) {

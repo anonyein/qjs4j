@@ -132,9 +132,27 @@ public final class JSContext {
             com.caoccao.qjs4j.vm.VirtualMachine vm = new com.caoccao.qjs4j.vm.VirtualMachine(this);
             JSValue result = vm.execute(func, globalObject, new JSValue[0]);
 
+            // Check if there's a pending exception
+            if (hasPendingException()) {
+                JSValue exception = getPendingException();
+                clearPendingException();
+                throw new JSException(exception);
+            }
+
             return result != null ? result : JSUndefined.INSTANCE;
+        } catch (JSException e) {
+            // Re-throw JavaScript exceptions
+            throw e;
         } catch (com.caoccao.qjs4j.compiler.Compiler.CompilerException e) {
             return throwError("SyntaxError", e.getMessage());
+        } catch (com.caoccao.qjs4j.vm.VirtualMachine.VMException e) {
+            // VM exception - check if there's a pending JavaScript exception
+            if (hasPendingException()) {
+                JSValue exception = getPendingException();
+                clearPendingException();
+                throw new JSException(exception);
+            }
+            return throwError("Error", "VM error: " + e.getMessage());
         } catch (Exception e) {
             return throwError("Error", "Execution error: " + e.getMessage());
         } finally {

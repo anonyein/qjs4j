@@ -56,6 +56,9 @@ public final class GlobalObject {
         global.set("encodeURIComponent", createNativeFunction(ctx, "encodeURIComponent", GlobalObject::encodeURIComponent, 1));
         global.set("decodeURIComponent", createNativeFunction(ctx, "decodeURIComponent", GlobalObject::decodeURIComponent, 1));
 
+        // Console object for debugging
+        initializeConsoleObject(ctx, global);
+
         // Global this reference
         global.set("globalThis", global);
 
@@ -66,6 +69,9 @@ public final class GlobalObject {
         initializeFunctionConstructor(ctx, global);
         initializeMathObject(ctx, global);
         initializeJSONObject(ctx, global);
+
+        // Error constructors
+        initializeErrorConstructors(ctx, global);
     }
 
     /**
@@ -547,5 +553,150 @@ public final class GlobalObject {
         } catch (Exception e) {
             return ctx.throwError("URIError", "URI malformed");
         }
+    }
+
+    /**
+     * Initialize console object.
+     */
+    private static void initializeConsoleObject(JSContext ctx, JSObject global) {
+        JSObject console = new JSObject();
+        console.set("log", createNativeFunction(ctx, "log", GlobalObject::consoleLog, 0));
+        console.set("info", createNativeFunction(ctx, "info", GlobalObject::consoleLog, 0));
+        console.set("warn", createNativeFunction(ctx, "warn", GlobalObject::consoleWarn, 0));
+        console.set("error", createNativeFunction(ctx, "error", GlobalObject::consoleError, 0));
+
+        global.set("console", console);
+    }
+
+    /**
+     * console.log(...args)
+     * Print values to standard output.
+     */
+    public static JSValue consoleLog(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        for (int i = 0; i < args.length; i++) {
+            if (i > 0) System.out.print(" ");
+            System.out.print(formatValue(args[i]));
+        }
+        System.out.println();
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * console.warn(...args)
+     * Print warning to standard error.
+     */
+    public static JSValue consoleWarn(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        System.err.print("[WARN] ");
+        for (int i = 0; i < args.length; i++) {
+            if (i > 0) System.err.print(" ");
+            System.err.print(formatValue(args[i]));
+        }
+        System.err.println();
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * console.error(...args)
+     * Print error to standard error.
+     */
+    public static JSValue consoleError(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        System.err.print("[ERROR] ");
+        for (int i = 0; i < args.length; i++) {
+            if (i > 0) System.err.print(" ");
+            System.err.print(formatValue(args[i]));
+        }
+        System.err.println();
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Format a value for console output.
+     */
+    private static String formatValue(JSValue value) {
+        if (value instanceof JSUndefined) {
+            return "undefined";
+        }
+        if (value instanceof JSNull) {
+            return "null";
+        }
+        if (value instanceof JSBoolean b) {
+            return String.valueOf(b.value());
+        }
+        if (value instanceof JSNumber n) {
+            return JSTypeConversions.toString(value).getValue();
+        }
+        if (value instanceof JSString s) {
+            return s.getValue();
+        }
+        if (value instanceof JSArray arr) {
+            StringBuilder sb = new StringBuilder("[");
+            for (long i = 0; i < arr.getLength(); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(formatValue(arr.get(i)));
+            }
+            sb.append("]");
+            return sb.toString();
+        }
+        if (value instanceof JSObject) {
+            return "[object Object]";
+        }
+        return String.valueOf(value);
+    }
+
+    /**
+     * Initialize Error constructors.
+     */
+    private static void initializeErrorConstructors(JSContext ctx, JSObject global) {
+        // Base Error constructor
+        global.set("Error", createErrorConstructor(ctx, "Error"));
+
+        // Derived Error types
+        global.set("TypeError", createErrorConstructor(ctx, "TypeError"));
+        global.set("ReferenceError", createErrorConstructor(ctx, "ReferenceError"));
+        global.set("RangeError", createErrorConstructor(ctx, "RangeError"));
+        global.set("SyntaxError", createErrorConstructor(ctx, "SyntaxError"));
+        global.set("URIError", createErrorConstructor(ctx, "URIError"));
+        global.set("EvalError", createErrorConstructor(ctx, "EvalError"));
+    }
+
+    /**
+     * Create an Error constructor.
+     */
+    private static JSObject createErrorConstructor(JSContext ctx, String errorName) {
+        // Error.prototype
+        JSObject errorPrototype = new JSObject();
+        errorPrototype.set("name", new JSString(errorName));
+        errorPrototype.set("message", new JSString(""));
+        errorPrototype.set("toString", createNativeFunction(ctx, "toString", GlobalObject::errorToString, 0));
+
+        // For now, Error constructor is a placeholder (like Array, String, etc.)
+        JSObject errorConstructor = new JSObject();
+        errorConstructor.set("prototype", errorPrototype);
+        // Store error name for constructor use
+        errorConstructor.set("[[ErrorName]]", new JSString(errorName));
+
+        return errorConstructor;
+    }
+
+    /**
+     * Error.prototype.toString()
+     * Converts an Error object to a string.
+     */
+    public static JSValue errorToString(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSObject error)) {
+            return new JSString("[object Object]");
+        }
+
+        JSValue nameValue = error.get("name");
+        JSValue messageValue = error.get("message");
+
+        String name = nameValue instanceof JSString ? ((JSString) nameValue).getValue() : "Error";
+        String message = messageValue instanceof JSString ? ((JSString) messageValue).getValue() : "";
+
+        if (message.isEmpty()) {
+            return new JSString(name);
+        }
+
+        return new JSString(name + ": " + message);
     }
 }
