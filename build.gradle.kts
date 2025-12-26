@@ -14,13 +14,65 @@
  * limitations under the License.
  */
 
+import org.gradle.internal.os.OperatingSystem
+
+
+object Config {
+    const val GROUP_ID = "com.caoccao.qjs4j"
+    const val NAME = "qjs4j"
+    const val VERSION = Versions.QJS4J
+    const val URL = "https://github.com/caoccao/qjs4j"
+    const val MAIN_CLASS = "com.caoccao.qjs4j.cli.QuickJSInterpreter"
+
+
+    object Pom {
+        const val ARTIFACT_ID = "javet"
+        const val DESCRIPTION = "qjs4j is a native Java implementation of QuickJS."
+
+        object Developer {
+            const val ID = "caoccao"
+            const val EMAIL = "sjtucaocao@gmail.com"
+            const val NAME = "Sam Cao"
+            const val ORGANIZATION = "caoccao.com"
+            const val ORGANIZATION_URL = "https://www.caoccao.com"
+        }
+
+        object License {
+            const val NAME = "APACHE LICENSE, VERSION 2.0"
+            const val URL = "https://github.com/caoccao/Javet/blob/main/LICENSE"
+        }
+
+        object Scm {
+            const val CONNECTION = "scm:git:git://github.com/caoccao/qjs4j.git"
+            const val DEVELOPER_CONNECTION = "scm:git:ssh://github.com/caoccao/qjs4j.git"
+        }
+    }
+
+    object Projects {
+        const val JUNIT_BOM = "org.junit:junit-bom:${Versions.JUNIT}"
+        // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
+        const val JUNIT_JUPITER = "org.junit.jupiter:junit-jupiter"
+        const val JUNIT_JUPITER_LAUNCHER = "org.junit.platform:junit-platform-launcher"
+
+        const val JAVET = "com.caoccao.javet:javet:${Versions.JAVET}"
+    }
+
+    object Versions {
+        const val JAVA_VERSION = "17"
+        const val JAVET = "5.0.2"
+        const val JUNIT = "6.0.1"
+        const val QJS4J = "0.1.0"
+    }
+}
+
 plugins {
     java
     id("application")
+    `maven-publish`
 }
 
-group = "com.caoccao.qjs4j"
-version = "0.1.0"
+group = Config.GROUP_ID
+version = Config.VERSION
 
 repositories {
     mavenCentral()
@@ -32,14 +84,24 @@ java {
 }
 
 application {
-    mainClass.set("com.caoccao.qjs4j.cli.QuickJSInterpreter")
+    mainClass.set(Config.MAIN_CLASS)
 }
+
+val os = OperatingSystem.current()
+val arch = System.getProperty("os.arch")
+val osType = if (os.isWindows) "windows" else
+    if (os.isMacOsX) "macos" else
+        if (os.isLinux) "linux" else ""
+val archType = if (arch == "aarch64" || arch == "arm64") "arm64" else "x86_64"
 
 dependencies {
     // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
-    testImplementation(platform("org.junit:junit-bom:6.0.1"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(platform(Config.Projects.JUNIT_BOM))
+    testImplementation(Config.Projects.JUNIT_JUPITER)
+    testRuntimeOnly(Config.Projects.JUNIT_JUPITER_LAUNCHER)
+
+    testImplementation(Config.Projects.JAVET)
+    testImplementation("com.caoccao.javet:javet-v8-$osType-$archType:${Config.Versions.JAVET}")
 }
 
 tasks.test {
@@ -55,5 +117,48 @@ tasks {
     }
     withType<Test> {
         systemProperty("file.encoding", "UTF-8")
+    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("generatePom") {
+            from(components["java"])
+            pom {
+                artifactId = Config.Pom.ARTIFACT_ID
+                description.set(Config.Pom.DESCRIPTION)
+                groupId = Config.GROUP_ID
+                name.set(Config.NAME)
+                url.set(Config.URL)
+                version = Config.VERSION
+                licenses {
+                    license {
+                        name.set(Config.Pom.License.NAME)
+                        url.set(Config.Pom.License.URL)
+                    }
+                }
+                developers {
+                    developer {
+                        id.set(Config.Pom.Developer.ID)
+                        email.set(Config.Pom.Developer.EMAIL)
+                        name.set(Config.Pom.Developer.NAME)
+                        organization.set(Config.Pom.Developer.ORGANIZATION)
+                        organizationUrl.set(Config.Pom.Developer.ORGANIZATION_URL)
+                    }
+                }
+                scm {
+                    connection.set(Config.Pom.Scm.CONNECTION)
+                    developerConnection.set(Config.Pom.Scm.DEVELOPER_CONNECTION)
+                    tag.set(Config.Versions.JAVET)
+                    url.set(Config.URL)
+                }
+                properties.set(
+                    mapOf(
+                        "maven.compiler.source" to Config.Versions.JAVA_VERSION,
+                        "maven.compiler.target" to Config.Versions.JAVA_VERSION,
+                    )
+                )
+            }
+        }
     }
 }

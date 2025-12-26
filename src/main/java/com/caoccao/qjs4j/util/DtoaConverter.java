@@ -16,7 +16,10 @@
 
 package com.caoccao.qjs4j.util;
 
+import com.caoccao.qjs4j.util.dtoa.QuickJSDtoa;
+
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.Locale;
 
@@ -132,6 +135,93 @@ public final class DtoaConverter {
     }
 
     /**
+     * Convert a decimal string to exponential notation.
+     * Preserves the significant digits from the input string.
+     */
+    private static String convertDecimalToExponential(String decimalStr) {
+        // Handle signs
+        boolean negative = decimalStr.startsWith("-");
+        if (negative) {
+            decimalStr = decimalStr.substring(1);
+        }
+
+        // Handle special cases from Double.toString()
+        if (decimalStr.equals("0.0")) {
+            return "0e+0";
+        }
+        if (decimalStr.contains("E") || decimalStr.contains("e")) {
+            // Already in exponential form, just normalize
+            String result = normalizeExponentialFormat(decimalStr);
+            return negative ? "-" + result : result;
+        }
+
+        // Remove decimal point and count position
+        int decimalPos = decimalStr.indexOf('.');
+        String digits;
+        int exponent;
+
+        if (decimalPos == -1) {
+            // No decimal point - integer
+            digits = decimalStr;
+            // Remove trailing zeros
+            int i = digits.length() - 1;
+            while (i > 0 && digits.charAt(i) == '0') {
+                i--;
+            }
+            digits = digits.substring(0, i + 1);
+            exponent = digits.length() - 1;
+        } else {
+            // Has decimal point
+            String intPart = decimalStr.substring(0, decimalPos);
+            String fracPart = decimalStr.substring(decimalPos + 1);
+
+            if (intPart.equals("0")) {
+                // Number like 0.00123 → 1.23e-3
+                // Find first non-zero digit
+                int firstNonZero = 0;
+                while (firstNonZero < fracPart.length() && fracPart.charAt(firstNonZero) == '0') {
+                    firstNonZero++;
+                }
+                if (firstNonZero == fracPart.length()) {
+                    // All zeros
+                    return "0e+0";
+                }
+                digits = fracPart.substring(firstNonZero);
+                exponent = -(firstNonZero + 1);
+            } else {
+                // Number like 123.456 → 1.23456e+2
+                digits = intPart + fracPart;
+                exponent = intPart.length() - 1;
+            }
+        }
+
+        // Remove trailing zeros from digits
+        int lastNonZero = digits.length() - 1;
+        while (lastNonZero > 0 && digits.charAt(lastNonZero) == '0') {
+            lastNonZero--;
+        }
+        digits = digits.substring(0, lastNonZero + 1);
+
+        // Format mantissa
+        StringBuilder result = new StringBuilder();
+        if (negative) {
+            result.append('-');
+        }
+        result.append(digits.charAt(0));
+        if (digits.length() > 1) {
+            result.append('.');
+            result.append(digits.substring(1));
+        }
+
+        // Format exponent
+        result.append('e');
+        result.append(exponent >= 0 ? '+' : "");
+        result.append(exponent);
+
+        return result.toString();
+    }
+
+    /**
      * Convert to exponential notation.
      * Implements Number.prototype.toExponential(fractionDigits).
      *
@@ -140,7 +230,7 @@ public final class DtoaConverter {
      * @return The formatted string in exponential notation
      * @throws IllegalArgumentException if fractionDigits is out of range
      */
-    public static String convertExponential(double value, int fractionDigits) {
+    public static String convertExponentialWithFractionDigits(double value, int fractionDigits) {
         if (fractionDigits < 0 || fractionDigits > MAX_DIGITS) {
             throw new IllegalArgumentException("fractionDigits must be between 0 and " + MAX_DIGITS);
         }
@@ -154,6 +244,30 @@ public final class DtoaConverter {
         }
 
         return formatExponential(value, fractionDigits);
+    }
+
+    /**
+     * Convert to exponential notation with automatic precision.
+     * Implements Number.prototype.toExponential() with no arguments.
+     * Uses the minimum number of significant digits to uniquely represent the value.
+     *
+     * @param value The value to convert
+     * @return The formatted string in exponential notation
+     */
+    public static String convertExponentialWithoutFractionDigits(double value) {
+        // Handle special values
+        if (Double.isNaN(value)) {
+            return "NaN";
+        }
+        if (Double.isInfinite(value)) {
+            return value > 0 ? "Infinity" : "-Infinity";
+        }
+
+        // Get the string representation which has the minimal precision
+        String str = Double.toString(value);
+
+        // Convert to exponential notation from the decimal string
+        return convertDecimalToExponential(str);
     }
 
     /**
@@ -184,10 +298,13 @@ public final class DtoaConverter {
         }
 
         // Use BigDecimal for precise fixed-point formatting
+        // Note: Use new BigDecimal(value) instead of BigDecimal.valueOf(value)
+        // to preserve the exact binary representation of the double, including
+        // floating-point rounding errors, which matches JavaScript behavior.
         try {
-            BigDecimal bd = BigDecimal.valueOf(value);
-            bd = bd.setScale(fractionDigits, RoundingMode.HALF_UP);
-            return bd.toPlainString();
+            BigDecimal bigDecimal = new BigDecimal(value);
+            bigDecimal = bigDecimal.setScale(fractionDigits, RoundingMode.HALF_UP);
+            return bigDecimal.toPlainString();
         } catch (NumberFormatException e) {
             // Fallback to String.format
             return String.format(Locale.US, "%." + fractionDigits + "f", value);
@@ -229,6 +346,19 @@ public final class DtoaConverter {
     }
 
     /**
+     * Convert a double to string with specified radix (2-36).
+     * Uses QuickJS-compatible dtoa algorithm for exact JavaScript compatibility.
+     *
+     * @param value The value to convert
+     * @param radix The radix (base) to use for conversion (2-36)
+     * @return The string representation in the specified radix
+     */
+    public static String convertToRadix(double value, int radix) {
+        // Use QuickJS-compatible dtoa implementation
+        return QuickJSDtoa.toString(value, radix);
+    }
+
+    /**
      * Convert with specified precision (significant digits).
      * Implements Number.prototype.toPrecision(precision).
      *
@@ -250,9 +380,8 @@ public final class DtoaConverter {
             return value > 0 ? "Infinity" : "-Infinity";
         }
 
-        // Use BigDecimal for accurate formatting
+        // Handle zero specially
         if (value == 0.0) {
-            // Special case for zero
             StringBuilder result = new StringBuilder("0");
             if (precision > 1) {
                 result.append(".");
@@ -263,19 +392,82 @@ public final class DtoaConverter {
             return result.toString();
         }
 
-        // Determine if we should use exponential or fixed notation
+        // Calculate the exponent (position of the most significant digit)
         int exponent = (int) Math.floor(Math.log10(Math.abs(value)));
 
+        // Use exponential notation if exponent < -6 or exponent >= precision
         if (exponent < -6 || exponent >= precision) {
-            // Use exponential notation
-            String format = "%." + (precision - 1) + "e";
-            return String.format(format, value).replaceAll("([eE][+-])0+", "$1");
+            // Use exponential notation with (precision - 1) fractional digits
+            return formatExponentialPrecision(value, precision - 1);
         } else {
             // Use fixed notation
-            BigDecimal bd = BigDecimal.valueOf(value);
-            bd = bd.round(new java.math.MathContext((int) precision, RoundingMode.HALF_UP));
-            return bd.stripTrailingZeros().toPlainString();
+            // Round to precision significant digits
+            BigDecimal bd = new BigDecimal(value);
+            MathContext mc = new MathContext(precision, RoundingMode.HALF_UP);
+            bd = bd.round(mc);
+            
+            // Format with exactly precision significant digits
+            String str = bd.toPlainString();
+            
+            // Count significant digits and add trailing zeros if needed
+            return formatFixedPrecision(str, precision, exponent);
         }
+    }
+    
+    /**
+     * Format a value in exponential notation for toPrecision.
+     * fractionDigits is the number of digits after the decimal point in the mantissa.
+     */
+    private static String formatExponentialPrecision(double value, int fractionDigits) {
+        // Use String.format for exponential notation
+        String format = "%." + fractionDigits + "e";
+        String result = String.format(Locale.US, format, value);
+        
+        // Clean up the exponent part (remove leading zeros after e+ or e-)
+        result = result.replaceAll("e([+-])0+(\\d)", "e$1$2");
+        
+        return result;
+    }
+    
+    /**
+     * Format a string to have exactly precision significant digits in fixed notation.
+     */
+    private static String formatFixedPrecision(String str, int precision, int exponent) {
+        // Remove sign for processing
+        boolean negative = str.startsWith("-");
+        if (negative) {
+            str = str.substring(1);
+        }
+        
+        // Remove decimal point for counting
+        String digits = str.replace(".", "");
+        
+        // Count leading zeros if any (for numbers like 0.001)
+        int leadingZeros = 0;
+        for (int i = 0; i < digits.length(); i++) {
+            if (digits.charAt(i) != '0') {
+                break;
+            }
+            leadingZeros++;
+        }
+        
+        // Significant digits are all non-leading-zero digits
+        int sigDigits = digits.length() - leadingZeros;
+        
+        // Add trailing zeros if we need more significant digits
+        int zerosToAdd = precision - sigDigits;
+        if (zerosToAdd > 0) {
+            StringBuilder result = new StringBuilder(str);
+            if (!str.contains(".")) {
+                result.append(".");
+            }
+            for (int i = 0; i < zerosToAdd; i++) {
+                result.append("0");
+            }
+            str = result.toString();
+        }
+        
+        return negative ? "-" + str : str;
     }
 
     /**
@@ -295,12 +487,30 @@ public final class DtoaConverter {
             return sb.toString();
         }
 
-        // Use scientific notation
-        String format = String.format(Locale.US, "%." + fractionDigits + "e", value);
+        // Use BigDecimal to preserve the exact binary representation of the double
+        // Note: Use new BigDecimal(value) instead of BigDecimal.valueOf(value)
+        // to preserve the exact binary representation, matching JavaScript behavior.
+        BigDecimal bd = new BigDecimal(value);
 
-        // Convert Java's format to JavaScript's format
-        // Java: 1.234e+00, JavaScript: 1.234e+0
-        return normalizeExponentialFormat(format);
+        // Calculate the exponent
+        int exponent = bd.precision() - bd.scale() - 1;
+
+        // Shift to get mantissa with proper decimal places
+        BigDecimal mantissa = bd.scaleByPowerOfTen(-exponent);
+
+        // Round to the desired number of fraction digits
+        mantissa = mantissa.setScale(fractionDigits, RoundingMode.HALF_UP);
+
+        // Format the result - keep the exact precision as specified by fractionDigits
+        String mantissaStr = mantissa.toPlainString();
+
+        StringBuilder result = new StringBuilder();
+        result.append(mantissaStr);
+        result.append('e');
+        result.append(exponent >= 0 ? '+' : "");
+        result.append(exponent);
+
+        return result.toString();
     }
 
     /**

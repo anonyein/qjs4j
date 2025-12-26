@@ -19,9 +19,6 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.core.*;
 import com.caoccao.qjs4j.util.DtoaConverter;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-
 /**
  * Implementation of JavaScript Number.prototype methods.
  * Based on ES2020 Number.prototype specification.
@@ -262,15 +259,15 @@ public final class NumberPrototype {
         double value = num.value();
         // Get fractionDigits
         if (args.length == 0 || args[0].isUndefined()) {
-            // Default: use standard number-to-string conversion
-            return new JSString(DtoaConverter.convert(value));
+            // No argument: use automatic precision (minimal digits to uniquely represent the value)
+            return new JSString(DtoaConverter.convertExponentialWithoutFractionDigits(value));
         }
         int fractionDigits = (int) JSTypeConversions.toInteger(args[0]);
         // RangeError if out of bounds [0, 100]
         if (fractionDigits < 0 || fractionDigits > DtoaConverter.MAX_DIGITS) {
             return ctx.throwError("RangeError", "toExponential() fractionDigits must be between 0 and 100");
         }
-        return new JSString(DtoaConverter.convertExponential(value, fractionDigits));
+        return new JSString(DtoaConverter.convertExponentialWithFractionDigits(value, fractionDigits));
     }
 
     /**
@@ -287,7 +284,7 @@ public final class NumberPrototype {
         }
         // RangeError if out of bounds [0, 100]
         if (fractionDigits < 0 || fractionDigits > DtoaConverter.MAX_DIGITS) {
-            return ctx.throwError("RangeError", "toExponential() fractionDigits must be between 0 and 100");
+            return ctx.throwError("RangeError", "toFixed() fractionDigits must be between 0 and 100");
         }
         return new JSString(DtoaConverter.convertFixed(value, fractionDigits));
     }
@@ -342,7 +339,7 @@ public final class NumberPrototype {
         }
 
         // Get radix (default 10)
-        long radix = args.length > 0 ? (long) JSTypeConversions.toInteger(args[0]) : 10;
+        int radix = args.length > 0 ? (int) JSTypeConversions.toInteger(args[0]) : 10;
 
         // RangeError if radix out of bounds [2, 36]
         if (radix < 2 || radix > 36) {
@@ -354,18 +351,8 @@ public final class NumberPrototype {
             return new JSString(DtoaConverter.convert(value));
         }
 
-        // For other radixes, only works for integers
-        if (value != Math.floor(value)) {
-            // Non-integer with non-10 radix - not fully supported
-            return new JSString(DtoaConverter.convert(value));
-        }
-
-        // Convert integer to specified radix
-        long intValue = (long) value;
-        if (intValue < 0) {
-            return new JSString("-" + Long.toString(-intValue, (int) radix));
-        }
-        return new JSString(Long.toString(intValue, (int) radix));
+        // For other radixes, convert using the radix conversion method
+        return new JSString(DtoaConverter.convertToRadix(value, radix));
     }
 
     /**

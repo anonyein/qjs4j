@@ -16,15 +16,21 @@
 
 package com.caoccao.qjs4j.builtins;
 
+import com.caoccao.javet.exceptions.JavetException;
+import com.caoccao.javet.interop.V8Host;
+import com.caoccao.javet.interop.V8Runtime;
 import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.JSNumber;
 import com.caoccao.qjs4j.core.JSString;
 import com.caoccao.qjs4j.core.JSUndefined;
 import com.caoccao.qjs4j.core.JSValue;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.util.List;
+import java.util.stream.IntStream;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for Number.prototype methods.
@@ -278,13 +284,13 @@ public class NumberPrototypeTest extends BaseTest {
     public void testToExponential() {
         JSNumber num = new JSNumber(123.456);
 
-        // Normal case: default precision
+        // Normal case: default precision (no argument - uses minimal precision)
         JSValue result = NumberPrototype.toExponential(ctx, num, new JSValue[]{});
-        assertEquals("123.456", result.asString().map(JSString::getValue).orElse(""));
+        assertEquals("1.23456e+2", result.asString().map(JSString::getValue).orElse(""));
         result = NumberPrototype.toExponential(ctx, new JSNumber(123123123123123.456D), new JSValue[]{});
-        assertEquals("123123123123123.45", result.asString().map(JSString::getValue).orElse(""));
+        assertEquals("1.2312312312312345e+14", result.asString().map(JSString::getValue).orElse(""));
         result = NumberPrototype.toExponential(ctx, new JSNumber(123123123123123123.456D), new JSValue[]{});
-        assertEquals("123123123123123120", result.asString().map(JSString::getValue).orElse(""));
+        assertEquals("1.2312312312312312e+17", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: specific precision
         result = NumberPrototype.toExponential(ctx, num, new JSValue[]{new JSNumber(2)});
@@ -320,6 +326,39 @@ public class NumberPrototypeTest extends BaseTest {
     }
 
     @Test
+    public void testToExponentialWithJavet() throws JavetException {
+        List<Double> testNumbers = List.of(
+                0D, 1D, -1D, 123.456D, -123.456D, 123456789.123456789D, -123456789.123456789D,
+                Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+        try (V8Runtime v8Runtime = V8Host.getV8Instance().createV8Runtime()) {
+            testNumbers.forEach(number -> {
+                IntStream.range(0, 101).forEach(fractionDigits -> {
+                    String expectedValue = null;
+                    try {
+                        expectedValue = v8Runtime.getExecutor("Number(" + number + ").toExponential(" + fractionDigits + ")").executeString();
+                    } catch (JavetException e) {
+                        fail(e);
+                    }
+                    assertEquals(
+                            expectedValue,
+                            NumberPrototype.toExponential(ctx, new JSNumber(number), new JSValue[]{new JSNumber(fractionDigits)}).asString().map(JSString::getValue).orElse(""),
+                            "Number: " + number + ", fractionDigits: " + fractionDigits);
+                });
+                String expectedValue = null;
+                try {
+                    expectedValue = v8Runtime.getExecutor("Number(" + number + ").toExponential()").executeString();
+                } catch (JavetException e) {
+                    fail(e);
+                }
+                assertEquals(
+                        expectedValue,
+                        NumberPrototype.toExponential(ctx, new JSNumber(number), new JSValue[]{}).asString().map(JSString::getValue).orElse(""),
+                        "Number: " + number);
+            });
+        }
+    }
+
+    @Test
     public void testToFixed() {
         JSNumber num = new JSNumber(123.456);
 
@@ -333,9 +372,10 @@ public class NumberPrototypeTest extends BaseTest {
         result = NumberPrototype.toFixed(ctx, num, new JSValue[]{new JSNumber(10)});
         assertEquals("123.4560000000", result.asString().map(JSString::getValue).orElse(""));
 
-        // Normal case: rounding
+        // Normal case: rounding - 1.005 is actually ~1.0049999... in binary
+        // so it rounds down to 1.00, not up to 1.01 (this matches JavaScript behavior)
         result = NumberPrototype.toFixed(ctx, new JSNumber(1.005), new JSValue[]{new JSNumber(2)});
-        assertEquals("1.01", result.asString().map(JSString::getValue).orElse(""));
+        assertEquals("1.00", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: zero
         result = NumberPrototype.toFixed(ctx, new JSNumber(0), new JSValue[]{new JSNumber(2)});
@@ -368,6 +408,39 @@ public class NumberPrototypeTest extends BaseTest {
         // Edge case: non-number thisArg (should coerce)
         result = NumberPrototype.toFixed(ctx, new JSString("42.5"), new JSValue[]{new JSNumber(1)});
         assertEquals("42.5", result.asString().map(JSString::getValue).orElse(""));
+    }
+
+    @Test
+    public void testToFixedWithJavet() throws JavetException {
+        List<Double> testNumbers = List.of(
+                0D, 1D, -1D, 123.456D, -123.456D, 123456789.123456789D, -123456789.123456789D,
+                Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+        try (V8Runtime v8Runtime = V8Host.getV8Instance().createV8Runtime()) {
+            testNumbers.forEach(number -> {
+                IntStream.range(0, 101).forEach(fractionDigits -> {
+                    String expectedValue = null;
+                    try {
+                        expectedValue = v8Runtime.getExecutor("Number(" + number + ").toFixed(" + fractionDigits + ")").executeString();
+                    } catch (JavetException e) {
+                        fail(e);
+                    }
+                    assertEquals(
+                            expectedValue,
+                            NumberPrototype.toFixed(ctx, new JSNumber(number), new JSValue[]{new JSNumber(fractionDigits)}).asString().map(JSString::getValue).orElse(""),
+                            "Number: " + number + ", fractionDigits: " + fractionDigits);
+                });
+                String expectedValue = null;
+                try {
+                    expectedValue = v8Runtime.getExecutor("Number(" + number + ").toFixed()").executeString();
+                } catch (JavetException e) {
+                    fail(e);
+                }
+                assertEquals(
+                        expectedValue,
+                        NumberPrototype.toFixed(ctx, new JSNumber(number), new JSValue[]{}).asString().map(JSString::getValue).orElse(""),
+                        "Number: " + number);
+            });
+        }
     }
 
     @Test
@@ -430,6 +503,39 @@ public class NumberPrototypeTest extends BaseTest {
     }
 
     @Test
+    public void testToPrecisionWithJavet() throws JavetException {
+        List<Double> testNumbers = List.of(
+                0D, 1D, -1D, 123.456D, -123.456D, 123456789.123456789D, -123456789.123456789D,
+                Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+        try (V8Runtime v8Runtime = V8Host.getV8Instance().createV8Runtime()) {
+            testNumbers.forEach(number -> {
+                IntStream.range(1, 101).forEach(precision -> {
+                    String expectedValue = null;
+                    try {
+                        expectedValue = v8Runtime.getExecutor("Number(" + number + ").toPrecision(" + precision + ")").executeString();
+                    } catch (JavetException e) {
+                        fail(e);
+                    }
+                    assertEquals(
+                            expectedValue,
+                            NumberPrototype.toPrecision(ctx, new JSNumber(number), new JSValue[]{new JSNumber(precision)}).asString().map(JSString::getValue).orElse(""),
+                            "Number: " + number + ", fractionDigits: " + precision);
+                });
+                String expectedValue = null;
+                try {
+                    expectedValue = v8Runtime.getExecutor("Number(" + number + ").toPrecision()").executeString();
+                } catch (JavetException e) {
+                    fail(e);
+                }
+                assertEquals(
+                        expectedValue,
+                        NumberPrototype.toPrecision(ctx, new JSNumber(number), new JSValue[]{}).asString().map(JSString::getValue).orElse(""),
+                        "Number: " + number);
+            });
+        }
+    }
+
+    @Test
     public void testToString() {
         JSNumber num = new JSNumber(42);
 
@@ -473,9 +579,33 @@ public class NumberPrototypeTest extends BaseTest {
         assertRangeError(NumberPrototype.toString(ctx, num, new JSValue[]{new JSNumber(37)}));
         assertPendingException(ctx);
 
-        // Edge case: non-integer with non-10 radix (falls back to base 10)
+        // Edge case: non-integer with non-10 radix (now supported for floating-point conversion)
         result = NumberPrototype.toString(ctx, new JSNumber(42.5), new JSValue[]{new JSNumber(16)});
-        assertEquals("42.5", result.asString().map(JSString::getValue).orElse(""));
+        assertEquals("2a.8", result.asString().map(JSString::getValue).orElse(""));
+    }
+
+    @Disabled
+    @Test
+    public void testToStringWithJavet() throws JavetException {
+        List<Double> testNumbers = List.of(
+                0D, 1D, -1D, 123.456D, -123.456D, 123456789.123456789D, -123456789.123456789D,
+                Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+        try (V8Runtime v8Runtime = V8Host.getV8Instance().createV8Runtime()) {
+            testNumbers.forEach(number -> {
+                IntStream.range(2, 37).forEach(radix -> {
+                    String expectedValue = null;
+                    try {
+                        expectedValue = v8Runtime.getExecutor("Number(" + number + ").toString(" + radix + ")").executeString();
+                    } catch (JavetException e) {
+                        fail(e);
+                    }
+                    assertEquals(
+                            expectedValue,
+                            NumberPrototype.toString(ctx, new JSNumber(number), new JSValue[]{new JSNumber(radix)}).asString().map(JSString::getValue).orElse(""),
+                            "Number: " + number + ", radix: " + radix);
+                });
+            });
+        }
     }
 
     @Test
