@@ -591,20 +591,18 @@ public class NumberPrototypeTest extends BaseTest {
                 0D, 1D, -1D, 123.456D, -123.456D, 123456789.123456789D, -123456789.123456789D,
                 Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
         try (V8Runtime v8Runtime = V8Host.getV8Instance().createV8Runtime()) {
-            testNumbers.forEach(number -> {
-                IntStream.range(2, 37).forEach(radix -> {
-                    String expectedValue = null;
-                    try {
-                        expectedValue = v8Runtime.getExecutor("Number(" + number + ").toString(" + radix + ")").executeString();
-                    } catch (JavetException e) {
-                        fail(e);
-                    }
-                    assertEquals(
-                            expectedValue,
-                            NumberPrototype.toString(ctx, new JSNumber(number), new JSValue[]{new JSNumber(radix)}).asString().map(JSString::getValue).orElse(""),
-                            "Number: " + number + ", radix: " + radix);
-                });
-            });
+            testNumbers.forEach(number -> IntStream.range(2, 37).forEach(radix -> {
+                String expectedValue = null;
+                try {
+                    expectedValue = v8Runtime.getExecutor("Number(" + number + ").toString(" + radix + ")").executeString();
+                } catch (JavetException e) {
+                    fail(e);
+                }
+                assertEquals(
+                        expectedValue,
+                        NumberPrototype.toString(ctx, new JSNumber(number), new JSValue[]{new JSNumber(radix)}).asString().map(JSString::getValue).orElse(""),
+                        "Number: " + number + ", radix: " + radix);
+            }));
         }
     }
 

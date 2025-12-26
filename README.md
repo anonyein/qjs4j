@@ -19,7 +19,7 @@ qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Ja
 - **Control Flow**: if/else, switch, loops (for, while, do-while), break/continue
 
 #### ✅ ES2015+ Features
-- **Symbol**: Well-known symbols (iterator, toStringTag, etc.), Symbol.for(), Symbol.keyFor()
+- **Symbol**: All 13 well-known symbols (iterator, asyncIterator, toStringTag, hasInstance, isConcatSpreadable, toPrimitive, match, matchAll, replace, search, split, species, unscopables), Symbol.for(), Symbol.keyFor()
 - **BigInt**: Arbitrary-precision integers with radix conversion and bit operations
 - **Promises**: Complete Promise implementation with then/catch/finally, Promise.all/race/allSettled/any
 - **Iterators & Generators**: Iterator protocol, Symbol.iterator, generator functions with yield
@@ -82,14 +82,55 @@ qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Ja
 - **Field Initialization**: Instance and static fields with property descriptors
 - **Class Validation**: Classes cannot be called without 'new'
 
+#### ✅ Async Iterators (ES2018)
+- **Async Iterator Protocol**: Symbol.asyncIterator support
+- **JSAsyncIterator**: Promise-based iterator with next() returning Promise<{value, done}>
+- **for-await-of loops**: Full support via JSAsyncIteratorHelper
+- **Sync to Async**: Automatic conversion of sync iterators to async
+- **Factory Methods**: fromArray(), fromIterator(), fromIterable(), fromPromise()
+- **Utility Functions**: toArray(), isAsyncIterable(), getAsyncIterator()
+- **Error Handling**: Promise rejection propagation through iteration
+
+#### ✅ Async Generators (ES2018)
+- **JSAsyncGenerator**: Full async generator object implementation
+- **Async Generator States**: SUSPENDED_START, SUSPENDED_YIELD, EXECUTING, AWAITING_RETURN, COMPLETED
+- **Methods**: next(), return(), throw() all return promises
+- **Symbol.asyncIterator**: Generators are async iterable
+- **Factory Functions**: create(), createFromValues(), createFromPromises(), createDelayedGenerator()
+- **State Management**: Prevents concurrent execution, proper completion tracking
+- **Promise Integration**: All operations return promises with proper microtask timing
+
+#### ✅ WeakRef & FinalizationRegistry (ES2021)
+- **WeakRef**: Weak references to objects using Java WeakReference
+  - deref() method returns target if alive, undefined if collected
+  - Type checking ensures only objects can be referenced
+  - No resurrection - objects can be collected at any time
+- **FinalizationRegistry**: Cleanup callbacks on object collection
+  - register(target, heldValue, unregisterToken) for registration
+  - unregister(token) for manual cleanup removal
+  - Background thread monitors PhantomReference queue
+  - Cleanup callbacks run as microtasks after GC
+  - Thread-safe with ConcurrentHashMap
+
+#### ✅ SharedArrayBuffer & Atomics (ES2017)
+- **SharedArrayBuffer**: Shared memory buffer for multi-threaded access
+  - Direct ByteBuffer allocation for efficient sharing
+  - Fixed-length buffer (cannot be detached)
+  - slice() method for copying byte ranges
+  - Thread-safe operations with synchronization
+- **Atomics**: Atomic operations on shared memory
+  - add, sub, and, or, xor: Atomic arithmetic and bitwise operations
+  - load, store: Atomic read/write operations
+  - compareExchange: Compare-and-swap operation
+  - exchange: Atomic value exchange
+  - isLockFree: Query lock-free operation support
+  - Works on Int32Array and Uint32Array backed by SharedArrayBuffer
+
 #### 🚧 In Progress
 - **Async/Await**: Await expression support (microtask infrastructure complete)
-- **Async iterators**: for-await-of loops
 
 #### ⏳ Planned
-- **WeakRef & FinalizationRegistry**: Advanced memory management
-- **SharedArrayBuffer**: Shared memory for multi-threading
-- **Atomics**: Atomic operations on shared memory
+- **Internationalization (Intl)**: i18n support for dates, numbers, strings
 
 ### Architecture
 

@@ -195,8 +195,12 @@ Created 9 typed array types:
 - **Meta-programming**: 4 files (Reflect, Proxy + constructors)
 - **Promises & Async**: 4 files (Promise, constructors, prototypes, microtask queue)
 - **Iterators**: 5 files (Iterator, Generator, helpers, prototypes)
+- **Async Iterators**: 2 files (JSAsyncIterator, JSAsyncIteratorHelper)
+- **Async Generators**: 2 files (JSAsyncGenerator, AsyncGeneratorPrototype)
 - **Module System**: 3 files (JSModule, ModuleLoader, DynamicImport)
 - **Class System**: 3 files (JSClass, ClassBuilder, SuperHelper)
+- **Weak References**: 4 files (JSWeakRef, JSFinalizationRegistry, WeakRefConstructor, FinalizationRegistryConstructor)
+- **Shared Memory**: 4 files (JSSharedArrayBuffer, SharedArrayBufferConstructor, SharedArrayBufferPrototype, AtomicsObject)
 
 ### Lines of Code
 - Approximately 15,000+ lines of production code
@@ -321,23 +325,199 @@ Proper implementation for Map/Set where:
 - JSFunction interface updated: Added JSClass to sealed permits list
 - Method binding: Super methods bound to current instance via JSBoundFunction
 
+### Phase 19: Async Iterators and for-await-of ✅
+**Completed**: Full async iteration protocol
+
+#### Phase 19.1: Async Iterator Protocol
+- JSAsyncIterator.java: Async iterator implementation
+  - AsyncIteratorFunction interface for promise-based next()
+  - next() returns Promise<{value, done}>
+  - Symbol.asyncIterator property for protocol identification
+  - createIteratorResultPromise(): Helper for creating resolved iterator results
+- Factory methods for creating async iterators:
+  - fromIterator(): Convert sync iterator to async
+  - fromArray(): Async iteration over arrays
+  - fromIterable(): Wrap Java Iterable as async iterator
+  - fromPromise(): Create single-value async iterator from promise
+- Symbol.asyncIterator: Added to well-known symbols
+  - Added to JSSymbol constants
+  - Registered on Symbol constructor
+  - getWellKnownSymbol() helper method
+
+#### Phase 19.2: for-await-of Loop Support
+- JSAsyncIteratorHelper.java: Utilities for async iteration
+  - getAsyncIterator(): Gets async iterator from value (checks Symbol.asyncIterator, falls back to Symbol.iterator)
+  - forAwaitOf(): Executes for-await-of loop with promise-based callback
+  - iterateNext(): Internal continuation-passing style iteration
+  - toArray(): Collects all async iterable values into array
+  - isAsyncIterable(): Checks if value supports async iteration
+- Automatic fallback: Sync iterators automatically converted to async
+- Promise-based iteration: Each value processed asynchronously
+- Error handling: Promise rejections properly propagated
+
+### Phase 20: Async Generator Functions ✅
+**Completed**: Full async generator implementation
+
+#### Phase 20.1: Async Generator Objects
+- JSAsyncGenerator.java: Complete async generator implementation
+  - AsyncGeneratorState: SUSPENDED_START, SUSPENDED_YIELD, EXECUTING, AWAITING_RETURN, COMPLETED
+  - AsyncGeneratorFunction interface for promise-based execution
+  - next(value): Returns Promise<{value, done}>, advances generator
+  - return(value): Returns Promise<{value, done: true}>, closes generator
+  - throw(exception): Returns Promise, throws into generator with error handling
+  - Symbol.asyncIterator property: Makes generators async iterable
+  - State management: Prevents concurrent execution, tracks completion
+- AsyncGeneratorFunction interface: Unified execution model with throw support
+- create() factory method: Simplified async generator creation
+- AsyncYieldFunction interface: Helper for simple yield patterns
+
+#### Phase 20.2: Async Generator Utilities
+- AsyncGeneratorPrototype.java: Prototype methods and utilities
+  - next(), return(), throw() prototype methods
+  - createFromValues(): Create async generator from value array
+  - createFromPromises(): Create async generator from promise array
+  - createDelayedGenerator(): Microtask-based delayed value generation
+- Factory patterns for common async generator use cases
+- Integration with microtask queue for proper async timing
+
+### Phase 21: WeakRef and FinalizationRegistry ✅
+**Completed**: ES2021 weak reference and finalization support
+
+#### Phase 21.1: WeakRef for Weak Object References
+- JSWeakRef.java: Weak reference wrapper for objects
+  - Uses Java WeakReference for automatic GC integration
+  - deref() method: Returns target if alive, undefined if collected
+  - Target must be an object (primitives rejected)
+  - No resurrection: Objects can be collected at any time
+- WeakRefConstructor.java: Constructor helper
+  - createWeakRef(): Validates target is an object
+  - Cannot create WeakRef to null
+  - TypeError for non-object targets
+- GlobalObject integration: initializeWeakRefConstructor()
+- VM integration: [[WeakRefConstructor]] marker handling
+
+#### Phase 21.2: FinalizationRegistry for Cleanup Callbacks
+- JSFinalizationRegistry.java: Cleanup callback registry
+  - Uses PhantomReference and ReferenceQueue for finalization tracking
+  - Background cleanup thread monitors reference queue
+  - register(target, heldValue, unregisterToken): Register object for cleanup
+  - unregister(token): Manual cleanup removal
+  - Cleanup callbacks run as microtasks after GC
+  - Thread-safe with ConcurrentHashMap
+  - shutdown() method for proper cleanup thread termination
+- FinalizationRegistryConstructor.java: Constructor helper
+  - createFinalizationRegistry(): Validates cleanup callback is a function
+  - Cleanup callback receives held value when target is collected
+- RegistrationRecord: Internal tracking of registrations
+- Proper error handling: Cleanup errors don't crash the program
+- GlobalObject integration: initializeFinalizationRegistryConstructor()
+- VM integration: [[FinalizationRegistryConstructor]] marker handling
+
+### Phase 23: Additional Well-Known Symbols ✅
+**Completed**: All ES2015+ well-known symbols
+
+#### Phase 23.1: String Method Symbols
+- JSSymbol.MATCH: Used by String.prototype.match()
+  - Allows custom objects to define matching behavior
+  - RegExp.prototype[Symbol.match] provides default implementation
+- JSSymbol.MATCH_ALL: Used by String.prototype.matchAll() (ES2020)
+  - Returns iterator of all matches
+  - RegExp.prototype[Symbol.matchAll] for global/sticky regex
+- JSSymbol.REPLACE: Used by String.prototype.replace()
+  - Custom replacement logic for objects
+  - RegExp.prototype[Symbol.replace] handles regex replacement
+- JSSymbol.SEARCH: Used by String.prototype.search()
+  - Custom search implementation
+  - Returns index of match or -1
+- JSSymbol.SPLIT: Used by String.prototype.split()
+  - Custom string splitting logic
+  - RegExp.prototype[Symbol.split] for regex splitting
+
+#### Phase 23.2: Constructor and Object Symbols
+- JSSymbol.SPECIES: Constructor customization
+  - Used by Array, Map, Set, Promise, RegExp, etc.
+  - Allows derived classes to specify constructor for creating derived objects
+  - Example: Array.prototype.map() uses @@species to determine result array type
+- JSSymbol.UNSCOPABLES: with statement control (legacy)
+  - Specifies properties to exclude from with statement binding
+  - Array.prototype[Symbol.unscopables] excludes newer methods
+
+#### Complete Symbol Support
+All 13 well-known symbols now registered:
+1. Symbol.iterator (ES2015)
+2. Symbol.asyncIterator (ES2018)
+3. Symbol.toStringTag (ES2015)
+4. Symbol.hasInstance (ES2015)
+5. Symbol.isConcatSpreadable (ES2015)
+6. Symbol.toPrimitive (ES2015)
+7. Symbol.match (ES2015)
+8. Symbol.matchAll (ES2020)
+9. Symbol.replace (ES2015)
+10. Symbol.search (ES2015)
+11. Symbol.split (ES2015)
+12. Symbol.species (ES2015)
+13. Symbol.unscopables (ES2015)
+
+All symbols available as Symbol.* properties and via getWellKnownSymbol() helper.
+
+### Phase 24: SharedArrayBuffer and Atomics (ES2017) ✅
+**Completed**: Shared memory and atomic operations
+
+#### Phase 24.1: SharedArrayBuffer
+- JSSharedArrayBuffer.java: Shared memory buffer for multi-threaded access
+  - Uses direct ByteBuffer for efficient sharing across threads
+  - Fixed-length binary data buffer
+  - Cannot be detached (unlike ArrayBuffer)
+  - slice(begin, end) creates new SharedArrayBuffer with copied bytes
+  - isShared() method returns true for identification
+  - Thread-safe slice operation with synchronized access
+- SharedArrayBufferConstructor.java: Constructor helper
+  - createSharedArrayBuffer(): Creates buffer with specified byte length
+  - Validates non-negative byte length
+  - TypeError for invalid arguments
+- SharedArrayBufferPrototype.java: Prototype methods
+  - byteLength getter: Returns buffer byte length
+  - slice(): Creates copy of byte range
+- GlobalObject integration: initializeSharedArrayBufferConstructor()
+- VM integration: [[SharedArrayBufferConstructor]] marker handling
+
+#### Phase 24.2: Atomics Object
+- AtomicsObject.java: Static methods for atomic operations on shared memory
+  - Atomics.add(array, index, value): Atomic addition, returns old value
+  - Atomics.sub(array, index, value): Atomic subtraction, returns old value
+  - Atomics.and(array, index, value): Atomic bitwise AND, returns old value
+  - Atomics.or(array, index, value): Atomic bitwise OR, returns old value
+  - Atomics.xor(array, index, value): Atomic bitwise XOR, returns old value
+  - Atomics.load(array, index): Atomic read operation
+  - Atomics.store(array, index, value): Atomic write operation, returns value
+  - Atomics.compareExchange(array, index, expected, replacement): Compare-and-swap
+  - Atomics.exchange(array, index, value): Atomic exchange, returns old value
+  - Atomics.isLockFree(size): Check if operations are lock-free (1, 2, 4, 8 bytes)
+- Validation: Requires Int32Array or Uint32Array backed by SharedArrayBuffer
+- Thread-safety: Synchronized access to ByteBuffer for atomic guarantees
+- Proper error handling: TypeError for non-shared buffers, RangeError for bounds
+- GlobalObject integration: initializeAtomicsObject() with all methods
+
+#### Key Technical Details
+- **Direct ByteBuffer**: SharedArrayBuffer uses allocateDirect() for efficient multi-threaded access
+- **isShared() method**: Added to JSArrayBuffer (returns false) and JSSharedArrayBuffer (returns true) for type checking
+- **Synchronized operations**: All atomic operations use synchronized blocks on ByteBuffer
+- **Lock-free operations**: Java supports lock-free operations on 1, 2, 4, and 8-byte values
+- **ES2017 compliance**: Full specification adherence for shared memory semantics
+
 ## Next Steps (Planned)
 
-### Phase 16: Async/Await - Part 2
+### Phase 16.2: Async/Await - Part 2
 - Await expression bytecode opcodes
 - VM support for pausing/resuming async function execution
 - Async function execution wrapper (wraps result in Promise)
+- Note: Requires bytecode compiler and VM execution model
 
-### Phase 19: Advanced Iterators
-- Async iterators (Symbol.asyncIterator)
-- for-await-of loops
-- Async generator functions
-
-### Phase 20: Remaining Features
-- WeakRef and FinalizationRegistry
-- SharedArrayBuffer and Atomics
-- Additional well-known symbols
+### Phase 22: Remaining ES2020+ Features
+- SharedArrayBuffer and Atomics (ES2017)
+- Additional well-known symbols (Symbol.match, Symbol.replace, etc.)
 - Internationalization (Intl object)
+- Top-level await (ES2022)
 
 ## Build Status
 

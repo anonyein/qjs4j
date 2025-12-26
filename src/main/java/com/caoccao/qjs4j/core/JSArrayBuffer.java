@@ -100,6 +100,15 @@ public final class JSArrayBuffer extends JSObject {
     }
 
     /**
+     * Check if this buffer is a SharedArrayBuffer.
+     *
+     * @return false for ArrayBuffer, true for SharedArrayBuffer
+     */
+    public boolean isShared() {
+        return false;
+    }
+
+    /**
      * ArrayBuffer.prototype.slice(begin, end)
      * ES2020 24.1.4.3
      * Returns a new ArrayBuffer with a copy of the bytes from begin to end.

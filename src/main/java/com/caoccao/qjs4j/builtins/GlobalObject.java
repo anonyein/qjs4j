@@ -78,6 +78,8 @@ public final class GlobalObject {
         initializeSetConstructor(ctx, global);
         initializeWeakMapConstructor(ctx, global);
         initializeWeakSetConstructor(ctx, global);
+        initializeWeakRefConstructor(ctx, global);
+        initializeFinalizationRegistryConstructor(ctx, global);
         initializeMathObject(ctx, global);
         initializeJSONObject(ctx, global);
         initializeReflectObject(ctx, global);
@@ -87,8 +89,10 @@ public final class GlobalObject {
 
         // Binary data constructors
         initializeArrayBufferConstructor(ctx, global);
+        initializeSharedArrayBufferConstructor(ctx, global);
         initializeDataViewConstructor(ctx, global);
         initializeTypedArrayConstructors(ctx, global);
+        initializeAtomicsObject(ctx, global);
 
         // Error constructors
         initializeErrorConstructors(ctx, global);
@@ -349,12 +353,20 @@ public final class GlobalObject {
         symbolConstructor.set("for", createNativeFunction(ctx, "for", SymbolConstructor::symbolFor, 1));
         symbolConstructor.set("keyFor", createNativeFunction(ctx, "keyFor", SymbolConstructor::keyFor, 1));
 
-        // Well-known symbols
+        // Well-known symbols (ES2015+)
         symbolConstructor.set("iterator", JSSymbol.ITERATOR);
+        symbolConstructor.set("asyncIterator", JSSymbol.ASYNC_ITERATOR);
         symbolConstructor.set("toStringTag", JSSymbol.TO_STRING_TAG);
         symbolConstructor.set("hasInstance", JSSymbol.HAS_INSTANCE);
         symbolConstructor.set("isConcatSpreadable", JSSymbol.IS_CONCAT_SPREADABLE);
         symbolConstructor.set("toPrimitive", JSSymbol.TO_PRIMITIVE);
+        symbolConstructor.set("match", JSSymbol.MATCH);
+        symbolConstructor.set("matchAll", JSSymbol.MATCH_ALL);
+        symbolConstructor.set("replace", JSSymbol.REPLACE);
+        symbolConstructor.set("search", JSSymbol.SEARCH);
+        symbolConstructor.set("split", JSSymbol.SPLIT);
+        symbolConstructor.set("species", JSSymbol.SPECIES);
+        symbolConstructor.set("unscopables", JSSymbol.UNSCOPABLES);
 
         global.set("Symbol", symbolConstructor);
     }
@@ -467,6 +479,38 @@ public final class GlobalObject {
         weakSetConstructor.set("[[WeakSetConstructor]]", JSBoolean.TRUE); // Mark as WeakSet constructor
 
         global.set("WeakSet", weakSetConstructor);
+    }
+
+    /**
+     * Initialize WeakRef constructor.
+     */
+    private static void initializeWeakRefConstructor(JSContext ctx, JSObject global) {
+        // Create WeakRef.prototype
+        JSObject weakRefPrototype = new JSObject();
+        // deref() method is added in JSWeakRef constructor
+
+        // Create WeakRef constructor
+        JSObject weakRefConstructor = new JSObject();
+        weakRefConstructor.set("prototype", weakRefPrototype);
+        weakRefConstructor.set("[[WeakRefConstructor]]", JSBoolean.TRUE); // Mark as WeakRef constructor
+
+        global.set("WeakRef", weakRefConstructor);
+    }
+
+    /**
+     * Initialize FinalizationRegistry constructor.
+     */
+    private static void initializeFinalizationRegistryConstructor(JSContext ctx, JSObject global) {
+        // Create FinalizationRegistry.prototype
+        JSObject finalizationRegistryPrototype = new JSObject();
+        // register() and unregister() methods are added in JSFinalizationRegistry constructor
+
+        // Create FinalizationRegistry constructor
+        JSObject finalizationRegistryConstructor = new JSObject();
+        finalizationRegistryConstructor.set("prototype", finalizationRegistryPrototype);
+        finalizationRegistryConstructor.set("[[FinalizationRegistryConstructor]]", JSBoolean.TRUE);
+
+        global.set("FinalizationRegistry", finalizationRegistryConstructor);
     }
 
     /**
@@ -1202,5 +1246,43 @@ public final class GlobalObject {
         });
 
         return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Initialize SharedArrayBuffer constructor and prototype.
+     */
+    private static void initializeSharedArrayBufferConstructor(JSContext ctx, JSObject global) {
+        // Create SharedArrayBuffer.prototype
+        JSObject sharedArrayBufferPrototype = new JSObject();
+        sharedArrayBufferPrototype.set("slice", createNativeFunction(ctx, "slice", SharedArrayBufferPrototype::slice, 2));
+        // byteLength getter
+        JSNativeFunction byteLengthGetter = createNativeFunction(ctx, "get byteLength", SharedArrayBufferPrototype::getByteLength, 0);
+        sharedArrayBufferPrototype.set("byteLength", byteLengthGetter); // Simplified: should be a getter
+
+        // Create SharedArrayBuffer constructor
+        JSObject sharedArrayBufferConstructor = new JSObject();
+        sharedArrayBufferConstructor.set("prototype", sharedArrayBufferPrototype);
+        sharedArrayBufferConstructor.set("[[SharedArrayBufferConstructor]]", JSBoolean.TRUE); // Mark as SharedArrayBuffer constructor
+
+        global.set("SharedArrayBuffer", sharedArrayBufferConstructor);
+    }
+
+    /**
+     * Initialize Atomics object.
+     */
+    private static void initializeAtomicsObject(JSContext ctx, JSObject global) {
+        JSObject atomics = new JSObject();
+        atomics.set("add", createNativeFunction(ctx, "add", AtomicsObject::add, 3));
+        atomics.set("sub", createNativeFunction(ctx, "sub", AtomicsObject::sub, 3));
+        atomics.set("and", createNativeFunction(ctx, "and", AtomicsObject::and, 3));
+        atomics.set("or", createNativeFunction(ctx, "or", AtomicsObject::or, 3));
+        atomics.set("xor", createNativeFunction(ctx, "xor", AtomicsObject::xor, 3));
+        atomics.set("load", createNativeFunction(ctx, "load", AtomicsObject::load, 2));
+        atomics.set("store", createNativeFunction(ctx, "store", AtomicsObject::store, 3));
+        atomics.set("compareExchange", createNativeFunction(ctx, "compareExchange", AtomicsObject::compareExchange, 4));
+        atomics.set("exchange", createNativeFunction(ctx, "exchange", AtomicsObject::exchange, 3));
+        atomics.set("isLockFree", createNativeFunction(ctx, "isLockFree", AtomicsObject::isLockFree, 1));
+
+        global.set("Atomics", atomics);
     }
 }

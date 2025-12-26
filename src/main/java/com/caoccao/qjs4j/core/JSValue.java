@@ -45,6 +45,24 @@ public sealed interface JSValue permits
     }
 
     /**
+     * Attempt to cast this value to JSAsyncGenerator.
+     *
+     * @return Optional containing the JSAsyncGenerator if this value is an async generator, empty otherwise
+     */
+    default Optional<JSAsyncGenerator> asAsyncGenerator() {
+        return this instanceof JSAsyncGenerator v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSAsyncIterator.
+     *
+     * @return Optional containing the JSAsyncIterator if this value is an async iterator, empty otherwise
+     */
+    default Optional<JSAsyncIterator> asAsyncIterator() {
+        return this instanceof JSAsyncIterator v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSBigInt.
      *
      * @return Optional containing the JSBigInt if this value is a BigInt, empty otherwise
@@ -78,6 +96,24 @@ public sealed interface JSValue permits
      */
     default Optional<JSBytecodeFunction> asBytecodeFunction() {
         return this instanceof JSBytecodeFunction v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSClass.
+     *
+     * @return Optional containing the JSClass if this value is a class, empty otherwise
+     */
+    default Optional<JSClass> asClass() {
+        return this instanceof JSClass v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSFinalizationRegistry.
+     *
+     * @return Optional containing the JSFinalizationRegistry if this value is a FinalizationRegistry, empty otherwise
+     */
+    default Optional<JSFinalizationRegistry> asFinalizationRegistry() {
+        return this instanceof JSFinalizationRegistry v ? Optional.of(v) : Optional.empty();
     }
 
     /**
@@ -198,15 +234,6 @@ public sealed interface JSValue permits
     }
 
     /**
-     * Attempt to cast this value to JSClass.
-     *
-     * @return Optional containing the JSClass if this value is a class, empty otherwise
-     */
-    default Optional<JSClass> asClass() {
-        return this instanceof JSClass v ? Optional.of(v) : Optional.empty();
-    }
-
-    /**
      * Attempt to cast this value to JSPromise.
      *
      * @return Optional containing the JSPromise if this value is a Promise, empty otherwise
@@ -240,6 +267,15 @@ public sealed interface JSValue permits
      */
     default Optional<JSSet> asSet() {
         return this instanceof JSSet v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSSharedArrayBuffer.
+     *
+     * @return Optional containing the JSSharedArrayBuffer if this value is a SharedArrayBuffer, empty otherwise
+     */
+    default Optional<JSSharedArrayBuffer> asSharedArrayBuffer() {
+        return this instanceof JSSharedArrayBuffer v ? Optional.of(v) : Optional.empty();
     }
 
     /**
@@ -324,6 +360,15 @@ public sealed interface JSValue permits
     }
 
     /**
+     * Attempt to cast this value to JSWeakRef.
+     *
+     * @return Optional containing the JSWeakRef if this value is a WeakRef, empty otherwise
+     */
+    default Optional<JSWeakRef> asWeakRef() {
+        return this instanceof JSWeakRef v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSWeakSet.
      *
      * @return Optional containing the JSWeakSet if this value is a WeakSet, empty otherwise
@@ -348,6 +393,24 @@ public sealed interface JSValue permits
      */
     default boolean isArrayBuffer() {
         return this instanceof JSArrayBuffer;
+    }
+
+    /**
+     * Check if this value is an async generator.
+     *
+     * @return true if this value is an async generator, false otherwise
+     */
+    default boolean isAsyncGenerator() {
+        return this instanceof JSAsyncGenerator;
+    }
+
+    /**
+     * Check if this value is an async iterator.
+     *
+     * @return true if this value is an async iterator, false otherwise
+     */
+    default boolean isAsyncIterator() {
+        return this instanceof JSAsyncIterator;
     }
 
     /**
@@ -405,6 +468,15 @@ public sealed interface JSValue permits
     }
 
     /**
+     * Check if this value is a class.
+     *
+     * @return true if this value is a class, false otherwise
+     */
+    default boolean isClass() {
+        return this instanceof JSClass;
+    }
+
+    /**
      * Check if this value is a DataView.
      *
      * @return true if this value is a DataView, false otherwise
@@ -420,6 +492,15 @@ public sealed interface JSValue permits
      */
     default boolean isDate() {
         return this instanceof JSDate;
+    }
+
+    /**
+     * Check if this value is a FinalizationRegistry.
+     *
+     * @return true if this value is a FinalizationRegistry, false otherwise
+     */
+    default boolean isFinalizationRegistry() {
+        return this instanceof JSFinalizationRegistry;
     }
 
     /**
@@ -534,15 +615,6 @@ public sealed interface JSValue permits
     }
 
     /**
-     * Check if this value is a class.
-     *
-     * @return true if this value is a class, false otherwise
-     */
-    default boolean isClass() {
-        return this instanceof JSClass;
-    }
-
-    /**
      * Check if this value is a Promise.
      *
      * @return true if this value is a Promise, false otherwise
@@ -576,6 +648,15 @@ public sealed interface JSValue permits
      */
     default boolean isSet() {
         return this instanceof JSSet;
+    }
+
+    /**
+     * Check if this value is a SharedArrayBuffer.
+     *
+     * @return true if this value is a SharedArrayBuffer, false otherwise
+     */
+    default boolean isSharedArrayBuffer() {
+        return this instanceof JSSharedArrayBuffer;
     }
 
     /**
@@ -657,6 +738,15 @@ public sealed interface JSValue permits
      */
     default boolean isWeakMap() {
         return this instanceof JSWeakMap;
+    }
+
+    /**
+     * Check if this value is a WeakRef.
+     *
+     * @return true if this value is a WeakRef, false otherwise
+     */
+    default boolean isWeakRef() {
+        return this instanceof JSWeakRef;
     }
 
     /**

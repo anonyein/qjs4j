@@ -17,6 +17,7 @@
 package com.caoccao.qjs4j.vm;
 
 import com.caoccao.qjs4j.builtins.BigIntConstructor;
+import com.caoccao.qjs4j.builtins.SharedArrayBufferConstructor;
 import com.caoccao.qjs4j.builtins.SymbolConstructor;
 import com.caoccao.qjs4j.core.*;
 
@@ -1057,6 +1058,56 @@ public final class VirtualMachine {
                 return;
             }
 
+            // Check for WeakRef constructor
+            JSValue isWeakRefCtor = ctorObj.get("[[WeakRefConstructor]]");
+            if (isWeakRefCtor instanceof JSBoolean && ((JSBoolean) isWeakRefCtor).value()) {
+                // WeakRef requires exactly 1 argument: target
+                if (args.length == 0) {
+                    context.throwError("TypeError", "WeakRef constructor requires a target object");
+                    valueStack.push(JSUndefined.INSTANCE);
+                    return;
+                }
+
+                JSValue result = com.caoccao.qjs4j.builtins.WeakRefConstructor.createWeakRef(context, args[0]);
+                if (result instanceof JSWeakRef weakRef) {
+                    // Set prototype
+                    JSValue prototypeValue = ctorObj.get("prototype");
+                    if (prototypeValue instanceof JSObject prototype) {
+                        weakRef.setPrototype(prototype);
+                    }
+                    valueStack.push(weakRef);
+                } else {
+                    // Error was thrown
+                    valueStack.push(result);
+                }
+                return;
+            }
+
+            // Check for FinalizationRegistry constructor
+            JSValue isFinalizationRegistryCtor = ctorObj.get("[[FinalizationRegistryConstructor]]");
+            if (isFinalizationRegistryCtor instanceof JSBoolean && ((JSBoolean) isFinalizationRegistryCtor).value()) {
+                // FinalizationRegistry requires exactly 1 argument: cleanupCallback
+                if (args.length == 0) {
+                    context.throwError("TypeError", "FinalizationRegistry constructor requires a cleanup callback");
+                    valueStack.push(JSUndefined.INSTANCE);
+                    return;
+                }
+
+                JSValue result = com.caoccao.qjs4j.builtins.FinalizationRegistryConstructor.createFinalizationRegistry(context, args[0]);
+                if (result instanceof JSFinalizationRegistry registry) {
+                    // Set prototype
+                    JSValue prototypeValue = ctorObj.get("prototype");
+                    if (prototypeValue instanceof JSObject prototype) {
+                        registry.setPrototype(prototype);
+                    }
+                    valueStack.push(registry);
+                } else {
+                    // Error was thrown
+                    valueStack.push(result);
+                }
+                return;
+            }
+
             // Check for Proxy constructor
             JSValue isProxyCtor = ctorObj.get("[[ProxyConstructor]]");
             if (isProxyCtor instanceof JSBoolean && ((JSBoolean) isProxyCtor).value()) {
@@ -1129,6 +1180,27 @@ public final class VirtualMachine {
                 }
 
                 valueStack.push(promiseObj);
+                return;
+            }
+
+            // Check for SharedArrayBuffer constructor
+            JSValue isSharedArrayBufferCtor = ctorObj.get("[[SharedArrayBufferConstructor]]");
+            if (isSharedArrayBufferCtor instanceof JSBoolean && ((JSBoolean) isSharedArrayBufferCtor).value()) {
+                // Get length argument
+                JSValue lengthArg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+
+                // Create SharedArrayBuffer
+                JSValue result = SharedArrayBufferConstructor.createSharedArrayBuffer(context, lengthArg);
+
+                if (result instanceof JSSharedArrayBuffer sharedArrayBuffer) {
+                    // Set prototype
+                    JSValue prototypeValue = ctorObj.get("prototype");
+                    if (prototypeValue instanceof JSObject prototype) {
+                        sharedArrayBuffer.setPrototype(prototype);
+                    }
+                }
+
+                valueStack.push(result);
                 return;
             }
 
