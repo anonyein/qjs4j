@@ -584,7 +584,6 @@ public class NumberPrototypeTest extends BaseTest {
         assertEquals("2a.8", result.asString().map(JSString::getValue).orElse(""));
     }
 
-    @Disabled
     @Test
     public void testToStringWithJavet() throws JavetException {
         List<Double> testNumbers = List.of(

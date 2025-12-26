@@ -16,8 +16,6 @@
 
 package com.caoccao.qjs4j.util;
 
-import com.caoccao.qjs4j.util.dtoa.QuickJSDtoa;
-
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -355,7 +353,7 @@ public final class DtoaConverter {
      */
     public static String convertToRadix(double value, int radix) {
         // Use QuickJS-compatible dtoa implementation
-        return QuickJSDtoa.toString(value, radix);
+        return JSDtoa.toString(value, radix);
     }
 
     /**
