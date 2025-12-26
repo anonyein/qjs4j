@@ -962,6 +962,114 @@ public final class VirtualMachine {
                 return;
             }
 
+            // Check for Map constructor
+            JSValue isMapCtor = ctorObj.get("[[MapConstructor]]");
+            if (isMapCtor instanceof JSBoolean && ((JSBoolean) isMapCtor).value()) {
+                // Create Map object
+                JSMap mapObj = new JSMap();
+
+                // Set prototype
+                JSValue prototypeValue = ctorObj.get("prototype");
+                if (prototypeValue instanceof JSObject prototype) {
+                    mapObj.setPrototype(prototype);
+                }
+
+                // If an iterable is provided, populate the map
+                // For now, simplified - we'll skip iterable initialization
+                // TODO: Implement iterable initialization when iterators are available
+
+                valueStack.push(mapObj);
+                return;
+            }
+
+            // Check for Set constructor
+            JSValue isSetCtor = ctorObj.get("[[SetConstructor]]");
+            if (isSetCtor instanceof JSBoolean && ((JSBoolean) isSetCtor).value()) {
+                // Create Set object
+                JSSet setObj = new JSSet();
+
+                // Set prototype
+                JSValue prototypeValue = ctorObj.get("prototype");
+                if (prototypeValue instanceof JSObject prototype) {
+                    setObj.setPrototype(prototype);
+                }
+
+                // If an iterable is provided, populate the set
+                // For now, simplified - we'll skip iterable initialization
+                // TODO: Implement iterable initialization when iterators are available
+
+                valueStack.push(setObj);
+                return;
+            }
+
+            // Check for WeakMap constructor
+            JSValue isWeakMapCtor = ctorObj.get("[[WeakMapConstructor]]");
+            if (isWeakMapCtor instanceof JSBoolean && ((JSBoolean) isWeakMapCtor).value()) {
+                // Create WeakMap object
+                JSWeakMap weakMapObj = new JSWeakMap();
+
+                // Set prototype
+                JSValue prototypeValue = ctorObj.get("prototype");
+                if (prototypeValue instanceof JSObject prototype) {
+                    weakMapObj.setPrototype(prototype);
+                }
+
+                // If an iterable is provided, populate the weakmap
+                // For now, simplified - we'll skip iterable initialization
+                // TODO: Implement iterable initialization when iterators are available
+
+                valueStack.push(weakMapObj);
+                return;
+            }
+
+            // Check for WeakSet constructor
+            JSValue isWeakSetCtor = ctorObj.get("[[WeakSetConstructor]]");
+            if (isWeakSetCtor instanceof JSBoolean && ((JSBoolean) isWeakSetCtor).value()) {
+                // Create WeakSet object
+                JSWeakSet weakSetObj = new JSWeakSet();
+
+                // Set prototype
+                JSValue prototypeValue = ctorObj.get("prototype");
+                if (prototypeValue instanceof JSObject prototype) {
+                    weakSetObj.setPrototype(prototype);
+                }
+
+                // If an iterable is provided, populate the weakset
+                // For now, simplified - we'll skip iterable initialization
+                // TODO: Implement iterable initialization when iterators are available
+
+                valueStack.push(weakSetObj);
+                return;
+            }
+
+            // Check for Proxy constructor
+            JSValue isProxyCtor = ctorObj.get("[[ProxyConstructor]]");
+            if (isProxyCtor instanceof JSBoolean && ((JSBoolean) isProxyCtor).value()) {
+                // Proxy requires exactly 2 arguments: target and handler
+                if (args.length < 2) {
+                    context.throwError("TypeError", "Proxy constructor requires target and handler");
+                    valueStack.push(JSUndefined.INSTANCE);
+                    return;
+                }
+
+                if (!(args[0] instanceof JSObject target)) {
+                    context.throwError("TypeError", "Proxy target must be an object");
+                    valueStack.push(JSUndefined.INSTANCE);
+                    return;
+                }
+
+                if (!(args[1] instanceof JSObject handler)) {
+                    context.throwError("TypeError", "Proxy handler must be an object");
+                    valueStack.push(JSUndefined.INSTANCE);
+                    return;
+                }
+
+                // Create Proxy object
+                JSProxy proxyObj = new JSProxy(target, handler, context);
+                valueStack.push(proxyObj);
+                return;
+            }
+
             // Handle Error constructors
             JSValue errorNameValue = ctorObj.get("[[ErrorName]]");
             if (errorNameValue instanceof JSString errorName) {

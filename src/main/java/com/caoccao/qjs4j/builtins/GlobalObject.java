@@ -73,8 +73,14 @@ public final class GlobalObject {
         initializeRegExpConstructor(ctx, global);
         initializeSymbolConstructor(ctx, global);
         initializeBigIntConstructor(ctx, global);
+        initializeMapConstructor(ctx, global);
+        initializeSetConstructor(ctx, global);
+        initializeWeakMapConstructor(ctx, global);
+        initializeWeakSetConstructor(ctx, global);
         initializeMathObject(ctx, global);
         initializeJSONObject(ctx, global);
+        initializeReflectObject(ctx, global);
+        initializeProxyConstructor(ctx, global);
 
         // Error constructors
         initializeErrorConstructors(ctx, global);
@@ -361,6 +367,90 @@ public final class GlobalObject {
     }
 
     /**
+     * Initialize Map constructor and prototype methods.
+     */
+    private static void initializeMapConstructor(JSContext ctx, JSObject global) {
+        // Create Map.prototype
+        JSObject mapPrototype = new JSObject();
+        mapPrototype.set("set", createNativeFunction(ctx, "set", MapPrototype::set, 2));
+        mapPrototype.set("get", createNativeFunction(ctx, "get", MapPrototype::get, 1));
+        mapPrototype.set("has", createNativeFunction(ctx, "has", MapPrototype::has, 1));
+        mapPrototype.set("delete", createNativeFunction(ctx, "delete", MapPrototype::delete, 1));
+        mapPrototype.set("clear", createNativeFunction(ctx, "clear", MapPrototype::clear, 0));
+        mapPrototype.set("forEach", createNativeFunction(ctx, "forEach", MapPrototype::forEach, 1));
+        mapPrototype.set("entries", createNativeFunction(ctx, "entries", MapPrototype::entries, 0));
+        mapPrototype.set("keys", createNativeFunction(ctx, "keys", MapPrototype::keys, 0));
+        mapPrototype.set("values", createNativeFunction(ctx, "values", MapPrototype::values, 0));
+
+        // Create Map constructor
+        JSObject mapConstructor = new JSObject();
+        mapConstructor.set("prototype", mapPrototype);
+        mapConstructor.set("[[MapConstructor]]", JSBoolean.TRUE); // Mark as Map constructor
+
+        global.set("Map", mapConstructor);
+    }
+
+    /**
+     * Initialize Set constructor and prototype methods.
+     */
+    private static void initializeSetConstructor(JSContext ctx, JSObject global) {
+        // Create Set.prototype
+        JSObject setPrototype = new JSObject();
+        setPrototype.set("add", createNativeFunction(ctx, "add", SetPrototype::add, 1));
+        setPrototype.set("has", createNativeFunction(ctx, "has", SetPrototype::has, 1));
+        setPrototype.set("delete", createNativeFunction(ctx, "delete", SetPrototype::delete, 1));
+        setPrototype.set("clear", createNativeFunction(ctx, "clear", SetPrototype::clear, 0));
+        setPrototype.set("forEach", createNativeFunction(ctx, "forEach", SetPrototype::forEach, 1));
+        setPrototype.set("entries", createNativeFunction(ctx, "entries", SetPrototype::entries, 0));
+        setPrototype.set("keys", createNativeFunction(ctx, "keys", SetPrototype::keys, 0));
+        setPrototype.set("values", createNativeFunction(ctx, "values", SetPrototype::values, 0));
+
+        // Create Set constructor
+        JSObject setConstructor = new JSObject();
+        setConstructor.set("prototype", setPrototype);
+        setConstructor.set("[[SetConstructor]]", JSBoolean.TRUE); // Mark as Set constructor
+
+        global.set("Set", setConstructor);
+    }
+
+    /**
+     * Initialize WeakMap constructor and prototype methods.
+     */
+    private static void initializeWeakMapConstructor(JSContext ctx, JSObject global) {
+        // Create WeakMap.prototype
+        JSObject weakMapPrototype = new JSObject();
+        weakMapPrototype.set("set", createNativeFunction(ctx, "set", WeakMapPrototype::set, 2));
+        weakMapPrototype.set("get", createNativeFunction(ctx, "get", WeakMapPrototype::get, 1));
+        weakMapPrototype.set("has", createNativeFunction(ctx, "has", WeakMapPrototype::has, 1));
+        weakMapPrototype.set("delete", createNativeFunction(ctx, "delete", WeakMapPrototype::delete, 1));
+
+        // Create WeakMap constructor
+        JSObject weakMapConstructor = new JSObject();
+        weakMapConstructor.set("prototype", weakMapPrototype);
+        weakMapConstructor.set("[[WeakMapConstructor]]", JSBoolean.TRUE); // Mark as WeakMap constructor
+
+        global.set("WeakMap", weakMapConstructor);
+    }
+
+    /**
+     * Initialize WeakSet constructor and prototype methods.
+     */
+    private static void initializeWeakSetConstructor(JSContext ctx, JSObject global) {
+        // Create WeakSet.prototype
+        JSObject weakSetPrototype = new JSObject();
+        weakSetPrototype.set("add", createNativeFunction(ctx, "add", WeakSetPrototype::add, 1));
+        weakSetPrototype.set("has", createNativeFunction(ctx, "has", WeakSetPrototype::has, 1));
+        weakSetPrototype.set("delete", createNativeFunction(ctx, "delete", WeakSetPrototype::delete, 1));
+
+        // Create WeakSet constructor
+        JSObject weakSetConstructor = new JSObject();
+        weakSetConstructor.set("prototype", weakSetPrototype);
+        weakSetConstructor.set("[[WeakSetConstructor]]", JSBoolean.TRUE); // Mark as WeakSet constructor
+
+        global.set("WeakSet", weakSetConstructor);
+    }
+
+    /**
      * Initialize Math object.
      */
     private static void initializeMathObject(JSContext ctx, JSObject global) {
@@ -425,6 +515,40 @@ public final class GlobalObject {
         json.set("stringify", createNativeFunction(ctx, "stringify", JSONObject::stringify, 1));
 
         global.set("JSON", json);
+    }
+
+    /**
+     * Initialize Reflect object.
+     */
+    private static void initializeReflectObject(JSContext ctx, JSObject global) {
+        JSObject reflect = new JSObject();
+        reflect.set("get", createNativeFunction(ctx, "get", ReflectObject::get, 2));
+        reflect.set("set", createNativeFunction(ctx, "set", ReflectObject::set, 3));
+        reflect.set("has", createNativeFunction(ctx, "has", ReflectObject::has, 2));
+        reflect.set("deleteProperty", createNativeFunction(ctx, "deleteProperty", ReflectObject::deleteProperty, 2));
+        reflect.set("getPrototypeOf", createNativeFunction(ctx, "getPrototypeOf", ReflectObject::getPrototypeOf, 1));
+        reflect.set("setPrototypeOf", createNativeFunction(ctx, "setPrototypeOf", ReflectObject::setPrototypeOf, 2));
+        reflect.set("ownKeys", createNativeFunction(ctx, "ownKeys", ReflectObject::ownKeys, 1));
+        reflect.set("apply", createNativeFunction(ctx, "apply", ReflectObject::apply, 3));
+        reflect.set("construct", createNativeFunction(ctx, "construct", ReflectObject::construct, 2));
+        reflect.set("isExtensible", createNativeFunction(ctx, "isExtensible", ReflectObject::isExtensible, 1));
+        reflect.set("preventExtensions", createNativeFunction(ctx, "preventExtensions", ReflectObject::preventExtensions, 1));
+
+        global.set("Reflect", reflect);
+    }
+
+    /**
+     * Initialize Proxy constructor.
+     */
+    private static void initializeProxyConstructor(JSContext ctx, JSObject global) {
+        // Create Proxy constructor (special handling required in VM)
+        JSObject proxyConstructor = new JSObject();
+        proxyConstructor.set("[[ProxyConstructor]]", JSBoolean.TRUE); // Mark as Proxy constructor
+
+        // Add static methods
+        proxyConstructor.set("revocable", createNativeFunction(ctx, "revocable", ProxyConstructor::revocable, 2));
+
+        global.set("Proxy", proxyConstructor);
     }
 
     /**

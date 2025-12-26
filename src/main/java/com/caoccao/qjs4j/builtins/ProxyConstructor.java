@@ -1,0 +1,59 @@
+/*
+ * Copyright (c) 2025-2026. caoccao.com Sam Cao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.caoccao.qjs4j.builtins;
+
+import com.caoccao.qjs4j.core.*;
+
+/**
+ * Implementation of the Proxy constructor.
+ * Based on ES2020 Proxy specification (simplified).
+ * The Proxy constructor creates a Proxy object that wraps a target object
+ * and allows intercepting operations on it via handler traps.
+ */
+public final class ProxyConstructor {
+
+    /**
+     * Proxy.revocable(target, handler)
+     * ES2020 26.2.2.1
+     * Creates a revocable proxy object.
+     * Simplified implementation: returns a basic proxy for now.
+     */
+    public static JSValue revocable(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length < 2 || !(args[0] instanceof JSObject) || !(args[1] instanceof JSObject)) {
+            return ctx.throwError("TypeError", "Proxy.revocable requires target and handler objects");
+        }
+
+        JSObject target = (JSObject) args[0];
+        JSObject handler = (JSObject) args[1];
+
+        // Create the proxy
+        JSProxy proxy = new JSProxy(target, handler, ctx);
+
+        // Create result object with proxy and revoke function
+        JSObject result = new JSObject();
+        result.set("proxy", proxy);
+
+        // Create revoke function (simplified: does nothing for now)
+        JSNativeFunction revokeFunc = new JSNativeFunction("revoke", 0, (context, thisValue, funcArgs) -> {
+            // In a full implementation, this would invalidate the proxy
+            return JSUndefined.INSTANCE;
+        });
+        result.set("revoke", revokeFunc);
+
+        return result;
+    }
+}
