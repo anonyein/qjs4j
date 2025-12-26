@@ -21,7 +21,7 @@ import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Unit tests for GeneratorPrototype methods.
@@ -47,20 +47,20 @@ public class GeneratorPrototypeTest extends BaseTest {
 
         // Test the custom generator
         JSValue result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        JSObject iteratorResult = (JSObject) result;
-        assertEquals("first", ((JSString) iteratorResult.get("value")).getValue());
+        JSObject iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals("first", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
-        assertEquals("second", ((JSString) iteratorResult.get("value")).getValue());
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals("second", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
     }
@@ -75,17 +75,17 @@ public class GeneratorPrototypeTest extends BaseTest {
 
         // Normal case: next() on empty generator
         JSValue result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        JSObject iteratorResult = (JSObject) result;
+        JSObject iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
         // Normal case: return on empty generator
         JSGenerator generator2 = JSGenerator.fromArray(emptyArray);
         result = GeneratorPrototype.returnMethod(ctx, generator2, new JSValue[]{new JSString("done")});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
-        assertEquals("done", ((JSString) iteratorResult.get("value")).getValue());
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals("done", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
     }
 
@@ -102,43 +102,43 @@ public class GeneratorPrototypeTest extends BaseTest {
 
         // Normal case: first next() call
         JSValue result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        JSObject iteratorResult = (JSObject) result;
-        assertEquals(1.0, ((JSNumber) iteratorResult.get("value")).value());
+        JSObject iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals(1.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElse(0.0));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         // Normal case: second next() call
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
-        assertEquals(2.0, ((JSNumber) iteratorResult.get("value")).value());
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals(2.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElse(0.0));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         // Normal case: third next() call
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
-        assertEquals(3.0, ((JSNumber) iteratorResult.get("value")).value());
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals(3.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElse(0.0));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         // Normal case: fourth next() call (done)
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
         // Normal case: subsequent calls after done
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
         // Normal case: next() with value argument (ignored in this simple implementation)
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{new JSString("ignored")});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
@@ -166,23 +166,23 @@ public class GeneratorPrototypeTest extends BaseTest {
 
         // Normal case: return with value
         JSValue result = GeneratorPrototype.returnMethod(ctx, generator, new JSValue[]{new JSString("returned")});
-        assertInstanceOf(JSObject.class, result);
-        JSObject iteratorResult = (JSObject) result;
-        assertEquals("returned", ((JSString) iteratorResult.get("value")).getValue());
+        JSObject iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals("returned", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
         // Normal case: subsequent next() calls after return
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
-        assertEquals("returned", ((JSString) iteratorResult.get("value")).getValue());
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals("returned", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
         // Normal case: return without value (undefined)
         JSGenerator generator2 = JSGenerator.fromArray(array);
         result = GeneratorPrototype.returnMethod(ctx, generator2, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 

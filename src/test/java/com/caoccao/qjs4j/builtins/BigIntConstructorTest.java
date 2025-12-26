@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Unit tests for BigInt constructor and static methods.
@@ -36,29 +36,33 @@ public class BigIntConstructorTest extends BaseTest {
         JSValue result = BigIntConstructor.asIntN(ctx, JSUndefined.INSTANCE, new JSValue[]{
                 new JSNumber(8), new JSBigInt(BigInteger.valueOf(127))
         });
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(127), ((JSBigInt) result).getValue());
+        JSBigInt bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(127), bigInt.getValue());
 
         // Normal case: negative value
         result = BigIntConstructor.asIntN(ctx, JSUndefined.INSTANCE, new JSValue[]{
                 new JSNumber(8), new JSBigInt(BigInteger.valueOf(-1))
         });
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(-1), ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(-1), bigInt.getValue());
 
         // Normal case: wrap around positive
         result = BigIntConstructor.asIntN(ctx, JSUndefined.INSTANCE, new JSValue[]{
                 new JSNumber(8), new JSBigInt(BigInteger.valueOf(128))
         });
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(-128), ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(-128), bigInt.getValue());
 
         // Normal case: wrap around negative
         result = BigIntConstructor.asIntN(ctx, JSUndefined.INSTANCE, new JSValue[]{
                 new JSNumber(8), new JSBigInt(BigInteger.valueOf(-129))
         });
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(127), ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(127), bigInt.getValue());
 
         // Edge case: insufficient arguments
         result = BigIntConstructor.asIntN(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(8)});
@@ -100,22 +104,25 @@ public class BigIntConstructorTest extends BaseTest {
         JSValue result = BigIntConstructor.asUintN(ctx, JSUndefined.INSTANCE, new JSValue[]{
                 new JSNumber(8), new JSBigInt(BigInteger.valueOf(255))
         });
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(255), ((JSBigInt) result).getValue());
+        JSBigInt bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(255), bigInt.getValue());
 
         // Normal case: wrap around
         result = BigIntConstructor.asUintN(ctx, JSUndefined.INSTANCE, new JSValue[]{
                 new JSNumber(8), new JSBigInt(BigInteger.valueOf(256))
         });
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.ZERO, ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.ZERO, bigInt.getValue());
 
         // Normal case: negative value becomes positive
         result = BigIntConstructor.asUintN(ctx, JSUndefined.INSTANCE, new JSValue[]{
                 new JSNumber(8), new JSBigInt(BigInteger.valueOf(-1))
         });
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(255), ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(255), bigInt.getValue());
 
         // Edge case: insufficient arguments
         result = BigIntConstructor.asUintN(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(8)});
@@ -155,43 +162,50 @@ public class BigIntConstructorTest extends BaseTest {
     public void testCall() {
         // Normal case: from number
         JSValue result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(123)});
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(123), ((JSBigInt) result).getValue());
+        JSBigInt bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(123), bigInt.getValue());
 
         // Normal case: from BigInt
-        JSBigInt bigInt = new JSBigInt(BigInteger.valueOf(456));
+        bigInt = new JSBigInt(BigInteger.valueOf(456));
         result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{bigInt});
         assertEquals(bigInt, result);
 
         // Normal case: from string (decimal)
         result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("789")});
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(789), ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(789), bigInt.getValue());
 
         // Normal case: from string (hex)
         result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("0xFF")});
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(255), ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(255), bigInt.getValue());
 
         // Normal case: from string (octal)
         result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("0o77")});
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(63), ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(63), bigInt.getValue());
 
         // Normal case: from string (binary)
         result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("0b101")});
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.valueOf(5), ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.valueOf(5), bigInt.getValue());
 
         // Normal case: from boolean true
         result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{JSBoolean.TRUE});
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.ONE, ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.ONE, bigInt.getValue());
 
         // Normal case: from boolean false
         result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{JSBoolean.FALSE});
-        assertInstanceOf(JSBigInt.class, result);
-        assertEquals(BigInteger.ZERO, ((JSBigInt) result).getValue());
+        bigInt = result.asBigInt().orElse(null);
+        assertNotNull(bigInt);
+        assertEquals(BigInteger.ZERO, bigInt.getValue());
 
         // Edge case: no arguments
         result = BigIntConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{});

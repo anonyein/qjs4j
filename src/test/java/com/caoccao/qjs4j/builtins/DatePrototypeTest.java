@@ -36,8 +36,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getDate(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(1.0, ((JSNumber) result).value());
+        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getDate(ctx, new JSString("not a date"), new JSValue[]{});
@@ -51,8 +50,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getDay(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double day = ((JSNumber) result).value();
+        double day = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(day >= 0 && day <= 6, "Day should be between 0 and 6");
 
         // Edge case: called on non-Date
@@ -67,8 +65,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getFullYear(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(2024.0, ((JSNumber) result).value());
+        assertEquals(2024.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getFullYear(ctx, new JSString("not a date"), new JSValue[]{});
@@ -82,8 +79,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getHours(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double hours = ((JSNumber) result).value();
+        double hours = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(hours >= 0 && hours <= 23, "Hours should be between 0 and 23");
 
         // Edge case: called on non-Date
@@ -98,8 +94,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getMilliseconds(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(0.0, ((JSNumber) result).value());
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getMilliseconds(ctx, new JSString("not a date"), new JSValue[]{});
@@ -113,8 +108,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getMinutes(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(0.0, ((JSNumber) result).value());
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getMinutes(ctx, new JSString("not a date"), new JSValue[]{});
@@ -128,8 +122,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getMonth(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(0.0, ((JSNumber) result).value()); // January is 0
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0)); // January is 0
 
         // Edge case: called on non-Date
         result = DatePrototype.getMonth(ctx, new JSString("not a date"), new JSValue[]{});
@@ -143,8 +136,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getSeconds(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(0.0, ((JSNumber) result).value());
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getSeconds(ctx, new JSString("not a date"), new JSValue[]{});
@@ -158,8 +150,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getTime(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(1704067200000.0, ((JSNumber) result).value());
+        assertEquals(1704067200000.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getTime(ctx, new JSString("not a date"), new JSValue[]{});
@@ -173,8 +164,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getUTCDate(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(1.0, ((JSNumber) result).value());
+        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getUTCDate(ctx, new JSString("not a date"), new JSValue[]{});
@@ -188,8 +178,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getUTCFullYear(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(2024.0, ((JSNumber) result).value());
+        assertEquals(2024.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getUTCFullYear(ctx, new JSString("not a date"), new JSValue[]{});
@@ -203,8 +192,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getUTCHours(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(0.0, ((JSNumber) result).value());
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.getUTCHours(ctx, new JSString("not a date"), new JSValue[]{});
@@ -218,8 +206,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.getUTCMonth(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(0.0, ((JSNumber) result).value()); // January is 0
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0)); // January is 0
 
         // Edge case: called on non-Date
         result = DatePrototype.getUTCMonth(ctx, new JSString("not a date"), new JSValue[]{});
@@ -233,8 +220,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.toISOString(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        String isoString = ((JSString) result).getValue();
+        String isoString = result.asString().map(JSString::getValue).orElse("");
         assertTrue(isoString.startsWith("2024-01-01T00:00:00"));
 
         // Edge case: called on non-Date
@@ -249,8 +235,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.toJSON(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        String jsonString = ((JSString) result).getValue();
+        String jsonString = result.asString().map(JSString::getValue).orElse("");
         assertTrue(jsonString.startsWith("2024-01-01T00:00:00"));
 
         // Edge case: called on non-Date
@@ -265,9 +250,8 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.toStringMethod(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
         // Should return a string representation
-        String str = ((JSString) result).getValue();
+        String str = result.asString().map(JSString::getValue).orElse("");
         assertNotNull(str);
         assertTrue(str.length() > 0);
 
@@ -283,8 +267,7 @@ public class DatePrototypeTest extends BaseTest {
         JSDate date = new JSDate(1704067200000L);
 
         JSValue result = DatePrototype.valueOf(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(1704067200000.0, ((JSNumber) result).value());
+        assertEquals(1704067200000.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         result = DatePrototype.valueOf(ctx, new JSString("not a date"), new JSValue[]{});

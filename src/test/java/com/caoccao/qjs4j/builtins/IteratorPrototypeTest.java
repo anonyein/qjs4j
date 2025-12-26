@@ -38,27 +38,27 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: get entries iterator
         JSValue result = IteratorPrototype.arrayEntries(ctx, array, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration - first entry [0, "a"]
-        JSObject iteratorResult = (JSObject) iterator.next();
-        assertInstanceOf(JSArray.class, iteratorResult.get("value"));
-        JSArray pair = (JSArray) iteratorResult.get("value");
-        assertEquals(0.0, ((JSNumber) pair.get(0)).value());
-        assertEquals("a", ((JSString) pair.get(1)).getValue());
+        JSObject iteratorResult = iterator.next();
+        JSArray pair = iteratorResult.get("value").asArray().orElse(null);
+        assertNotNull(pair);
+        assertEquals(0.0, pair.get(0).asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals("a", pair.get(1).asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         // Second entry [1, "b"]
-        iteratorResult = (JSObject) iterator.next();
-        assertInstanceOf(JSArray.class, iteratorResult.get("value"));
-        pair = (JSArray) iteratorResult.get("value");
-        assertEquals(1.0, ((JSNumber) pair.get(0)).value());
-        assertEquals("b", ((JSString) pair.get(1)).getValue());
+        iteratorResult = iterator.next();
+        pair = iteratorResult.get("value").asArray().orElse(null);
+        assertNotNull(pair);
+        assertEquals(1.0, pair.get(0).asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals("b", pair.get(1).asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         // End
-        iteratorResult = (JSObject) iterator.next();
+        iteratorResult = iterator.next();
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
@@ -79,19 +79,19 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: get keys iterator
         JSValue result = IteratorPrototype.arrayKeys(ctx, array, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration
-        JSObject iteratorResult = (JSObject) iterator.next();
-        assertEquals(0.0, ((JSNumber) iteratorResult.get("value")).value());
+        JSObject iteratorResult = iterator.next();
+        assertEquals(0.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElse(0.0));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
-        iteratorResult = (JSObject) iterator.next();
-        assertEquals(1.0, ((JSNumber) iteratorResult.get("value")).value());
+        iteratorResult = iterator.next();
+        assertEquals(1.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElse(0.0));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
-        iteratorResult = (JSObject) iterator.next();
+        iteratorResult = iterator.next();
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
@@ -113,23 +113,23 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: get values iterator
         JSValue result = IteratorPrototype.arrayValues(ctx, array, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration
-        JSObject iteratorResult = (JSObject) iterator.next();
-        assertEquals(1.0, ((JSNumber) iteratorResult.get("value")).value());
+        JSObject iteratorResult = iterator.next();
+        assertEquals(1.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElse(0.0));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
-        iteratorResult = (JSObject) iterator.next();
-        assertEquals("hello", ((JSString) iteratorResult.get("value")).getValue());
+        iteratorResult = iterator.next();
+        assertEquals("hello", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
-        iteratorResult = (JSObject) iterator.next();
+        iteratorResult = iterator.next();
         assertEquals(JSBoolean.TRUE, iteratorResult.get("value"));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
-        iteratorResult = (JSObject) iterator.next();
+        iteratorResult = iterator.next();
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
@@ -150,30 +150,30 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: get entries iterator
         JSValue result = IteratorPrototype.mapEntriesIterator(ctx, map, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration (order may vary)
         boolean foundKey1 = false, foundKey2 = false;
         for (int i = 0; i < 2; i++) {
-            JSObject iteratorResult = (JSObject) iterator.next();
+            JSObject iteratorResult = iterator.next();
             assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
-            assertInstanceOf(JSArray.class, iteratorResult.get("value"));
-            JSArray pair = (JSArray) iteratorResult.get("value");
+            JSArray pair = iteratorResult.get("value").asArray().orElse(null);
+            assertNotNull(pair);
 
-            JSString key = (JSString) pair.get(0);
-            if ("key1".equals(key.getValue())) {
-                assertEquals("value1", ((JSString) pair.get(1)).getValue());
+            String key = pair.get(0).asString().map(JSString::getValue).orElse("");
+            if ("key1".equals(key)) {
+                assertEquals("value1", pair.get(1).asString().map(JSString::getValue).orElse(""));
                 foundKey1 = true;
-            } else if ("key2".equals(key.getValue())) {
-                assertEquals(42.0, ((JSNumber) pair.get(1)).value());
+            } else if ("key2".equals(key)) {
+                assertEquals(42.0, pair.get(1).asNumber().map(JSNumber::value).orElse(0.0));
                 foundKey2 = true;
             }
         }
         assertTrue(foundKey1 && foundKey2);
 
         // End of iteration
-        JSObject iteratorResult = (JSObject) iterator.next();
+        JSObject iteratorResult = iterator.next();
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
@@ -194,17 +194,17 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: get keys iterator
         JSValue result = IteratorPrototype.mapKeysIterator(ctx, map, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration
         boolean foundA = false, foundB = false;
         for (int i = 0; i < 2; i++) {
-            JSObject iteratorResult = (JSObject) iterator.next();
+            JSObject iteratorResult = iterator.next();
             assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
-            JSString key = (JSString) iteratorResult.get("value");
-            if ("a".equals(key.getValue())) foundA = true;
-            else if ("b".equals(key.getValue())) foundB = true;
+            String key = iteratorResult.get("value").asString().map(JSString::getValue).orElse("");
+            if ("a".equals(key)) foundA = true;
+            else if ("b".equals(key)) foundB = true;
         }
         assertTrue(foundA && foundB);
 
@@ -225,17 +225,17 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: get values iterator
         JSValue result = IteratorPrototype.mapValuesIterator(ctx, map, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration
         boolean foundOne = false, foundTwo = false;
         for (int i = 0; i < 2; i++) {
-            JSObject iteratorResult = (JSObject) iterator.next();
+            JSObject iteratorResult = iterator.next();
             assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
-            JSString value = (JSString) iteratorResult.get("value");
-            if ("one".equals(value.getValue())) foundOne = true;
-            else if ("two".equals(value.getValue())) foundTwo = true;
+            String value = iteratorResult.get("value").asString().map(JSString::getValue).orElse("");
+            if ("one".equals(value)) foundOne = true;
+            else if ("two".equals(value)) foundTwo = true;
         }
         assertTrue(foundOne && foundTwo);
 
@@ -257,22 +257,22 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: next() on iterator
         JSValue result = IteratorPrototype.next(ctx, iterator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        JSObject iteratorResult = (JSObject) result;
-        assertEquals(1.0, ((JSNumber) iteratorResult.get("value")).value());
+        JSObject iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals(1.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElse(0.0));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         // Continue iteration
         result = IteratorPrototype.next(ctx, iterator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
-        assertEquals(2.0, ((JSNumber) iteratorResult.get("value")).value());
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
+        assertEquals(2.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElse(0.0));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
         // End of iteration
         result = IteratorPrototype.next(ctx, iterator, new JSValue[]{});
-        assertInstanceOf(JSObject.class, result);
-        iteratorResult = (JSObject) result;
+        iteratorResult = result.asObject().orElse(null);
+        assertNotNull(iteratorResult);
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
@@ -293,16 +293,16 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: get entries iterator
         JSValue result = IteratorPrototype.setEntriesIterator(ctx, set, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration - each entry should be [value, value]
         boolean foundHello = false, found42 = false;
         for (int i = 0; i < 2; i++) {
-            JSObject iteratorResult = (JSObject) iterator.next();
+            JSObject iteratorResult = iterator.next();
             assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
-            assertInstanceOf(JSArray.class, iteratorResult.get("value"));
-            JSArray pair = (JSArray) iteratorResult.get("value");
+            JSArray pair = iteratorResult.get("value").asArray().orElse(null);
+            assertNotNull(pair);
 
             // In Set entries, both elements should be the same
             assertEquals(pair.get(0), pair.get(1));
@@ -333,7 +333,7 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: keys() should be same as values() for Set
         JSValue result = IteratorPrototype.setKeysIterator(ctx, set, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
+        result.asIterator().orElse(null);
 
         // Should behave identically to values iterator
         JSValue valuesResult = IteratorPrototype.setValuesIterator(ctx, set, new JSValue[]{});
@@ -357,13 +357,13 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: get values iterator
         JSValue result = IteratorPrototype.setValuesIterator(ctx, set, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration (order may vary, but all values should be present)
         boolean foundA = false, foundB = false, found3 = false;
         for (int i = 0; i < 3; i++) {
-            JSObject iteratorResult = (JSObject) iterator.next();
+            JSObject iteratorResult = iterator.next();
             assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
             JSValue value = iteratorResult.get("value");
             if (value instanceof JSString str) {
@@ -376,7 +376,7 @@ public class IteratorPrototypeTest extends BaseTest {
         assertTrue(foundA && foundB && found3);
 
         // End of iteration
-        JSObject iteratorResult = (JSObject) iterator.next();
+        JSObject iteratorResult = iterator.next();
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
@@ -393,32 +393,32 @@ public class IteratorPrototypeTest extends BaseTest {
         // Normal case: string iteration
         JSString str = new JSString("abc");
         JSValue result = IteratorPrototype.stringIterator(ctx, str, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        JSIterator iterator = (JSIterator) result;
+        JSIterator iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
 
         // Test iteration
-        JSObject iteratorResult = (JSObject) iterator.next();
-        assertEquals("a", ((JSString) iteratorResult.get("value")).getValue());
+        JSObject iteratorResult = iterator.next();
+        assertEquals("a", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
-        iteratorResult = (JSObject) iterator.next();
-        assertEquals("b", ((JSString) iteratorResult.get("value")).getValue());
+        iteratorResult = iterator.next();
+        assertEquals("b", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
-        iteratorResult = (JSObject) iterator.next();
-        assertEquals("c", ((JSString) iteratorResult.get("value")).getValue());
+        iteratorResult = iterator.next();
+        assertEquals("c", iteratorResult.get("value").asString().map(JSString::getValue).orElse(""));
         assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
 
-        iteratorResult = (JSObject) iterator.next();
+        iteratorResult = iterator.next();
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
         // Normal case: empty string
         JSString emptyStr = new JSString("");
         result = IteratorPrototype.stringIterator(ctx, emptyStr, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
-        iterator = (JSIterator) result;
-        iteratorResult = (JSObject) iterator.next();
+        iterator = result.asIterator().orElse(null);
+        assertNotNull(iterator);
+        iteratorResult = iterator.next();
         assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
         assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
 
@@ -426,7 +426,7 @@ public class IteratorPrototypeTest extends BaseTest {
         JSObject boxedString = new JSObject();
         boxedString.set("[[PrimitiveValue]]", str);
         result = IteratorPrototype.stringIterator(ctx, boxedString, new JSValue[]{});
-        assertInstanceOf(JSIterator.class, result);
+        result.asIterator().orElse(null);
 
         // Edge case: called on non-string
         result = IteratorPrototype.stringIterator(ctx, new JSNumber(123), new JSValue[]{});

@@ -27,7 +27,26 @@ public sealed interface JSValue permits
         JSObject, JSSymbol, JSBigInt, JSFunction {
 
     /**
+     * Attempt to cast this value to JSArray.
+     *
+     * @return Optional containing the JSArray if this value is an array, empty otherwise
+     */
+    default Optional<JSArray> asArray() {
+        return this instanceof JSArray v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSArrayBuffer.
+     *
+     * @return Optional containing the JSArrayBuffer if this value is an ArrayBuffer, empty otherwise
+     */
+    default Optional<JSArrayBuffer> asArrayBuffer() {
+        return this instanceof JSArrayBuffer v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSBigInt.
+     *
      * @return Optional containing the JSBigInt if this value is a BigInt, empty otherwise
      */
     default Optional<JSBigInt> asBigInt() {
@@ -36,6 +55,7 @@ public sealed interface JSValue permits
 
     /**
      * Attempt to cast this value to JSBoolean.
+     *
      * @return Optional containing the JSBoolean if this value is a boolean, empty otherwise
      */
     default Optional<JSBoolean> asBoolean() {
@@ -43,7 +63,44 @@ public sealed interface JSValue permits
     }
 
     /**
+     * Attempt to cast this value to JSBoundFunction.
+     *
+     * @return Optional containing the JSBoundFunction if this value is a bound function, empty otherwise
+     */
+    default Optional<JSBoundFunction> asBoundFunction() {
+        return this instanceof JSBoundFunction v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSDataView.
+     *
+     * @return Optional containing the JSDataView if this value is a DataView, empty otherwise
+     */
+    default Optional<JSDataView> asDataView() {
+        return this instanceof JSDataView v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSDate.
+     *
+     * @return Optional containing the JSDate if this value is a Date, empty otherwise
+     */
+    default Optional<JSDate> asDate() {
+        return this instanceof JSDate v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSFloat64Array.
+     *
+     * @return Optional containing the JSFloat64Array if this value is a Float64Array, empty otherwise
+     */
+    default Optional<JSFloat64Array> asFloat64Array() {
+        return this instanceof JSFloat64Array v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSFunction.
+     *
      * @return Optional containing the JSFunction if this value is a function, empty otherwise
      */
     default Optional<JSFunction> asFunction() {
@@ -51,7 +108,44 @@ public sealed interface JSValue permits
     }
 
     /**
+     * Attempt to cast this value to JSGenerator.
+     *
+     * @return Optional containing the JSGenerator if this value is a generator, empty otherwise
+     */
+    default Optional<JSGenerator> asGenerator() {
+        return this instanceof JSGenerator v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSInt32Array.
+     *
+     * @return Optional containing the JSInt32Array if this value is an Int32Array, empty otherwise
+     */
+    default Optional<JSInt32Array> asInt32Array() {
+        return this instanceof JSInt32Array v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSIterator.
+     *
+     * @return Optional containing the JSIterator if this value is an iterator, empty otherwise
+     */
+    default Optional<JSIterator> asIterator() {
+        return this instanceof JSIterator v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSMap.
+     *
+     * @return Optional containing the JSMap if this value is a Map, empty otherwise
+     */
+    default Optional<JSMap> asMap() {
+        return this instanceof JSMap v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSNull.
+     *
      * @return Optional containing the JSNull if this value is null, empty otherwise
      */
     default Optional<JSNull> asNull() {
@@ -60,6 +154,7 @@ public sealed interface JSValue permits
 
     /**
      * Attempt to cast this value to JSNumber.
+     *
      * @return Optional containing the JSNumber if this value is a number, empty otherwise
      */
     default Optional<JSNumber> asNumber() {
@@ -68,6 +163,7 @@ public sealed interface JSValue permits
 
     /**
      * Attempt to cast this value to JSObject.
+     *
      * @return Optional containing the JSObject if this value is an object, empty otherwise
      */
     default Optional<JSObject> asObject() {
@@ -75,7 +171,44 @@ public sealed interface JSValue permits
     }
 
     /**
+     * Attempt to cast this value to JSPromise.
+     *
+     * @return Optional containing the JSPromise if this value is a Promise, empty otherwise
+     */
+    default Optional<JSPromise> asPromise() {
+        return this instanceof JSPromise v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSProxy.
+     *
+     * @return Optional containing the JSProxy if this value is a Proxy, empty otherwise
+     */
+    default Optional<JSProxy> asProxy() {
+        return this instanceof JSProxy v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSRegExp.
+     *
+     * @return Optional containing the JSRegExp if this value is a RegExp, empty otherwise
+     */
+    default Optional<JSRegExp> asRegExp() {
+        return this instanceof JSRegExp v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSSet.
+     *
+     * @return Optional containing the JSSet if this value is a Set, empty otherwise
+     */
+    default Optional<JSSet> asSet() {
+        return this instanceof JSSet v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSString.
+     *
      * @return Optional containing the JSString if this value is a string, empty otherwise
      */
     default Optional<JSString> asString() {
@@ -84,6 +217,7 @@ public sealed interface JSValue permits
 
     /**
      * Attempt to cast this value to JSSymbol.
+     *
      * @return Optional containing the JSSymbol if this value is a symbol, empty otherwise
      */
     default Optional<JSSymbol> asSymbol() {
@@ -91,11 +225,309 @@ public sealed interface JSValue permits
     }
 
     /**
+     * Attempt to cast this value to JSTypedArray.
+     *
+     * @return Optional containing the JSTypedArray if this value is a TypedArray, empty otherwise
+     */
+    default Optional<JSTypedArray> asTypedArray() {
+        return this instanceof JSTypedArray v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSUint8Array.
+     *
+     * @return Optional containing the JSUint8Array if this value is a Uint8Array, empty otherwise
+     */
+    default Optional<JSUint8Array> asUint8Array() {
+        return this instanceof JSUint8Array v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSUndefined.
+     *
      * @return Optional containing the JSUndefined if this value is undefined, empty otherwise
      */
     default Optional<JSUndefined> asUndefined() {
         return this instanceof JSUndefined v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSWeakMap.
+     *
+     * @return Optional containing the JSWeakMap if this value is a WeakMap, empty otherwise
+     */
+    default Optional<JSWeakMap> asWeakMap() {
+        return this instanceof JSWeakMap v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to cast this value to JSWeakSet.
+     *
+     * @return Optional containing the JSWeakSet if this value is a WeakSet, empty otherwise
+     */
+    default Optional<JSWeakSet> asWeakSet() {
+        return this instanceof JSWeakSet v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Check if this value is an array.
+     *
+     * @return true if this value is an array, false otherwise
+     */
+    default boolean isArray() {
+        return this instanceof JSArray;
+    }
+
+    /**
+     * Check if this value is an ArrayBuffer.
+     *
+     * @return true if this value is an ArrayBuffer, false otherwise
+     */
+    default boolean isArrayBuffer() {
+        return this instanceof JSArrayBuffer;
+    }
+
+    /**
+     * Check if this value is a BigInt.
+     *
+     * @return true if this value is a BigInt, false otherwise
+     */
+    default boolean isBigInt() {
+        return this instanceof JSBigInt;
+    }
+
+    /**
+     * Check if this value is a boolean.
+     *
+     * @return true if this value is a boolean, false otherwise
+     */
+    default boolean isBoolean() {
+        return this instanceof JSBoolean;
+    }
+
+    /**
+     * Check if this value is the boolean false.
+     *
+     * @return true if this value is the boolean false, false otherwise
+     */
+    default boolean isBooleanFalse() {
+        return this == JSBoolean.FALSE;
+    }
+
+    /**
+     * Check if this value is the boolean true.
+     *
+     * @return true if this value is the boolean true, false otherwise
+     */
+    default boolean isBooleanTrue() {
+        return this == JSBoolean.TRUE;
+    }
+
+    /**
+     * Check if this value is a bound function.
+     *
+     * @return true if this value is a bound function, false otherwise
+     */
+    default boolean isBoundFunction() {
+        return this instanceof JSBoundFunction;
+    }
+
+    /**
+     * Check if this value is a DataView.
+     *
+     * @return true if this value is a DataView, false otherwise
+     */
+    default boolean isDataView() {
+        return this instanceof JSDataView;
+    }
+
+    /**
+     * Check if this value is a Date.
+     *
+     * @return true if this value is a Date, false otherwise
+     */
+    default boolean isDate() {
+        return this instanceof JSDate;
+    }
+
+    /**
+     * Check if this value is a Float64Array.
+     *
+     * @return true if this value is a Float64Array, false otherwise
+     */
+    default boolean isFloat64Array() {
+        return this instanceof JSFloat64Array;
+    }
+
+    /**
+     * Check if this value is a function.
+     *
+     * @return true if this value is a function, false otherwise
+     */
+    default boolean isFunction() {
+        return this instanceof JSFunction;
+    }
+
+    /**
+     * Check if this value is a generator.
+     *
+     * @return true if this value is a generator, false otherwise
+     */
+    default boolean isGenerator() {
+        return this instanceof JSGenerator;
+    }
+
+    /**
+     * Check if this value is an Int32Array.
+     *
+     * @return true if this value is an Int32Array, false otherwise
+     */
+    default boolean isInt32Array() {
+        return this instanceof JSInt32Array;
+    }
+
+    /**
+     * Check if this value is an iterator.
+     *
+     * @return true if this value is an iterator, false otherwise
+     */
+    default boolean isIterator() {
+        return this instanceof JSIterator;
+    }
+
+    /**
+     * Check if this value is a Map.
+     *
+     * @return true if this value is a Map, false otherwise
+     */
+    default boolean isMap() {
+        return this instanceof JSMap;
+    }
+
+    /**
+     * Check if this value is null.
+     *
+     * @return true if this value is null, false otherwise
+     */
+    default boolean isNull() {
+        return this instanceof JSNull;
+    }
+
+    /**
+     * Check if this value is a number.
+     *
+     * @return true if this value is a number, false otherwise
+     */
+    default boolean isNumber() {
+        return this instanceof JSNumber;
+    }
+
+    /**
+     * Check if this value is an object.
+     *
+     * @return true if this value is an object, false otherwise
+     */
+    default boolean isObject() {
+        return this instanceof JSObject;
+    }
+
+    /**
+     * Check if this value is a Promise.
+     *
+     * @return true if this value is a Promise, false otherwise
+     */
+    default boolean isPromise() {
+        return this instanceof JSPromise;
+    }
+
+    /**
+     * Check if this value is a Proxy.
+     *
+     * @return true if this value is a Proxy, false otherwise
+     */
+    default boolean isProxy() {
+        return this instanceof JSProxy;
+    }
+
+    /**
+     * Check if this value is a RegExp.
+     *
+     * @return true if this value is a RegExp, false otherwise
+     */
+    default boolean isRegExp() {
+        return this instanceof JSRegExp;
+    }
+
+    /**
+     * Check if this value is a Set.
+     *
+     * @return true if this value is a Set, false otherwise
+     */
+    default boolean isSet() {
+        return this instanceof JSSet;
+    }
+
+    /**
+     * Check if this value is a string.
+     *
+     * @return true if this value is a string, false otherwise
+     */
+    default boolean isString() {
+        return this instanceof JSString;
+    }
+
+    /**
+     * Check if this value is a symbol.
+     *
+     * @return true if this value is a symbol, false otherwise
+     */
+    default boolean isSymbol() {
+        return this instanceof JSSymbol;
+    }
+
+    /**
+     * Check if this value is a TypedArray.
+     *
+     * @return true if this value is a TypedArray, false otherwise
+     */
+    default boolean isTypedArray() {
+        return this instanceof JSTypedArray;
+    }
+
+    /**
+     * Check if this value is a Uint8Array.
+     *
+     * @return true if this value is a Uint8Array, false otherwise
+     */
+    default boolean isUint8Array() {
+        return this instanceof JSUint8Array;
+    }
+
+    /**
+     * Check if this value is undefined.
+     *
+     * @return true if this value is undefined, false otherwise
+     */
+    default boolean isUndefined() {
+        return this instanceof JSUndefined;
+    }
+
+    /**
+     * Check if this value is a WeakMap.
+     *
+     * @return true if this value is a WeakMap, false otherwise
+     */
+    default boolean isWeakMap() {
+        return this instanceof JSWeakMap;
+    }
+
+    /**
+     * Check if this value is a WeakSet.
+     *
+     * @return true if this value is a WeakSet, false otherwise
+     */
+    default boolean isWeakSet() {
+        return this instanceof JSWeakSet;
     }
 
     /**

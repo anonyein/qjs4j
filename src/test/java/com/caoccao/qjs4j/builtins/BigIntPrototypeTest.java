@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Unit tests for BigIntPrototype methods.
@@ -38,13 +38,15 @@ public class BigIntPrototypeTest extends BaseTest {
         JSBigInt bigInt = new JSBigInt(BigInteger.valueOf(12345));
         // Normal case: default
         JSValue result = BigIntPrototype.toLocaleString(ctx, bigInt, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("12345", ((JSString) result).getValue());
+        JSString str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("12345", str.getValue());
 
         // Normal case: with arguments (ignored in simplified implementation)
         result = BigIntPrototype.toLocaleString(ctx, bigInt, new JSValue[]{new JSString("en-US")});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("12345", ((JSString) result).getValue());
+        str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("12345", str.getValue());
 
         // Edge case: called on non-BigInt
         result = BigIntPrototype.toLocaleString(ctx, new JSString("not a bigint"), new JSValue[]{});
@@ -57,39 +59,46 @@ public class BigIntPrototypeTest extends BaseTest {
         JSBigInt bigInt = new JSBigInt(BigInteger.valueOf(12345));
         // Normal case: default radix (10)
         JSValue result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("12345", ((JSString) result).getValue());
+        JSString str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("12345", str.getValue());
 
         // Normal case: explicit radix 10
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(10)});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("12345", ((JSString) result).getValue());
+        str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("12345", str.getValue());
 
         // Normal case: radix 16
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(16)});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("3039", ((JSString) result).getValue());
+        str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("3039", str.getValue());
 
         // Normal case: radix 2
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(2)});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("11000000111001", ((JSString) result).getValue());
+        str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("11000000111001", str.getValue());
 
         // Normal case: negative BigInt
         JSBigInt negativeBigInt = new JSBigInt(BigInteger.valueOf(-12345));
         result = BigIntPrototype.toString(ctx, negativeBigInt, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("-12345", ((JSString) result).getValue());
+        str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("-12345", str.getValue());
 
         // Edge case: radix 2 (minimum)
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(2)});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("11000000111001", ((JSString) result).getValue());
+        str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("11000000111001", str.getValue());
 
         // Edge case: radix 36 (maximum)
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(36)});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("9ix", ((JSString) result).getValue());
+        str = result.asString().orElse(null);
+        assertNotNull(str);
+        assertEquals("9ix", str.getValue());
 
         // Edge case: radix too small
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(1)});

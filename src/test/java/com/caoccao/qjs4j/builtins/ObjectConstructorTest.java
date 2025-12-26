@@ -41,16 +41,16 @@ public class ObjectConstructorTest extends BaseTest {
         // Normal case
         JSValue result = ObjectConstructor.assign(ctx, JSUndefined.INSTANCE, new JSValue[]{target, source1, source2});
         assertSame(target, result);
-        assertEquals(10.0, ((JSNumber) target.get("a")).value());
-        assertEquals(2.0, ((JSNumber) target.get("b")).value());
-        assertEquals(3.0, ((JSNumber) target.get("c")).value());
+        assertEquals(10.0, target.get("a").asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(2.0, target.get("b").asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(3.0, target.get("c").asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: null/undefined sources (should be ignored)
         JSObject target2 = new JSObject();
         target2.set("x", new JSNumber(1));
         result = ObjectConstructor.assign(ctx, JSUndefined.INSTANCE, new JSValue[]{target2, JSNull.INSTANCE, JSUndefined.INSTANCE});
         assertSame(target2, result);
-        assertEquals(1.0, ((JSNumber) target2.get("x")).value());
+        assertEquals(1.0, target2.get("x").asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: no arguments
         assertTypeError(ObjectConstructor.assign(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
@@ -72,14 +72,14 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case: create object with prototype
         JSValue result = ObjectConstructor.create(ctx, JSUndefined.INSTANCE, new JSValue[]{proto});
-        assertInstanceOf(JSObject.class, result);
-        JSObject obj = (JSObject) result;
+        JSObject obj = result.asObject().orElse(null);
+        assertNotNull(obj);
         assertSame(proto, obj.getPrototype());
 
         // Edge case: create with null prototype
         result = ObjectConstructor.create(ctx, JSUndefined.INSTANCE, new JSValue[]{JSNull.INSTANCE});
-        assertInstanceOf(JSObject.class, result);
-        obj = (JSObject) result;
+        obj = result.asObject().orElse(null);
+        assertNotNull(obj);
         assertNull(obj.getPrototype());
 
         // Edge case: no arguments
@@ -104,22 +104,23 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case
         JSValue result = ObjectConstructor.entries(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray entries = (JSArray) result;
+        JSArray entries = result.asArray().orElse(null);
+        assertNotNull(entries);
         assertEquals(2, entries.getLength());
 
         // Check first entry
         JSValue firstEntry = entries.get(0);
-        assertInstanceOf(JSArray.class, firstEntry);
-        JSArray firstPair = (JSArray) firstEntry;
+        JSArray firstPair = firstEntry.asArray().orElse(null);
+        assertNotNull(firstPair);
         assertEquals(2, firstPair.getLength());
-        assertInstanceOf(JSString.class, firstPair.get(0));
-        assertInstanceOf(JSNumber.class, firstPair.get(1));
+        assertTrue(firstPair.get(0).asString().isPresent());
+        assertTrue(firstPair.get(1).asNumber().isPresent());
 
         // Edge case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectConstructor.entries(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        entries = (JSArray) result;
+        entries = result.asArray().orElse(null);
+        assertNotNull(entries);
         assertEquals(0, entries.getLength());
 
         // Edge case: no arguments
@@ -161,7 +162,7 @@ public class ObjectConstructorTest extends BaseTest {
         JSObject objWithNullProto = new JSObject();
         objWithNullProto.setPrototype(null);
         result = ObjectConstructor.getPrototypeOf(ctx, JSUndefined.INSTANCE, new JSValue[]{objWithNullProto});
-        assertInstanceOf(JSNull.class, result);
+        assertTrue(result.isNull());
 
         // Edge case: no arguments
         assertTypeError(ObjectConstructor.getPrototypeOf(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
@@ -185,15 +186,15 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case: property exists
         JSValue result = ObjectConstructor.hasOwnProperty(ctx, obj, new JSValue[]{new JSString("a")});
-        assertEquals(JSBoolean.TRUE, result);
+        assertTrue(result.isBooleanTrue());
 
         // Property doesn't exist
         result = ObjectConstructor.hasOwnProperty(ctx, obj, new JSValue[]{new JSString("z")});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // Edge case: no arguments
         result = ObjectConstructor.hasOwnProperty(ctx, obj, new JSValue[]{});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // Edge case: called on non-object
         assertTypeError(ObjectConstructor.hasOwnProperty(ctx, new JSString("not object"), new JSValue[]{new JSString("a")}));
@@ -207,12 +208,12 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case: not frozen
         JSValue result = ObjectConstructor.isFrozen(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // After freezing
         obj.freeze();
         result = ObjectConstructor.isFrozen(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertEquals(JSBoolean.TRUE, result);
+        assertTrue(result.isBooleanTrue());
 
         // Edge case: no arguments
         assertTypeError(ObjectConstructor.isFrozen(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
@@ -226,12 +227,12 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case: not sealed
         JSValue result = ObjectConstructor.isSealed(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // After sealing
         obj.seal();
         result = ObjectConstructor.isSealed(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertEquals(JSBoolean.TRUE, result);
+        assertTrue(result.isBooleanTrue());
 
         // Edge case: no arguments
         assertTypeError(ObjectConstructor.isSealed(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
@@ -247,14 +248,15 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case
         JSValue result = ObjectConstructor.keys(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray keys = (JSArray) result;
+        JSArray keys = result.asArray().orElse(null);
+        assertNotNull(keys);
         assertEquals(3, keys.getLength());
 
         // Edge case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectConstructor.keys(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        keys = (JSArray) result;
+        keys = result.asArray().orElse(null);
+        assertNotNull(keys);
         assertEquals(0, keys.getLength());
 
         // Edge case: no arguments
@@ -331,14 +333,15 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case
         JSValue result = ObjectConstructor.values(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray values = (JSArray) result;
+        JSArray values = result.asArray().orElse(null);
+        assertNotNull(values);
         assertEquals(3, values.getLength());
 
         // Edge case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectConstructor.values(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        values = (JSArray) result;
+        values = result.asArray().orElse(null);
+        assertNotNull(values);
         assertEquals(0, values.getLength());
 
         // Edge case: no arguments

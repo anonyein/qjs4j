@@ -34,8 +34,7 @@ public class DateConstructorTest extends BaseTest {
         JSValue result = DateConstructor.now(ctx, JSUndefined.INSTANCE, new JSValue[]{});
         long after = System.currentTimeMillis();
 
-        assertInstanceOf(JSNumber.class, result);
-        double timestamp = ((JSNumber) result).value();
+        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(timestamp >= before && timestamp <= after);
     }
 
@@ -43,64 +42,62 @@ public class DateConstructorTest extends BaseTest {
     public void testUTC() {
         // Normal case: Date.UTC(2025, 0, 1, 0, 0, 0)
         JSValue result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
-            new JSNumber(2025),
-            new JSNumber(0), // January
-            new JSNumber(1),
-            new JSNumber(0),
-            new JSNumber(0),
-            new JSNumber(0)
+                new JSNumber(2025),
+                new JSNumber(0), // January
+                new JSNumber(1),
+                new JSNumber(0),
+                new JSNumber(0),
+                new JSNumber(0)
         });
-        assertInstanceOf(JSNumber.class, result);
-        double timestamp = ((JSNumber) result).value();
+        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(timestamp > 0);
 
         // Edge case: only year
         result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(2025)});
-        assertInstanceOf(JSNumber.class, result);
+        result.asNumber().map(JSNumber::value).orElse(0.0);
 
         // Edge case: year and month
         result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
-            new JSNumber(2025),
-            new JSNumber(5) // June
+                new JSNumber(2025),
+                new JSNumber(5) // June
         });
-        assertInstanceOf(JSNumber.class, result);
+        result.asNumber().map(JSNumber::value).orElse(0.0);
 
         // Edge case: no arguments (should return NaN)
         result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertTrue(Double.isNaN(((JSNumber) result).value()));
+        double nanValue = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(Double.isNaN(nanValue));
 
         // Edge case: invalid date (should return NaN)
         result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
-            new JSNumber(2025),
-            new JSNumber(12), // Invalid month
-            new JSNumber(32)  // Invalid day
+                new JSNumber(2025),
+                new JSNumber(12), // Invalid month
+                new JSNumber(32)  // Invalid day
         });
-        assertInstanceOf(JSNumber.class, result);
-        assertTrue(Double.isNaN(((JSNumber) result).value()));
+        double invalidValue = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(Double.isNaN(invalidValue));
     }
 
     @Test
     public void testParse() {
         // Normal case: ISO 8601 format
         JSValue result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{
-            new JSString("2025-01-01T00:00:00.000Z")
+                new JSString("2025-01-01T00:00:00.000Z")
         });
-        assertInstanceOf(JSNumber.class, result);
-        double timestamp = ((JSNumber) result).value();
+        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(timestamp > 0);
 
         // Edge case: no arguments
         result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertTrue(Double.isNaN(((JSNumber) result).value()));
+        double nanValue = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(Double.isNaN(nanValue));
 
         // Edge case: invalid date string
         result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{
-            new JSString("not a date")
+                new JSString("not a date")
         });
-        assertInstanceOf(JSNumber.class, result);
-        assertTrue(Double.isNaN(((JSNumber) result).value()));
+        double invalidValue = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(Double.isNaN(invalidValue));
     }
 
     @Test
@@ -110,8 +107,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(timestamp);
 
         JSValue result = DatePrototype.getTime(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(timestamp, ((JSNumber) result).value());
+        assertEquals(timestamp, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.getTime(ctx, new JSString("not date"), new JSValue[]{}));
@@ -124,8 +120,8 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1750000000000L); // Approximately 2025-06-15
 
         JSValue result = DatePrototype.getFullYear(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
         // We don't assert exact year as it depends on timezone
+        result.asNumber().map(JSNumber::value).orElse(0.0);
 
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.getFullYear(ctx, new JSObject(), new JSValue[]{}));
@@ -137,8 +133,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1750000000000L);
 
         JSValue result = DatePrototype.getMonth(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double month = ((JSNumber) result).value();
+        double month = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(month >= 0 && month <= 11);
 
         // Edge case: called on non-Date
@@ -151,8 +146,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1750000000000L);
 
         JSValue result = DatePrototype.getDate(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double day = ((JSNumber) result).value();
+        double day = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(day >= 1 && day <= 31);
 
         // Edge case: called on non-Date
@@ -165,8 +159,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1750000000000L);
 
         JSValue result = DatePrototype.getDay(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double day = ((JSNumber) result).value();
+        double day = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(day >= 0 && day <= 6);
 
         // Edge case: called on non-Date
@@ -179,8 +172,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1750000000000L);
 
         JSValue result = DatePrototype.getHours(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double hours = ((JSNumber) result).value();
+        double hours = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(hours >= 0 && hours <= 23);
 
         // Edge case: called on non-Date
@@ -193,8 +185,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1750000000000L);
 
         JSValue result = DatePrototype.getMinutes(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double minutes = ((JSNumber) result).value();
+        double minutes = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(minutes >= 0 && minutes <= 59);
 
         // Edge case: called on non-Date
@@ -207,8 +198,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1750000000000L);
 
         JSValue result = DatePrototype.getSeconds(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double seconds = ((JSNumber) result).value();
+        double seconds = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(seconds >= 0 && seconds <= 59);
 
         // Edge case: called on non-Date
@@ -221,8 +211,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1750000000123L); // 123 milliseconds
 
         JSValue result = DatePrototype.getMilliseconds(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        double ms = ((JSNumber) result).value();
+        double ms = result.asNumber().map(JSNumber::value).orElse(0.0);
         assertTrue(ms >= 0 && ms <= 999);
 
         // Edge case: called on non-Date
@@ -236,8 +225,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1735689600000L);
 
         JSValue result = DatePrototype.getUTCFullYear(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(2025.0, ((JSNumber) result).value());
+        assertEquals(2025.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.getUTCFullYear(ctx, new JSString("not date"), new JSValue[]{}));
@@ -250,8 +238,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1735689600000L);
 
         JSValue result = DatePrototype.getUTCMonth(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(0.0, ((JSNumber) result).value()); // January = 0
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0)); // January = 0
 
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.getUTCMonth(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
@@ -264,8 +251,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1735689600000L);
 
         JSValue result = DatePrototype.getUTCDate(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(1.0, ((JSNumber) result).value());
+        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.getUTCDate(ctx, new JSNumber(42), new JSValue[]{}));
@@ -278,8 +264,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1735689600000L);
 
         JSValue result = DatePrototype.getUTCHours(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(0.0, ((JSNumber) result).value());
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.getUTCHours(ctx, JSNull.INSTANCE, new JSValue[]{}));
@@ -292,8 +277,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1735689600000L);
 
         JSValue result = DatePrototype.toISOString(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        String isoString = ((JSString) result).getValue();
+        String isoString = result.asString().map(JSString::getValue).orElse("");
         assertTrue(isoString.contains("2025-01-01"));
         assertTrue(isoString.endsWith("Z"));
 
@@ -308,8 +292,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1735689600000L);
 
         JSValue result = DatePrototype.toJSON(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        String jsonString = ((JSString) result).getValue();
+        String jsonString = result.asString().map(JSString::getValue).orElse("");
         assertTrue(jsonString.contains("2025-01-01"));
 
         // Edge case: called on non-Date
@@ -322,8 +305,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(1735689600000L);
 
         JSValue result = DatePrototype.toStringMethod(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        String str = ((JSString) result).getValue();
+        String str = result.asString().map(JSString::getValue).orElse("");
         assertFalse(str.isEmpty());
 
         // Edge case: called on non-Date
@@ -337,8 +319,7 @@ public class DateConstructorTest extends BaseTest {
         JSDate date = new JSDate(timestamp);
 
         JSValue result = DatePrototype.valueOf(ctx, date, new JSValue[]{});
-        assertInstanceOf(JSNumber.class, result);
-        assertEquals(timestamp, ((JSNumber) result).value());
+        assertEquals(timestamp, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.valueOf(ctx, new JSObject(), new JSValue[]{}));

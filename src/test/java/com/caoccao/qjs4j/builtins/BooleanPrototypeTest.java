@@ -20,7 +20,8 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests for Boolean.prototype methods.
@@ -31,24 +32,22 @@ public class BooleanPrototypeTest extends BaseTest {
     public void testToString() {
         // Normal case: true
         JSValue result = BooleanPrototype.toString(ctx, JSBoolean.TRUE, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("true", ((JSString) result).getValue());
+        assertEquals("true", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: false
         result = BooleanPrototype.toString(ctx, JSBoolean.FALSE, new JSValue[]{});
-        assertInstanceOf(JSString.class, result);
-        assertEquals("false", ((JSString) result).getValue());
+        assertEquals("false", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: Boolean object wrapper
         JSObject boolObj = new JSObject();
         boolObj.set("[[PrimitiveValue]]", JSBoolean.TRUE);
         result = BooleanPrototype.toString(ctx, boolObj, new JSValue[]{});
-        assertEquals("true", ((JSString) result).getValue());
+        assertEquals("true", result.asString().map(JSString::getValue).orElse(""));
 
         JSObject boolObj2 = new JSObject();
         boolObj2.set("[[PrimitiveValue]]", JSBoolean.FALSE);
         result = BooleanPrototype.toString(ctx, boolObj2, new JSValue[]{});
-        assertEquals("false", ((JSString) result).getValue());
+        assertEquals("false", result.asString().map(JSString::getValue).orElse(""));
 
         // Edge case: called on non-boolean
         assertTypeError(BooleanPrototype.toString(ctx, new JSString("not boolean"), new JSValue[]{}));
@@ -64,22 +63,22 @@ public class BooleanPrototypeTest extends BaseTest {
     public void testValueOf() {
         // Normal case: true
         JSValue result = BooleanPrototype.valueOf(ctx, JSBoolean.TRUE, new JSValue[]{});
-        assertEquals(JSBoolean.TRUE, result);
+        assertTrue(result.isBooleanTrue());
 
         // Normal case: false
         result = BooleanPrototype.valueOf(ctx, JSBoolean.FALSE, new JSValue[]{});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // Normal case: Boolean object wrapper
         JSObject boolObj = new JSObject();
         boolObj.set("[[PrimitiveValue]]", JSBoolean.TRUE);
         result = BooleanPrototype.valueOf(ctx, boolObj, new JSValue[]{});
-        assertEquals(JSBoolean.TRUE, result);
+        assertTrue(result.isBooleanTrue());
 
         JSObject boolObj2 = new JSObject();
         boolObj2.set("[[PrimitiveValue]]", JSBoolean.FALSE);
         result = BooleanPrototype.valueOf(ctx, boolObj2, new JSValue[]{});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // Edge case: called on non-boolean
         assertTypeError(BooleanPrototype.valueOf(ctx, new JSNumber(123), new JSValue[]{}));

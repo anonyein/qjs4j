@@ -18,11 +18,9 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for StringPrototype methods.
@@ -32,103 +30,103 @@ public class StringPrototypeTest extends BaseTest {
     public void testCharAt() {
         // Normal case
         JSValue result = StringPrototype.charAt(ctx, str, new JSValue[]{new JSNumber(0)});
-        assertEquals("h", ((JSString) result).getValue());
+        assertEquals("h", result.asString().map(JSString::getValue).orElse(""));
 
         result = StringPrototype.charAt(ctx, str, new JSValue[]{new JSNumber(4)});
-        assertEquals("o", ((JSString) result).getValue());
+        assertEquals("o", result.asString().map(JSString::getValue).orElse(""));
 
         // Default index 0
         result = StringPrototype.charAt(ctx, str, new JSValue[]{});
-        assertEquals("h", ((JSString) result).getValue());
+        assertEquals("h", result.asString().map(JSString::getValue).orElse(""));
 
         // Out of bounds
         result = StringPrototype.charAt(ctx, str, new JSValue[]{new JSNumber(-1)});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         result = StringPrototype.charAt(ctx, str, new JSValue[]{new JSNumber(20)});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         // Non-integer index
         result = StringPrototype.charAt(ctx, str, new JSValue[]{new JSString("1")});
-        assertEquals("e", ((JSString) result).getValue());
+        assertEquals("e", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.charAt(ctx, empty, new JSValue[]{new JSNumber(0)});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         // Non-string thisArg
         result = StringPrototype.charAt(ctx, new JSNumber(42), new JSValue[]{new JSNumber(0)});
-        assertEquals("4", ((JSString) result).getValue());
+        assertEquals("4", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
     public void testCharCodeAt() {
         // Normal case
         JSValue result = StringPrototype.charCodeAt(ctx, str, new JSValue[]{new JSNumber(0)});
-        assertEquals(104.0, ((JSNumber) result).value());
+        assertEquals(104.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         result = StringPrototype.charCodeAt(ctx, str, new JSValue[]{new JSNumber(4)});
-        assertEquals(111.0, ((JSNumber) result).value());
+        assertEquals(111.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Default index 0
         result = StringPrototype.charCodeAt(ctx, str, new JSValue[]{});
-        assertEquals(104.0, ((JSNumber) result).value());
+        assertEquals(104.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Out of bounds
         result = StringPrototype.charCodeAt(ctx, str, new JSValue[]{new JSNumber(-1)});
-        assertTrue(result instanceof JSNumber && Double.isNaN(((JSNumber) result).value()));
+        assertTrue(result.asNumber().isPresent() && Double.isNaN(result.asNumber().get().value()));
 
         result = StringPrototype.charCodeAt(ctx, str, new JSValue[]{new JSNumber(20)});
-        assertTrue(result instanceof JSNumber && Double.isNaN(((JSNumber) result).value()));
+        assertTrue(result.asNumber().isPresent() && Double.isNaN(result.asNumber().get().value()));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.charCodeAt(ctx, empty, new JSValue[]{new JSNumber(0)});
-        assertTrue(result instanceof JSNumber && Double.isNaN(((JSNumber) result).value()));
+        assertTrue(result.asNumber().isPresent() && Double.isNaN(result.asNumber().get().value()));
     }
 
     @Test
     public void testCodePointAt() {
         // Normal case
         JSValue result = StringPrototype.codePointAt(ctx, str, new JSValue[]{new JSNumber(0)});
-        assertEquals(104.0, ((JSNumber) result).value());
+        assertEquals(104.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Surrogate pair (if applicable)
         JSString surrogate = new JSString("😀");
         result = StringPrototype.codePointAt(ctx, surrogate, new JSValue[]{new JSNumber(0)});
-        assertEquals(128512.0, ((JSNumber) result).value());
+        assertEquals(128512.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Out of bounds
         result = StringPrototype.codePointAt(ctx, str, new JSValue[]{new JSNumber(-1)});
-        assertEquals(JSUndefined.INSTANCE, result);
+        assertTrue(result.isUndefined());
 
         result = StringPrototype.codePointAt(ctx, str, new JSValue[]{new JSNumber(20)});
-        assertEquals(JSUndefined.INSTANCE, result);
+        assertTrue(result.isUndefined());
     }
 
     @Test
     public void testConcat() {
         // Normal case
         JSValue result = StringPrototype.concat(ctx, str, new JSValue[]{new JSString(" test")});
-        assertEquals("hello world test", ((JSString) result).getValue());
+        assertEquals("hello world test", result.asString().map(JSString::getValue).orElse(""));
 
         // Multiple args
         result = StringPrototype.concat(ctx, str, new JSValue[]{new JSString(" "), new JSString("test")});
-        assertEquals("hello world test", ((JSString) result).getValue());
+        assertEquals("hello world test", result.asString().map(JSString::getValue).orElse(""));
 
         // No args
         result = StringPrototype.concat(ctx, str, new JSValue[]{});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Non-string args
         result = StringPrototype.concat(ctx, str, new JSValue[]{new JSNumber(42)});
-        assertEquals("hello world42", ((JSString) result).getValue());
+        assertEquals("hello world42", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.concat(ctx, empty, new JSValue[]{str});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
@@ -138,7 +136,7 @@ public class StringPrototypeTest extends BaseTest {
         assertEquals(JSBoolean.TRUE, result);
 
         result = StringPrototype.endsWith(ctx, str, new JSValue[]{new JSString("hello")});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // With position
         result = StringPrototype.endsWith(ctx, str, new JSValue[]{new JSString("lo"), new JSNumber(5)});
@@ -150,7 +148,7 @@ public class StringPrototypeTest extends BaseTest {
 
         // Position 0
         result = StringPrototype.endsWith(ctx, str, new JSValue[]{new JSString("world"), new JSNumber(0)});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // Empty search string
         result = StringPrototype.endsWith(ctx, str, new JSValue[]{new JSString("")});
@@ -191,7 +189,7 @@ public class StringPrototypeTest extends BaseTest {
         assertEquals(JSBoolean.TRUE, result);
 
         result = StringPrototype.includes(ctx, str, new JSValue[]{new JSString("test")});
-        assertEquals(JSBoolean.FALSE, result);
+        assertTrue(result.isBooleanFalse());
 
         // With position
         result = StringPrototype.includes(ctx, str, new JSValue[]{new JSString("world"), new JSNumber(6)});
@@ -214,110 +212,110 @@ public class StringPrototypeTest extends BaseTest {
     public void testIndexOf() {
         // Normal case
         JSValue result = StringPrototype.indexOf(ctx, str, new JSValue[]{new JSString("world")});
-        assertEquals(6.0, ((JSNumber) result).value());
+        assertEquals(6.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         result = StringPrototype.indexOf(ctx, str, new JSValue[]{new JSString("test")});
-        assertEquals(-1.0, ((JSNumber) result).value());
+        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // With position
         result = StringPrototype.indexOf(ctx, str, new JSValue[]{new JSString("o"), new JSNumber(5)});
-        assertEquals(7.0, ((JSNumber) result).value());
+        assertEquals(7.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Position beyond length
         result = StringPrototype.indexOf(ctx, str, new JSValue[]{new JSString("world"), new JSNumber(50)});
-        assertEquals(-1.0, ((JSNumber) result).value());
+        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Empty search string
         result = StringPrototype.indexOf(ctx, str, new JSValue[]{new JSString("")});
-        assertEquals(0.0, ((JSNumber) result).value());
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.indexOf(ctx, empty, new JSValue[]{new JSString("test")});
-        assertEquals(-1.0, ((JSNumber) result).value());
+        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElse(0.0));
     }
 
     @Test
     public void testLastIndexOf() {
         // Normal case
         JSValue result = StringPrototype.lastIndexOf(ctx, str, new JSValue[]{new JSString("o")});
-        assertEquals(7.0, ((JSNumber) result).value());
+        assertEquals(7.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         result = StringPrototype.lastIndexOf(ctx, str, new JSValue[]{new JSString("test")});
-        assertEquals(-1.0, ((JSNumber) result).value());
+        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // With position
         result = StringPrototype.lastIndexOf(ctx, str, new JSValue[]{new JSString("o"), new JSNumber(5)});
-        assertEquals(4.0, ((JSNumber) result).value());
+        assertEquals(4.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Position 0
         result = StringPrototype.lastIndexOf(ctx, str, new JSValue[]{new JSString("h"), new JSNumber(0)});
-        assertEquals(0.0, ((JSNumber) result).value());
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Empty search string
         result = StringPrototype.lastIndexOf(ctx, str, new JSValue[]{new JSString("")});
-        assertEquals(11.0, ((JSNumber) result).value());
+        assertEquals(11.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.lastIndexOf(ctx, empty, new JSValue[]{new JSString("test")});
-        assertEquals(-1.0, ((JSNumber) result).value());
+        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElse(0.0));
     }
 
     @Test
     public void testPadEnd() {
         // Normal case
         JSValue result = StringPrototype.padEnd(ctx, str, new JSValue[]{new JSNumber(15), new JSString("*")});
-        assertEquals("hello world****", ((JSString) result).getValue());
+        assertEquals("hello world****", result.asString().map(JSString::getValue).orElse(""));
 
         // Shorter target length
         result = StringPrototype.padEnd(ctx, str, new JSValue[]{new JSNumber(5)});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Default filler
         result = StringPrototype.padEnd(ctx, str, new JSValue[]{new JSNumber(15)});
-        assertEquals("hello world    ", ((JSString) result).getValue());
+        assertEquals("hello world    ", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty filler
         result = StringPrototype.padEnd(ctx, str, new JSValue[]{new JSNumber(15), new JSString("")});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Long filler
         result = StringPrototype.padEnd(ctx, str, new JSValue[]{new JSNumber(15), new JSString("abc")});
-        assertEquals("hello worldabca", ((JSString) result).getValue());
+        assertEquals("hello worldabca", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.padEnd(ctx, empty, new JSValue[]{new JSNumber(5), new JSString("*")});
-        assertEquals("*****", ((JSString) result).getValue());
+        assertEquals("*****", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
     public void testPadStart() {
         // Normal case
         JSValue result = StringPrototype.padStart(ctx, str, new JSValue[]{new JSNumber(15), new JSString("*")});
-        assertEquals("****hello world", ((JSString) result).getValue());
+        assertEquals("****hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Shorter target length
         result = StringPrototype.padStart(ctx, str, new JSValue[]{new JSNumber(5)});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Default filler
         result = StringPrototype.padStart(ctx, str, new JSValue[]{new JSNumber(15)});
-        assertEquals("    hello world", ((JSString) result).getValue());
+        assertEquals("    hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty filler
         result = StringPrototype.padStart(ctx, str, new JSValue[]{new JSNumber(15), new JSString("")});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Long filler
         result = StringPrototype.padStart(ctx, str, new JSValue[]{new JSNumber(15), new JSString("abc")});
-        assertEquals("abcahello world", ((JSString) result).getValue());
+        assertEquals("abcahello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.padStart(ctx, empty, new JSValue[]{new JSNumber(5), new JSString("*")});
-        assertEquals("*****", ((JSString) result).getValue());
+        assertEquals("*****", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
@@ -410,39 +408,39 @@ public class StringPrototypeTest extends BaseTest {
     public void testSplit() {
         // Normal case
         JSValue result = StringPrototype.split(ctx, str, new JSValue[]{new JSString(" ")});
-        assertTrue(result instanceof JSArray);
-        JSArray arr = (JSArray) result;
+        JSArray arr = result.asArray().orElse(null);
+        assertNotNull(arr);
         assertEquals(2, arr.getLength());
-        assertEquals("hello", ((JSString) arr.get(0)).getValue());
-        assertEquals("world", ((JSString) arr.get(1)).getValue());
+        assertEquals("hello", arr.get(0).asString().map(JSString::getValue).orElse(""));
+        assertEquals("world", arr.get(1).asString().map(JSString::getValue).orElse(""));
 
         // No separator
         result = StringPrototype.split(ctx, str, new JSValue[]{});
-        assertTrue(result instanceof JSArray);
-        arr = (JSArray) result;
+        arr = result.asArray().orElse(null);
+        assertNotNull(arr);
         assertEquals(1, arr.getLength());
-        assertEquals("hello world", ((JSString) arr.get(0)).getValue());
+        assertEquals("hello world", arr.get(0).asString().map(JSString::getValue).orElse(""));
 
         // Empty separator
         result = StringPrototype.split(ctx, str, new JSValue[]{new JSString("")});
-        assertTrue(result instanceof JSArray);
-        arr = (JSArray) result;
+        arr = result.asArray().orElse(null);
+        assertNotNull(arr);
         assertEquals(11, arr.getLength()); // "h","e","l","l","o"," ","w","o","r","l","d"
 
         // Limit
         result = StringPrototype.split(ctx, str, new JSValue[]{new JSString(" "), new JSNumber(1)});
-        assertTrue(result instanceof JSArray);
-        arr = (JSArray) result;
+        arr = result.asArray().orElse(null);
+        assertNotNull(arr);
         assertEquals(1, arr.getLength());
-        assertEquals("hello", ((JSString) arr.get(0)).getValue());
+        assertEquals("hello", arr.get(0).asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.split(ctx, empty, new JSValue[]{new JSString(" ")});
-        assertTrue(result instanceof JSArray);
-        arr = (JSArray) result;
+        arr = result.asArray().orElse(null);
+        assertNotNull(arr);
         assertEquals(1, arr.getLength());
-        assertEquals("", ((JSString) arr.get(0)).getValue());
+        assertEquals("", arr.get(0).asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
@@ -476,149 +474,149 @@ public class StringPrototypeTest extends BaseTest {
     public void testSubstr() {
         // Normal case
         JSValue result = StringPrototype.substr(ctx, str, new JSValue[]{new JSNumber(6), new JSNumber(5)});
-        assertEquals("world", ((JSString) result).getValue());
+        assertEquals("world", result.asString().map(JSString::getValue).orElse(""));
 
         // No length
         result = StringPrototype.substr(ctx, str, new JSValue[]{new JSNumber(6)});
-        assertEquals("world", ((JSString) result).getValue());
+        assertEquals("world", result.asString().map(JSString::getValue).orElse(""));
 
         // Negative start
         result = StringPrototype.substr(ctx, str, new JSValue[]{new JSNumber(-5), new JSNumber(5)});
-        assertEquals("world", ((JSString) result).getValue());
+        assertEquals("world", result.asString().map(JSString::getValue).orElse(""));
 
         // Negative length
         result = StringPrototype.substr(ctx, str, new JSValue[]{new JSNumber(0), new JSNumber(-1)});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         // Out of bounds
         result = StringPrototype.substr(ctx, str, new JSValue[]{new JSNumber(50)});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.substr(ctx, empty, new JSValue[]{new JSNumber(0)});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         // Chinese characters
         JSString chinese = new JSString("你好世界");
         result = StringPrototype.substr(ctx, chinese, new JSValue[]{new JSNumber(0), new JSNumber(2)});
-        assertEquals("你好", ((JSString) result).getValue());
+        assertEquals("你好", result.asString().map(JSString::getValue).orElse(""));
 
         result = StringPrototype.substr(ctx, chinese, new JSValue[]{new JSNumber(1), new JSNumber(2)});
-        assertEquals("好世", ((JSString) result).getValue());
+        assertEquals("好世", result.asString().map(JSString::getValue).orElse(""));
 
         // Emoji characters
         JSString emoji = new JSString("😀🌟🚀");
         result = StringPrototype.substr(ctx, emoji, new JSValue[]{new JSNumber(0), new JSNumber(2)});
-        assertEquals("😀", ((JSString) result).getValue());
+        assertEquals("😀", result.asString().map(JSString::getValue).orElse(""));
 
         result = StringPrototype.substr(ctx, emoji, new JSValue[]{new JSNumber(2), new JSNumber(2)});
-        assertEquals("🌟", ((JSString) result).getValue());
+        assertEquals("🌟", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
     public void testSubstring() {
         // Normal case
         JSValue result = StringPrototype.substring(ctx, str, new JSValue[]{new JSNumber(6)});
-        assertEquals("world", ((JSString) result).getValue());
+        assertEquals("world", result.asString().map(JSString::getValue).orElse(""));
 
         result = StringPrototype.substring(ctx, str, new JSValue[]{new JSNumber(0), new JSNumber(5)});
-        assertEquals("hello", ((JSString) result).getValue());
+        assertEquals("hello", result.asString().map(JSString::getValue).orElse(""));
 
         // Swapped indices
         result = StringPrototype.substring(ctx, str, new JSValue[]{new JSNumber(5), new JSNumber(0)});
-        assertEquals("hello", ((JSString) result).getValue());
+        assertEquals("hello", result.asString().map(JSString::getValue).orElse(""));
 
         // Negative indices
         result = StringPrototype.substring(ctx, str, new JSValue[]{new JSNumber(-5)});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Out of bounds
         result = StringPrototype.substring(ctx, str, new JSValue[]{new JSNumber(50)});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.substring(ctx, empty, new JSValue[]{new JSNumber(0)});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         // Chinese characters
         JSString chinese = new JSString("你好世界");
         result = StringPrototype.substring(ctx, chinese, new JSValue[]{new JSNumber(0), new JSNumber(2)});
-        assertEquals("你好", ((JSString) result).getValue());
+        assertEquals("你好", result.asString().map(JSString::getValue).orElse(""));
 
         result = StringPrototype.substring(ctx, chinese, new JSValue[]{new JSNumber(1), new JSNumber(3)});
-        assertEquals("好世", ((JSString) result).getValue());
+        assertEquals("好世", result.asString().map(JSString::getValue).orElse(""));
 
         // Emoji characters
         JSString emoji = new JSString("😀🌟🚀");
         result = StringPrototype.substring(ctx, emoji, new JSValue[]{new JSNumber(0), new JSNumber(2)});
-        assertEquals("😀", ((JSString) result).getValue());
+        assertEquals("😀", result.asString().map(JSString::getValue).orElse(""));
 
         result = StringPrototype.substring(ctx, emoji, new JSValue[]{new JSNumber(2), new JSNumber(4)});
-        assertEquals("🌟", ((JSString) result).getValue());
+        assertEquals("🌟", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
     public void testToLowerCase() {
         JSString upper = new JSString("HELLO WORLD");
         JSValue result = StringPrototype.toLowerCase(ctx, upper, new JSValue[]{});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Already lower
         result = StringPrototype.toLowerCase(ctx, str, new JSValue[]{});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Mixed
         JSString mixed = new JSString("HeLLo WoRLd");
         result = StringPrototype.toLowerCase(ctx, mixed, new JSValue[]{});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.toLowerCase(ctx, empty, new JSValue[]{});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
     public void testToUpperCase() {
         JSValue result = StringPrototype.toUpperCase(ctx, str, new JSValue[]{});
-        assertEquals("HELLO WORLD", ((JSString) result).getValue());
+        assertEquals("HELLO WORLD", result.asString().map(JSString::getValue).orElse(""));
 
         // Already upper
         JSString upper = new JSString("HELLO WORLD");
         result = StringPrototype.toUpperCase(ctx, upper, new JSValue[]{});
-        assertEquals("HELLO WORLD", ((JSString) result).getValue());
+        assertEquals("HELLO WORLD", result.asString().map(JSString::getValue).orElse(""));
 
         // Mixed
         JSString mixed = new JSString("HeLLo WoRLd");
         result = StringPrototype.toUpperCase(ctx, mixed, new JSValue[]{});
-        assertEquals("HELLO WORLD", ((JSString) result).getValue());
+        assertEquals("HELLO WORLD", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.toUpperCase(ctx, empty, new JSValue[]{});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
     public void testTrim() {
         JSString spaced = new JSString("  hello world  ");
         JSValue result = StringPrototype.trim(ctx, spaced, new JSValue[]{});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // No spaces
         result = StringPrototype.trim(ctx, str, new JSValue[]{});
-        assertEquals("hello world", ((JSString) result).getValue());
+        assertEquals("hello world", result.asString().map(JSString::getValue).orElse(""));
 
         // Only spaces
         JSString spaces = new JSString("   ");
         result = StringPrototype.trim(ctx, spaces, new JSValue[]{});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
 
         // Empty string
         JSString empty = new JSString("");
         result = StringPrototype.trim(ctx, empty, new JSValue[]{});
-        assertEquals("", ((JSString) result).getValue());
+        assertEquals("", result.asString().map(JSString::getValue).orElse(""));
     }
 }

@@ -31,19 +31,19 @@ public class ObjectPrototypeTest extends BaseTest {
     public void testCreate() {
         // Normal case: create object with null prototype
         JSValue result = ObjectPrototype.create(ctx, JSUndefined.INSTANCE, new JSValue[]{JSNull.INSTANCE});
-        assertInstanceOf(JSObject.class, result);
-        JSObject obj = (JSObject) result;
+        JSObject obj = result.asObject().orElse(null);
+        assertNotNull(obj);
         assertNull(obj.getPrototype());
 
         // Normal case: create object with object prototype
         JSObject proto = new JSObject();
         proto.set("testProp", new JSString("testValue"));
         result = ObjectPrototype.create(ctx, JSUndefined.INSTANCE, new JSValue[]{proto});
-        assertInstanceOf(JSObject.class, result);
-        JSObject obj2 = (JSObject) result;
+        JSObject obj2 = result.asObject().orElse(null);
+        assertNotNull(obj2);
         assertEquals(proto, obj2.getPrototype());
         // Should inherit property
-        assertEquals("testValue", ((JSString) obj2.get("testProp")).getValue());
+        assertEquals("testValue", obj2.get("testProp").asString().map(JSString::getValue).orElse(""));
 
         // Edge case: invalid prototype
         result = ObjectPrototype.create(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("not object")});
@@ -68,10 +68,10 @@ public class ObjectPrototypeTest extends BaseTest {
         descriptor.set("configurable", JSBoolean.TRUE);
 
         JSValue result = ObjectPrototype.defineProperty(ctx, JSUndefined.INSTANCE, new JSValue[]{
-            obj, new JSString("testProp"), descriptor
+                obj, new JSString("testProp"), descriptor
         });
         assertEquals(obj, result);
-        assertEquals("test", ((JSString) obj.get("testProp")).getValue());
+        assertEquals("test", obj.get("testProp").asString().map(JSString::getValue).orElse(""));
 
         // Edge case: not enough arguments
         result = ObjectPrototype.defineProperty(ctx, JSUndefined.INSTANCE, new JSValue[]{obj, new JSString("prop")});
@@ -80,7 +80,7 @@ public class ObjectPrototypeTest extends BaseTest {
 
         // Edge case: first argument not object
         result = ObjectPrototype.defineProperty(ctx, JSUndefined.INSTANCE, new JSValue[]{
-            new JSString("not object"), new JSString("prop"), descriptor
+                new JSString("not object"), new JSString("prop"), descriptor
         });
         assertTypeError(result);
         assertPendingException(ctx);
@@ -95,15 +95,15 @@ public class ObjectPrototypeTest extends BaseTest {
 
         // Normal case: object with properties
         JSValue result = ObjectPrototype.keys(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray keys = (JSArray) result;
+        JSArray keys = result.asArray().orElse(null);
+        assertNotNull(keys);
         assertTrue(keys.getLength() >= 3); // May include prototype properties
 
         // Normal case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectPrototype.keys(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray emptyKeys = (JSArray) result;
+        JSArray emptyKeys = result.asArray().orElse(null);
+        assertNotNull(emptyKeys);
         assertEquals(0, emptyKeys.getLength());
 
         // Edge case: null
@@ -118,8 +118,9 @@ public class ObjectPrototypeTest extends BaseTest {
 
         // Edge case: primitive
         result = ObjectPrototype.keys(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("string")});
-        assertInstanceOf(JSArray.class, result);
-        assertEquals(0, ((JSArray) result).getLength());
+        JSArray primitiveKeys = result.asArray().orElse(null);
+        assertNotNull(primitiveKeys);
+        assertEquals(0, primitiveKeys.getLength());
     }
 
     @Test
@@ -131,15 +132,15 @@ public class ObjectPrototypeTest extends BaseTest {
 
         // Normal case: object with properties
         JSValue result = ObjectPrototype.values(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray values = (JSArray) result;
+        JSArray values = result.asArray().orElse(null);
+        assertNotNull(values);
         assertTrue(values.getLength() >= 3);
 
         // Normal case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectPrototype.values(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray emptyValues = (JSArray) result;
+        JSArray emptyValues = result.asArray().orElse(null);
+        assertNotNull(emptyValues);
         assertEquals(0, emptyValues.getLength());
 
         // Edge case: null
@@ -149,8 +150,9 @@ public class ObjectPrototypeTest extends BaseTest {
 
         // Edge case: primitive
         result = ObjectPrototype.values(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(42)});
-        assertInstanceOf(JSArray.class, result);
-        assertEquals(0, ((JSArray) result).getLength());
+        JSArray primitiveValues = result.asArray().orElse(null);
+        assertNotNull(primitiveValues);
+        assertEquals(0, primitiveValues.getLength());
     }
 
     @Test
@@ -161,15 +163,15 @@ public class ObjectPrototypeTest extends BaseTest {
 
         // Normal case: object with properties
         JSValue result = ObjectPrototype.entries(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray entries = (JSArray) result;
+        JSArray entries = result.asArray().orElse(null);
+        assertNotNull(entries);
         assertTrue(entries.getLength() >= 2);
 
         // Normal case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectPrototype.entries(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray emptyEntries = (JSArray) result;
+        JSArray emptyEntries = result.asArray().orElse(null);
+        assertNotNull(emptyEntries);
         assertEquals(0, emptyEntries.getLength());
 
         // Edge case: null
@@ -179,8 +181,9 @@ public class ObjectPrototypeTest extends BaseTest {
 
         // Edge case: primitive
         result = ObjectPrototype.entries(ctx, JSUndefined.INSTANCE, new JSValue[]{JSBoolean.FALSE});
-        assertInstanceOf(JSArray.class, result);
-        assertEquals(0, ((JSArray) result).getLength());
+        JSArray primitiveEntries = result.asArray().orElse(null);
+        assertNotNull(primitiveEntries);
+        assertEquals(0, primitiveEntries.getLength());
     }
 
     @Test
@@ -195,9 +198,9 @@ public class ObjectPrototypeTest extends BaseTest {
         // Normal case: assign sources to target
         JSValue result = ObjectPrototype.assign(ctx, JSUndefined.INSTANCE, new JSValue[]{target, source});
         assertEquals(target, result);
-        assertEquals(1.0, ((JSNumber) target.get("a")).value());
-        assertEquals(2.0, ((JSNumber) target.get("b")).value());
-        assertEquals("hello", ((JSString) target.get("c")).getValue());
+        assertEquals(1.0, target.get("a").asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(2.0, target.get("b").asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals("hello", target.get("c").asString().map(JSString::getValue).orElse(""));
 
         // Normal case: multiple sources
         JSObject source2 = new JSObject();
@@ -232,45 +235,45 @@ public class ObjectPrototypeTest extends BaseTest {
 
         // Normal case: freeze primitive (returns primitive)
         result = ObjectPrototype.freeze(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("string")});
-        assertEquals("string", ((JSString) result).getValue());
+        assertEquals("string", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
     public void testToString() {
         // Normal case: undefined
         JSValue result = ObjectPrototype.toString(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        assertEquals("[object Undefined]", ((JSString) result).getValue());
+        assertEquals("[object Undefined]", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: null
         result = ObjectPrototype.toString(ctx, JSNull.INSTANCE, new JSValue[]{});
-        assertEquals("[object Null]", ((JSString) result).getValue());
+        assertEquals("[object Null]", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: object
         JSObject obj = new JSObject();
         result = ObjectPrototype.toString(ctx, obj, new JSValue[]{});
-        assertEquals("[object Object]", ((JSString) result).getValue());
+        assertEquals("[object Object]", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: array
         JSArray arr = new JSArray();
         result = ObjectPrototype.toString(ctx, arr, new JSValue[]{});
-        assertEquals("[object Array]", ((JSString) result).getValue());
+        assertEquals("[object Array]", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: function
         JSFunction func = new JSNativeFunction("test", 0, (ctx, thisArg, args) -> JSUndefined.INSTANCE);
         result = ObjectPrototype.toString(ctx, func, new JSValue[]{});
-        assertEquals("[object Function]", ((JSString) result).getValue());
+        assertEquals("[object Function]", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: string
         result = ObjectPrototype.toString(ctx, new JSString("test"), new JSValue[]{});
-        assertEquals("[object String]", ((JSString) result).getValue());
+        assertEquals("[object String]", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: number
         result = ObjectPrototype.toString(ctx, new JSNumber(42), new JSValue[]{});
-        assertEquals("[object Number]", ((JSString) result).getValue());
+        assertEquals("[object Number]", result.asString().map(JSString::getValue).orElse(""));
 
         // Normal case: boolean
         result = ObjectPrototype.toString(ctx, JSBoolean.TRUE, new JSValue[]{});
-        assertEquals("[object Boolean]", ((JSString) result).getValue());
+        assertEquals("[object Boolean]", result.asString().map(JSString::getValue).orElse(""));
     }
 
     @Test
