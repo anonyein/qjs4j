@@ -18,15 +18,13 @@ package com.caoccao.qjs4j.util;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 
 /**
  * Double-to-ASCII converter.
  * Implements proper JavaScript number-to-string conversion.
  * Based on QuickJS dtoa.c implementation.
- *
+ * <p>
  * Supports JavaScript's Number.prototype methods:
  * - toString() - free format
  * - toFixed(fractionDigits) - fixed decimal notation
@@ -35,8 +33,31 @@ import java.util.Locale;
  */
 public final class DtoaConverter {
 
-    private static final int MAX_DIGITS = 100;
-    private static final double FIXED_THRESHOLD = 1e21;
+    public static final double FIXED_THRESHOLD = 1e21;
+    public static final int MAX_DIGITS = 100;
+    public static final int MAX_PRECISION = 100;
+
+    /**
+     * Clean up number string by removing trailing zeros and unnecessary decimal points.
+     */
+    private static String cleanupNumberString(String str) {
+        if (!str.contains(".")) {
+            return str;
+        }
+
+        // Remove trailing zeros after decimal point
+        int i = str.length() - 1;
+        while (i >= 0 && str.charAt(i) == '0') {
+            i--;
+        }
+
+        // Remove decimal point if no fractional part remains
+        if (i >= 0 && str.charAt(i) == '.') {
+            i--;
+        }
+
+        return str.substring(0, i + 1);
+    }
 
     /**
      * Convert a double to string using free format (automatic best representation).
@@ -49,7 +70,7 @@ public final class DtoaConverter {
     /**
      * Convert a double to string with optional minus zero handling.
      *
-     * @param value The value to convert
+     * @param value         The value to convert
      * @param showMinusZero If true, show "-0" for negative zero
      */
     public static String convert(double value, boolean showMinusZero) {
@@ -68,14 +89,42 @@ public final class DtoaConverter {
             return "0";
         }
 
-        // Use Java's toString() which already implements ECMAScript-like conversion
-        String result = Double.toString(value);
+        // JavaScript uses exponential notation when exponent < -6 or >= 21
+        // Java's Double.toString uses different rules, so we need custom logic
 
-        // Remove unnecessary ".0" suffix for integers that fit in safe range
-        if (result.endsWith(".0") && !result.contains("e") && !result.contains("E")) {
-            double absValue = Math.abs(value);
-            if (absValue < 1e15 && absValue == Math.floor(absValue)) {
-                result = result.substring(0, result.length() - 2);
+        // Calculate the exponent
+        double absValue = Math.abs(value);
+        int exponent = 0;
+        if (absValue != 0) {
+            exponent = (int) Math.floor(Math.log10(absValue));
+        }
+
+        // Use exponential notation for very small or very large numbers
+        if (absValue != 0 && (exponent < -6 || exponent >= 21)) {
+            // Use exponential notation
+            String result = Double.toString(value);
+            // Convert uppercase 'E' to lowercase 'e' for JavaScript standard
+            result = result.replace('E', 'e');
+            return result;
+        }
+
+        // Use decimal notation
+        // For numbers in the safe range, use BigDecimal for accurate representation
+        String result;
+        if (value == Math.floor(value) && absValue < 1e15) {
+            // Integer value - no decimal point
+            result = String.format("%.0f", value);
+        } else {
+            // Use BigDecimal to avoid precision issues
+            result = Double.toString(value);
+            // If Java's toString used exponential notation, we need to convert it
+            if (result.contains("E") || result.contains("e")) {
+                // Convert from exponential to decimal
+                result = String.format("%.15f", value).replaceAll("0+$", "").replaceAll("\\.$", "");
+            }
+            // Remove trailing zeros after decimal point
+            if (result.contains(".")) {
+                result = result.replaceAll("0+$", "").replaceAll("\\.$", "");
             }
         }
 
@@ -83,52 +132,10 @@ public final class DtoaConverter {
     }
 
     /**
-     * Convert with specified precision (significant digits).
-     * Implements Number.prototype.toPrecision(precision).
-     *
-     * @param value The value to convert
-     * @param precision Number of significant digits (1-100)
-     * @return The formatted string
-     * @throws IllegalArgumentException if precision is out of range
-     */
-    public static String convertWithPrecision(double value, int precision) {
-        if (precision < 1 || precision > MAX_DIGITS) {
-            throw new IllegalArgumentException("precision must be between 1 and " + MAX_DIGITS);
-        }
-
-        // Handle special values
-        if (Double.isNaN(value)) {
-            return "NaN";
-        }
-        if (Double.isInfinite(value)) {
-            return value > 0 ? "Infinity" : "-Infinity";
-        }
-
-        // Use BigDecimal for precise rounding
-        try {
-            BigDecimal bd = BigDecimal.valueOf(value);
-            bd = bd.round(new java.math.MathContext(precision, RoundingMode.HALF_UP));
-
-            // Determine if we should use exponential notation
-            // JavaScript uses exponential if exponent < -6 or >= precision
-            int exponent = getExponent(value);
-            if (exponent < -6 || exponent >= precision) {
-                return formatExponential(bd.doubleValue(), precision - 1);
-            }
-
-            String result = bd.toPlainString();
-            return cleanupNumberString(result);
-        } catch (NumberFormatException e) {
-            // Fallback to simple format
-            return String.format(Locale.US, "%." + (precision - 1) + "g", value);
-        }
-    }
-
-    /**
      * Convert to exponential notation.
      * Implements Number.prototype.toExponential(fractionDigits).
      *
-     * @param value The value to convert
+     * @param value          The value to convert
      * @param fractionDigits Number of digits after decimal point (0-100)
      * @return The formatted string in exponential notation
      * @throws IllegalArgumentException if fractionDigits is out of range
@@ -153,7 +160,7 @@ public final class DtoaConverter {
      * Convert to fixed-point notation.
      * Implements Number.prototype.toFixed(fractionDigits).
      *
-     * @param value The value to convert
+     * @param value          The value to convert
      * @param fractionDigits Number of digits after decimal point (0-100)
      * @return The formatted string in fixed notation
      * @throws IllegalArgumentException if fractionDigits is out of range
@@ -188,6 +195,90 @@ public final class DtoaConverter {
     }
 
     /**
+     * Convert integer to string (optimized path).
+     */
+    public static String convertInt(int value) {
+        return Integer.toString(value);
+    }
+
+    /**
+     * Convert integer to string with specified radix (2-36).
+     */
+    public static String convertIntRadix(int value, int radix) {
+        if (radix < 2 || radix > 36) {
+            throw new IllegalArgumentException("radix must be between 2 and 36");
+        }
+        return Integer.toString(value, radix);
+    }
+
+    /**
+     * Convert long to string (optimized path).
+     */
+    public static String convertLong(long value) {
+        return Long.toString(value);
+    }
+
+    /**
+     * Convert long to string with specified radix (2-36).
+     */
+    public static String convertLongRadix(long value, int radix) {
+        if (radix < 2 || radix > 36) {
+            throw new IllegalArgumentException("radix must be between 2 and 36");
+        }
+        return Long.toString(value, radix);
+    }
+
+    /**
+     * Convert with specified precision (significant digits).
+     * Implements Number.prototype.toPrecision(precision).
+     *
+     * @param value     The value to convert
+     * @param precision Number of significant digits (1-100)
+     * @return The formatted string
+     * @throws IllegalArgumentException if precision is out of range
+     */
+    public static String convertWithPrecision(double value, int precision) {
+        if (precision < 1 || precision > MAX_DIGITS) {
+            throw new IllegalArgumentException("precision must be between 1 and " + MAX_DIGITS);
+        }
+
+        // Handle special values
+        if (Double.isNaN(value)) {
+            return "NaN";
+        }
+        if (Double.isInfinite(value)) {
+            return value > 0 ? "Infinity" : "-Infinity";
+        }
+
+        // Use BigDecimal for accurate formatting
+        if (value == 0.0) {
+            // Special case for zero
+            StringBuilder result = new StringBuilder("0");
+            if (precision > 1) {
+                result.append(".");
+                for (int i = 1; i < precision; i++) {
+                    result.append("0");
+                }
+            }
+            return result.toString();
+        }
+
+        // Determine if we should use exponential or fixed notation
+        int exponent = (int) Math.floor(Math.log10(Math.abs(value)));
+
+        if (exponent < -6 || exponent >= precision) {
+            // Use exponential notation
+            String format = "%." + (precision - 1) + "e";
+            return String.format(format, value).replaceAll("([eE][+-])0+", "$1");
+        } else {
+            // Use fixed notation
+            BigDecimal bd = BigDecimal.valueOf(value);
+            bd = bd.round(new java.math.MathContext((int) precision, RoundingMode.HALF_UP));
+            return bd.stripTrailingZeros().toPlainString();
+        }
+    }
+
+    /**
      * Format a value in exponential notation.
      */
     private static String formatExponential(double value, int fractionDigits) {
@@ -210,6 +301,16 @@ public final class DtoaConverter {
         // Convert Java's format to JavaScript's format
         // Java: 1.234e+00, JavaScript: 1.234e+0
         return normalizeExponentialFormat(format);
+    }
+
+    /**
+     * Get the base-10 exponent of a value.
+     */
+    private static int getExponent(double value) {
+        if (value == 0.0) {
+            return 0;
+        }
+        return (int) Math.floor(Math.log10(Math.abs(value)));
     }
 
     /**
@@ -239,71 +340,5 @@ public final class DtoaConverter {
 
         int exponent = Integer.parseInt(exponentPart.substring(startIndex));
         return mantissa + "e" + sign + exponent;
-    }
-
-    /**
-     * Get the base-10 exponent of a value.
-     */
-    private static int getExponent(double value) {
-        if (value == 0.0) {
-            return 0;
-        }
-        return (int) Math.floor(Math.log10(Math.abs(value)));
-    }
-
-    /**
-     * Clean up number string by removing trailing zeros and unnecessary decimal points.
-     */
-    private static String cleanupNumberString(String str) {
-        if (!str.contains(".")) {
-            return str;
-        }
-
-        // Remove trailing zeros after decimal point
-        int i = str.length() - 1;
-        while (i >= 0 && str.charAt(i) == '0') {
-            i--;
-        }
-
-        // Remove decimal point if no fractional part remains
-        if (i >= 0 && str.charAt(i) == '.') {
-            i--;
-        }
-
-        return str.substring(0, i + 1);
-    }
-
-    /**
-     * Convert integer to string (optimized path).
-     */
-    public static String convertInt(int value) {
-        return Integer.toString(value);
-    }
-
-    /**
-     * Convert long to string (optimized path).
-     */
-    public static String convertLong(long value) {
-        return Long.toString(value);
-    }
-
-    /**
-     * Convert integer to string with specified radix (2-36).
-     */
-    public static String convertIntRadix(int value, int radix) {
-        if (radix < 2 || radix > 36) {
-            throw new IllegalArgumentException("radix must be between 2 and 36");
-        }
-        return Integer.toString(value, radix);
-    }
-
-    /**
-     * Convert long to string with specified radix (2-36).
-     */
-    public static String convertLongRadix(long value, int radix) {
-        if (radix < 2 || radix > 36) {
-            throw new IllegalArgumentException("radix must be between 2 and 36");
-        }
-        return Long.toString(value, radix);
     }
 }

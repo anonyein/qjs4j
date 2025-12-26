@@ -30,35 +30,227 @@ public final class NumberPrototype {
     public static final long MAX_SAFE_INTEGER = 9007199254740991L; // 2^53 - 1
 
     /**
-     * Number.prototype.toFixed(fractionDigits)
-     * ES2020 20.1.3.3
+     * Number.isFinite(value)
+     * ES2020 20.1.2.2
      */
-    public static JSValue toFixed(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSNumber num = JSTypeConversions.toNumber(thisArg);
-        double value = num.value();
+    public static JSValue isFinite(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+        JSValue value = args[0];
+        return JSBoolean.valueOf(value instanceof JSNumber n && Double.isFinite(n.value()));
+    }
 
-        // Get fractionDigits (default 0)
-        long f = args.length > 0 ? (long) JSTypeConversions.toInteger(args[0]) : 0;
+    /**
+     * Number.isInteger(value)
+     * ES2020 20.1.2.3
+     */
+    public static JSValue isInteger(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+        JSValue value = args[0];
+        if (!(value instanceof JSNumber n)) {
+            return JSBoolean.FALSE;
+        }
+        double d = n.value();
+        return JSBoolean.valueOf(Double.isFinite(d) && d == Math.floor(d));
+    }
 
-        // RangeError if out of bounds [0, 100]
-        if (f < 0 || f > 100) {
-            return ctx.throwError("RangeError", "toFixed() fractionDigits must be between 0 and 100");
+    /**
+     * Number.isNaN(value)
+     * ES2020 20.1.2.4
+     */
+    public static JSValue isNaN(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+        JSValue value = args[0];
+        return JSBoolean.valueOf(value instanceof JSNumber n && Double.isNaN(n.value()));
+    }
+
+    /**
+     * Number.isSafeInteger(value)
+     * ES2020 20.1.2.5
+     */
+    public static JSValue isSafeInteger(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+        JSValue value = args[0];
+        if (!(value instanceof JSNumber n)) {
+            return JSBoolean.FALSE;
+        }
+        double d = n.value();
+        return JSBoolean.valueOf(
+                Double.isFinite(d) &&
+                        d == Math.floor(d) &&
+                        Math.abs(d) <= MAX_SAFE_INTEGER
+        );
+    }
+
+    /**
+     * Number.parseFloat(string)
+     * ES2020 20.1.2.12
+     */
+    public static JSValue parseFloat(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return new JSNumber(Double.NaN);
+        }
+        String str = JSTypeConversions.toString(args[0]).getValue().trim();
+
+        // Find the longest prefix that could be a valid number
+        if (str.isEmpty()) {
+            return new JSNumber(Double.NaN);
         }
 
-        // Handle special cases
-        if (Double.isNaN(value)) {
-            return new JSString("NaN");
+        // Skip leading whitespace (already done with trim)
+        int start = 0;
+
+        // Check for optional sign
+        if (str.charAt(start) == '+' || str.charAt(start) == '-') {
+            start++;
         }
 
-        if (Math.abs(value) >= 1e21) {
-            return new JSString(DtoaConverter.convert(value));
+        // Check for Infinity
+        if (str.regionMatches(true, start, "Infinity", 0, 8)) {
+            return new JSNumber(str.charAt(0) == '-' ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY);
         }
 
-        // Use BigDecimal for accurate rounding
-        BigDecimal bd = BigDecimal.valueOf(value);
-        bd = bd.setScale((int) f, RoundingMode.HALF_UP);
+        // Check for NaN
+        if (str.regionMatches(true, start, "NaN", 0, 3)) {
+            return new JSNumber(Double.NaN);
+        }
 
-        return new JSString(bd.toPlainString());
+        // Parse the number part
+        int end = start;
+        boolean hasDot = false;
+        boolean hasExp = false;
+
+        // Integer part
+        while (end < str.length() && Character.isDigit(str.charAt(end))) {
+            end++;
+        }
+
+        // Decimal part
+        if (end < str.length() && str.charAt(end) == '.') {
+            hasDot = true;
+            end++;
+            while (end < str.length() && Character.isDigit(str.charAt(end))) {
+                end++;
+            }
+        }
+
+        // Exponent part
+        if (end < str.length() && (str.charAt(end) == 'e' || str.charAt(end) == 'E')) {
+            hasExp = true;
+            end++;
+            if (end < str.length() && (str.charAt(end) == '+' || str.charAt(end) == '-')) {
+                end++;
+            }
+            while (end < str.length() && Character.isDigit(str.charAt(end))) {
+                end++;
+            }
+        }
+
+        if (end == start && !hasDot) {
+            // No valid number found
+            return new JSNumber(Double.NaN);
+        }
+
+        String numberStr = str.substring(0, end);
+        try {
+            return new JSNumber(Double.parseDouble(numberStr));
+        } catch (NumberFormatException e) {
+            return new JSNumber(Double.NaN);
+        }
+    }
+
+    /**
+     * Number.parseInt(string, radix)
+     * ES2020 20.1.2.13
+     */
+    public static JSValue parseInt(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return new JSNumber(Double.NaN);
+        }
+
+        String str = JSTypeConversions.toString(args[0]).getValue().trim();
+        long radix = args.length > 1 ? (long) JSTypeConversions.toInteger(args[1]) : 0;
+
+        // Auto-detect radix if 0
+        if (radix == 0) {
+            if (str.startsWith("0x") || str.startsWith("0X")) {
+                radix = 16;
+                str = str.substring(2);
+            } else if (str.startsWith("0o") || str.startsWith("0O")) {
+                radix = 8;
+                str = str.substring(2);
+            } else if (str.startsWith("0b") || str.startsWith("0B")) {
+                radix = 2;
+                str = str.substring(2);
+            } else {
+                radix = 10;
+            }
+        } else {
+            // If radix is 16, allow 0x/0X prefix
+            if (radix == 16 && (str.startsWith("0x") || str.startsWith("0X"))) {
+                str = str.substring(2);
+            }
+        }
+
+        // Validate radix
+        if (radix < 2 || radix > 36) {
+            return new JSNumber(Double.NaN);
+        }
+
+        // Skip leading whitespace (already done with trim)
+        int start = 0;
+
+        // Check for optional sign
+        boolean negative = false;
+        if (start < str.length() && str.charAt(start) == '+') {
+            start++;
+        } else if (start < str.length() && str.charAt(start) == '-') {
+            negative = true;
+            start++;
+        }
+
+        // Parse digits
+        long result = 0;
+        boolean hasDigits = false;
+
+        for (int i = start; i < str.length(); i++) {
+            char c = str.charAt(i);
+            int digit;
+
+            if (Character.isDigit(c)) {
+                digit = c - '0';
+            } else if (Character.isLetter(c)) {
+                digit = Character.toLowerCase(c) - 'a' + 10;
+            } else {
+                break; // Stop at first invalid character
+            }
+
+            if (digit < 0 || digit >= radix) {
+                break; // Invalid digit for this radix
+            }
+
+            hasDigits = true;
+
+            // Check for overflow
+            if (result > (Long.MAX_VALUE - digit) / radix) {
+                return new JSNumber(negative ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY);
+            }
+
+            result = result * radix + digit;
+        }
+
+        if (!hasDigits) {
+            return new JSNumber(Double.NaN);
+        }
+
+        return new JSNumber(negative ? -result : result);
     }
 
     /**
@@ -68,31 +260,46 @@ public final class NumberPrototype {
     public static JSValue toExponential(JSContext ctx, JSValue thisArg, JSValue[] args) {
         JSNumber num = JSTypeConversions.toNumber(thisArg);
         double value = num.value();
-
-        // Handle special cases
-        if (Double.isNaN(value)) {
-            return new JSString("NaN");
-        }
-        if (Double.isInfinite(value)) {
-            return new JSString(value > 0 ? "Infinity" : "-Infinity");
-        }
-
         // Get fractionDigits
-        if (args.length == 0 || args[0] instanceof JSUndefined) {
-            // Default: use toString with exponential notation
-            return new JSString(String.format("%e", value));
+        if (args.length == 0 || args[0].isUndefined()) {
+            // Default: use standard number-to-string conversion
+            return new JSString(DtoaConverter.convert(value));
         }
-
-        long f = (long) JSTypeConversions.toInteger(args[0]);
-
+        int fractionDigits = (int) JSTypeConversions.toInteger(args[0]);
         // RangeError if out of bounds [0, 100]
-        if (f < 0 || f > 100) {
+        if (fractionDigits < 0 || fractionDigits > DtoaConverter.MAX_DIGITS) {
             return ctx.throwError("RangeError", "toExponential() fractionDigits must be between 0 and 100");
         }
+        return new JSString(DtoaConverter.convertExponential(value, fractionDigits));
+    }
 
-        // Format with specified precision
-        String format = "%." + f + "e";
-        return new JSString(String.format(format, value));
+    /**
+     * Number.prototype.toFixed(fractionDigits)
+     * ES2020 20.1.3.3
+     */
+    public static JSValue toFixed(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSNumber num = JSTypeConversions.toNumber(thisArg);
+        double value = num.value();
+        int fractionDigits = 0;
+        // Get fractionDigits
+        if (args.length > 0 && !args[0].isUndefined()) {
+            fractionDigits = (int) JSTypeConversions.toInteger(args[0]);
+        }
+        // RangeError if out of bounds [0, 100]
+        if (fractionDigits < 0 || fractionDigits > DtoaConverter.MAX_DIGITS) {
+            return ctx.throwError("RangeError", "toExponential() fractionDigits must be between 0 and 100");
+        }
+        return new JSString(DtoaConverter.convertFixed(value, fractionDigits));
+    }
+
+    /**
+     * Number.prototype.toLocaleString()
+     * ES2020 20.1.3.4 (simplified)
+     */
+    public static JSValue toLocaleString(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSNumber num = JSTypeConversions.toNumber(thisArg);
+        // Simplified: just use default toString
+        return new JSString(DtoaConverter.convert(num.value()));
     }
 
     /**
@@ -103,55 +310,19 @@ public final class NumberPrototype {
         JSNumber num = JSTypeConversions.toNumber(thisArg);
         double value = num.value();
 
-        // Handle special cases
-        if (Double.isNaN(value)) {
-            return new JSString("NaN");
-        }
-        if (Double.isInfinite(value)) {
-            return new JSString(value > 0 ? "Infinity" : "-Infinity");
-        }
-
         // If precision is undefined, use toString
         if (args.length == 0 || args[0] instanceof JSUndefined) {
             return new JSString(DtoaConverter.convert(value));
         }
 
-        long p = (long) JSTypeConversions.toInteger(args[0]);
+        int precision = (int) JSTypeConversions.toInteger(args[0]);
 
         // RangeError if out of bounds [1, 100]
-        if (p < 1 || p > 100) {
+        if (precision < 1 || precision > DtoaConverter.MAX_PRECISION) {
             return ctx.throwError("RangeError", "toPrecision() precision must be between 1 and 100");
         }
 
-        // Use BigDecimal for accurate formatting
-        if (value == 0.0) {
-            // Special case for zero
-            StringBuilder result = new StringBuilder("0");
-            if (p > 1) {
-                result.append(".");
-                for (int i = 1; i < p; i++) {
-                    result.append("0");
-                }
-            }
-            return new JSString(result.toString());
-        }
-
-        // Determine if we should use exponential or fixed notation
-        int exponent = (int) Math.floor(Math.log10(Math.abs(value)));
-
-        if (exponent < -6 || exponent >= p) {
-            // Use exponential notation
-            String format = "%." + (p - 1) + "e";
-            return new JSString(String.format(format, value));
-        } else {
-            // Use fixed notation
-            BigDecimal bd = BigDecimal.valueOf(value);
-            bd = bd.round(new java.math.MathContext((int) p, RoundingMode.HALF_UP));
-            String result = bd.stripTrailingZeros().toPlainString();
-
-            // Ensure we have exactly p significant digits
-            return new JSString(result);
-        }
+        return new JSString(DtoaConverter.convertWithPrecision(value, precision));
     }
 
     /**
@@ -198,16 +369,6 @@ public final class NumberPrototype {
     }
 
     /**
-     * Number.prototype.toLocaleString()
-     * ES2020 20.1.3.4 (simplified)
-     */
-    public static JSValue toLocaleString(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSNumber num = JSTypeConversions.toNumber(thisArg);
-        // Simplified: just use default toString
-        return new JSString(DtoaConverter.convert(num.value()));
-    }
-
-    /**
      * Number.prototype.valueOf()
      * ES2020 20.1.3.7
      */
@@ -216,115 +377,5 @@ public final class NumberPrototype {
             return num;
         }
         return ctx.throwError("TypeError", "Number.prototype.valueOf called on non-number");
-    }
-
-    /**
-     * Number.isNaN(value)
-     * ES2020 20.1.2.4
-     */
-    public static JSValue isNaN(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-        JSValue value = args[0];
-        return JSBoolean.valueOf(value instanceof JSNumber n && Double.isNaN(n.value()));
-    }
-
-    /**
-     * Number.isFinite(value)
-     * ES2020 20.1.2.2
-     */
-    public static JSValue isFinite(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-        JSValue value = args[0];
-        return JSBoolean.valueOf(value instanceof JSNumber n && Double.isFinite(n.value()));
-    }
-
-    /**
-     * Number.isInteger(value)
-     * ES2020 20.1.2.3
-     */
-    public static JSValue isInteger(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-        JSValue value = args[0];
-        if (!(value instanceof JSNumber n)) {
-            return JSBoolean.FALSE;
-        }
-        double d = n.value();
-        return JSBoolean.valueOf(Double.isFinite(d) && d == Math.floor(d));
-    }
-
-    /**
-     * Number.isSafeInteger(value)
-     * ES2020 20.1.2.5
-     */
-    public static JSValue isSafeInteger(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-        JSValue value = args[0];
-        if (!(value instanceof JSNumber n)) {
-            return JSBoolean.FALSE;
-        }
-        double d = n.value();
-        return JSBoolean.valueOf(
-            Double.isFinite(d) &&
-            d == Math.floor(d) &&
-            Math.abs(d) <= 0x1FFFFFFFFFFFFFL  // 2^53 - 1
-        );
-    }
-
-    /**
-     * Number.parseFloat(string)
-     * ES2020 20.1.2.12
-     */
-    public static JSValue parseFloat(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return new JSNumber(Double.NaN);
-        }
-        String str = JSTypeConversions.toString(args[0]).getValue().strip();
-        try {
-            return new JSNumber(Double.parseDouble(str));
-        } catch (NumberFormatException e) {
-            return new JSNumber(Double.NaN);
-        }
-    }
-
-    /**
-     * Number.parseInt(string, radix)
-     * ES2020 20.1.2.13
-     */
-    public static JSValue parseInt(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return new JSNumber(Double.NaN);
-        }
-
-        String str = JSTypeConversions.toString(args[0]).getValue().strip();
-        long radix = args.length > 1 ? (long) JSTypeConversions.toInteger(args[1]) : 0;
-
-        // Auto-detect radix if 0
-        if (radix == 0) {
-            if (str.startsWith("0x") || str.startsWith("0X")) {
-                radix = 16;
-                str = str.substring(2);
-            } else {
-                radix = 10;
-            }
-        }
-
-        // Validate radix
-        if (radix < 2 || radix > 36) {
-            return new JSNumber(Double.NaN);
-        }
-
-        try {
-            return new JSNumber(Long.parseLong(str, (int) radix));
-        } catch (NumberFormatException e) {
-            return new JSNumber(Double.NaN);
-        }
     }
 }

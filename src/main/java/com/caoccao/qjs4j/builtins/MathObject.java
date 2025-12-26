@@ -389,6 +389,9 @@ public final class MathObject {
             return new JSNumber(Double.NaN);
         }
         double x = JSTypeConversions.toNumber(args[0]).value();
+        if (Double.isNaN(x)) {
+            return new JSNumber(Double.NaN);
+        }
         return new JSNumber(Math.round(x));
     }
 
