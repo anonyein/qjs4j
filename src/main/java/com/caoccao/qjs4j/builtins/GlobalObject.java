@@ -456,6 +456,10 @@ public final class GlobalObject {
         atomics.set("compareExchange", new JSNativeFunction("compareExchange", 4, AtomicsObject::compareExchange));
         atomics.set("exchange", new JSNativeFunction("exchange", 3, AtomicsObject::exchange));
         atomics.set("isLockFree", new JSNativeFunction("isLockFree", 1, AtomicsObject::isLockFree));
+        atomics.set("notify", new JSNativeFunction("notify", 3, AtomicsObject::notify));
+        atomics.set("pause", new JSNativeFunction("pause", 0, AtomicsObject::pause));
+        atomics.set("wait", new JSNativeFunction("wait", 4, AtomicsObject::wait));
+        atomics.set("waitAsync", new JSNativeFunction("waitAsync", 4, AtomicsObject::waitAsync));
 
         global.set("Atomics", atomics);
     }

@@ -19,6 +19,12 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.core.*;
 
 import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Implementation of Atomics object static methods.
@@ -28,6 +34,9 @@ import java.nio.ByteBuffer;
  * These operations guarantee atomic read-modify-write sequences and memory ordering.
  */
 public final class AtomicsObject {
+
+    // Global wait lists indexed by SharedArrayBuffer + index
+    private static final Map<String, WaitList> waitLists = new ConcurrentHashMap<>();
 
     /**
      * Atomics.add(typedArray, index, value)
@@ -192,6 +201,10 @@ public final class AtomicsObject {
         }
     }
 
+    private static String getWaitKey(JSArrayBuffer buffer, int index) {
+        return System.identityHashCode(buffer) + ":" + index;
+    }
+
     /**
      * Atomics.isLockFree(size)
      * ES2017 24.4.2
@@ -248,6 +261,49 @@ public final class AtomicsObject {
     }
 
     /**
+     * Atomics.notify(typedArray, index, count)
+     * ES2017 24.4.11
+     * Notifies some agents that are sleeping in a wait on the given index.
+     * Returns the number of agents that were awoken.
+     */
+    public static JSValue notify(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length < 1) {
+            return ctx.throwError("TypeError", "Atomics.notify requires typedArray");
+        }
+
+        if (!(args[0] instanceof JSTypedArray typedArray)) {
+            return ctx.throwError("TypeError", "Atomics.notify requires a TypedArray");
+        }
+
+        if (!(typedArray instanceof JSInt32Array)) {
+            return ctx.throwError("TypeError", "Atomics.notify only works on Int32Array");
+        }
+
+        int index = args.length >= 2 ? (int) ((JSNumber) args[1]).value() : 0;
+        int count = args.length >= 3 ? (int) ((JSNumber) args[2]).value() : Integer.MAX_VALUE;
+
+        if (index < 0 || index >= typedArray.getLength()) {
+            return ctx.throwError("RangeError", "Index out of bounds");
+        }
+
+        if (count < 0) {
+            return ctx.throwError("RangeError", "Count must be non-negative");
+        }
+
+        // Get the buffer
+        JSArrayBuffer buffer = typedArray.getBuffer();
+        String waitKey = getWaitKey(buffer, index);
+
+        WaitList waitList = waitLists.get(waitKey);
+        if (waitList == null) {
+            return new JSNumber(0);
+        }
+
+        int notified = waitList.notifyWaiters(count);
+        return new JSNumber(notified);
+    }
+
+    /**
      * Atomics.or(typedArray, index, value)
      * ES2017 24.4.8
      * Atomically computes bitwise OR and returns the old value.
@@ -284,6 +340,18 @@ public final class AtomicsObject {
             buffer.putInt(byteOffset, oldValue | value);
             return new JSNumber(oldValue);
         }
+    }
+
+    /**
+     * Atomics.pause()
+     * ES2024 Proposal
+     * Provides a hint to the runtime that it may be a good time to yield.
+     * Useful in spin-wait loops.
+     */
+    public static JSValue pause(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        // Java 9+ Thread.onSpinWait() provides a hint to the JVM that we're in a spin-wait loop
+        Thread.onSpinWait();
+        return JSUndefined.INSTANCE;
     }
 
     /**
@@ -364,6 +432,123 @@ public final class AtomicsObject {
     }
 
     /**
+     * Atomics.wait(typedArray, index, value, timeout)
+     * ES2017 24.4.13
+     * Puts the agent to sleep until woken by notify or timeout expires.
+     * Returns "ok" if woken by notify, "not-equal" if value doesn't match,
+     * or "timed-out" if timeout expired.
+     */
+    public static JSValue wait(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length < 3) {
+            return ctx.throwError("TypeError", "Atomics.wait requires typedArray, index, and value");
+        }
+
+        if (!(args[0] instanceof JSTypedArray typedArray)) {
+            return ctx.throwError("TypeError", "Atomics.wait requires a TypedArray");
+        }
+
+        if (!(typedArray instanceof JSInt32Array)) {
+            return ctx.throwError("TypeError", "Atomics.wait only works on Int32Array");
+        }
+
+        int index = (int) ((JSNumber) args[1]).value();
+        int expectedValue = (int) ((JSNumber) args[2]).value();
+        long timeout = args.length >= 4 ? (long) ((JSNumber) args[3]).value() : -1;
+
+        if (index < 0 || index >= typedArray.getLength()) {
+            return ctx.throwError("RangeError", "Index out of bounds");
+        }
+
+        ByteBuffer byteBuffer = typedArray.getBuffer().getBuffer();
+        int byteOffset = typedArray.getByteOffset() + (index * 4);
+
+        // Check if the value matches
+        int currentValue;
+        synchronized (byteBuffer) {
+            currentValue = byteBuffer.getInt(byteOffset);
+        }
+
+        if (currentValue != expectedValue) {
+            return new JSString("not-equal");
+        }
+
+        // Set up wait
+        JSArrayBuffer buffer = typedArray.getBuffer();
+        String waitKey = getWaitKey(buffer, index);
+        WaitList waitList = waitLists.computeIfAbsent(waitKey, k -> new WaitList());
+
+        try {
+            String result = waitList.await(timeout);
+            return new JSString(result);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new JSString("timed-out");
+        }
+    }
+
+    /**
+     * Atomics.waitAsync(typedArray, index, value, timeout)
+     * ES2024 Proposal
+     * Async version of wait that returns a result object with async property.
+     * Returns {async: false, value: "not-equal"} if value doesn't match,
+     * or {async: true, value: Promise} if waiting.
+     */
+    public static JSValue waitAsync(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length < 3) {
+            return ctx.throwError("TypeError", "Atomics.waitAsync requires typedArray, index, and value");
+        }
+
+        if (!(args[0] instanceof JSTypedArray typedArray)) {
+            return ctx.throwError("TypeError", "Atomics.waitAsync requires a TypedArray");
+        }
+
+        if (!(typedArray instanceof JSInt32Array)) {
+            return ctx.throwError("TypeError", "Atomics.waitAsync only works on Int32Array");
+        }
+
+        int index = (int) ((JSNumber) args[1]).value();
+        int expectedValue = (int) ((JSNumber) args[2]).value();
+        long timeout = args.length >= 4 ? (long) ((JSNumber) args[3]).value() : -1;
+
+        if (index < 0 || index >= typedArray.getLength()) {
+            return ctx.throwError("RangeError", "Index out of bounds");
+        }
+
+        ByteBuffer byteBuffer = typedArray.getBuffer().getBuffer();
+        int byteOffset = typedArray.getByteOffset() + (index * 4);
+
+        // Check if the value matches
+        int currentValue;
+        synchronized (byteBuffer) {
+            currentValue = byteBuffer.getInt(byteOffset);
+        }
+
+        if (currentValue != expectedValue) {
+            // Return {async: false, value: "not-equal"}
+            JSObject result = new JSObject();
+            result.set("async", JSBoolean.FALSE);
+            result.set("value", new JSString("not-equal"));
+            return result;
+        }
+
+        // Create a promise for async waiting
+        JSArrayBuffer buffer = typedArray.getBuffer();
+        String waitKey = getWaitKey(buffer, index);
+        WaitList waitList = waitLists.computeIfAbsent(waitKey, k -> new WaitList());
+
+        // For now, return a simplified version without actual Promise support
+        // A full implementation would require Promise support in the runtime
+        JSObject result = new JSObject();
+        result.set("async", JSBoolean.TRUE);
+
+        // TODO: Implement Promise-based async waiting when Promise support is available
+        // For now, just return a result indicating async waiting was initiated
+        result.set("value", new JSString("ok"));
+
+        return result;
+    }
+
+    /**
      * Atomics.xor(typedArray, index, value)
      * ES2017 24.4.14
      * Atomically computes bitwise XOR and returns the old value.
@@ -399,6 +584,50 @@ public final class AtomicsObject {
             int oldValue = buffer.getInt(byteOffset);
             buffer.putInt(byteOffset, oldValue ^ value);
             return new JSNumber(oldValue);
+        }
+    }
+
+    /**
+     * WaitList manages threads waiting on specific SharedArrayBuffer locations.
+     * This is used by Atomics.wait() and Atomics.notify().
+     */
+    private static class WaitList {
+        private final Lock lock = new ReentrantLock();
+        private final Condition condition = lock.newCondition();
+        private int waitingCount = 0;
+
+        public String await(long timeoutMs) throws InterruptedException {
+            lock.lock();
+            try {
+                waitingCount++;
+                boolean timedOut = false;
+
+                if (timeoutMs < 0) {
+                    // Wait indefinitely
+                    condition.await();
+                } else {
+                    // Wait with timeout
+                    timedOut = !condition.await(timeoutMs, TimeUnit.MILLISECONDS);
+                }
+
+                waitingCount--;
+                return timedOut ? "timed-out" : "ok";
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        public int notifyWaiters(int count) {
+            lock.lock();
+            try {
+                int toNotify = (count <= 0) ? waitingCount : Math.min(count, waitingCount);
+                for (int i = 0; i < toNotify; i++) {
+                    condition.signal();
+                }
+                return toNotify;
+            } finally {
+                lock.unlock();
+            }
         }
     }
 }

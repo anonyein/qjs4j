@@ -1207,7 +1207,9 @@ public class ArrayPrototypeTest extends BaseTest {
         arr.push(new JSNumber(3));
 
         // Set prototype to Array.prototype
-        JSObject arrayProto = ctx.getGlobalObject().get("Array").asObject().orElse(null).get("prototype").asObject().orElse(null);
+        JSObject arrayObj = ctx.getGlobalObject().get("Array").asObject().orElse(null);
+        assertNotNull(arrayObj);
+        JSObject arrayProto = arrayObj.get("prototype").asObject().orElse(null);
         arr.setPrototype(arrayProto);
 
         // Get Symbol.iterator
