@@ -27,31 +27,15 @@ import java.util.List;
  * Represents a JavaScript Promise.
  */
 public final class JSPromise extends JSObject {
-    private final State state;
-    private JSValue result;
     private final List<PromiseReaction> fulfillReactions;
     private final List<PromiseReaction> rejectReactions;
-
-    public enum State {
-        PENDING,
-        FULFILLED,
-        REJECTED
-    }
+    private final State state;
+    private JSValue result;
 
     public JSPromise() {
         this.state = State.PENDING;
         this.fulfillReactions = new ArrayList<>();
         this.rejectReactions = new ArrayList<>();
-    }
-
-    public void fulfill(JSValue value) {
-    }
-
-    public void reject(JSValue reason) {
-    }
-
-    public JSPromise then(JSFunction onFulfilled, JSFunction onRejected) {
-        return null;
     }
 
     public JSPromise catch_(JSFunction onRejected) {
@@ -62,8 +46,24 @@ public final class JSPromise extends JSObject {
         return null;
     }
 
+    public void fulfill(JSValue value) {
+    }
+
     public State getState() {
         return state;
+    }
+
+    public void reject(JSValue reason) {
+    }
+
+    public JSPromise then(JSFunction onFulfilled, JSFunction onRejected) {
+        return null;
+    }
+
+    public enum State {
+        PENDING,
+        FULFILLED,
+        REJECTED
     }
 
     public record PromiseReaction(JSFunction handler, JSPromise promise) {

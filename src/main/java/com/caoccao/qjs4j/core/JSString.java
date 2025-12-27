@@ -26,11 +26,6 @@ public record JSString(String value, int atomIndex) implements JSValue {
     }
 
     @Override
-    public JSValueType type() {
-        return JSValueType.STRING;
-    }
-
-    @Override
     public Object toJavaObject() {
         return value;
     }
@@ -38,5 +33,10 @@ public record JSString(String value, int atomIndex) implements JSValue {
     @Override
     public String toString() {
         return value;
+    }
+
+    @Override
+    public JSValueType type() {
+        return JSValueType.STRING;
     }
 }

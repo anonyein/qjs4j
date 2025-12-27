@@ -23,12 +23,12 @@ public record JSNull() implements JSValue {
     public static final JSNull INSTANCE = new JSNull();
 
     @Override
-    public JSValueType type() {
-        return JSValueType.NULL;
+    public Object toJavaObject() {
+        return null;
     }
 
     @Override
-    public Object toJavaObject() {
-        return null;
+    public JSValueType type() {
+        return JSValueType.NULL;
     }
 }

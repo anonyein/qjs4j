@@ -32,22 +32,19 @@ public final class JSMicrotaskQueue {
     private boolean executing;
 
     /**
-     * Functional interface for microtask callbacks.
-     */
-    @FunctionalInterface
-    public interface Microtask {
-        /**
-         * Execute the microtask.
-         */
-        void execute();
-    }
-
-    /**
      * Create a new microtask queue.
      */
     public JSMicrotaskQueue() {
         this.queue = new LinkedList<>();
         this.executing = false;
+    }
+
+    /**
+     * Clear all pending microtasks.
+     * This is used for cleanup or testing.
+     */
+    public void clear() {
+        queue.clear();
     }
 
     /**
@@ -57,6 +54,15 @@ public final class JSMicrotaskQueue {
      */
     public void enqueue(Microtask microtask) {
         queue.offer(microtask);
+    }
+
+    /**
+     * Check if there are pending microtasks.
+     *
+     * @return true if the queue is not empty
+     */
+    public boolean hasPendingMicrotasks() {
+        return !queue.isEmpty();
     }
 
     /**
@@ -91,28 +97,22 @@ public final class JSMicrotaskQueue {
     }
 
     /**
-     * Check if there are pending microtasks.
-     *
-     * @return true if the queue is not empty
-     */
-    public boolean hasPendingMicrotasks() {
-        return !queue.isEmpty();
-    }
-
-    /**
-     * Clear all pending microtasks.
-     * This is used for cleanup or testing.
-     */
-    public void clear() {
-        queue.clear();
-    }
-
-    /**
      * Get the number of pending microtasks.
      *
      * @return The queue size
      */
     public int size() {
         return queue.size();
+    }
+
+    /**
+     * Functional interface for microtask callbacks.
+     */
+    @FunctionalInterface
+    public interface Microtask {
+        /**
+         * Execute the microtask.
+         */
+        void execute();
     }
 }

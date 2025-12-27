@@ -28,120 +28,6 @@ import static org.junit.jupiter.api.Assertions.*;
 public class DateConstructorTest extends BaseTest {
 
     @Test
-    public void testNow() {
-        // Normal case
-        long before = System.currentTimeMillis();
-        JSValue result = DateConstructor.now(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        long after = System.currentTimeMillis();
-
-        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(timestamp >= before && timestamp <= after);
-    }
-
-    @Test
-    public void testUTC() {
-        // Normal case: Date.UTC(2025, 0, 1, 0, 0, 0)
-        JSValue result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
-                new JSNumber(2025),
-                new JSNumber(0), // January
-                new JSNumber(1),
-                new JSNumber(0),
-                new JSNumber(0),
-                new JSNumber(0)
-        });
-        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(timestamp > 0);
-
-        // Edge case: only year
-        result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(2025)});
-        result.asNumber().map(JSNumber::value).orElse(0.0);
-
-        // Edge case: year and month
-        result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
-                new JSNumber(2025),
-                new JSNumber(5) // June
-        });
-        result.asNumber().map(JSNumber::value).orElse(0.0);
-
-        // Edge case: no arguments (should return NaN)
-        result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        double nanValue = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(Double.isNaN(nanValue));
-
-        // Edge case: invalid date (should return NaN)
-        result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
-                new JSNumber(2025),
-                new JSNumber(12), // Invalid month
-                new JSNumber(32)  // Invalid day
-        });
-        double invalidValue = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(Double.isNaN(invalidValue));
-    }
-
-    @Test
-    public void testParse() {
-        // Normal case: ISO 8601 format
-        JSValue result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{
-                new JSString("2025-01-01T00:00:00.000Z")
-        });
-        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(timestamp > 0);
-
-        // Edge case: no arguments
-        result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        double nanValue = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(Double.isNaN(nanValue));
-
-        // Edge case: invalid date string
-        result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{
-                new JSString("not a date")
-        });
-        double invalidValue = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(Double.isNaN(invalidValue));
-    }
-
-    @Test
-    public void testGetTime() {
-        // Normal case
-        long timestamp = System.currentTimeMillis();
-        JSDate date = new JSDate(timestamp);
-
-        JSValue result = DatePrototype.getTime(ctx, date, new JSValue[]{});
-        assertEquals(timestamp, result.asNumber().map(JSNumber::value).orElse(0.0));
-
-        // Edge case: called on non-Date
-        assertTypeError(DatePrototype.getTime(ctx, new JSString("not date"), new JSValue[]{}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testGetFullYear() {
-        // Normal case: 2025-06-15
-        JSDate date = new JSDate(1750000000000L); // Approximately 2025-06-15
-
-        JSValue result = DatePrototype.getFullYear(ctx, date, new JSValue[]{});
-        // We don't assert exact year as it depends on timezone
-        result.asNumber().map(JSNumber::value).orElse(0.0);
-
-        // Edge case: called on non-Date
-        assertTypeError(DatePrototype.getFullYear(ctx, new JSObject(), new JSValue[]{}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testGetMonth() {
-        JSDate date = new JSDate(1750000000000L);
-
-        JSValue result = DatePrototype.getMonth(ctx, date, new JSValue[]{});
-        double month = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(month >= 0 && month <= 11);
-
-        // Edge case: called on non-Date
-        assertTypeError(DatePrototype.getMonth(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
-        assertPendingException(ctx);
-    }
-
-    @Test
     public void testGetDate() {
         JSDate date = new JSDate(1750000000000L);
 
@@ -168,6 +54,20 @@ public class DateConstructorTest extends BaseTest {
     }
 
     @Test
+    public void testGetFullYear() {
+        // Normal case: 2025-06-15
+        JSDate date = new JSDate(1750000000000L); // Approximately 2025-06-15
+
+        JSValue result = DatePrototype.getFullYear(ctx, date, new JSValue[]{});
+        // We don't assert exact year as it depends on timezone
+        result.asNumber().map(JSNumber::value).orElse(0.0);
+
+        // Edge case: called on non-Date
+        assertTypeError(DatePrototype.getFullYear(ctx, new JSObject(), new JSValue[]{}));
+        assertPendingException(ctx);
+    }
+
+    @Test
     public void testGetHours() {
         JSDate date = new JSDate(1750000000000L);
 
@@ -177,32 +77,6 @@ public class DateConstructorTest extends BaseTest {
 
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.getHours(ctx, new JSArray(), new JSValue[]{}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testGetMinutes() {
-        JSDate date = new JSDate(1750000000000L);
-
-        JSValue result = DatePrototype.getMinutes(ctx, date, new JSValue[]{});
-        double minutes = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(minutes >= 0 && minutes <= 59);
-
-        // Edge case: called on non-Date
-        assertTypeError(DatePrototype.getMinutes(ctx, new JSString("not date"), new JSValue[]{}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testGetSeconds() {
-        JSDate date = new JSDate(1750000000000L);
-
-        JSValue result = DatePrototype.getSeconds(ctx, date, new JSValue[]{});
-        double seconds = result.asNumber().map(JSNumber::value).orElse(0.0);
-        assertTrue(seconds >= 0 && seconds <= 59);
-
-        // Edge case: called on non-Date
-        assertTypeError(DatePrototype.getSeconds(ctx, JSBoolean.TRUE, new JSValue[]{}));
         assertPendingException(ctx);
     }
 
@@ -220,28 +94,55 @@ public class DateConstructorTest extends BaseTest {
     }
 
     @Test
-    public void testGetUTCFullYear() {
-        // Known timestamp: 2025-01-01T00:00:00.000Z = 1735689600000
-        JSDate date = new JSDate(1735689600000L);
+    public void testGetMinutes() {
+        JSDate date = new JSDate(1750000000000L);
 
-        JSValue result = DatePrototype.getUTCFullYear(ctx, date, new JSValue[]{});
-        assertEquals(2025.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+        JSValue result = DatePrototype.getMinutes(ctx, date, new JSValue[]{});
+        double minutes = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(minutes >= 0 && minutes <= 59);
 
         // Edge case: called on non-Date
-        assertTypeError(DatePrototype.getUTCFullYear(ctx, new JSString("not date"), new JSValue[]{}));
+        assertTypeError(DatePrototype.getMinutes(ctx, new JSString("not date"), new JSValue[]{}));
         assertPendingException(ctx);
     }
 
     @Test
-    public void testGetUTCMonth() {
-        // Known timestamp: 2025-01-01T00:00:00.000Z
-        JSDate date = new JSDate(1735689600000L);
+    public void testGetMonth() {
+        JSDate date = new JSDate(1750000000000L);
 
-        JSValue result = DatePrototype.getUTCMonth(ctx, date, new JSValue[]{});
-        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0)); // January = 0
+        JSValue result = DatePrototype.getMonth(ctx, date, new JSValue[]{});
+        double month = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(month >= 0 && month <= 11);
 
         // Edge case: called on non-Date
-        assertTypeError(DatePrototype.getUTCMonth(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
+        assertTypeError(DatePrototype.getMonth(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
+        assertPendingException(ctx);
+    }
+
+    @Test
+    public void testGetSeconds() {
+        JSDate date = new JSDate(1750000000000L);
+
+        JSValue result = DatePrototype.getSeconds(ctx, date, new JSValue[]{});
+        double seconds = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(seconds >= 0 && seconds <= 59);
+
+        // Edge case: called on non-Date
+        assertTypeError(DatePrototype.getSeconds(ctx, JSBoolean.TRUE, new JSValue[]{}));
+        assertPendingException(ctx);
+    }
+
+    @Test
+    public void testGetTime() {
+        // Normal case
+        long timestamp = System.currentTimeMillis();
+        JSDate date = new JSDate(timestamp);
+
+        JSValue result = DatePrototype.getTime(ctx, date, new JSValue[]{});
+        assertEquals(timestamp, result.asNumber().map(JSNumber::value).orElse(0.0));
+
+        // Edge case: called on non-Date
+        assertTypeError(DatePrototype.getTime(ctx, new JSString("not date"), new JSValue[]{}));
         assertPendingException(ctx);
     }
 
@@ -259,6 +160,19 @@ public class DateConstructorTest extends BaseTest {
     }
 
     @Test
+    public void testGetUTCFullYear() {
+        // Known timestamp: 2025-01-01T00:00:00.000Z = 1735689600000
+        JSDate date = new JSDate(1735689600000L);
+
+        JSValue result = DatePrototype.getUTCFullYear(ctx, date, new JSValue[]{});
+        assertEquals(2025.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+
+        // Edge case: called on non-Date
+        assertTypeError(DatePrototype.getUTCFullYear(ctx, new JSString("not date"), new JSValue[]{}));
+        assertPendingException(ctx);
+    }
+
+    @Test
     public void testGetUTCHours() {
         // Known timestamp: 2025-01-01T00:00:00.000Z
         JSDate date = new JSDate(1735689600000L);
@@ -269,6 +183,52 @@ public class DateConstructorTest extends BaseTest {
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.getUTCHours(ctx, JSNull.INSTANCE, new JSValue[]{}));
         assertPendingException(ctx);
+    }
+
+    @Test
+    public void testGetUTCMonth() {
+        // Known timestamp: 2025-01-01T00:00:00.000Z
+        JSDate date = new JSDate(1735689600000L);
+
+        JSValue result = DatePrototype.getUTCMonth(ctx, date, new JSValue[]{});
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0)); // January = 0
+
+        // Edge case: called on non-Date
+        assertTypeError(DatePrototype.getUTCMonth(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
+        assertPendingException(ctx);
+    }
+
+    @Test
+    public void testNow() {
+        // Normal case
+        long before = System.currentTimeMillis();
+        JSValue result = DateConstructor.now(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        long after = System.currentTimeMillis();
+
+        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(timestamp >= before && timestamp <= after);
+    }
+
+    @Test
+    public void testParse() {
+        // Normal case: ISO 8601 format
+        JSValue result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{
+                new JSString("2025-01-01T00:00:00.000Z")
+        });
+        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(timestamp > 0);
+
+        // Edge case: no arguments
+        result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        double nanValue = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(Double.isNaN(nanValue));
+
+        // Edge case: invalid date string
+        result = DateConstructor.parse(ctx, JSUndefined.INSTANCE, new JSValue[]{
+                new JSString("not a date")
+        });
+        double invalidValue = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(Double.isNaN(invalidValue));
     }
 
     @Test
@@ -311,6 +271,46 @@ public class DateConstructorTest extends BaseTest {
         // Edge case: called on non-Date
         assertTypeError(DatePrototype.toStringMethod(ctx, new JSString("not date"), new JSValue[]{}));
         assertPendingException(ctx);
+    }
+
+    @Test
+    public void testUTC() {
+        // Normal case: Date.UTC(2025, 0, 1, 0, 0, 0)
+        JSValue result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
+                new JSNumber(2025),
+                new JSNumber(0), // January
+                new JSNumber(1),
+                new JSNumber(0),
+                new JSNumber(0),
+                new JSNumber(0)
+        });
+        double timestamp = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(timestamp > 0);
+
+        // Edge case: only year
+        result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(2025)});
+        result.asNumber().map(JSNumber::value).orElse(0.0);
+
+        // Edge case: year and month
+        result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
+                new JSNumber(2025),
+                new JSNumber(5) // June
+        });
+        result.asNumber().map(JSNumber::value).orElse(0.0);
+
+        // Edge case: no arguments (should return NaN)
+        result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        double nanValue = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(Double.isNaN(nanValue));
+
+        // Edge case: invalid date (should return NaN)
+        result = DateConstructor.UTC(ctx, JSUndefined.INSTANCE, new JSValue[]{
+                new JSNumber(2025),
+                new JSNumber(12), // Invalid month
+                new JSNumber(32)  // Invalid day
+        });
+        double invalidValue = result.asNumber().map(JSNumber::value).orElse(0.0);
+        assertTrue(Double.isNaN(invalidValue));
     }
 
     @Test

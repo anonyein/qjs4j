@@ -75,14 +75,6 @@ public enum RegExpOpcode {
         this.length = length;
     }
 
-    public int getCode() {
-        return code;
-    }
-
-    public int getLength() {
-        return length;
-    }
-
     /**
      * Get opcode by code value.
      */
@@ -93,6 +85,14 @@ public enum RegExpOpcode {
             }
         }
         return INVALID;
+    }
+
+    public int getCode() {
+        return code;
+    }
+
+    public int getLength() {
+        return length;
     }
 
     /**

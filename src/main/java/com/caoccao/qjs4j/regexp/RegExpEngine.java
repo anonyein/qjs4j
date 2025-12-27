@@ -65,13 +65,6 @@ public final class RegExpEngine {
     }
 
     /**
-     * Test if the regex matches the input.
-     */
-    public boolean test(String input) {
-        return exec(input, 0) != null;
-    }
-
-    /**
      * Execute the bytecode starting from the given instruction pointer.
      */
     private boolean execute(ExecutionContext ctx) {
@@ -188,21 +181,27 @@ public final class RegExpEngine {
     }
 
     /**
+     * Test if the regex matches the input.
+     */
+    public boolean test(String input) {
+        return exec(input, 0) != null;
+    }
+
+    /**
      * Execution context for a single match attempt.
      */
     private static class ExecutionContext {
-        final String input;
         final byte[] bytecode;
-        final int[] codePoints;
         final int captureCount;
-        final boolean ignoreCase;
-        final boolean multiline;
+        final int[] codePoints;
         final boolean dotAll;
+        final boolean ignoreCase;
+        final String input;
+        final boolean multiline;
         final boolean unicode;
-
-        int pos;  // Current position in code points
-        int[] captureStarts;
         int[] captureEnds;
+        int[] captureStarts;
+        int pos;  // Current position in code points
 
         ExecutionContext(String input, byte[] bytecode, int captureCount,
                          boolean ignoreCase, boolean multiline, boolean dotAll, boolean unicode) {
@@ -218,95 +217,6 @@ public final class RegExpEngine {
             this.captureEnds = new int[captureCount];
             Arrays.fill(captureStarts, -1);
             Arrays.fill(captureEnds, -1);
-        }
-
-        void reset(int startPos) {
-            this.pos = startPos;
-            Arrays.fill(captureStarts, -1);
-            Arrays.fill(captureEnds, -1);
-            if (captureCount > 0) {
-                captureStarts[0] = startPos;
-            }
-        }
-
-        boolean matchChar(int ch) {
-            if (pos >= codePoints.length) {
-                return false;
-            }
-            if (codePoints[pos] == ch) {
-                pos++;
-                return true;
-            }
-            return false;
-        }
-
-        boolean matchCharIgnoreCase(int ch) {
-            if (pos >= codePoints.length) {
-                return false;
-            }
-            int current = codePoints[pos];
-            if (current == ch ||
-                    Character.toLowerCase(current) == Character.toLowerCase(ch) ||
-                    Character.toUpperCase(current) == Character.toUpperCase(ch)) {
-                pos++;
-                return true;
-            }
-            return false;
-        }
-
-        boolean matchDot() {
-            if (pos >= codePoints.length) {
-                return false;
-            }
-            int ch = codePoints[pos];
-            // Dot matches everything except line terminators
-            if (ch == '\n' || ch == '\r' || ch == 0x2028 || ch == 0x2029) {
-                return false;
-            }
-            pos++;
-            return true;
-        }
-
-        boolean matchAny() {
-            if (pos >= codePoints.length) {
-                return false;
-            }
-            pos++;
-            return true;
-        }
-
-        boolean matchLineStart(boolean multilineMode) {
-            if (pos == 0) {
-                return true;
-            }
-            if (multilineMode && pos < codePoints.length) {
-                int prevCh = codePoints[pos - 1];
-                return prevCh == '\n' || prevCh == '\r' || prevCh == 0x2028 || prevCh == 0x2029;
-            }
-            return false;
-        }
-
-        boolean matchLineEnd(boolean multilineMode) {
-            if (pos >= codePoints.length) {
-                return true;
-            }
-            if (multilineMode) {
-                int ch = codePoints[pos];
-                return ch == '\n' || ch == '\r' || ch == 0x2028 || ch == 0x2029;
-            }
-            return false;
-        }
-
-        void saveStart(int captureIndex) {
-            if (captureIndex < captureCount) {
-                captureStarts[captureIndex] = pos;
-            }
-        }
-
-        void saveEnd(int captureIndex) {
-            if (captureIndex < captureCount) {
-                captureEnds[captureIndex] = pos;
-            }
         }
 
         MatchResult createResult(boolean matched) {
@@ -353,6 +263,95 @@ public final class RegExpEngine {
 
             return new MatchResult(true, startIndex, endIndex, captures, indices);
         }
+
+        boolean matchAny() {
+            if (pos >= codePoints.length) {
+                return false;
+            }
+            pos++;
+            return true;
+        }
+
+        boolean matchChar(int ch) {
+            if (pos >= codePoints.length) {
+                return false;
+            }
+            if (codePoints[pos] == ch) {
+                pos++;
+                return true;
+            }
+            return false;
+        }
+
+        boolean matchCharIgnoreCase(int ch) {
+            if (pos >= codePoints.length) {
+                return false;
+            }
+            int current = codePoints[pos];
+            if (current == ch ||
+                    Character.toLowerCase(current) == Character.toLowerCase(ch) ||
+                    Character.toUpperCase(current) == Character.toUpperCase(ch)) {
+                pos++;
+                return true;
+            }
+            return false;
+        }
+
+        boolean matchDot() {
+            if (pos >= codePoints.length) {
+                return false;
+            }
+            int ch = codePoints[pos];
+            // Dot matches everything except line terminators
+            if (ch == '\n' || ch == '\r' || ch == 0x2028 || ch == 0x2029) {
+                return false;
+            }
+            pos++;
+            return true;
+        }
+
+        boolean matchLineEnd(boolean multilineMode) {
+            if (pos >= codePoints.length) {
+                return true;
+            }
+            if (multilineMode) {
+                int ch = codePoints[pos];
+                return ch == '\n' || ch == '\r' || ch == 0x2028 || ch == 0x2029;
+            }
+            return false;
+        }
+
+        boolean matchLineStart(boolean multilineMode) {
+            if (pos == 0) {
+                return true;
+            }
+            if (multilineMode && pos < codePoints.length) {
+                int prevCh = codePoints[pos - 1];
+                return prevCh == '\n' || prevCh == '\r' || prevCh == 0x2028 || prevCh == 0x2029;
+            }
+            return false;
+        }
+
+        void reset(int startPos) {
+            this.pos = startPos;
+            Arrays.fill(captureStarts, -1);
+            Arrays.fill(captureEnds, -1);
+            if (captureCount > 0) {
+                captureStarts[0] = startPos;
+            }
+        }
+
+        void saveEnd(int captureIndex) {
+            if (captureIndex < captureCount) {
+                captureEnds[captureIndex] = pos;
+            }
+        }
+
+        void saveStart(int captureIndex) {
+            if (captureIndex < captureCount) {
+                captureStarts[captureIndex] = pos;
+            }
+        }
     }
 
     /**
@@ -372,19 +371,19 @@ public final class RegExpEngine {
             int[][] indices
     ) {
         /**
-         * Get the full matched string.
-         */
-        public String getMatch() {
-            return matched && captures != null && captures.length > 0 ? captures[0] : null;
-        }
-
-        /**
          * Get a specific capture group.
          */
         public String getCapture(int index) {
             return matched && captures != null && index >= 0 && index < captures.length
                     ? captures[index]
                     : null;
+        }
+
+        /**
+         * Get the full matched string.
+         */
+        public String getMatch() {
+            return matched && captures != null && captures.length > 0 ? captures[0] : null;
         }
     }
 }

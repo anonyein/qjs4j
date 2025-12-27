@@ -25,53 +25,6 @@ import com.caoccao.qjs4j.core.*;
 public final class PromisePrototype {
 
     /**
-     * Promise.prototype.then(onFulfilled, onRejected)
-     * ES2020 25.6.5.4
-     * Returns a new Promise, and attaches callbacks for fulfillment and/or rejection.
-     */
-    public static JSValue then(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSPromise promise)) {
-            return ctx.throwError("TypeError", "Promise.prototype.then called on non-Promise");
-        }
-
-        JSFunction onFulfilled = null;
-        JSFunction onRejected = null;
-
-        if (args.length > 0 && args[0] instanceof JSFunction) {
-            onFulfilled = (JSFunction) args[0];
-        }
-
-        if (args.length > 1 && args[1] instanceof JSFunction) {
-            onRejected = (JSFunction) args[1];
-        }
-
-        // Create a new promise to be returned (for chaining)
-        JSPromise chainedPromise = new JSPromise();
-
-        // Create reaction records
-        JSPromise.ReactionRecord fulfillReaction = null;
-        if (onFulfilled != null) {
-            fulfillReaction = new JSPromise.ReactionRecord(onFulfilled, chainedPromise, ctx);
-        } else {
-            // If no onFulfilled, pass value through
-            fulfillReaction = new JSPromise.ReactionRecord(null, chainedPromise, ctx);
-        }
-
-        JSPromise.ReactionRecord rejectReaction = null;
-        if (onRejected != null) {
-            rejectReaction = new JSPromise.ReactionRecord(onRejected, chainedPromise, ctx);
-        } else {
-            // If no onRejected, pass rejection through
-            rejectReaction = new JSPromise.ReactionRecord(null, chainedPromise, ctx);
-        }
-
-        // Add reactions to the promise
-        promise.addReactions(fulfillReaction, rejectReaction);
-
-        return chainedPromise;
-    }
-
-    /**
      * Promise.prototype.catch(onRejected)
      * ES2020 25.6.5.1
      * Returns a new Promise, and attaches a callback for rejection only.
@@ -119,5 +72,52 @@ public final class PromisePrototype {
         // Call then with both wrappers
         JSValue[] thenArgs = new JSValue[]{onFulfilledWrapper, onRejectedWrapper};
         return then(ctx, thisArg, thenArgs);
+    }
+
+    /**
+     * Promise.prototype.then(onFulfilled, onRejected)
+     * ES2020 25.6.5.4
+     * Returns a new Promise, and attaches callbacks for fulfillment and/or rejection.
+     */
+    public static JSValue then(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSPromise promise)) {
+            return ctx.throwError("TypeError", "Promise.prototype.then called on non-Promise");
+        }
+
+        JSFunction onFulfilled = null;
+        JSFunction onRejected = null;
+
+        if (args.length > 0 && args[0] instanceof JSFunction) {
+            onFulfilled = (JSFunction) args[0];
+        }
+
+        if (args.length > 1 && args[1] instanceof JSFunction) {
+            onRejected = (JSFunction) args[1];
+        }
+
+        // Create a new promise to be returned (for chaining)
+        JSPromise chainedPromise = new JSPromise();
+
+        // Create reaction records
+        JSPromise.ReactionRecord fulfillReaction = null;
+        if (onFulfilled != null) {
+            fulfillReaction = new JSPromise.ReactionRecord(onFulfilled, chainedPromise, ctx);
+        } else {
+            // If no onFulfilled, pass value through
+            fulfillReaction = new JSPromise.ReactionRecord(null, chainedPromise, ctx);
+        }
+
+        JSPromise.ReactionRecord rejectReaction = null;
+        if (onRejected != null) {
+            rejectReaction = new JSPromise.ReactionRecord(onRejected, chainedPromise, ctx);
+        } else {
+            // If no onRejected, pass rejection through
+            rejectReaction = new JSPromise.ReactionRecord(null, chainedPromise, ctx);
+        }
+
+        // Add reactions to the promise
+        promise.addReactions(fulfillReaction, rejectReaction);
+
+        return chainedPromise;
     }
 }

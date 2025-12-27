@@ -36,31 +36,10 @@ public final class JSSet extends JSObject {
     }
 
     /**
-     * Get the number of values in the Set.
-     */
-    public int size() {
-        return data.size();
-    }
-
-    /**
      * Add a value to the Set.
      */
     public void setAdd(JSValue value) {
         data.add(new JSMap.KeyWrapper(value));
-    }
-
-    /**
-     * Check if the Set has a value.
-     */
-    public boolean setHas(JSValue value) {
-        return data.contains(new JSMap.KeyWrapper(value));
-    }
-
-    /**
-     * Delete a value from the Set.
-     */
-    public boolean setDelete(JSValue value) {
-        return data.remove(new JSMap.KeyWrapper(value));
     }
 
     /**
@@ -71,14 +50,35 @@ public final class JSSet extends JSObject {
     }
 
     /**
-     * Get all values as an iterable.
+     * Delete a value from the Set.
      */
-    public Iterable<JSMap.KeyWrapper> values() {
-        return data;
+    public boolean setDelete(JSValue value) {
+        return data.remove(new JSMap.KeyWrapper(value));
+    }
+
+    /**
+     * Check if the Set has a value.
+     */
+    public boolean setHas(JSValue value) {
+        return data.contains(new JSMap.KeyWrapper(value));
+    }
+
+    /**
+     * Get the number of values in the Set.
+     */
+    public int size() {
+        return data.size();
     }
 
     @Override
     public String toString() {
         return "[object Set]";
+    }
+
+    /**
+     * Get all values as an iterable.
+     */
+    public Iterable<JSMap.KeyWrapper> values() {
+        return data;
     }
 }

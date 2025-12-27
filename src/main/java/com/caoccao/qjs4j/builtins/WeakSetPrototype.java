@@ -51,30 +51,6 @@ public final class WeakSetPrototype {
     }
 
     /**
-     * WeakSet.prototype.has(value)
-     * ES2020 23.4.3.3
-     * Returns a boolean indicating whether a value exists in the WeakSet.
-     */
-    public static JSValue has(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSWeakSet weakSet)) {
-            return ctx.throwError("TypeError", "WeakSet.prototype.has called on non-WeakSet");
-        }
-
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-
-        JSValue value = args[0];
-
-        // Value must be an object
-        if (!(value instanceof JSObject valueObj)) {
-            return JSBoolean.FALSE;
-        }
-
-        return JSBoolean.valueOf(weakSet.weakSetHas(valueObj));
-    }
-
-    /**
      * WeakSet.prototype.delete(value)
      * ES2020 23.4.3.2
      * Removes the value from the WeakSet. Returns true if the value existed and was removed.
@@ -96,5 +72,29 @@ public final class WeakSetPrototype {
         }
 
         return JSBoolean.valueOf(weakSet.weakSetDelete(valueObj));
+    }
+
+    /**
+     * WeakSet.prototype.has(value)
+     * ES2020 23.4.3.3
+     * Returns a boolean indicating whether a value exists in the WeakSet.
+     */
+    public static JSValue has(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSWeakSet weakSet)) {
+            return ctx.throwError("TypeError", "WeakSet.prototype.has called on non-WeakSet");
+        }
+
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+
+        JSValue value = args[0];
+
+        // Value must be an object
+        if (!(value instanceof JSObject valueObj)) {
+            return JSBoolean.FALSE;
+        }
+
+        return JSBoolean.valueOf(weakSet.weakSetHas(valueObj));
     }
 }

@@ -37,18 +37,12 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class JSFinalizationRegistry extends JSObject {
     private final JSFunction cleanupCallback;
+    private final Thread cleanupThread;
     private final JSContext context;
     private final ReferenceQueue<JSObject> referenceQueue;
     private final Map<PhantomReference<JSObject>, RegistrationRecord> registrations;
     private final Map<JSValue, PhantomReference<JSObject>> unregisterTokenMap;
-    private final Thread cleanupThread;
     private volatile boolean running;
-
-    /**
-         * Record for a registered object.
-         */
-        private record RegistrationRecord(JSValue heldValue, JSValue unregisterToken) {
-    }
 
     /**
      * Create a new FinalizationRegistry.
@@ -106,44 +100,6 @@ public final class JSFinalizationRegistry extends JSObject {
     }
 
     /**
-     * Register an object for finalization.
-     * ES2021 FinalizationRegistry.prototype.register()
-     *
-     * @param target          The object to monitor
-     * @param heldValue       Value passed to cleanup callback
-     * @param unregisterToken Optional token for manual unregistration
-     */
-    public void register(JSObject target, JSValue heldValue, JSValue unregisterToken) {
-        // Create phantom reference to track when target is collected
-        PhantomReference<JSObject> phantomRef = new PhantomReference<>(target, referenceQueue);
-
-        // Store registration
-        RegistrationRecord record = new RegistrationRecord(heldValue, unregisterToken);
-        registrations.put(phantomRef, record);
-
-        // Store unregister token mapping if provided
-        if (unregisterToken != null) {
-            unregisterTokenMap.put(unregisterToken, phantomRef);
-        }
-    }
-
-    /**
-     * Unregister an object using its unregister token.
-     * ES2021 FinalizationRegistry.prototype.unregister()
-     *
-     * @param unregisterToken The token provided during registration
-     * @return True if a registration was removed
-     */
-    public boolean unregister(JSValue unregisterToken) {
-        PhantomReference<JSObject> phantomRef = unregisterTokenMap.remove(unregisterToken);
-        if (phantomRef != null) {
-            registrations.remove(phantomRef);
-            return true;
-        }
-        return false;
-    }
-
-    /**
      * Cleanup loop that monitors the reference queue.
      * Runs in a background thread.
      */
@@ -187,6 +143,38 @@ public final class JSFinalizationRegistry extends JSObject {
     }
 
     /**
+     * Get the number of active registrations.
+     * For debugging/testing purposes.
+     *
+     * @return The number of registered objects
+     */
+    public int getRegistrationCount() {
+        return registrations.size();
+    }
+
+    /**
+     * Register an object for finalization.
+     * ES2021 FinalizationRegistry.prototype.register()
+     *
+     * @param target          The object to monitor
+     * @param heldValue       Value passed to cleanup callback
+     * @param unregisterToken Optional token for manual unregistration
+     */
+    public void register(JSObject target, JSValue heldValue, JSValue unregisterToken) {
+        // Create phantom reference to track when target is collected
+        PhantomReference<JSObject> phantomRef = new PhantomReference<>(target, referenceQueue);
+
+        // Store registration
+        RegistrationRecord record = new RegistrationRecord(heldValue, unregisterToken);
+        registrations.put(phantomRef, record);
+
+        // Store unregister token mapping if provided
+        if (unregisterToken != null) {
+            unregisterTokenMap.put(unregisterToken, phantomRef);
+        }
+    }
+
+    /**
      * Stop the cleanup thread and clear all registrations.
      * Called when the registry is no longer needed.
      */
@@ -197,18 +185,30 @@ public final class JSFinalizationRegistry extends JSObject {
         unregisterTokenMap.clear();
     }
 
-    /**
-     * Get the number of active registrations.
-     * For debugging/testing purposes.
-     *
-     * @return The number of registered objects
-     */
-    public int getRegistrationCount() {
-        return registrations.size();
-    }
-
     @Override
     public String toString() {
         return "[object FinalizationRegistry]";
+    }
+
+    /**
+     * Unregister an object using its unregister token.
+     * ES2021 FinalizationRegistry.prototype.unregister()
+     *
+     * @param unregisterToken The token provided during registration
+     * @return True if a registration was removed
+     */
+    public boolean unregister(JSValue unregisterToken) {
+        PhantomReference<JSObject> phantomRef = unregisterTokenMap.remove(unregisterToken);
+        if (phantomRef != null) {
+            registrations.remove(phantomRef);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Record for a registered object.
+     */
+    private record RegistrationRecord(JSValue heldValue, JSValue unregisterToken) {
     }
 }

@@ -69,24 +69,6 @@ public final class RegExpCompiler {
         }
     }
 
-    private void compilePattern(CompileContext ctx) {
-        // Save start of capture group 0
-        ctx.buffer.appendU8(RegExpOpcode.SAVE_START.getCode());
-        ctx.buffer.appendU8(0); // Capture group 0
-
-        compileDisjunction(ctx);
-
-        // Save end of capture group 0
-        ctx.buffer.appendU8(RegExpOpcode.SAVE_END.getCode());
-        ctx.buffer.appendU8(0); // Capture group 0
-    }
-
-    private void compileDisjunction(CompileContext ctx) {
-        // A disjunction is a sequence of alternatives separated by |
-        // For now, we just compile a sequence (no | support yet)
-        compileAlternative(ctx);
-    }
-
     private void compileAlternative(CompileContext ctx) {
         // An alternative is a sequence of terms
         while (ctx.pos < ctx.codePoints.length) {
@@ -151,6 +133,18 @@ public final class RegExpCompiler {
         }
     }
 
+    private void compileCharacterClass(CompileContext ctx) {
+        // Character classes [abc], [^abc], [a-z]
+        // Not fully implemented yet
+        throw new RegExpSyntaxException("Character classes not yet fully implemented");
+    }
+
+    private void compileDisjunction(CompileContext ctx) {
+        // A disjunction is a sequence of alternatives separated by |
+        // For now, we just compile a sequence (no | support yet)
+        compileAlternative(ctx);
+    }
+
     private void compileEscape(CompileContext ctx) {
         if (ctx.pos >= ctx.codePoints.length) {
             throw new RegExpSyntaxException("Incomplete escape sequence");
@@ -178,26 +172,6 @@ public final class RegExpCompiler {
         }
     }
 
-    private void compileLiteralChar(CompileContext ctx, int ch) {
-        if (ch <= 0xFFFF) {
-            ctx.buffer.appendU8(ctx.isIgnoreCase() ?
-                    RegExpOpcode.CHAR_I.getCode() :
-                    RegExpOpcode.CHAR.getCode());
-            ctx.buffer.appendU16(ch);
-        } else {
-            ctx.buffer.appendU8(ctx.isIgnoreCase() ?
-                    RegExpOpcode.CHAR32_I.getCode() :
-                    RegExpOpcode.CHAR32.getCode());
-            ctx.buffer.appendU32(ch);
-        }
-    }
-
-    private void compileCharacterClass(CompileContext ctx) {
-        // Character classes [abc], [^abc], [a-z]
-        // Not fully implemented yet
-        throw new RegExpSyntaxException("Character classes not yet fully implemented");
-    }
-
     private void compileGroup(CompileContext ctx) {
         // Capture groups (...)
         ctx.pos++; // Skip '('
@@ -221,11 +195,37 @@ public final class RegExpCompiler {
         ctx.pos++; // Skip ')'
     }
 
+    private void compileLiteralChar(CompileContext ctx, int ch) {
+        if (ch <= 0xFFFF) {
+            ctx.buffer.appendU8(ctx.isIgnoreCase() ?
+                    RegExpOpcode.CHAR_I.getCode() :
+                    RegExpOpcode.CHAR.getCode());
+            ctx.buffer.appendU16(ch);
+        } else {
+            ctx.buffer.appendU8(ctx.isIgnoreCase() ?
+                    RegExpOpcode.CHAR32_I.getCode() :
+                    RegExpOpcode.CHAR32.getCode());
+            ctx.buffer.appendU32(ch);
+        }
+    }
+
+    private void compilePattern(CompileContext ctx) {
+        // Save start of capture group 0
+        ctx.buffer.appendU8(RegExpOpcode.SAVE_START.getCode());
+        ctx.buffer.appendU8(0); // Capture group 0
+
+        compileDisjunction(ctx);
+
+        // Save end of capture group 0
+        ctx.buffer.appendU8(RegExpOpcode.SAVE_END.getCode());
+        ctx.buffer.appendU8(0); // Capture group 0
+    }
+
     private static class CompileContext {
-        final String pattern;
+        final DynamicBuffer buffer;
         final int[] codePoints;
         final int flags;
-        final DynamicBuffer buffer;
+        final String pattern;
         int pos;
 
         CompileContext(String pattern, int flags, DynamicBuffer buffer) {
@@ -236,16 +236,16 @@ public final class RegExpCompiler {
             this.pos = 0;
         }
 
+        boolean isDotAll() {
+            return (flags & RegExpBytecode.FLAG_DOTALL) != 0;
+        }
+
         boolean isIgnoreCase() {
             return (flags & RegExpBytecode.FLAG_IGNORECASE) != 0;
         }
 
         boolean isMultiline() {
             return (flags & RegExpBytecode.FLAG_MULTILINE) != 0;
-        }
-
-        boolean isDotAll() {
-            return (flags & RegExpBytecode.FLAG_DOTALL) != 0;
         }
 
         boolean isUnicode() {

@@ -34,13 +34,6 @@ public class JSException extends RuntimeException {
     }
 
     /**
-     * Get the JavaScript error value.
-     */
-    public JSValue getErrorValue() {
-        return errorValue;
-    }
-
-    /**
      * Format error message from JavaScript error object.
      */
     private static String formatErrorMessage(JSValue error) {
@@ -58,5 +51,12 @@ public class JSException extends RuntimeException {
         }
 
         return error.toString();
+    }
+
+    /**
+     * Get the JavaScript error value.
+     */
+    public JSValue getErrorValue() {
+        return errorValue;
     }
 }

@@ -37,10 +37,10 @@ package com.caoccao.qjs4j.core;
  * </pre>
  */
 public final class ClassBuilder {
+    private final JSClass classObject;
     private final String name;
     private JSFunction constructor;
     private JSClass superClass;
-    private final JSClass classObject;
 
     /**
      * Create a new class builder.
@@ -52,6 +52,27 @@ public final class ClassBuilder {
         this.constructor = new JSNativeFunction("constructor", 0, (ctx, thisArg, args) -> JSUndefined.INSTANCE);
         this.superClass = null;
         this.classObject = null; // Will be created in build()
+    }
+
+    /**
+     * Build the class.
+     *
+     * @return The constructed class
+     */
+    public JSClass build() {
+        JSClass result = new JSClass(name, constructor, superClass);
+        return result;
+    }
+
+    /**
+     * Build the class and immediately add methods/fields.
+     * This variant allows method chaining after build().
+     *
+     * @return A BuilderWithClass that allows adding methods/fields
+     */
+    public BuilderWithClass buildAndConfigure() {
+        JSClass result = new JSClass(name, constructor, superClass);
+        return new BuilderWithClass(result);
     }
 
     /**
@@ -89,6 +110,27 @@ public final class ClassBuilder {
     }
 
     /**
+     * Add an instance field with initial value.
+     *
+     * @param fieldName    Field name
+     * @param initialValue Initial value
+     * @return This builder
+     */
+    public ClassBuilder instanceField(String fieldName, JSValue initialValue) {
+        if (classObject == null) {
+            throw new IllegalStateException("Must call build() before adding fields");
+        }
+        JSClass.PropertyDescriptor descriptor = new JSClass.PropertyDescriptor(
+                initialValue,
+                true,  // writable
+                true,  // enumerable
+                true   // configurable
+        );
+        classObject.addInstanceField(fieldName, descriptor);
+        return this;
+    }
+
+    /**
      * Add an instance method.
      *
      * @param methodName Method name
@@ -113,6 +155,27 @@ public final class ClassBuilder {
         }
         JSNativeFunction method = new JSNativeFunction(methodName, length, callback);
         classObject.addInstanceMethod(methodName, method);
+        return this;
+    }
+
+    /**
+     * Add a static field with value.
+     *
+     * @param fieldName Field name
+     * @param value     Field value
+     * @return This builder
+     */
+    public ClassBuilder staticField(String fieldName, JSValue value) {
+        if (classObject == null) {
+            throw new IllegalStateException("Must call build() before adding fields");
+        }
+        JSClass.PropertyDescriptor descriptor = new JSClass.PropertyDescriptor(
+                value,
+                true,  // writable
+                true,  // enumerable
+                true   // configurable
+        );
+        classObject.addStaticField(fieldName, descriptor);
         return this;
     }
 
@@ -145,69 +208,6 @@ public final class ClassBuilder {
     }
 
     /**
-     * Add an instance field with initial value.
-     *
-     * @param fieldName    Field name
-     * @param initialValue Initial value
-     * @return This builder
-     */
-    public ClassBuilder instanceField(String fieldName, JSValue initialValue) {
-        if (classObject == null) {
-            throw new IllegalStateException("Must call build() before adding fields");
-        }
-        JSClass.PropertyDescriptor descriptor = new JSClass.PropertyDescriptor(
-                initialValue,
-                true,  // writable
-                true,  // enumerable
-                true   // configurable
-        );
-        classObject.addInstanceField(fieldName, descriptor);
-        return this;
-    }
-
-    /**
-     * Add a static field with value.
-     *
-     * @param fieldName Field name
-     * @param value     Field value
-     * @return This builder
-     */
-    public ClassBuilder staticField(String fieldName, JSValue value) {
-        if (classObject == null) {
-            throw new IllegalStateException("Must call build() before adding fields");
-        }
-        JSClass.PropertyDescriptor descriptor = new JSClass.PropertyDescriptor(
-                value,
-                true,  // writable
-                true,  // enumerable
-                true   // configurable
-        );
-        classObject.addStaticField(fieldName, descriptor);
-        return this;
-    }
-
-    /**
-     * Build the class.
-     *
-     * @return The constructed class
-     */
-    public JSClass build() {
-        JSClass result = new JSClass(name, constructor, superClass);
-        return result;
-    }
-
-    /**
-     * Build the class and immediately add methods/fields.
-     * This variant allows method chaining after build().
-     *
-     * @return A BuilderWithClass that allows adding methods/fields
-     */
-    public BuilderWithClass buildAndConfigure() {
-        JSClass result = new JSClass(name, constructor, superClass);
-        return new BuilderWithClass(result);
-    }
-
-    /**
      * Builder that wraps an already-created class for configuration.
      */
     public static final class BuilderWithClass {
@@ -215,6 +215,19 @@ public final class ClassBuilder {
 
         private BuilderWithClass(JSClass classObject) {
             this.classObject = classObject;
+        }
+
+        public JSClass getClass_() {
+            return classObject;
+        }
+
+        public BuilderWithClass instanceField(String fieldName, JSValue initialValue) {
+            JSClass.PropertyDescriptor descriptor = new JSClass.PropertyDescriptor(
+                    initialValue,
+                    true, true, true
+            );
+            classObject.addInstanceField(fieldName, descriptor);
+            return this;
         }
 
         public BuilderWithClass instanceMethod(String methodName, JSNativeFunction.NativeCallback callback) {
@@ -227,25 +240,6 @@ public final class ClassBuilder {
             return this;
         }
 
-        public BuilderWithClass staticMethod(String methodName, JSNativeFunction.NativeCallback callback) {
-            return staticMethod(methodName, 0, callback);
-        }
-
-        public BuilderWithClass staticMethod(String methodName, int length, JSNativeFunction.NativeCallback callback) {
-            JSNativeFunction method = new JSNativeFunction(methodName, length, callback);
-            classObject.addStaticMethod(methodName, method);
-            return this;
-        }
-
-        public BuilderWithClass instanceField(String fieldName, JSValue initialValue) {
-            JSClass.PropertyDescriptor descriptor = new JSClass.PropertyDescriptor(
-                    initialValue,
-                    true, true, true
-            );
-            classObject.addInstanceField(fieldName, descriptor);
-            return this;
-        }
-
         public BuilderWithClass staticField(String fieldName, JSValue value) {
             JSClass.PropertyDescriptor descriptor = new JSClass.PropertyDescriptor(
                     value,
@@ -255,8 +249,14 @@ public final class ClassBuilder {
             return this;
         }
 
-        public JSClass getClass_() {
-            return classObject;
+        public BuilderWithClass staticMethod(String methodName, int length, JSNativeFunction.NativeCallback callback) {
+            JSNativeFunction method = new JSNativeFunction(methodName, length, callback);
+            classObject.addStaticMethod(methodName, method);
+            return this;
+        }
+
+        public BuilderWithClass staticMethod(String methodName, JSNativeFunction.NativeCallback callback) {
+            return staticMethod(methodName, 0, callback);
         }
     }
 }

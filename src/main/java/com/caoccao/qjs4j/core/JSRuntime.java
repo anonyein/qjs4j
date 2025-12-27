@@ -46,16 +46,15 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * - Stack traces
  */
 public final class JSRuntime {
+    private final AtomTable atoms;
     private final List<JSContext> contexts;
     private final GarbageCollector gc;
-    private final AtomTable atoms;
+    private final int interruptCheckCounter;
     private final Queue<Job> jobQueue;
     private final RuntimeOptions options;
-
+    private long maxMemoryUsage;
     // Runtime limits
     private long maxStackSize;
-    private long maxMemoryUsage;
-    private final int interruptCheckCounter;
 
     /**
      * Create a new runtime with default options.
@@ -95,10 +94,69 @@ public final class JSRuntime {
     }
 
     /**
+     * Enqueue a job to be executed later.
+     * Used for promise reactions and queueMicrotask().
+     */
+    public void enqueueJob(Job job) {
+        if (job != null) {
+            jobQueue.offer(job);
+        }
+    }
+
+    /**
+     * Perform garbage collection.
+     */
+    public void gc() {
+        gc.collectGarbage();
+    }
+
+    /**
+     * Get the atom table for this runtime.
+     */
+    public AtomTable getAtoms() {
+        return atoms;
+    }
+
+    /**
      * Get all contexts in this runtime.
      */
     public List<JSContext> getContexts() {
         return new ArrayList<>(contexts);
+    }
+
+    /**
+     * Get the garbage collector.
+     */
+    public GarbageCollector getGarbageCollector() {
+        return gc;
+    }
+
+    /**
+     * Get maximum memory usage.
+     */
+    public long getMaxMemoryUsage() {
+        return maxMemoryUsage;
+    }
+
+    /**
+     * Get maximum stack size.
+     */
+    public long getMaxStackSize() {
+        return maxStackSize;
+    }
+
+    /**
+     * Get runtime options.
+     */
+    public RuntimeOptions getOptions() {
+        return options;
+    }
+
+    /**
+     * Check if there are pending jobs.
+     */
+    public boolean hasPendingJobs() {
+        return !jobQueue.isEmpty();
     }
 
     /**
@@ -125,58 +183,6 @@ public final class JSRuntime {
     }
 
     /**
-     * Enqueue a job to be executed later.
-     * Used for promise reactions and queueMicrotask().
-     */
-    public void enqueueJob(Job job) {
-        if (job != null) {
-            jobQueue.offer(job);
-        }
-    }
-
-    /**
-     * Check if there are pending jobs.
-     */
-    public boolean hasPendingJobs() {
-        return !jobQueue.isEmpty();
-    }
-
-    /**
-     * Get the atom table for this runtime.
-     */
-    public AtomTable getAtoms() {
-        return atoms;
-    }
-
-    /**
-     * Get the garbage collector.
-     */
-    public GarbageCollector getGarbageCollector() {
-        return gc;
-    }
-
-    /**
-     * Get runtime options.
-     */
-    public RuntimeOptions getOptions() {
-        return options;
-    }
-
-    /**
-     * Set maximum stack size in bytes.
-     */
-    public void setMaxStackSize(long bytes) {
-        this.maxStackSize = bytes;
-    }
-
-    /**
-     * Get maximum stack size.
-     */
-    public long getMaxStackSize() {
-        return maxStackSize;
-    }
-
-    /**
      * Set maximum memory usage in bytes.
      */
     public void setMaxMemoryUsage(long bytes) {
@@ -184,10 +190,10 @@ public final class JSRuntime {
     }
 
     /**
-     * Get maximum memory usage.
+     * Set maximum stack size in bytes.
      */
-    public long getMaxMemoryUsage() {
-        return maxMemoryUsage;
+    public void setMaxStackSize(long bytes) {
+        this.maxStackSize = bytes;
     }
 
     /**
@@ -203,27 +209,29 @@ public final class JSRuntime {
     }
 
     /**
-     * Perform garbage collection.
+     * A job to be executed in the job queue.
+     * Used for promises, queueMicrotask, and other async operations.
      */
-    public void gc() {
-        gc.collectGarbage();
+    @FunctionalInterface
+    public interface Job {
+        void run();
     }
 
     /**
      * Runtime configuration options.
      */
     public static class RuntimeOptions {
-        public long maxStackSize = 256 * 1024; // 256 KB default
-        public long maxMemoryUsage = 64 * 1024 * 1024; // 64 MB default
         public boolean enableBigInt = true;
-        public boolean enableOperatorOverloading = false;
         public boolean enableDateExtensions = false;
+        public boolean enableOperatorOverloading = false;
+        public long maxMemoryUsage = 64 * 1024 * 1024; // 64 MB default
+        public long maxStackSize = 256 * 1024; // 256 KB default
 
         public RuntimeOptions() {
         }
 
-        public RuntimeOptions maxStackSize(long bytes) {
-            this.maxStackSize = bytes;
+        public RuntimeOptions enableBigInt(boolean enable) {
+            this.enableBigInt = enable;
             return this;
         }
 
@@ -232,18 +240,9 @@ public final class JSRuntime {
             return this;
         }
 
-        public RuntimeOptions enableBigInt(boolean enable) {
-            this.enableBigInt = enable;
+        public RuntimeOptions maxStackSize(long bytes) {
+            this.maxStackSize = bytes;
             return this;
         }
-    }
-
-    /**
-     * A job to be executed in the job queue.
-     * Used for promises, queueMicrotask, and other async operations.
-     */
-    @FunctionalInterface
-    public interface Job {
-        void run();
     }
 }

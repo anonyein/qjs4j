@@ -23,55 +23,19 @@ import java.util.Arrays;
  * Based on QuickJS libregexp.h.
  */
 public record RegExpBytecode(byte[] instructions, int flags, int captureCount, String[] groupNames) {
+    public static final int FLAG_DOTALL = 1 << 3;
     // Regex flags
     public static final int FLAG_GLOBAL = 1 << 0;
     public static final int FLAG_IGNORECASE = 1 << 1;
-    public static final int FLAG_MULTILINE = 1 << 2;
-    public static final int FLAG_DOTALL = 1 << 3;
-    public static final int FLAG_UNICODE = 1 << 4;
-    public static final int FLAG_STICKY = 1 << 5;
     public static final int FLAG_INDICES = 1 << 6;
+    public static final int FLAG_MULTILINE = 1 << 2;
     public static final int FLAG_NAMED_GROUPS = 1 << 7;
+    public static final int FLAG_STICKY = 1 << 5;
+    public static final int FLAG_UNICODE = 1 << 4;
     public static final int FLAG_UNICODE_SETS = 1 << 8;
 
     public RegExpBytecode(byte[] instructions, int flags, int captureCount) {
         this(instructions, flags, captureCount, null);
-    }
-
-    public boolean isGlobal() {
-        return (flags & FLAG_GLOBAL) != 0;
-    }
-
-    public boolean isIgnoreCase() {
-        return (flags & FLAG_IGNORECASE) != 0;
-    }
-
-    public boolean isMultiline() {
-        return (flags & FLAG_MULTILINE) != 0;
-    }
-
-    public boolean isDotAll() {
-        return (flags & FLAG_DOTALL) != 0;
-    }
-
-    public boolean isUnicode() {
-        return (flags & FLAG_UNICODE) != 0;
-    }
-
-    public boolean isSticky() {
-        return (flags & FLAG_STICKY) != 0;
-    }
-
-    public boolean hasIndices() {
-        return (flags & FLAG_INDICES) != 0;
-    }
-
-    public boolean hasNamedGroups() {
-        return (flags & FLAG_NAMED_GROUPS) != 0;
-    }
-
-    public boolean hasUnicodeSets() {
-        return (flags & FLAG_UNICODE_SETS) != 0;
     }
 
     /**
@@ -112,6 +76,42 @@ public record RegExpBytecode(byte[] instructions, int flags, int captureCount, S
         if (hasIndices()) sb.append('d');
         if (hasUnicodeSets()) sb.append('v');
         return sb.toString();
+    }
+
+    public boolean hasIndices() {
+        return (flags & FLAG_INDICES) != 0;
+    }
+
+    public boolean hasNamedGroups() {
+        return (flags & FLAG_NAMED_GROUPS) != 0;
+    }
+
+    public boolean hasUnicodeSets() {
+        return (flags & FLAG_UNICODE_SETS) != 0;
+    }
+
+    public boolean isDotAll() {
+        return (flags & FLAG_DOTALL) != 0;
+    }
+
+    public boolean isGlobal() {
+        return (flags & FLAG_GLOBAL) != 0;
+    }
+
+    public boolean isIgnoreCase() {
+        return (flags & FLAG_IGNORECASE) != 0;
+    }
+
+    public boolean isMultiline() {
+        return (flags & FLAG_MULTILINE) != 0;
+    }
+
+    public boolean isSticky() {
+        return (flags & FLAG_STICKY) != 0;
+    }
+
+    public boolean isUnicode() {
+        return (flags & FLAG_UNICODE) != 0;
     }
 
     @Override

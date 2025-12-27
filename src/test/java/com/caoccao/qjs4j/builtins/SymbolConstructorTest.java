@@ -64,36 +64,43 @@ public class SymbolConstructorTest extends BaseTest {
     }
 
     @Test
-    public void testSymbolFor() {
-        // Normal case: create new symbol in registry
-        JSValue result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("test")});
-        JSSymbol symbol1 = result.asSymbol().orElse(null);
-        assertNotNull(symbol1);
-        assertEquals("test", symbol1.getDescription());
+    public void testGetHasInstance() {
+        JSValue result = SymbolConstructor.getHasInstance(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        JSSymbol symbol = result.asSymbol().orElse(null);
+        assertNotNull(symbol);
+        assertEquals(JSSymbol.HAS_INSTANCE, symbol);
+    }
 
-        // Normal case: get existing symbol from registry
-        result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("test")});
-        JSSymbol symbol2 = result.asSymbol().orElse(null);
-        assertNotNull(symbol2);
-        assertEquals(symbol1, symbol2); // Same symbol instance
+    @Test
+    public void testGetIsConcatSpreadable() {
+        JSValue result = SymbolConstructor.getIsConcatSpreadable(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        JSSymbol symbol = result.asSymbol().orElse(null);
+        assertNotNull(symbol);
+        assertEquals(JSSymbol.IS_CONCAT_SPREADABLE, symbol);
+    }
 
-        // Normal case: different keys create different symbols
-        result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("other")});
-        JSSymbol symbol3 = result.asSymbol().orElse(null);
-        assertNotNull(symbol3);
-        assertNotEquals(symbol1, symbol3);
-        assertEquals("other", symbol3.getDescription());
+    @Test
+    public void testGetIterator() {
+        JSValue result = SymbolConstructor.getIterator(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        JSSymbol symbol = result.asSymbol().orElse(null);
+        assertNotNull(symbol);
+        assertEquals(JSSymbol.ITERATOR, symbol);
+    }
 
-        // Normal case: numeric key
-        result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(123)});
-        JSSymbol symbol4 = result.asSymbol().orElse(null);
-        assertNotNull(symbol4);
-        assertEquals("123", symbol4.getDescription());
+    @Test
+    public void testGetToPrimitive() {
+        JSValue result = SymbolConstructor.getToPrimitive(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        JSSymbol symbol = result.asSymbol().orElse(null);
+        assertNotNull(symbol);
+        assertEquals(JSSymbol.TO_PRIMITIVE, symbol);
+    }
 
-        // Edge case: no arguments
-        result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+    @Test
+    public void testGetToStringTag() {
+        JSValue result = SymbolConstructor.getToStringTag(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        JSSymbol symbol = result.asSymbol().orElse(null);
+        assertNotNull(symbol);
+        assertEquals(JSSymbol.TO_STRING_TAG, symbol);
     }
 
     @Test
@@ -132,42 +139,35 @@ public class SymbolConstructorTest extends BaseTest {
     }
 
     @Test
-    public void testGetIterator() {
-        JSValue result = SymbolConstructor.getIterator(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
-        assertEquals(JSSymbol.ITERATOR, symbol);
-    }
+    public void testSymbolFor() {
+        // Normal case: create new symbol in registry
+        JSValue result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("test")});
+        JSSymbol symbol1 = result.asSymbol().orElse(null);
+        assertNotNull(symbol1);
+        assertEquals("test", symbol1.getDescription());
 
-    @Test
-    public void testGetToStringTag() {
-        JSValue result = SymbolConstructor.getToStringTag(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
-        assertEquals(JSSymbol.TO_STRING_TAG, symbol);
-    }
+        // Normal case: get existing symbol from registry
+        result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("test")});
+        JSSymbol symbol2 = result.asSymbol().orElse(null);
+        assertNotNull(symbol2);
+        assertEquals(symbol1, symbol2); // Same symbol instance
 
-    @Test
-    public void testGetHasInstance() {
-        JSValue result = SymbolConstructor.getHasInstance(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
-        assertEquals(JSSymbol.HAS_INSTANCE, symbol);
-    }
+        // Normal case: different keys create different symbols
+        result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("other")});
+        JSSymbol symbol3 = result.asSymbol().orElse(null);
+        assertNotNull(symbol3);
+        assertNotEquals(symbol1, symbol3);
+        assertEquals("other", symbol3.getDescription());
 
-    @Test
-    public void testGetIsConcatSpreadable() {
-        JSValue result = SymbolConstructor.getIsConcatSpreadable(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
-        assertEquals(JSSymbol.IS_CONCAT_SPREADABLE, symbol);
-    }
+        // Normal case: numeric key
+        result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(123)});
+        JSSymbol symbol4 = result.asSymbol().orElse(null);
+        assertNotNull(symbol4);
+        assertEquals("123", symbol4.getDescription());
 
-    @Test
-    public void testGetToPrimitive() {
-        JSValue result = SymbolConstructor.getToPrimitive(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
-        assertEquals(JSSymbol.TO_PRIMITIVE, symbol);
+        // Edge case: no arguments
+        result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{});
+        assertTypeError(result);
+        assertPendingException(ctx);
     }
 }

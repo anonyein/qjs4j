@@ -31,17 +31,6 @@ public final class JSGenerator extends JSObject {
     private final JSIterator.IteratorFunction iteratorFunction;
     private boolean done;
     private JSValue returnValue;
-
-    /**
-     * Generator state.
-     */
-    public enum GeneratorState {
-        SUSPENDED_START,    // Created but not yet started
-        SUSPENDED_YIELD,    // Suspended at a yield expression
-        EXECUTING,          // Currently running
-        COMPLETED           // Finished execution
-    }
-
     private GeneratorState state;
 
     /**
@@ -54,6 +43,44 @@ public final class JSGenerator extends JSObject {
         this.done = false;
         this.returnValue = JSUndefined.INSTANCE;
         this.state = GeneratorState.SUSPENDED_START;
+    }
+
+    /**
+     * Helper to create a generator from an array.
+     */
+    public static JSGenerator fromArray(JSArray array) {
+        final int[] index = {0};
+        return new JSGenerator(() -> {
+            if (index[0] < array.getLength()) {
+                JSValue value = array.get(index[0]++);
+                return JSIterator.IteratorResult.of(value);
+            }
+            return JSIterator.IteratorResult.done();
+        });
+    }
+
+    /**
+     * Helper to create a simple generator from an iterator function.
+     */
+    public static JSGenerator fromIteratorFunction(JSIterator.IteratorFunction iteratorFunction) {
+        return new JSGenerator(iteratorFunction);
+    }
+
+    /**
+     * Create an iterator result object: { value: any, done: boolean }
+     */
+    private JSObject createIteratorResult(JSValue value, boolean isDone) {
+        JSObject result = new JSObject();
+        result.set("value", value);
+        result.set("done", JSBoolean.valueOf(isDone));
+        return result;
+    }
+
+    /**
+     * Get the current state of the generator.
+     */
+    public GeneratorState getState() {
+        return state;
     }
 
     /**
@@ -123,46 +150,18 @@ public final class JSGenerator extends JSObject {
         throw new RuntimeException("Exception thrown into generator: " + exception);
     }
 
-    /**
-     * Create an iterator result object: { value: any, done: boolean }
-     */
-    private JSObject createIteratorResult(JSValue value, boolean isDone) {
-        JSObject result = new JSObject();
-        result.set("value", value);
-        result.set("done", JSBoolean.valueOf(isDone));
-        return result;
-    }
-
-    /**
-     * Get the current state of the generator.
-     */
-    public GeneratorState getState() {
-        return state;
-    }
-
     @Override
     public String toString() {
         return "[object Generator]";
     }
 
     /**
-     * Helper to create a simple generator from an iterator function.
+     * Generator state.
      */
-    public static JSGenerator fromIteratorFunction(JSIterator.IteratorFunction iteratorFunction) {
-        return new JSGenerator(iteratorFunction);
-    }
-
-    /**
-     * Helper to create a generator from an array.
-     */
-    public static JSGenerator fromArray(JSArray array) {
-        final int[] index = {0};
-        return new JSGenerator(() -> {
-            if (index[0] < array.getLength()) {
-                JSValue value = array.get(index[0]++);
-                return JSIterator.IteratorResult.of(value);
-            }
-            return JSIterator.IteratorResult.done();
-        });
+    public enum GeneratorState {
+        SUSPENDED_START,    // Created but not yet started
+        SUSPENDED_YIELD,    // Suspended at a yield expression
+        EXECUTING,          // Currently running
+        COMPLETED           // Finished execution
     }
 }

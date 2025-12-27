@@ -28,38 +28,11 @@ package com.caoccao.qjs4j.core;
  * - Methods return promises: next(), return(), throw()
  */
 public final class JSAsyncGenerator extends JSObject {
-    /**
-     * Async generator states based on ES2018.
-     */
-    public enum AsyncGeneratorState {
-        SUSPENDED_START,    // Created but not started
-        SUSPENDED_YIELD,    // Suspended at a yield point
-        EXECUTING,          // Currently executing
-        AWAITING_RETURN,    // Awaiting a return value
-        COMPLETED           // Generator has completed
-    }
-
-    private AsyncGeneratorState state;
     private final JSContext context;
     private final AsyncGeneratorFunction generatorFunction;
     private JSValue returnValue;
+    private AsyncGeneratorState state;
     private JSValue thrownValue;
-
-    /**
-     * Functional interface for async generator implementation.
-     */
-    @FunctionalInterface
-    public interface AsyncGeneratorFunction {
-        /**
-         * Execute the next step of the generator.
-         *
-         * @param inputValue Value passed to next()
-         * @param isThrow    Whether this is a throw() call
-         * @return A promise that resolves to {value, done}
-         */
-        JSPromise executeNext(JSValue inputValue, boolean isThrow);
-    }
-
     /**
      * Create a new async generator.
      *
@@ -95,6 +68,48 @@ public final class JSAsyncGenerator extends JSObject {
         // Make this an async iterable via Symbol.asyncIterator
         this.set(PropertyKey.fromSymbol(JSSymbol.ASYNC_ITERATOR),
                 new JSNativeFunction("[Symbol.asyncIterator]", 0, (context, thisArg, args) -> thisArg));
+    }
+
+    /**
+     * Create a simple async generator from a function that yields promises.
+     *
+     * @param yielder Function that returns promise values in sequence
+     * @param ctx     The execution context
+     * @return An async generator
+     */
+    public static JSAsyncGenerator create(AsyncYieldFunction yielder, JSContext ctx) {
+        return new JSAsyncGenerator((inputValue, isThrow) -> {
+            if (isThrow) {
+                // If throwing, reject the promise
+                JSPromise promise = new JSPromise();
+                promise.reject(inputValue);
+                return promise;
+            }
+            return yielder.yieldNext(inputValue);
+        }, ctx);
+    }
+
+    /**
+     * Create an iterator result promise.
+     *
+     * @param value The iterator value
+     * @param done  Whether iteration is complete
+     * @return A promise that resolves to {value, done}
+     */
+    private JSPromise createIteratorResultPromise(JSValue value, boolean done) {
+        JSPromise promise = new JSPromise();
+        JSObject result = new JSObject();
+        result.set("value", value);
+        result.set("done", JSBoolean.valueOf(done));
+        promise.fulfill(result);
+        return promise;
+    }
+
+    /**
+     * Get the current state of the async generator.
+     */
+    public AsyncGeneratorState getState() {
+        return state;
     }
 
     /**
@@ -263,46 +278,35 @@ public final class JSAsyncGenerator extends JSObject {
         }
     }
 
-    /**
-     * Get the current state of the async generator.
-     */
-    public AsyncGeneratorState getState() {
-        return state;
+    @Override
+    public String toString() {
+        return "[object AsyncGenerator]";
     }
 
     /**
-     * Create an iterator result promise.
-     *
-     * @param value The iterator value
-     * @param done  Whether iteration is complete
-     * @return A promise that resolves to {value, done}
+     * Async generator states based on ES2018.
      */
-    private JSPromise createIteratorResultPromise(JSValue value, boolean done) {
-        JSPromise promise = new JSPromise();
-        JSObject result = new JSObject();
-        result.set("value", value);
-        result.set("done", JSBoolean.valueOf(done));
-        promise.fulfill(result);
-        return promise;
+    public enum AsyncGeneratorState {
+        SUSPENDED_START,    // Created but not started
+        SUSPENDED_YIELD,    // Suspended at a yield point
+        EXECUTING,          // Currently executing
+        AWAITING_RETURN,    // Awaiting a return value
+        COMPLETED           // Generator has completed
     }
 
     /**
-     * Create a simple async generator from a function that yields promises.
-     *
-     * @param yielder Function that returns promise values in sequence
-     * @param ctx     The execution context
-     * @return An async generator
+     * Functional interface for async generator implementation.
      */
-    public static JSAsyncGenerator create(AsyncYieldFunction yielder, JSContext ctx) {
-        return new JSAsyncGenerator((inputValue, isThrow) -> {
-            if (isThrow) {
-                // If throwing, reject the promise
-                JSPromise promise = new JSPromise();
-                promise.reject(inputValue);
-                return promise;
-            }
-            return yielder.yieldNext(inputValue);
-        }, ctx);
+    @FunctionalInterface
+    public interface AsyncGeneratorFunction {
+        /**
+         * Execute the next step of the generator.
+         *
+         * @param inputValue Value passed to next()
+         * @param isThrow    Whether this is a throw() call
+         * @return A promise that resolves to {value, done}
+         */
+        JSPromise executeNext(JSValue inputValue, boolean isThrow);
     }
 
     /**
@@ -317,10 +321,5 @@ public final class JSAsyncGenerator extends JSObject {
          * @return A promise that resolves to {value, done}
          */
         JSPromise yieldNext(JSValue inputValue);
-    }
-
-    @Override
-    public String toString() {
-        return "[object AsyncGenerator]";
     }
 }

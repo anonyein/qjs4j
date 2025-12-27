@@ -45,6 +45,13 @@ public final class JSDate extends JSObject {
     }
 
     /**
+     * Get ZonedDateTime representation (local timezone).
+     */
+    public ZonedDateTime getLocalZonedDateTime() {
+        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeValue), ZoneId.systemDefault());
+    }
+
+    /**
      * Get the time value (milliseconds since Unix epoch).
      */
     public long getTimeValue() {
@@ -56,13 +63,6 @@ public final class JSDate extends JSObject {
      */
     public ZonedDateTime getZonedDateTime() {
         return ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeValue), ZoneId.of("UTC"));
-    }
-
-    /**
-     * Get ZonedDateTime representation (local timezone).
-     */
-    public ZonedDateTime getLocalZonedDateTime() {
-        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeValue), ZoneId.systemDefault());
     }
 
     @Override

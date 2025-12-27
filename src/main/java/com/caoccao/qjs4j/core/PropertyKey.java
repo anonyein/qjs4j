@@ -28,19 +28,12 @@ import java.util.Objects;
  * - Integer indices (for array-like objects)
  */
 public final class PropertyKey {
-    private final Object value; // String, Integer, or JSSymbol
     private final int atomIndex; // -1 if not interned
+    private final Object value; // String, Integer, or JSSymbol
 
     private PropertyKey(Object value, int atomIndex) {
         this.value = value;
         this.atomIndex = atomIndex;
-    }
-
-    /**
-     * Create a property key from a string.
-     */
-    public static PropertyKey fromString(String str) {
-        return new PropertyKey(str, -1);
     }
 
     /**
@@ -55,6 +48,13 @@ public final class PropertyKey {
      */
     public static PropertyKey fromIndex(int index) {
         return new PropertyKey(index, -1);
+    }
+
+    /**
+     * Create a property key from a string.
+     */
+    public static PropertyKey fromString(String str) {
+        return new PropertyKey(str, -1);
     }
 
     /**
@@ -87,12 +87,63 @@ public final class PropertyKey {
         return fromString(str.value());
     }
 
-    public Object getValue() {
-        return value;
+    /**
+     * Get the integer value (if this is an index key).
+     */
+    public int asIndex() {
+        return value instanceof Integer i ? i : -1;
+    }
+
+    /**
+     * Get the string value (if this is a string key).
+     */
+    public String asString() {
+        return value instanceof String s ? s : null;
+    }
+
+    /**
+     * Get the symbol value (if this is a symbol key).
+     */
+    public JSSymbol asSymbol() {
+        return value instanceof JSSymbol s ? s : null;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (!(obj instanceof PropertyKey other)) return false;
+
+        // Fast path: if both have atom indices, compare them
+        if (atomIndex >= 0 && other.atomIndex >= 0) {
+            return atomIndex == other.atomIndex;
+        }
+
+        // Compare values
+        return Objects.equals(value, other.value);
     }
 
     public int getAtomIndex() {
         return atomIndex;
+    }
+
+    public Object getValue() {
+        return value;
+    }
+
+    @Override
+    public int hashCode() {
+        // Use atom index for faster hashing if available
+        if (atomIndex >= 0) {
+            return atomIndex;
+        }
+        return Objects.hashCode(value);
+    }
+
+    /**
+     * Check if this key is an integer index.
+     */
+    public boolean isIndex() {
+        return value instanceof Integer;
     }
 
     /**
@@ -110,38 +161,10 @@ public final class PropertyKey {
     }
 
     /**
-     * Check if this key is an integer index.
-     */
-    public boolean isIndex() {
-        return value instanceof Integer;
-    }
-
-    /**
      * Check if this key is a symbol.
      */
     public boolean isSymbol() {
         return value instanceof JSSymbol;
-    }
-
-    /**
-     * Get the string value (if this is a string key).
-     */
-    public String asString() {
-        return value instanceof String s ? s : null;
-    }
-
-    /**
-     * Get the integer value (if this is an index key).
-     */
-    public int asIndex() {
-        return value instanceof Integer i ? i : -1;
-    }
-
-    /**
-     * Get the symbol value (if this is a symbol key).
-     */
-    public JSSymbol asSymbol() {
-        return value instanceof JSSymbol s ? s : null;
     }
 
     /**
@@ -158,29 +181,6 @@ public final class PropertyKey {
             return "Symbol(" + (s.getDescription() != null ? s.getDescription() : "") + ")";
         }
         return value.toString();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (!(obj instanceof PropertyKey other)) return false;
-
-        // Fast path: if both have atom indices, compare them
-        if (atomIndex >= 0 && other.atomIndex >= 0) {
-            return atomIndex == other.atomIndex;
-        }
-
-        // Compare values
-        return Objects.equals(value, other.value);
-    }
-
-    @Override
-    public int hashCode() {
-        // Use atom index for faster hashing if available
-        if (atomIndex >= 0) {
-            return atomIndex;
-        }
-        return Objects.hashCode(value);
     }
 
     @Override

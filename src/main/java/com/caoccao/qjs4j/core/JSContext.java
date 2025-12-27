@@ -35,29 +35,24 @@ import java.util.*;
  * from the others (separate globals, separate module namespaces).
  */
 public final class JSContext {
-    private final JSRuntime runtime;
-    private final JSObject globalObject;
-    private final Map<String, JSModule> moduleCache;
-
+    private static final int DEFAULT_MAX_STACK_DEPTH = 1000;
     // Call stack management
     private final Deque<StackFrame> callStack;
-    private int stackDepth;
-    private static final int DEFAULT_MAX_STACK_DEPTH = 1000;
-    private int maxStackDepth;
-
-    // Exception state
-    private JSValue pendingException;
-    private boolean inCatchHandler;
-
-    // Microtask queue for promise resolution and async operations
-    private final JSMicrotaskQueue microtaskQueue;
-
-    // Execution state
-    private boolean strictMode;
-    private JSValue currentThis;
-
     // Stack trace capture
     private final List<StackTraceElement> errorStackTrace;
+    private final JSObject globalObject;
+    // Microtask queue for promise resolution and async operations
+    private final JSMicrotaskQueue microtaskQueue;
+    private final Map<String, JSModule> moduleCache;
+    private final JSRuntime runtime;
+    private JSValue currentThis;
+    private boolean inCatchHandler;
+    private int maxStackDepth;
+    // Exception state
+    private JSValue pendingException;
+    private int stackDepth;
+    // Execution state
+    private boolean strictMode;
 
     /**
      * Create a new execution context.
@@ -80,19 +75,99 @@ public final class JSContext {
     }
 
     /**
-     * Initialize the global object with built-in properties.
-     * Delegates to GlobalObject to set up all global functions and properties.
+     * Capture stack trace when exception is thrown.
      */
-    private void initializeGlobalObject() {
-        GlobalObject.initialize(this, globalObject);
-
-        // In full implementation, this would also add:
-        // - Built-in constructors (Object, Array, Function, String, Number, Boolean, etc.)
-        // - Error constructors (Error, TypeError, ReferenceError, etc.)
-        // - Advanced built-ins (Promise, Symbol, Map, Set, etc.)
+    private void captureErrorStackTrace() {
+        errorStackTrace.clear();
+        for (StackFrame frame : callStack) {
+            errorStackTrace.add(new StackTraceElement(
+                    "JavaScript",
+                    frame.functionName,
+                    frame.filename,
+                    frame.lineNumber
+            ));
+        }
     }
 
     // Evaluation
+
+    /**
+     * Capture stack trace and attach to error object.
+     */
+    private void captureStackTrace(JSObject error) {
+        StringBuilder stackTrace = new StringBuilder();
+
+        for (StackFrame frame : callStack) {
+            stackTrace.append("    at ")
+                    .append(frame.functionName)
+                    .append(" (")
+                    .append(frame.filename)
+                    .append(":")
+                    .append(frame.lineNumber)
+                    .append(")\n");
+        }
+
+        error.set("stack", new JSString(stackTrace.toString()));
+    }
+
+    /**
+     * Clear the module cache.
+     */
+    public void clearModuleCache() {
+        moduleCache.clear();
+    }
+
+    // Module system
+
+    /**
+     * Clear the pending exception.
+     */
+    public void clearPendingException() {
+        this.pendingException = null;
+        this.errorStackTrace.clear();
+    }
+
+    /**
+     * Close this context and release resources.
+     * Called when the context is no longer needed.
+     */
+    public void close() {
+        // Clear all caches
+        moduleCache.clear();
+        callStack.clear();
+        errorStackTrace.clear();
+
+        // Clear exception state
+        pendingException = null;
+
+        // Remove from runtime
+        runtime.destroyContext(this);
+    }
+
+    /**
+     * Enqueue a microtask to be executed.
+     *
+     * @param microtask The microtask to enqueue
+     */
+    public void enqueueMicrotask(JSMicrotaskQueue.Microtask microtask) {
+        microtaskQueue.enqueue(microtask);
+    }
+
+    /**
+     * Execute code in a try-catch context.
+     */
+    public void enterCatchHandler() {
+        this.inCatchHandler = true;
+    }
+
+    // Exception handling
+
+    /**
+     * Enter strict mode.
+     */
+    public void enterStrictMode() {
+        this.strictMode = true;
+    }
 
     /**
      * Evaluate JavaScript code in this context.
@@ -167,7 +242,116 @@ public final class JSContext {
         }
     }
 
-    // Module system
+    /**
+     * Exit try-catch context.
+     */
+    public void exitCatchHandler() {
+        this.inCatchHandler = false;
+    }
+
+    /**
+     * Exit strict mode.
+     */
+    public void exitStrictMode() {
+        this.strictMode = false;
+    }
+
+    /**
+     * Get the full call stack.
+     */
+    public List<StackFrame> getCallStack() {
+        return new ArrayList<>(callStack);
+    }
+
+    /**
+     * Get the current stack frame.
+     */
+    public StackFrame getCurrentStackFrame() {
+        return callStack.peek();
+    }
+
+    /**
+     * Get the current 'this' binding.
+     */
+    public JSValue getCurrentThis() {
+        return currentThis;
+    }
+
+    // Stack management
+
+    /**
+     * Get the error stack trace.
+     */
+    public List<StackTraceElement> getErrorStackTrace() {
+        return new ArrayList<>(errorStackTrace);
+    }
+
+    public JSObject getGlobalObject() {
+        return globalObject;
+    }
+
+    /**
+     * Get the microtask queue for this context.
+     */
+    public JSMicrotaskQueue getMicrotaskQueue() {
+        return microtaskQueue;
+    }
+
+    /**
+     * Get a cached module.
+     */
+    public JSModule getModule(String specifier) {
+        return moduleCache.get(specifier);
+    }
+
+    /**
+     * Get the pending exception.
+     */
+    public JSValue getPendingException() {
+        return pendingException;
+    }
+
+    public JSRuntime getRuntime() {
+        return runtime;
+    }
+
+    // Stack trace capture
+
+    /**
+     * Get the current call stack depth.
+     */
+    public int getStackDepth() {
+        return stackDepth;
+    }
+
+    /**
+     * Check if there's a pending exception.
+     */
+    public boolean hasPendingException() {
+        return pendingException != null;
+    }
+
+    /**
+     * Initialize the global object with built-in properties.
+     * Delegates to GlobalObject to set up all global functions and properties.
+     */
+    private void initializeGlobalObject() {
+        GlobalObject.initialize(this, globalObject);
+
+        // In full implementation, this would also add:
+        // - Built-in constructors (Object, Array, Function, String, Number, Boolean, etc.)
+        // - Error constructors (Error, TypeError, ReferenceError, etc.)
+        // - Advanced built-ins (Promise, Symbol, Map, Set, etc.)
+    }
+
+    // Execution state
+
+    /**
+     * Check if in strict mode.
+     */
+    public boolean isStrictMode() {
+        return strictMode;
+    }
 
     /**
      * Load and cache a JavaScript module.
@@ -195,6 +379,40 @@ public final class JSContext {
     }
 
     /**
+     * Pop the current stack frame.
+     */
+    public StackFrame popStackFrame() {
+        if (callStack.isEmpty()) {
+            return null;
+        }
+        stackDepth--;
+        return callStack.pop();
+    }
+
+    /**
+     * Process all pending microtasks.
+     * This should be called at the end of each task in the event loop.
+     */
+    public void processMicrotasks() {
+        microtaskQueue.processMicrotasks();
+    }
+
+    /**
+     * Push a new stack frame.
+     * Returns false if stack limit exceeded.
+     */
+    public boolean pushStackFrame(StackFrame frame) {
+        if (stackDepth >= maxStackDepth) {
+            return false;
+        }
+        callStack.push(frame);
+        stackDepth++;
+        return true;
+    }
+
+    // Accessors
+
+    /**
      * Register a module in the cache.
      */
     public void registerModule(String specifier, JSModule module) {
@@ -202,20 +420,30 @@ public final class JSContext {
     }
 
     /**
-     * Get a cached module.
+     * Set the current 'this' binding.
      */
-    public JSModule getModule(String specifier) {
-        return moduleCache.get(specifier);
+    public void setCurrentThis(JSValue thisValue) {
+        this.currentThis = thisValue != null ? thisValue : globalObject;
+    }
+
+    // Microtask queue management
+
+    /**
+     * Set the maximum stack depth.
+     */
+    public void setMaxStackDepth(int depth) {
+        this.maxStackDepth = depth;
     }
 
     /**
-     * Clear the module cache.
+     * Set the pending exception.
      */
-    public void clearModuleCache() {
-        moduleCache.clear();
+    public void setPendingException(JSValue exception) {
+        if (!inCatchHandler) {
+            this.pendingException = exception;
+            captureErrorStackTrace();
+        }
     }
-
-    // Exception handling
 
     /**
      * Throw a JavaScript error.
@@ -227,6 +455,8 @@ public final class JSContext {
     public JSValue throwError(String message) {
         return throwError("Error", message);
     }
+
+    // Cleanup
 
     /**
      * Throw a JavaScript error of a specific type.
@@ -251,258 +481,23 @@ public final class JSContext {
     }
 
     /**
-     * Set the pending exception.
+     * Represents a stack frame in the call stack.
      */
-    public void setPendingException(JSValue exception) {
-        if (!inCatchHandler) {
-            this.pendingException = exception;
-            captureErrorStackTrace();
-        }
-    }
-
-    /**
-     * Get the pending exception.
-     */
-    public JSValue getPendingException() {
-        return pendingException;
-    }
-
-    /**
-     * Check if there's a pending exception.
-     */
-    public boolean hasPendingException() {
-        return pendingException != null;
-    }
-
-    /**
-     * Clear the pending exception.
-     */
-    public void clearPendingException() {
-        this.pendingException = null;
-        this.errorStackTrace.clear();
-    }
-
-    /**
-     * Execute code in a try-catch context.
-     */
-    public void enterCatchHandler() {
-        this.inCatchHandler = true;
-    }
-
-    /**
-     * Exit try-catch context.
-     */
-    public void exitCatchHandler() {
-        this.inCatchHandler = false;
-    }
-
-    // Stack management
-
-    /**
-     * Push a new stack frame.
-     * Returns false if stack limit exceeded.
-     */
-    public boolean pushStackFrame(StackFrame frame) {
-        if (stackDepth >= maxStackDepth) {
-            return false;
-        }
-        callStack.push(frame);
-        stackDepth++;
-        return true;
-    }
-
-    /**
-     * Pop the current stack frame.
-     */
-    public StackFrame popStackFrame() {
-        if (callStack.isEmpty()) {
-            return null;
-        }
-        stackDepth--;
-        return callStack.pop();
-    }
-
-    /**
-     * Get the current stack frame.
-     */
-    public StackFrame getCurrentStackFrame() {
-        return callStack.peek();
-    }
-
-    /**
-     * Get the current call stack depth.
-     */
-    public int getStackDepth() {
-        return stackDepth;
-    }
-
-    /**
-     * Set the maximum stack depth.
-     */
-    public void setMaxStackDepth(int depth) {
-        this.maxStackDepth = depth;
-    }
-
-    /**
-     * Get the full call stack.
-     */
-    public List<StackFrame> getCallStack() {
-        return new ArrayList<>(callStack);
-    }
-
-    // Stack trace capture
-
-    /**
-     * Capture stack trace and attach to error object.
-     */
-    private void captureStackTrace(JSObject error) {
-        StringBuilder stackTrace = new StringBuilder();
-
-        for (StackFrame frame : callStack) {
-            stackTrace.append("    at ")
-                    .append(frame.functionName)
-                    .append(" (")
-                    .append(frame.filename)
-                    .append(":")
-                    .append(frame.lineNumber)
-                    .append(")\n");
+    public record StackFrame(String functionName, String filename, int lineNumber, int columnNumber) {
+        public StackFrame(String functionName, String filename, int lineNumber) {
+            this(functionName, filename, lineNumber, 0);
         }
 
-        error.set("stack", new JSString(stackTrace.toString()));
-    }
+        public StackFrame(String functionName, String filename, int lineNumber, int columnNumber) {
+            this.functionName = functionName != null ? functionName : "<anonymous>";
+            this.filename = filename != null ? filename : "<unknown>";
+            this.lineNumber = lineNumber;
+            this.columnNumber = columnNumber;
+        }
 
-    /**
-     * Capture stack trace when exception is thrown.
-     */
-    private void captureErrorStackTrace() {
-        errorStackTrace.clear();
-        for (StackFrame frame : callStack) {
-            errorStackTrace.add(new StackTraceElement(
-                    "JavaScript",
-                    frame.functionName,
-                    frame.filename,
-                    frame.lineNumber
-            ));
+        @Override
+        public String toString() {
+            return functionName + " (" + filename + ":" + lineNumber + ":" + columnNumber + ")";
         }
     }
-
-    /**
-     * Get the error stack trace.
-     */
-    public List<StackTraceElement> getErrorStackTrace() {
-        return new ArrayList<>(errorStackTrace);
-    }
-
-    // Execution state
-
-    /**
-     * Check if in strict mode.
-     */
-    public boolean isStrictMode() {
-        return strictMode;
-    }
-
-    /**
-     * Enter strict mode.
-     */
-    public void enterStrictMode() {
-        this.strictMode = true;
-    }
-
-    /**
-     * Exit strict mode.
-     */
-    public void exitStrictMode() {
-        this.strictMode = false;
-    }
-
-    /**
-     * Get the current 'this' binding.
-     */
-    public JSValue getCurrentThis() {
-        return currentThis;
-    }
-
-    /**
-     * Set the current 'this' binding.
-     */
-    public void setCurrentThis(JSValue thisValue) {
-        this.currentThis = thisValue != null ? thisValue : globalObject;
-    }
-
-    // Accessors
-
-    public JSRuntime getRuntime() {
-        return runtime;
-    }
-
-    public JSObject getGlobalObject() {
-        return globalObject;
-    }
-
-    // Microtask queue management
-
-    /**
-     * Get the microtask queue for this context.
-     */
-    public JSMicrotaskQueue getMicrotaskQueue() {
-        return microtaskQueue;
-    }
-
-    /**
-     * Process all pending microtasks.
-     * This should be called at the end of each task in the event loop.
-     */
-    public void processMicrotasks() {
-        microtaskQueue.processMicrotasks();
-    }
-
-    /**
-     * Enqueue a microtask to be executed.
-     *
-     * @param microtask The microtask to enqueue
-     */
-    public void enqueueMicrotask(JSMicrotaskQueue.Microtask microtask) {
-        microtaskQueue.enqueue(microtask);
-    }
-
-    // Cleanup
-
-    /**
-     * Close this context and release resources.
-     * Called when the context is no longer needed.
-     */
-    public void close() {
-        // Clear all caches
-        moduleCache.clear();
-        callStack.clear();
-        errorStackTrace.clear();
-
-        // Clear exception state
-        pendingException = null;
-
-        // Remove from runtime
-        runtime.destroyContext(this);
-    }
-
-    /**
-         * Represents a stack frame in the call stack.
-         */
-        public record StackFrame(String functionName, String filename, int lineNumber, int columnNumber) {
-            public StackFrame(String functionName, String filename, int lineNumber) {
-                this(functionName, filename, lineNumber, 0);
-            }
-
-            public StackFrame(String functionName, String filename, int lineNumber, int columnNumber) {
-                this.functionName = functionName != null ? functionName : "<anonymous>";
-                this.filename = filename != null ? filename : "<unknown>";
-                this.lineNumber = lineNumber;
-                this.columnNumber = columnNumber;
-            }
-
-            @Override
-            public String toString() {
-                return functionName + " (" + filename + ":" + lineNumber + ":" + columnNumber + ")";
-            }
-        }
 }

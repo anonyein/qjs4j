@@ -26,28 +26,21 @@ import java.text.Normalizer;
 public final class UnicodeNormalization {
 
     /**
-     * Unicode normalization forms.
+     * Check if a string is already normalized in the specified form.
      */
-    public enum Form {
-        /**
-         * Canonical Decomposition, followed by Canonical Composition.
-         */
-        NFC,
+    public static boolean isNormalized(String input, Form form) {
+        if (input == null || input.isEmpty()) {
+            return true;
+        }
 
-        /**
-         * Canonical Decomposition.
-         */
-        NFD,
+        Normalizer.Form javaForm = switch (form) {
+            case NFC -> Normalizer.Form.NFC;
+            case NFD -> Normalizer.Form.NFD;
+            case NFKC -> Normalizer.Form.NFKC;
+            case NFKD -> Normalizer.Form.NFKD;
+        };
 
-        /**
-         * Compatibility Decomposition, followed by Canonical Composition.
-         */
-        NFKC,
-
-        /**
-         * Compatibility Decomposition.
-         */
-        NFKD
+        return Normalizer.isNormalized(input, javaForm);
     }
 
     /**
@@ -74,6 +67,28 @@ public final class UnicodeNormalization {
         };
 
         return Normalizer.normalize(input, javaForm);
+    }
+
+    /**
+     * Normalize an array of code points.
+     *
+     * @param codePoints Array of Unicode code points
+     * @param form       The normalization form
+     * @return Array of normalized code points
+     */
+    public static int[] normalize(int[] codePoints, Form form) {
+        if (codePoints == null || codePoints.length == 0) {
+            return codePoints;
+        }
+
+        // Convert code points to String
+        String str = new String(codePoints, 0, codePoints.length);
+
+        // Normalize
+        String normalized = normalize(str, form);
+
+        // Convert back to code points
+        return normalized.codePoints().toArray();
     }
 
     /**
@@ -106,42 +121,27 @@ public final class UnicodeNormalization {
     }
 
     /**
-     * Check if a string is already normalized in the specified form.
+     * Unicode normalization forms.
      */
-    public static boolean isNormalized(String input, Form form) {
-        if (input == null || input.isEmpty()) {
-            return true;
-        }
+    public enum Form {
+        /**
+         * Canonical Decomposition, followed by Canonical Composition.
+         */
+        NFC,
 
-        Normalizer.Form javaForm = switch (form) {
-            case NFC -> Normalizer.Form.NFC;
-            case NFD -> Normalizer.Form.NFD;
-            case NFKC -> Normalizer.Form.NFKC;
-            case NFKD -> Normalizer.Form.NFKD;
-        };
+        /**
+         * Canonical Decomposition.
+         */
+        NFD,
 
-        return Normalizer.isNormalized(input, javaForm);
-    }
+        /**
+         * Compatibility Decomposition, followed by Canonical Composition.
+         */
+        NFKC,
 
-    /**
-     * Normalize an array of code points.
-     *
-     * @param codePoints Array of Unicode code points
-     * @param form       The normalization form
-     * @return Array of normalized code points
-     */
-    public static int[] normalize(int[] codePoints, Form form) {
-        if (codePoints == null || codePoints.length == 0) {
-            return codePoints;
-        }
-
-        // Convert code points to String
-        String str = new String(codePoints, 0, codePoints.length);
-
-        // Normalize
-        String normalized = normalize(str, form);
-
-        // Convert back to code points
-        return normalized.codePoints().toArray();
+        /**
+         * Compatibility Decomposition.
+         */
+        NFKD
     }
 }

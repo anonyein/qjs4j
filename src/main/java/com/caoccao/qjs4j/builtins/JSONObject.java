@@ -53,124 +53,58 @@ public final class JSONObject {
         }
     }
 
-    /**
-     * JSON.stringify(value[, replacer[, space]])
-     * ES2020 24.5.2
-     * Simplified implementation - basic JSON stringification
-     */
-    public static JSValue stringify(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return JSUndefined.INSTANCE;
+    private static ParseResult parseArray(String text, int start) {
+        if (text.charAt(start) != '[') {
+            throw new IllegalArgumentException("Expected '['");
         }
 
-        JSValue value = args[0];
+        JSArray arr = new JSArray();
+        int i = skipWhitespace(text, start + 1);
 
-        // If value is undefined, return undefined
-        if (value instanceof JSUndefined) {
-            return JSUndefined.INSTANCE;
+        // Empty array
+        if (i < text.length() && text.charAt(i) == ']') {
+            return new ParseResult(arr, i + 1);
         }
 
-        // Handle space parameter for indentation (simplified)
-        String indent = "";
-        if (args.length > 2 && args[2] instanceof JSNumber num) {
-            int spaces = Math.min(10, Math.max(0, (int) num.value()));
-            indent = " ".repeat(spaces);
-        } else if (args.length > 2 && args[2] instanceof JSString str) {
-            indent = str.value().substring(0, Math.min(10, str.value().length()));
-        }
+        while (i < text.length()) {
+            // Parse value
+            ParseResult valueResult = parseValue(text, i);
+            arr.push(valueResult.value);
+            i = skipWhitespace(text, valueResult.endIndex);
 
-        try {
-            String result = stringifyValue(value, indent, "");
-            if (result == null) {
-                return JSUndefined.INSTANCE;
+            // Check for comma or end
+            if (i >= text.length()) {
+                throw new IllegalArgumentException("Unexpected end of array");
             }
-            return new JSString(result);
-        } catch (Exception e) {
-            return JSUndefined.INSTANCE;
+
+            if (text.charAt(i) == ']') {
+                return new ParseResult(arr, i + 1);
+            }
+
+            if (text.charAt(i) != ',') {
+                throw new IllegalArgumentException("Expected ',' or ']'");
+            }
+
+            i = skipWhitespace(text, i + 1);
         }
+
+        throw new IllegalArgumentException("Unterminated array");
     }
 
     // ========== JSON Parsing Helper Methods ==========
 
-    private static class ParseResult {
-        JSValue value;
-        int endIndex;
-
-        ParseResult(JSValue value, int endIndex) {
-            this.value = value;
-            this.endIndex = endIndex;
+    private static ParseResult parseFalse(String text, int start) {
+        if (text.startsWith("false", start)) {
+            return new ParseResult(JSBoolean.FALSE, start + 5);
         }
+        throw new IllegalArgumentException("Invalid literal");
     }
 
-    private static ParseResult parseValue(String text, int start) {
-        int i = skipWhitespace(text, start);
-
-        if (i >= text.length()) {
-            throw new IllegalArgumentException("Unexpected end of JSON input");
+    private static ParseResult parseNull(String text, int start) {
+        if (text.startsWith("null", start)) {
+            return new ParseResult(JSNull.INSTANCE, start + 4);
         }
-
-        char ch = text.charAt(i);
-
-        return switch (ch) {
-            case '"' -> parseString(text, i);
-            case '{' -> parseObject(text, i);
-            case '[' -> parseArray(text, i);
-            case 't' -> parseTrue(text, i);
-            case 'f' -> parseFalse(text, i);
-            case 'n' -> parseNull(text, i);
-            case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> parseNumber(text, i);
-            default -> throw new IllegalArgumentException("Unexpected character: " + ch);
-        };
-    }
-
-    private static ParseResult parseString(String text, int start) {
-        if (text.charAt(start) != '"') {
-            throw new IllegalArgumentException("Expected '\"'");
-        }
-
-        StringBuilder sb = new StringBuilder();
-        int i = start + 1;
-
-        while (i < text.length()) {
-            char ch = text.charAt(i);
-
-            if (ch == '"') {
-                return new ParseResult(new JSString(sb.toString()), i + 1);
-            }
-
-            if (ch == '\\') {
-                i++;
-                if (i >= text.length()) {
-                    throw new IllegalArgumentException("Unexpected end in string");
-                }
-                char escaped = text.charAt(i);
-                switch (escaped) {
-                    case '"' -> sb.append('"');
-                    case '\\' -> sb.append('\\');
-                    case '/' -> sb.append('/');
-                    case 'b' -> sb.append('\b');
-                    case 'f' -> sb.append('\f');
-                    case 'n' -> sb.append('\n');
-                    case 'r' -> sb.append('\r');
-                    case 't' -> sb.append('\t');
-                    case 'u' -> {
-                        // Unicode escape
-                        if (i + 4 >= text.length()) {
-                            throw new IllegalArgumentException("Invalid unicode escape");
-                        }
-                        String hex = text.substring(i + 1, i + 5);
-                        sb.append((char) Integer.parseInt(hex, 16));
-                        i += 4;
-                    }
-                    default -> throw new IllegalArgumentException("Invalid escape: \\" + escaped);
-                }
-            } else {
-                sb.append(ch);
-            }
-            i++;
-        }
-
-        throw new IllegalArgumentException("Unterminated string");
+        throw new IllegalArgumentException("Invalid literal");
     }
 
     private static ParseResult parseNumber(String text, int start) {
@@ -273,42 +207,54 @@ public final class JSONObject {
         throw new IllegalArgumentException("Unterminated object");
     }
 
-    private static ParseResult parseArray(String text, int start) {
-        if (text.charAt(start) != '[') {
-            throw new IllegalArgumentException("Expected '['");
+    private static ParseResult parseString(String text, int start) {
+        if (text.charAt(start) != '"') {
+            throw new IllegalArgumentException("Expected '\"'");
         }
 
-        JSArray arr = new JSArray();
-        int i = skipWhitespace(text, start + 1);
-
-        // Empty array
-        if (i < text.length() && text.charAt(i) == ']') {
-            return new ParseResult(arr, i + 1);
-        }
+        StringBuilder sb = new StringBuilder();
+        int i = start + 1;
 
         while (i < text.length()) {
-            // Parse value
-            ParseResult valueResult = parseValue(text, i);
-            arr.push(valueResult.value);
-            i = skipWhitespace(text, valueResult.endIndex);
+            char ch = text.charAt(i);
 
-            // Check for comma or end
-            if (i >= text.length()) {
-                throw new IllegalArgumentException("Unexpected end of array");
+            if (ch == '"') {
+                return new ParseResult(new JSString(sb.toString()), i + 1);
             }
 
-            if (text.charAt(i) == ']') {
-                return new ParseResult(arr, i + 1);
+            if (ch == '\\') {
+                i++;
+                if (i >= text.length()) {
+                    throw new IllegalArgumentException("Unexpected end in string");
+                }
+                char escaped = text.charAt(i);
+                switch (escaped) {
+                    case '"' -> sb.append('"');
+                    case '\\' -> sb.append('\\');
+                    case '/' -> sb.append('/');
+                    case 'b' -> sb.append('\b');
+                    case 'f' -> sb.append('\f');
+                    case 'n' -> sb.append('\n');
+                    case 'r' -> sb.append('\r');
+                    case 't' -> sb.append('\t');
+                    case 'u' -> {
+                        // Unicode escape
+                        if (i + 4 >= text.length()) {
+                            throw new IllegalArgumentException("Invalid unicode escape");
+                        }
+                        String hex = text.substring(i + 1, i + 5);
+                        sb.append((char) Integer.parseInt(hex, 16));
+                        i += 4;
+                    }
+                    default -> throw new IllegalArgumentException("Invalid escape: \\" + escaped);
+                }
+            } else {
+                sb.append(ch);
             }
-
-            if (text.charAt(i) != ',') {
-                throw new IllegalArgumentException("Expected ',' or ']'");
-            }
-
-            i = skipWhitespace(text, i + 1);
+            i++;
         }
 
-        throw new IllegalArgumentException("Unterminated array");
+        throw new IllegalArgumentException("Unterminated string");
     }
 
     private static ParseResult parseTrue(String text, int start) {
@@ -318,18 +264,25 @@ public final class JSONObject {
         throw new IllegalArgumentException("Invalid literal");
     }
 
-    private static ParseResult parseFalse(String text, int start) {
-        if (text.startsWith("false", start)) {
-            return new ParseResult(JSBoolean.FALSE, start + 5);
-        }
-        throw new IllegalArgumentException("Invalid literal");
-    }
+    private static ParseResult parseValue(String text, int start) {
+        int i = skipWhitespace(text, start);
 
-    private static ParseResult parseNull(String text, int start) {
-        if (text.startsWith("null", start)) {
-            return new ParseResult(JSNull.INSTANCE, start + 4);
+        if (i >= text.length()) {
+            throw new IllegalArgumentException("Unexpected end of JSON input");
         }
-        throw new IllegalArgumentException("Invalid literal");
+
+        char ch = text.charAt(i);
+
+        return switch (ch) {
+            case '"' -> parseString(text, i);
+            case '{' -> parseObject(text, i);
+            case '[' -> parseArray(text, i);
+            case 't' -> parseTrue(text, i);
+            case 'f' -> parseFalse(text, i);
+            case 'n' -> parseNull(text, i);
+            case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> parseNumber(text, i);
+            default -> throw new IllegalArgumentException("Unexpected character: " + ch);
+        };
     }
 
     private static int skipWhitespace(String text, int start) {
@@ -345,67 +298,41 @@ public final class JSONObject {
         return i;
     }
 
-    // ========== JSON Stringification Helper Methods ==========
-
-    private static String stringifyValue(JSValue value, String indent, String currentIndent) {
-        if (value instanceof JSNull || value instanceof JSUndefined) {
-            return "null";
+    /**
+     * JSON.stringify(value[, replacer[, space]])
+     * ES2020 24.5.2
+     * Simplified implementation - basic JSON stringification
+     */
+    public static JSValue stringify(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return JSUndefined.INSTANCE;
         }
 
-        if (value instanceof JSBoolean b) {
-            return b.value() ? "true" : "false";
+        JSValue value = args[0];
+
+        // If value is undefined, return undefined
+        if (value instanceof JSUndefined) {
+            return JSUndefined.INSTANCE;
         }
 
-        if (value instanceof JSNumber n) {
-            double d = n.value();
-            if (Double.isNaN(d) || Double.isInfinite(d)) {
-                return "null";
+        // Handle space parameter for indentation (simplified)
+        String indent = "";
+        if (args.length > 2 && args[2] instanceof JSNumber num) {
+            int spaces = Math.min(10, Math.max(0, (int) num.value()));
+            indent = " ".repeat(spaces);
+        } else if (args.length > 2 && args[2] instanceof JSString str) {
+            indent = str.value().substring(0, Math.min(10, str.value().length()));
+        }
+
+        try {
+            String result = stringifyValue(value, indent, "");
+            if (result == null) {
+                return JSUndefined.INSTANCE;
             }
-            // Check if it's an integer
-            if (d == Math.floor(d) && !Double.isInfinite(d)) {
-                return String.valueOf((long) d);
-            }
-            return String.valueOf(d);
+            return new JSString(result);
+        } catch (Exception e) {
+            return JSUndefined.INSTANCE;
         }
-
-        if (value instanceof JSString s) {
-            return stringifyString(s.value());
-        }
-
-        if (value instanceof JSArray arr) {
-            return stringifyArray(arr, indent, currentIndent);
-        }
-
-        if (value instanceof JSObject obj) {
-            return stringifyObject(obj, indent, currentIndent);
-        }
-
-        // Functions and symbols are not serializable
-        return null;
-    }
-
-    private static String stringifyString(String str) {
-        StringBuilder sb = new StringBuilder("\"");
-        for (char ch : str.toCharArray()) {
-            switch (ch) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\b' -> sb.append("\\b");
-                case '\f' -> sb.append("\\f");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> {
-                    if (ch < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) ch));
-                    } else {
-                        sb.append(ch);
-                    }
-                }
-            }
-        }
-        sb.append("\"");
-        return sb.toString();
     }
 
     private static String stringifyArray(JSArray arr, String indent, String currentIndent) {
@@ -441,6 +368,8 @@ public final class JSONObject {
             return sb.toString();
         }
     }
+
+    // ========== JSON Stringification Helper Methods ==========
 
     private static String stringifyObject(JSObject obj, String indent, String currentIndent) {
         // Get all own property keys
@@ -494,6 +423,77 @@ public final class JSONObject {
             }
             sb.append("\n").append(currentIndent).append("}");
             return sb.toString();
+        }
+    }
+
+    private static String stringifyString(String str) {
+        StringBuilder sb = new StringBuilder("\"");
+        for (char ch : str.toCharArray()) {
+            switch (ch) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> {
+                    if (ch < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) ch));
+                    } else {
+                        sb.append(ch);
+                    }
+                }
+            }
+        }
+        sb.append("\"");
+        return sb.toString();
+    }
+
+    private static String stringifyValue(JSValue value, String indent, String currentIndent) {
+        if (value instanceof JSNull || value instanceof JSUndefined) {
+            return "null";
+        }
+
+        if (value instanceof JSBoolean b) {
+            return b.value() ? "true" : "false";
+        }
+
+        if (value instanceof JSNumber n) {
+            double d = n.value();
+            if (Double.isNaN(d) || Double.isInfinite(d)) {
+                return "null";
+            }
+            // Check if it's an integer
+            if (d == Math.floor(d) && !Double.isInfinite(d)) {
+                return String.valueOf((long) d);
+            }
+            return String.valueOf(d);
+        }
+
+        if (value instanceof JSString s) {
+            return stringifyString(s.value());
+        }
+
+        if (value instanceof JSArray arr) {
+            return stringifyArray(arr, indent, currentIndent);
+        }
+
+        if (value instanceof JSObject obj) {
+            return stringifyObject(obj, indent, currentIndent);
+        }
+
+        // Functions and symbols are not serializable
+        return null;
+    }
+
+    private static class ParseResult {
+        int endIndex;
+        JSValue value;
+
+        ParseResult(JSValue value, int endIndex) {
+            this.value = value;
+            this.endIndex = endIndex;
         }
     }
 }

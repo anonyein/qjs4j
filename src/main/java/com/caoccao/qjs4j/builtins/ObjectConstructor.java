@@ -27,110 +27,6 @@ import java.util.List;
 public final class ObjectConstructor {
 
     /**
-     * Object.keys(obj)
-     * ES2020 19.1.2.16
-     * Returns an array of a given object's own enumerable property names.
-     */
-    public static JSValue keys(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Object.keys called on non-object");
-        }
-
-        JSValue arg = args[0];
-
-        // Null and undefined throw TypeError
-        if (arg instanceof JSNull || arg instanceof JSUndefined) {
-            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
-        }
-
-        if (!(arg instanceof JSObject obj)) {
-            // Other primitive values are coerced to objects (return empty array)
-            return new JSArray();
-        }
-
-        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
-        JSArray result = new JSArray();
-
-        for (PropertyKey key : propertyKeys) {
-            if (key.isString()) {
-                result.push(new JSString(key.asString()));
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Object.values(obj)
-     * ES2020 19.1.2.21
-     * Returns an array of a given object's own enumerable property values.
-     */
-    public static JSValue values(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Object.values called on non-object");
-        }
-
-        JSValue arg = args[0];
-
-        // Null and undefined throw TypeError
-        if (arg instanceof JSNull || arg instanceof JSUndefined) {
-            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
-        }
-
-        if (!(arg instanceof JSObject obj)) {
-            return new JSArray();
-        }
-
-        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
-        JSArray result = new JSArray();
-
-        for (PropertyKey key : propertyKeys) {
-            if (key.isString()) {
-                JSValue value = obj.get(key);
-                result.push(value);
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Object.entries(obj)
-     * ES2020 19.1.2.5
-     * Returns an array of a given object's own enumerable property [key, value] pairs.
-     */
-    public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Object.entries called on non-object");
-        }
-
-        JSValue arg = args[0];
-
-        // Null and undefined throw TypeError
-        if (arg instanceof JSNull || arg instanceof JSUndefined) {
-            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
-        }
-
-        if (!(arg instanceof JSObject obj)) {
-            return new JSArray();
-        }
-
-        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
-        JSArray result = new JSArray();
-
-        for (PropertyKey key : propertyKeys) {
-            if (key.isString()) {
-                JSArray entry = new JSArray();
-                entry.push(new JSString(key.asString()));
-                entry.push(obj.get(key));
-                result.push(entry);
-            }
-        }
-
-        return result;
-    }
-
-    /**
      * Object.assign(target, ...sources)
      * ES2020 19.1.2.1
      * Copies all enumerable own properties from one or more source objects to a target object.
@@ -196,49 +92,39 @@ public final class ObjectConstructor {
     }
 
     /**
-     * Object.getPrototypeOf(obj)
-     * ES2020 19.1.2.9
-     * Returns the prototype of the specified object.
+     * Object.entries(obj)
+     * ES2020 19.1.2.5
+     * Returns an array of a given object's own enumerable property [key, value] pairs.
      */
-    public static JSValue getPrototypeOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
-            return ctx.throwError("TypeError", "Object.getPrototypeOf called on non-object");
+            return ctx.throwError("TypeError", "Object.entries called on non-object");
         }
 
         JSValue arg = args[0];
+
+        // Null and undefined throw TypeError
+        if (arg instanceof JSNull || arg instanceof JSUndefined) {
+            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
+        }
+
         if (!(arg instanceof JSObject obj)) {
-            return ctx.throwError("TypeError", "Object.getPrototypeOf called on non-object");
+            return new JSArray();
         }
 
-        JSObject prototype = obj.getPrototype();
-        return prototype != null ? prototype : JSNull.INSTANCE;
-    }
+        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
+        JSArray result = new JSArray();
 
-    /**
-     * Object.setPrototypeOf(obj, prototype)
-     * ES2020 19.1.2.18
-     * Sets the prototype of a specified object.
-     */
-    public static JSValue setPrototypeOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length < 2) {
-            return ctx.throwError("TypeError", "Object.setPrototypeOf requires 2 arguments");
+        for (PropertyKey key : propertyKeys) {
+            if (key.isString()) {
+                JSArray entry = new JSArray();
+                entry.push(new JSString(key.asString()));
+                entry.push(obj.get(key));
+                result.push(entry);
+            }
         }
 
-        JSValue objValue = args[0];
-        if (!(objValue instanceof JSObject obj)) {
-            return ctx.throwError("TypeError", "Object.setPrototypeOf called on non-object");
-        }
-
-        JSValue protoValue = args[1];
-        if (protoValue instanceof JSObject proto) {
-            obj.setPrototype(proto);
-        } else if (protoValue instanceof JSNull) {
-            obj.setPrototype(null);
-        } else {
-            return ctx.throwError("TypeError", "Object prototype may only be an Object or null");
-        }
-
-        return obj;
+        return result;
     }
 
     /**
@@ -258,103 +144,6 @@ public final class ObjectConstructor {
 
         obj.freeze();
         return arg;
-    }
-
-    /**
-     * Object.seal(obj)
-     * ES2020 19.1.2.17
-     * Seals an object (simplified implementation).
-     */
-    public static JSValue seal(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Object.seal called on non-object");
-        }
-
-        JSValue arg = args[0];
-        if (!(arg instanceof JSObject obj)) {
-            return arg; // Primitives are returned as-is
-        }
-
-        obj.seal();
-        return arg;
-    }
-
-    /**
-     * Object.isFrozen(obj)
-     * ES2020 19.1.2.12
-     */
-    public static JSValue isFrozen(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Object.isFrozen called without arguments");
-        }
-
-        JSValue arg = args[0];
-        if (!(arg instanceof JSObject obj)) {
-            return JSBoolean.TRUE; // Primitives are always frozen
-        }
-
-        return JSBoolean.valueOf(obj.isFrozen());
-    }
-
-    /**
-     * Object.isSealed(obj)
-     * ES2020 19.1.2.13
-     */
-    public static JSValue isSealed(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Object.isSealed called without arguments");
-        }
-
-        JSValue arg = args[0];
-        if (!(arg instanceof JSObject obj)) {
-            return JSBoolean.TRUE; // Primitives are always sealed
-        }
-
-        return JSBoolean.valueOf(obj.isSealed());
-    }
-
-    /**
-     * Object.hasOwnProperty(obj, prop)
-     * This is actually Object.prototype.hasOwnProperty, but we implement it here.
-     */
-    public static JSValue hasOwnProperty(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSObject obj)) {
-            return ctx.throwError("TypeError", "hasOwnProperty called on non-object");
-        }
-
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-
-        JSString propName = JSTypeConversions.toString(args[0]);
-        PropertyKey key = PropertyKey.fromString(propName.value());
-
-        return JSBoolean.valueOf(obj.hasOwnProperty(key));
-    }
-
-    /**
-     * Object.hasOwn(obj, prop)
-     * ES2022 20.1.2.10
-     * Static method to check if an object has a property as its own property.
-     */
-    public static JSValue hasOwn(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Object.hasOwn requires at least 1 argument");
-        }
-
-        JSValue objValue = args[0];
-        if (!(objValue instanceof JSObject obj)) {
-            return ctx.throwError("TypeError", "Object.hasOwn called on non-object");
-        }
-
-        if (args.length < 2) {
-            return JSBoolean.FALSE;
-        }
-
-        JSString propName = JSTypeConversions.toString(args[1]);
-        PropertyKey key = PropertyKey.fromString(propName.value());
-
-        return JSBoolean.valueOf(obj.hasOwnProperty(key));
     }
 
     /**
@@ -470,6 +259,25 @@ public final class ObjectConstructor {
     }
 
     /**
+     * Object.getPrototypeOf(obj)
+     * ES2020 19.1.2.9
+     * Returns the prototype of the specified object.
+     */
+    public static JSValue getPrototypeOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Object.getPrototypeOf called on non-object");
+        }
+
+        JSValue arg = args[0];
+        if (!(arg instanceof JSObject obj)) {
+            return ctx.throwError("TypeError", "Object.getPrototypeOf called on non-object");
+        }
+
+        JSObject prototype = obj.getPrototype();
+        return prototype != null ? prototype : JSNull.INSTANCE;
+    }
+
+    /**
      * Object.groupBy(items, callbackFn)
      * ES2024 20.1.2.11
      * Groups array elements by a key returned from the callback function.
@@ -512,6 +320,198 @@ public final class ObjectConstructor {
 
             // Add element to group
             group.push(element);
+        }
+
+        return result;
+    }
+
+    /**
+     * Object.hasOwn(obj, prop)
+     * ES2022 20.1.2.10
+     * Static method to check if an object has a property as its own property.
+     */
+    public static JSValue hasOwn(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Object.hasOwn requires at least 1 argument");
+        }
+
+        JSValue objValue = args[0];
+        if (!(objValue instanceof JSObject obj)) {
+            return ctx.throwError("TypeError", "Object.hasOwn called on non-object");
+        }
+
+        if (args.length < 2) {
+            return JSBoolean.FALSE;
+        }
+
+        JSString propName = JSTypeConversions.toString(args[1]);
+        PropertyKey key = PropertyKey.fromString(propName.value());
+
+        return JSBoolean.valueOf(obj.hasOwnProperty(key));
+    }
+
+    /**
+     * Object.hasOwnProperty(obj, prop)
+     * This is actually Object.prototype.hasOwnProperty, but we implement it here.
+     */
+    public static JSValue hasOwnProperty(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSObject obj)) {
+            return ctx.throwError("TypeError", "hasOwnProperty called on non-object");
+        }
+
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+
+        JSString propName = JSTypeConversions.toString(args[0]);
+        PropertyKey key = PropertyKey.fromString(propName.value());
+
+        return JSBoolean.valueOf(obj.hasOwnProperty(key));
+    }
+
+    /**
+     * Object.isFrozen(obj)
+     * ES2020 19.1.2.12
+     */
+    public static JSValue isFrozen(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Object.isFrozen called without arguments");
+        }
+
+        JSValue arg = args[0];
+        if (!(arg instanceof JSObject obj)) {
+            return JSBoolean.TRUE; // Primitives are always frozen
+        }
+
+        return JSBoolean.valueOf(obj.isFrozen());
+    }
+
+    /**
+     * Object.isSealed(obj)
+     * ES2020 19.1.2.13
+     */
+    public static JSValue isSealed(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Object.isSealed called without arguments");
+        }
+
+        JSValue arg = args[0];
+        if (!(arg instanceof JSObject obj)) {
+            return JSBoolean.TRUE; // Primitives are always sealed
+        }
+
+        return JSBoolean.valueOf(obj.isSealed());
+    }
+
+    /**
+     * Object.keys(obj)
+     * ES2020 19.1.2.16
+     * Returns an array of a given object's own enumerable property names.
+     */
+    public static JSValue keys(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Object.keys called on non-object");
+        }
+
+        JSValue arg = args[0];
+
+        // Null and undefined throw TypeError
+        if (arg instanceof JSNull || arg instanceof JSUndefined) {
+            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
+        }
+
+        if (!(arg instanceof JSObject obj)) {
+            // Other primitive values are coerced to objects (return empty array)
+            return new JSArray();
+        }
+
+        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
+        JSArray result = new JSArray();
+
+        for (PropertyKey key : propertyKeys) {
+            if (key.isString()) {
+                result.push(new JSString(key.asString()));
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Object.seal(obj)
+     * ES2020 19.1.2.17
+     * Seals an object (simplified implementation).
+     */
+    public static JSValue seal(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Object.seal called on non-object");
+        }
+
+        JSValue arg = args[0];
+        if (!(arg instanceof JSObject obj)) {
+            return arg; // Primitives are returned as-is
+        }
+
+        obj.seal();
+        return arg;
+    }
+
+    /**
+     * Object.setPrototypeOf(obj, prototype)
+     * ES2020 19.1.2.18
+     * Sets the prototype of a specified object.
+     */
+    public static JSValue setPrototypeOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length < 2) {
+            return ctx.throwError("TypeError", "Object.setPrototypeOf requires 2 arguments");
+        }
+
+        JSValue objValue = args[0];
+        if (!(objValue instanceof JSObject obj)) {
+            return ctx.throwError("TypeError", "Object.setPrototypeOf called on non-object");
+        }
+
+        JSValue protoValue = args[1];
+        if (protoValue instanceof JSObject proto) {
+            obj.setPrototype(proto);
+        } else if (protoValue instanceof JSNull) {
+            obj.setPrototype(null);
+        } else {
+            return ctx.throwError("TypeError", "Object prototype may only be an Object or null");
+        }
+
+        return obj;
+    }
+
+    /**
+     * Object.values(obj)
+     * ES2020 19.1.2.21
+     * Returns an array of a given object's own enumerable property values.
+     */
+    public static JSValue values(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Object.values called on non-object");
+        }
+
+        JSValue arg = args[0];
+
+        // Null and undefined throw TypeError
+        if (arg instanceof JSNull || arg instanceof JSUndefined) {
+            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
+        }
+
+        if (!(arg instanceof JSObject obj)) {
+            return new JSArray();
+        }
+
+        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
+        JSArray result = new JSArray();
+
+        for (PropertyKey key : propertyKeys) {
+            if (key.isString()) {
+                JSValue value = obj.get(key);
+                result.push(value);
+            }
         }
 
         return result;

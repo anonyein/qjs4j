@@ -27,6 +27,41 @@ import com.caoccao.qjs4j.core.*;
 public final class ObjectPrototype {
 
     /**
+     * Object.assign(target, ...sources)
+     */
+    public static JSValue assign(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
+        }
+
+        JSValue targetArg = args[0];
+        if (targetArg instanceof JSNull || targetArg instanceof JSUndefined) {
+            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
+        }
+
+        if (!(targetArg instanceof JSObject target)) {
+            return targetArg;
+        }
+
+        for (int i = 1; i < args.length; i++) {
+            JSValue source = args[i];
+
+            if (source instanceof JSNull || source instanceof JSUndefined) {
+                continue;
+            }
+
+            if (source instanceof JSObject srcObj) {
+                PropertyKey[] keys = srcObj.enumerableKeys();
+                for (PropertyKey key : keys) {
+                    target.set(key, srcObj.get(key));
+                }
+            }
+        }
+
+        return target;
+    }
+
+    /**
      * Object.create(proto[, propertiesObject])
      * Creates a new object with the specified prototype.
      *
@@ -124,54 +159,6 @@ public final class ObjectPrototype {
     }
 
     /**
-     * Object.keys(obj)
-     */
-    public static JSValue keys(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSValue arg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-
-        if (arg instanceof JSNull || arg instanceof JSUndefined) {
-            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
-        }
-
-        if (!(arg instanceof JSObject obj)) {
-            return new JSArray();
-        }
-
-        PropertyKey[] enumerableKeys = obj.enumerableKeys();
-        JSValue[] keyStrings = new JSValue[enumerableKeys.length];
-
-        for (int i = 0; i < enumerableKeys.length; i++) {
-            keyStrings[i] = new JSString(enumerableKeys[i].toPropertyString());
-        }
-
-        return new JSArray(keyStrings);
-    }
-
-    /**
-     * Object.values(obj)
-     */
-    public static JSValue values(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSValue arg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-
-        if (arg instanceof JSNull || arg instanceof JSUndefined) {
-            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
-        }
-
-        if (!(arg instanceof JSObject obj)) {
-            return new JSArray();
-        }
-
-        PropertyKey[] enumerableKeys = obj.enumerableKeys();
-        JSValue[] values = new JSValue[enumerableKeys.length];
-
-        for (int i = 0; i < enumerableKeys.length; i++) {
-            values[i] = obj.get(enumerableKeys[i]);
-        }
-
-        return new JSArray(values);
-    }
-
-    /**
      * Object.entries(obj)
      */
     public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
@@ -199,41 +186,6 @@ public final class ObjectPrototype {
     }
 
     /**
-     * Object.assign(target, ...sources)
-     */
-    public static JSValue assign(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
-        }
-
-        JSValue targetArg = args[0];
-        if (targetArg instanceof JSNull || targetArg instanceof JSUndefined) {
-            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
-        }
-
-        if (!(targetArg instanceof JSObject target)) {
-            return targetArg;
-        }
-
-        for (int i = 1; i < args.length; i++) {
-            JSValue source = args[i];
-
-            if (source instanceof JSNull || source instanceof JSUndefined) {
-                continue;
-            }
-
-            if (source instanceof JSObject srcObj) {
-                PropertyKey[] keys = srcObj.enumerableKeys();
-                for (PropertyKey key : keys) {
-                    target.set(key, srcObj.get(key));
-                }
-            }
-        }
-
-        return target;
-    }
-
-    /**
      * Object.freeze(obj)
      */
     public static JSValue freeze(JSContext ctx, JSValue thisArg, JSValue[] args) {
@@ -245,6 +197,46 @@ public final class ObjectPrototype {
 
         // In full implementation, would freeze the object
         return obj;
+    }
+
+    /**
+     * Object.prototype.hasOwnProperty(prop)
+     */
+    public static JSValue hasOwnProperty(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSObject obj)) {
+            return JSBoolean.FALSE;
+        }
+
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+
+        PropertyKey key = PropertyKey.fromValue(args[0]);
+        return JSBoolean.valueOf(obj.hasOwnProperty(key));
+    }
+
+    /**
+     * Object.keys(obj)
+     */
+    public static JSValue keys(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSValue arg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+
+        if (arg instanceof JSNull || arg instanceof JSUndefined) {
+            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
+        }
+
+        if (!(arg instanceof JSObject obj)) {
+            return new JSArray();
+        }
+
+        PropertyKey[] enumerableKeys = obj.enumerableKeys();
+        JSValue[] keyStrings = new JSValue[enumerableKeys.length];
+
+        for (int i = 0; i < enumerableKeys.length; i++) {
+            keyStrings[i] = new JSString(enumerableKeys[i].toPropertyString());
+        }
+
+        return new JSArray(keyStrings);
     }
 
     /**
@@ -286,18 +278,26 @@ public final class ObjectPrototype {
     }
 
     /**
-     * Object.prototype.hasOwnProperty(prop)
+     * Object.values(obj)
      */
-    public static JSValue hasOwnProperty(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSObject obj)) {
-            return JSBoolean.FALSE;
+    public static JSValue values(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSValue arg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+
+        if (arg instanceof JSNull || arg instanceof JSUndefined) {
+            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
         }
 
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
+        if (!(arg instanceof JSObject obj)) {
+            return new JSArray();
         }
 
-        PropertyKey key = PropertyKey.fromValue(args[0]);
-        return JSBoolean.valueOf(obj.hasOwnProperty(key));
+        PropertyKey[] enumerableKeys = obj.enumerableKeys();
+        JSValue[] values = new JSValue[enumerableKeys.length];
+
+        for (int i = 0; i < enumerableKeys.length; i++) {
+            values[i] = obj.get(enumerableKeys[i]);
+        }
+
+        return new JSArray(values);
     }
 }

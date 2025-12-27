@@ -27,52 +27,6 @@ import java.math.BigInteger;
 public final class BigIntConstructor {
 
     /**
-     * BigInt(value)
-     * ES2020 20.2.1
-     * Creates a new BigInt value from a number or string.
-     * Note: BigInt cannot be called with new operator in ES2020.
-     */
-    public static JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "BigInt requires an argument");
-        }
-
-        JSValue arg = args[0];
-
-        // Convert argument to BigInt
-        if (arg instanceof JSBigInt bigInt) {
-            return bigInt;
-        } else if (arg instanceof JSNumber num) {
-            double value = num.value();
-            // Check if value is an integer
-            if (value != Math.floor(value) || Double.isInfinite(value) || Double.isNaN(value)) {
-                return ctx.throwError("RangeError", "Cannot convert non-integer number to BigInt");
-            }
-            return new JSBigInt((long) value);
-        } else if (arg instanceof JSString str) {
-            String strValue = str.value().trim();
-            try {
-                // Handle different radix
-                if (strValue.startsWith("0x") || strValue.startsWith("0X")) {
-                    return new JSBigInt(new BigInteger(strValue.substring(2), 16));
-                } else if (strValue.startsWith("0o") || strValue.startsWith("0O")) {
-                    return new JSBigInt(new BigInteger(strValue.substring(2), 8));
-                } else if (strValue.startsWith("0b") || strValue.startsWith("0B")) {
-                    return new JSBigInt(new BigInteger(strValue.substring(2), 2));
-                } else {
-                    return new JSBigInt(new BigInteger(strValue, 10));
-                }
-            } catch (NumberFormatException e) {
-                return ctx.throwError("SyntaxError", "Cannot convert string to BigInt: " + strValue);
-            }
-        } else if (arg instanceof JSBoolean bool) {
-            return new JSBigInt(bool.value() ? 1L : 0L);
-        } else {
-            return ctx.throwError("TypeError", "Cannot convert value to BigInt");
-        }
-    }
-
-    /**
      * BigInt.asIntN(bits, bigint)
      * ES2020 20.2.2.1
      * Wraps a BigInt value to a signed integer of the given bit width.
@@ -150,5 +104,51 @@ public final class BigIntConstructor {
         }
 
         return new JSBigInt(result);
+    }
+
+    /**
+     * BigInt(value)
+     * ES2020 20.2.1
+     * Creates a new BigInt value from a number or string.
+     * Note: BigInt cannot be called with new operator in ES2020.
+     */
+    public static JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "BigInt requires an argument");
+        }
+
+        JSValue arg = args[0];
+
+        // Convert argument to BigInt
+        if (arg instanceof JSBigInt bigInt) {
+            return bigInt;
+        } else if (arg instanceof JSNumber num) {
+            double value = num.value();
+            // Check if value is an integer
+            if (value != Math.floor(value) || Double.isInfinite(value) || Double.isNaN(value)) {
+                return ctx.throwError("RangeError", "Cannot convert non-integer number to BigInt");
+            }
+            return new JSBigInt((long) value);
+        } else if (arg instanceof JSString str) {
+            String strValue = str.value().trim();
+            try {
+                // Handle different radix
+                if (strValue.startsWith("0x") || strValue.startsWith("0X")) {
+                    return new JSBigInt(new BigInteger(strValue.substring(2), 16));
+                } else if (strValue.startsWith("0o") || strValue.startsWith("0O")) {
+                    return new JSBigInt(new BigInteger(strValue.substring(2), 8));
+                } else if (strValue.startsWith("0b") || strValue.startsWith("0B")) {
+                    return new JSBigInt(new BigInteger(strValue.substring(2), 2));
+                } else {
+                    return new JSBigInt(new BigInteger(strValue, 10));
+                }
+            } catch (NumberFormatException e) {
+                return ctx.throwError("SyntaxError", "Cannot convert string to BigInt: " + strValue);
+            }
+        } else if (arg instanceof JSBoolean bool) {
+            return new JSBigInt(bool.value() ? 1L : 0L);
+        } else {
+            return ctx.throwError("TypeError", "Cannot convert value to BigInt");
+        }
     }
 }

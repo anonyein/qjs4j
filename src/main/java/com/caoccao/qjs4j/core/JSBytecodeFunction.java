@@ -37,12 +37,12 @@ import com.caoccao.qjs4j.vm.Bytecode;
 public final class JSBytecodeFunction implements JSFunction {
     private final Bytecode bytecode;
     private final JSValue[] closureVars;
-    private final JSObject prototype;
-    private final String name;
-    private final int length;
-    private final boolean isConstructor;
     private final boolean isAsync;
+    private final boolean isConstructor;
     private final boolean isGenerator;
+    private final int length;
+    private final String name;
+    private final JSObject prototype;
 
     /**
      * Create a bytecode function.
@@ -71,6 +71,18 @@ public final class JSBytecodeFunction implements JSFunction {
         this.isGenerator = isGenerator;
     }
 
+    @Override
+    public JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        // In full implementation, this would:
+        // 1. Create a new stack frame
+        // 2. Bind arguments to parameters
+        // 3. Execute bytecode in the VM
+        // 4. Return the result
+        //
+        // For now, return undefined as placeholder
+        return JSUndefined.INSTANCE;
+    }
+
     /**
      * Get the bytecode for this function.
      */
@@ -85,18 +97,21 @@ public final class JSBytecodeFunction implements JSFunction {
         return closureVars;
     }
 
+    @Override
+    public int getLength() {
+        return length;
+    }
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
     /**
      * Get the prototype object (for constructor calls).
      */
     public JSObject getPrototype() {
         return prototype;
-    }
-
-    /**
-     * Check if this function can be used as a constructor.
-     */
-    public boolean isConstructor() {
-        return isConstructor;
     }
 
     /**
@@ -107,37 +122,17 @@ public final class JSBytecodeFunction implements JSFunction {
     }
 
     /**
+     * Check if this function can be used as a constructor.
+     */
+    public boolean isConstructor() {
+        return isConstructor;
+    }
+
+    /**
      * Check if this is a generator function.
      */
     public boolean isGenerator() {
         return isGenerator;
-    }
-
-    @Override
-    public JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        // In full implementation, this would:
-        // 1. Create a new stack frame
-        // 2. Bind arguments to parameters
-        // 3. Execute bytecode in the VM
-        // 4. Return the result
-        //
-        // For now, return undefined as placeholder
-        return JSUndefined.INSTANCE;
-    }
-
-    @Override
-    public String getName() {
-        return name;
-    }
-
-    @Override
-    public int getLength() {
-        return length;
-    }
-
-    @Override
-    public JSValueType type() {
-        return JSValueType.FUNCTION;
     }
 
     @Override
@@ -155,5 +150,10 @@ public final class JSBytecodeFunction implements JSFunction {
         if (!name.isEmpty()) sb.append(name);
         sb.append("() { [bytecode] }");
         return sb.toString();
+    }
+
+    @Override
+    public JSValueType type() {
+        return JSValueType.FUNCTION;
     }
 }

@@ -23,9 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Includes well-known symbols.
  */
 public final class JSSymbol implements JSValue {
-    private static final AtomicInteger nextId = new AtomicInteger(0);
     private static final int WELL_KNOWN_ID_START = 1000;
-
     // Well-known symbols (ES2015+)
     public static final JSSymbol ITERATOR = new JSSymbol("Symbol.iterator", WELL_KNOWN_ID_START);
     public static final JSSymbol ASYNC_ITERATOR = new JSSymbol("Symbol.asyncIterator", WELL_KNOWN_ID_START + 1);
@@ -40,9 +38,9 @@ public final class JSSymbol implements JSValue {
     public static final JSSymbol SPLIT = new JSSymbol("Symbol.split", WELL_KNOWN_ID_START + 10);
     public static final JSSymbol SPECIES = new JSSymbol("Symbol.species", WELL_KNOWN_ID_START + 11);
     public static final JSSymbol UNSCOPABLES = new JSSymbol("Symbol.unscopables", WELL_KNOWN_ID_START + 12);
-
-    private final int id;
+    private static final AtomicInteger nextId = new AtomicInteger(0);
     private final String description;
+    private final int id;
 
     public JSSymbol(String description) {
         this.id = nextId.getAndIncrement();
@@ -52,24 +50,6 @@ public final class JSSymbol implements JSValue {
     private JSSymbol(String description, int id) {
         this.id = id;
         this.description = description;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    @Override
-    public JSValueType type() {
-        return JSValueType.SYMBOL;
-    }
-
-    @Override
-    public Object toJavaObject() {
-        return this;
     }
 
     /**
@@ -95,5 +75,23 @@ public final class JSSymbol implements JSValue {
             case "unscopables" -> UNSCOPABLES;
             default -> null;
         };
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    @Override
+    public Object toJavaObject() {
+        return this;
+    }
+
+    @Override
+    public JSValueType type() {
+        return JSValueType.SYMBOL;
     }
 }

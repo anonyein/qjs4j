@@ -33,30 +33,17 @@ import java.util.*;
  * - Evaluation state (unlinked, linking, linked, evaluating, evaluated)
  */
 public final class JSModule {
-    /**
-     * Module evaluation states based on ES2020 Cyclic Module Records.
-     */
-    public enum ModuleStatus {
-        UNLINKED,      // Module not yet linked to its dependencies
-        LINKING,       // Currently resolving dependencies
-        LINKED,        // All dependencies resolved, ready to evaluate
-        EVALUATING,    // Currently executing module code
-        EVALUATED      // Module code has been executed
-    }
-
-    private final String url;
+    private final int dfsAncestorIndex;
+    // For circular dependency detection
+    private final int dfsIndex;
     private final JSBytecodeFunction moduleFunction;
     private final Map<String, ExportEntry> namedExports;
     private final Map<String, ImportEntry> namedImports;
-    private JSValue defaultExport;
-    private final List<JSModule> requestedModules;
-    private ModuleStatus status;
     private final JSObject namespace;
-
-    // For circular dependency detection
-    private final int dfsIndex;
-    private final int dfsAncestorIndex;
-
+    private final List<JSModule> requestedModules;
+    private final String url;
+    private JSValue defaultExport;
+    private ModuleStatus status;
     /**
      * Create a new module.
      *
@@ -74,6 +61,28 @@ public final class JSModule {
         this.namespace = new JSObject();
         this.dfsIndex = -1;
         this.dfsAncestorIndex = -1;
+    }
+
+    /**
+     * Add a module dependency.
+     *
+     * @param module The module this module depends on
+     */
+    public void addDependency(JSModule module) {
+        if (!requestedModules.contains(module)) {
+            requestedModules.add(module);
+        }
+    }
+
+    /**
+     * Add a named import from another module.
+     *
+     * @param localName     The local binding name
+     * @param moduleRequest The module to import from
+     * @param importName    The name to import (or "*" for namespace import)
+     */
+    public void addImport(String localName, String moduleRequest, String importName) {
+        namedImports.put(localName, new ImportEntry(moduleRequest, importName, localName));
     }
 
     /**
@@ -95,76 +104,6 @@ public final class JSModule {
      */
     public void addReExport(String exportName, String moduleRequest, String importName) {
         namedExports.put(exportName, new ExportEntry(exportName, null, moduleRequest, importName));
-    }
-
-    /**
-     * Set the default export.
-     *
-     * @param value The default export value
-     */
-    public void setDefaultExport(JSValue value) {
-        this.defaultExport = value;
-        namedExports.put("default", new ExportEntry("default", "*default*", null, null));
-    }
-
-    /**
-     * Add a named import from another module.
-     *
-     * @param localName     The local binding name
-     * @param moduleRequest The module to import from
-     * @param importName    The name to import (or "*" for namespace import)
-     */
-    public void addImport(String localName, String moduleRequest, String importName) {
-        namedImports.put(localName, new ImportEntry(moduleRequest, importName, localName));
-    }
-
-    /**
-     * Add a module dependency.
-     *
-     * @param module The module this module depends on
-     */
-    public void addDependency(JSModule module) {
-        if (!requestedModules.contains(module)) {
-            requestedModules.add(module);
-        }
-    }
-
-    /**
-     * Link this module to its dependencies.
-     * ES2020 15.2.1.16 Link() method.
-     *
-     * @param resolver Module resolver for resolving import specifiers
-     * @param ctx      The execution context
-     * @throws ModuleLinkingException if linking fails
-     */
-    public void link(ModuleResolver resolver, JSContext ctx) throws ModuleLinkingException {
-        if (status == ModuleStatus.LINKING || status == ModuleStatus.EVALUATING) {
-            throw new ModuleLinkingException("Circular module dependency detected: " + url);
-        }
-        if (status == ModuleStatus.LINKED || status == ModuleStatus.EVALUATED) {
-            return; // Already linked
-        }
-
-        status = ModuleStatus.LINKING;
-
-        try {
-            // Resolve all import entries
-            for (ImportEntry importEntry : namedImports.values()) {
-                JSModule importedModule = resolver.resolve(importEntry.moduleRequest, this);
-                if (importedModule == null) {
-                    throw new ModuleLinkingException("Cannot resolve module: " + importEntry.moduleRequest);
-                }
-                addDependency(importedModule);
-
-                // Recursively link dependencies
-                importedModule.link(resolver, ctx);
-            }
-
-            status = ModuleStatus.LINKED;
-        } catch (Exception e) {
-            status = ModuleStatus.UNLINKED;
-            throw new ModuleLinkingException("Failed to link module " + url + ": " + e.getMessage(), e);
-        }
     }
 
     /**
@@ -221,6 +160,92 @@ public final class JSModule {
     }
 
     /**
+     * Get all dependencies.
+     */
+    public List<JSModule> getDependencies() {
+        return Collections.unmodifiableList(requestedModules);
+    }
+
+    /**
+     * Get a named export value.
+     *
+     * @param name The export name
+     * @return The exported value, or null if not found
+     */
+    public JSValue getExport(String name) {
+        return namespace.get(name);
+    }
+
+    /**
+     * Get all named exports.
+     */
+    public Map<String, ExportEntry> getNamedExports() {
+        return Collections.unmodifiableMap(namedExports);
+    }
+
+    /**
+     * Get the module namespace object.
+     * Used for: import * as ns from 'module'
+     *
+     * @return The namespace object containing all exports
+     */
+    public JSObject getNamespace() {
+        return namespace;
+    }
+
+    /**
+     * Get the module status.
+     */
+    public ModuleStatus getStatus() {
+        return status;
+    }
+
+    /**
+     * Get the module URL/identifier.
+     */
+    public String getUrl() {
+        return url;
+    }
+
+    /**
+     * Link this module to its dependencies.
+     * ES2020 15.2.1.16 Link() method.
+     *
+     * @param resolver Module resolver for resolving import specifiers
+     * @param ctx      The execution context
+     * @throws ModuleLinkingException if linking fails
+     */
+    public void link(ModuleResolver resolver, JSContext ctx) throws ModuleLinkingException {
+        if (status == ModuleStatus.LINKING || status == ModuleStatus.EVALUATING) {
+            throw new ModuleLinkingException("Circular module dependency detected: " + url);
+        }
+        if (status == ModuleStatus.LINKED || status == ModuleStatus.EVALUATED) {
+            return; // Already linked
+        }
+
+        status = ModuleStatus.LINKING;
+
+        try {
+            // Resolve all import entries
+            for (ImportEntry importEntry : namedImports.values()) {
+                JSModule importedModule = resolver.resolve(importEntry.moduleRequest, this);
+                if (importedModule == null) {
+                    throw new ModuleLinkingException("Cannot resolve module: " + importEntry.moduleRequest);
+                }
+                addDependency(importedModule);
+
+                // Recursively link dependencies
+                importedModule.link(resolver, ctx);
+            }
+
+            status = ModuleStatus.LINKED;
+        } catch (Exception e) {
+            status = ModuleStatus.UNLINKED;
+            throw new ModuleLinkingException("Failed to link module " + url + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Populate the namespace object with exported values.
      */
     private void populateNamespace(JSContext ctx) {
@@ -254,74 +279,29 @@ public final class JSModule {
     }
 
     /**
-     * Get a named export value.
+     * Set the default export.
      *
-     * @param name The export name
-     * @return The exported value, or null if not found
+     * @param value The default export value
      */
-    public JSValue getExport(String name) {
-        return namespace.get(name);
+    public void setDefaultExport(JSValue value) {
+        this.defaultExport = value;
+        namedExports.put("default", new ExportEntry("default", "*default*", null, null));
+    }
+
+    @Override
+    public String toString() {
+        return "Module[" + url + ", status=" + status + "]";
     }
 
     /**
-     * Get the module namespace object.
-     * Used for: import * as ns from 'module'
-     *
-     * @return The namespace object containing all exports
+     * Module evaluation states based on ES2020 Cyclic Module Records.
      */
-    public JSObject getNamespace() {
-        return namespace;
-    }
-
-    /**
-     * Get the module URL/identifier.
-     */
-    public String getUrl() {
-        return url;
-    }
-
-    /**
-     * Get the module status.
-     */
-    public ModuleStatus getStatus() {
-        return status;
-    }
-
-    /**
-     * Get all named exports.
-     */
-    public Map<String, ExportEntry> getNamedExports() {
-        return Collections.unmodifiableMap(namedExports);
-    }
-
-    /**
-     * Get all dependencies.
-     */
-    public List<JSModule> getDependencies() {
-        return Collections.unmodifiableList(requestedModules);
-    }
-
-    /**
-     * Export entry record.
-     * Represents: export { x as y } or export { x } from 'module'
-     *
-     * @param exportName    Name exported to other modules
-     * @param localName     Local binding name (for local exports)
-     * @param moduleRequest Module to re-export from (for re-exports)
-     * @param importName    Name to import from that module (for re-exports)
-     */
-        public record ExportEntry(String exportName, String localName, String moduleRequest, String importName) {
-    }
-
-    /**
-     * Import entry record.
-     * Represents: import { x as y } from 'module'
-     *
-     * @param moduleRequest Module specifier to import from
-     * @param importName    Name to import (or "*" for namespace)
-     * @param localName     Local binding name
-     */
-        public record ImportEntry(String moduleRequest, String importName, String localName) {
+    public enum ModuleStatus {
+        UNLINKED,      // Module not yet linked to its dependencies
+        LINKING,       // Currently resolving dependencies
+        LINKED,        // All dependencies resolved, ready to evaluate
+        EVALUATING,    // Currently executing module code
+        EVALUATED      // Module code has been executed
     }
 
     /**
@@ -340,16 +320,26 @@ public final class JSModule {
     }
 
     /**
-     * Exception thrown when module linking fails.
+     * Export entry record.
+     * Represents: export { x as y } or export { x } from 'module'
+     *
+     * @param exportName    Name exported to other modules
+     * @param localName     Local binding name (for local exports)
+     * @param moduleRequest Module to re-export from (for re-exports)
+     * @param importName    Name to import from that module (for re-exports)
      */
-    public static class ModuleLinkingException extends Exception {
-        public ModuleLinkingException(String message) {
-            super(message);
-        }
+    public record ExportEntry(String exportName, String localName, String moduleRequest, String importName) {
+    }
 
-        public ModuleLinkingException(String message, Throwable cause) {
-            super(message, cause);
-        }
+    /**
+     * Import entry record.
+     * Represents: import { x as y } from 'module'
+     *
+     * @param moduleRequest Module specifier to import from
+     * @param importName    Name to import (or "*" for namespace)
+     * @param localName     Local binding name
+     */
+    public record ImportEntry(String moduleRequest, String importName, String localName) {
     }
 
     /**
@@ -378,8 +368,16 @@ public final class JSModule {
         }
     }
 
-    @Override
-    public String toString() {
-        return "Module[" + url + ", status=" + status + "]";
+    /**
+     * Exception thrown when module linking fails.
+     */
+    public static class ModuleLinkingException extends Exception {
+        public ModuleLinkingException(String message) {
+            super(message);
+        }
+
+        public ModuleLinkingException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }

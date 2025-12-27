@@ -26,8 +26,8 @@ import java.util.Arrays;
  */
 public final class DynamicBuffer {
     private byte[] buffer;
-    private int size;
     private boolean error;
+    private int size;
 
     /**
      * Create a new dynamic buffer with default initial capacity (64 bytes).
@@ -94,13 +94,6 @@ public final class DynamicBuffer {
     }
 
     /**
-     * Append an unsigned 8-bit value.
-     */
-    public void appendU8(int value) {
-        append((byte) value);
-    }
-
-    /**
      * Append an unsigned 16-bit value (little-endian).
      */
     public void appendU16(int value) {
@@ -142,24 +135,10 @@ public final class DynamicBuffer {
     }
 
     /**
-     * Get a copy of the buffer contents.
+     * Append an unsigned 8-bit value.
      */
-    public byte[] toByteArray() {
-        return Arrays.copyOf(buffer, size);
-    }
-
-    /**
-     * Get a ByteBuffer view of the contents (read-only).
-     */
-    public ByteBuffer toByteBuffer() {
-        return ByteBuffer.wrap(buffer, 0, size).asReadOnlyBuffer();
-    }
-
-    /**
-     * Get the current size of the buffer.
-     */
-    public int size() {
-        return size;
+    public void appendU8(int value) {
+        append((byte) value);
     }
 
     /**
@@ -170,27 +149,9 @@ public final class DynamicBuffer {
     }
 
     /**
-     * Check if an error occurred during buffer operations.
-     */
-    public boolean hasError() {
-        return error;
-    }
-
-    /**
      * Clear the buffer.
      */
     public void clear() {
-        size = 0;
-        error = false;
-    }
-
-    /**
-     * Reset the buffer and optionally resize.
-     */
-    public void reset(int newCapacity) {
-        if (newCapacity > 0) {
-            buffer = new byte[newCapacity];
-        }
         size = 0;
         error = false;
     }
@@ -225,6 +186,45 @@ public final class DynamicBuffer {
      */
     byte[] getInternalBuffer() {
         return buffer;
+    }
+
+    /**
+     * Check if an error occurred during buffer operations.
+     */
+    public boolean hasError() {
+        return error;
+    }
+
+    /**
+     * Reset the buffer and optionally resize.
+     */
+    public void reset(int newCapacity) {
+        if (newCapacity > 0) {
+            buffer = new byte[newCapacity];
+        }
+        size = 0;
+        error = false;
+    }
+
+    /**
+     * Get the current size of the buffer.
+     */
+    public int size() {
+        return size;
+    }
+
+    /**
+     * Get a copy of the buffer contents.
+     */
+    public byte[] toByteArray() {
+        return Arrays.copyOf(buffer, size);
+    }
+
+    /**
+     * Get a ByteBuffer view of the contents (read-only).
+     */
+    public ByteBuffer toByteBuffer() {
+        return ByteBuffer.wrap(buffer, 0, size).asReadOnlyBuffer();
     }
 
     @Override

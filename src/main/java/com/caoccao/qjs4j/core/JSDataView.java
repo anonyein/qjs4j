@@ -28,8 +28,8 @@ import java.nio.ByteOrder;
  */
 public final class JSDataView extends JSObject {
     private final JSArrayBuffer buffer;
-    private final int byteOffset;
     private final int byteLength;
+    private final int byteOffset;
 
     /**
      * Create a DataView for the entire buffer.
@@ -58,94 +58,25 @@ public final class JSDataView extends JSObject {
         this.byteLength = byteLength;
     }
 
-    public JSArrayBuffer getBuffer() {
-        return buffer;
+    private void checkOffset(int offset, int size) {
+        if (buffer.isDetached()) {
+            throw new IllegalStateException("DataView buffer is detached");
+        }
+        if (offset < 0 || offset + size > byteLength) {
+            throw new RangeError("DataView offset out of range");
+        }
     }
 
-    public int getByteOffset() {
-        return byteOffset;
+    public JSArrayBuffer getBuffer() {
+        return buffer;
     }
 
     public int getByteLength() {
         return byteLength;
     }
 
-    // Int8 operations
-    public byte getInt8(int byteOffset) {
-        checkOffset(byteOffset, 1);
-        return buffer.getBuffer().get(this.byteOffset + byteOffset);
-    }
-
-    public void setInt8(int byteOffset, byte value) {
-        checkOffset(byteOffset, 1);
-        buffer.getBuffer().put(this.byteOffset + byteOffset, value);
-    }
-
-    // Uint8 operations
-    public int getUint8(int byteOffset) {
-        return getInt8(byteOffset) & 0xFF;
-    }
-
-    public void setUint8(int byteOffset, int value) {
-        setInt8(byteOffset, (byte) value);
-    }
-
-    // Int16 operations
-    public short getInt16(int byteOffset, boolean littleEndian) {
-        checkOffset(byteOffset, 2);
-        ByteBuffer buf = buffer.getBuffer();
-        ByteOrder originalOrder = buf.order();
-        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
-        short value = buf.getShort(this.byteOffset + byteOffset);
-        buf.order(originalOrder);
-        return value;
-    }
-
-    public void setInt16(int byteOffset, short value, boolean littleEndian) {
-        checkOffset(byteOffset, 2);
-        ByteBuffer buf = buffer.getBuffer();
-        ByteOrder originalOrder = buf.order();
-        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
-        buf.putShort(this.byteOffset + byteOffset, value);
-        buf.order(originalOrder);
-    }
-
-    // Uint16 operations
-    public int getUint16(int byteOffset, boolean littleEndian) {
-        return getInt16(byteOffset, littleEndian) & 0xFFFF;
-    }
-
-    public void setUint16(int byteOffset, int value, boolean littleEndian) {
-        setInt16(byteOffset, (short) value, littleEndian);
-    }
-
-    // Int32 operations
-    public int getInt32(int byteOffset, boolean littleEndian) {
-        checkOffset(byteOffset, 4);
-        ByteBuffer buf = buffer.getBuffer();
-        ByteOrder originalOrder = buf.order();
-        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
-        int value = buf.getInt(this.byteOffset + byteOffset);
-        buf.order(originalOrder);
-        return value;
-    }
-
-    public void setInt32(int byteOffset, int value, boolean littleEndian) {
-        checkOffset(byteOffset, 4);
-        ByteBuffer buf = buffer.getBuffer();
-        ByteOrder originalOrder = buf.order();
-        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
-        buf.putInt(this.byteOffset + byteOffset, value);
-        buf.order(originalOrder);
-    }
-
-    // Uint32 operations
-    public long getUint32(int byteOffset, boolean littleEndian) {
-        return getInt32(byteOffset, littleEndian) & 0xFFFFFFFFL;
-    }
-
-    public void setUint32(int byteOffset, long value, boolean littleEndian) {
-        setInt32(byteOffset, (int) value, littleEndian);
+    public int getByteOffset() {
+        return byteOffset;
     }
 
     // Float32 operations
@@ -159,15 +90,6 @@ public final class JSDataView extends JSObject {
         return value;
     }
 
-    public void setFloat32(int byteOffset, float value, boolean littleEndian) {
-        checkOffset(byteOffset, 4);
-        ByteBuffer buf = buffer.getBuffer();
-        ByteOrder originalOrder = buf.order();
-        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
-        buf.putFloat(this.byteOffset + byteOffset, value);
-        buf.order(originalOrder);
-    }
-
     // Float64 operations
     public double getFloat64(int byteOffset, boolean littleEndian) {
         checkOffset(byteOffset, 8);
@@ -179,6 +101,58 @@ public final class JSDataView extends JSObject {
         return value;
     }
 
+    // Int16 operations
+    public short getInt16(int byteOffset, boolean littleEndian) {
+        checkOffset(byteOffset, 2);
+        ByteBuffer buf = buffer.getBuffer();
+        ByteOrder originalOrder = buf.order();
+        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+        short value = buf.getShort(this.byteOffset + byteOffset);
+        buf.order(originalOrder);
+        return value;
+    }
+
+    // Int32 operations
+    public int getInt32(int byteOffset, boolean littleEndian) {
+        checkOffset(byteOffset, 4);
+        ByteBuffer buf = buffer.getBuffer();
+        ByteOrder originalOrder = buf.order();
+        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+        int value = buf.getInt(this.byteOffset + byteOffset);
+        buf.order(originalOrder);
+        return value;
+    }
+
+    // Int8 operations
+    public byte getInt8(int byteOffset) {
+        checkOffset(byteOffset, 1);
+        return buffer.getBuffer().get(this.byteOffset + byteOffset);
+    }
+
+    // Uint16 operations
+    public int getUint16(int byteOffset, boolean littleEndian) {
+        return getInt16(byteOffset, littleEndian) & 0xFFFF;
+    }
+
+    // Uint32 operations
+    public long getUint32(int byteOffset, boolean littleEndian) {
+        return getInt32(byteOffset, littleEndian) & 0xFFFFFFFFL;
+    }
+
+    // Uint8 operations
+    public int getUint8(int byteOffset) {
+        return getInt8(byteOffset) & 0xFF;
+    }
+
+    public void setFloat32(int byteOffset, float value, boolean littleEndian) {
+        checkOffset(byteOffset, 4);
+        ByteBuffer buf = buffer.getBuffer();
+        ByteOrder originalOrder = buf.order();
+        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+        buf.putFloat(this.byteOffset + byteOffset, value);
+        buf.order(originalOrder);
+    }
+
     public void setFloat64(int byteOffset, double value, boolean littleEndian) {
         checkOffset(byteOffset, 8);
         ByteBuffer buf = buffer.getBuffer();
@@ -188,13 +162,39 @@ public final class JSDataView extends JSObject {
         buf.order(originalOrder);
     }
 
-    private void checkOffset(int offset, int size) {
-        if (buffer.isDetached()) {
-            throw new IllegalStateException("DataView buffer is detached");
-        }
-        if (offset < 0 || offset + size > byteLength) {
-            throw new RangeError("DataView offset out of range");
-        }
+    public void setInt16(int byteOffset, short value, boolean littleEndian) {
+        checkOffset(byteOffset, 2);
+        ByteBuffer buf = buffer.getBuffer();
+        ByteOrder originalOrder = buf.order();
+        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+        buf.putShort(this.byteOffset + byteOffset, value);
+        buf.order(originalOrder);
+    }
+
+    public void setInt32(int byteOffset, int value, boolean littleEndian) {
+        checkOffset(byteOffset, 4);
+        ByteBuffer buf = buffer.getBuffer();
+        ByteOrder originalOrder = buf.order();
+        buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+        buf.putInt(this.byteOffset + byteOffset, value);
+        buf.order(originalOrder);
+    }
+
+    public void setInt8(int byteOffset, byte value) {
+        checkOffset(byteOffset, 1);
+        buffer.getBuffer().put(this.byteOffset + byteOffset, value);
+    }
+
+    public void setUint16(int byteOffset, int value, boolean littleEndian) {
+        setInt16(byteOffset, (short) value, littleEndian);
+    }
+
+    public void setUint32(int byteOffset, long value, boolean littleEndian) {
+        setInt32(byteOffset, (int) value, littleEndian);
+    }
+
+    public void setUint8(int byteOffset, int value) {
+        setInt8(byteOffset, (byte) value);
     }
 
     @Override

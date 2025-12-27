@@ -23,6 +23,46 @@ package com.caoccao.qjs4j.core;
 public final class JSIteratorHelper {
 
     /**
+     * Execute a for...of loop over an iterable.
+     * This is a helper for bytecode that implements for...of loops.
+     *
+     * @param iterable The iterable to loop over
+     * @param callback Function to call for each value
+     * @param ctx      The execution context
+     */
+    public static void forOf(JSValue iterable, IterationCallback callback, JSContext ctx) {
+        // Get the iterator
+        JSValue iterator = getIterator(iterable, ctx);
+        if (iterator == null) {
+            ctx.throwError("TypeError", "Object is not iterable");
+            return;
+        }
+
+        // Iterate until done
+        while (true) {
+            JSObject result = iteratorNext(iterator, ctx);
+            if (result == null) {
+                break;
+            }
+
+            // Check if done
+            JSValue doneValue = result.get("done");
+            boolean done = JSTypeConversions.toBoolean(doneValue) == JSBoolean.TRUE;
+
+            if (done) {
+                break;
+            }
+
+            // Get the value and call the callback
+            JSValue value = result.get("value");
+            if (!callback.iterate(value)) {
+                // Callback returned false, break early
+                break;
+            }
+        }
+    }
+
+    /**
      * Get an iterator from an iterable object.
      * Calls the object's [Symbol.iterator] method to get an iterator.
      *
@@ -54,6 +94,21 @@ public final class JSIteratorHelper {
         }
 
         return null;
+    }
+
+    /**
+     * Check if a value is iterable (has Symbol.iterator).
+     *
+     * @param value The value to check
+     * @return true if iterable, false otherwise
+     */
+    public static boolean isIterable(JSValue value) {
+        if (!(value instanceof JSObject obj)) {
+            return false;
+        }
+
+        JSValue iteratorMethod = obj.get(PropertyKey.fromSymbol(JSSymbol.ITERATOR));
+        return iteratorMethod instanceof JSFunction;
     }
 
     /**
@@ -95,60 +150,6 @@ public final class JSIteratorHelper {
     }
 
     /**
-     * Execute a for...of loop over an iterable.
-     * This is a helper for bytecode that implements for...of loops.
-     *
-     * @param iterable The iterable to loop over
-     * @param callback Function to call for each value
-     * @param ctx      The execution context
-     */
-    public static void forOf(JSValue iterable, IterationCallback callback, JSContext ctx) {
-        // Get the iterator
-        JSValue iterator = getIterator(iterable, ctx);
-        if (iterator == null) {
-            ctx.throwError("TypeError", "Object is not iterable");
-            return;
-        }
-
-        // Iterate until done
-        while (true) {
-            JSObject result = iteratorNext(iterator, ctx);
-            if (result == null) {
-                break;
-            }
-
-            // Check if done
-            JSValue doneValue = result.get("done");
-            boolean done = JSTypeConversions.toBoolean(doneValue) == JSBoolean.TRUE;
-
-            if (done) {
-                break;
-            }
-
-            // Get the value and call the callback
-            JSValue value = result.get("value");
-            if (!callback.iterate(value)) {
-                // Callback returned false, break early
-                break;
-            }
-        }
-    }
-
-    /**
-     * Functional interface for iteration callbacks.
-     */
-    @FunctionalInterface
-    public interface IterationCallback {
-        /**
-         * Called for each iterated value.
-         *
-         * @param value The current value
-         * @return true to continue iteration, false to break
-         */
-        boolean iterate(JSValue value);
-    }
-
-    /**
      * Convert an iterable to an array.
      *
      * @param iterable The iterable to convert
@@ -167,17 +168,16 @@ public final class JSIteratorHelper {
     }
 
     /**
-     * Check if a value is iterable (has Symbol.iterator).
-     *
-     * @param value The value to check
-     * @return true if iterable, false otherwise
+     * Functional interface for iteration callbacks.
      */
-    public static boolean isIterable(JSValue value) {
-        if (!(value instanceof JSObject obj)) {
-            return false;
-        }
-
-        JSValue iteratorMethod = obj.get(PropertyKey.fromSymbol(JSSymbol.ITERATOR));
-        return iteratorMethod instanceof JSFunction;
+    @FunctionalInterface
+    public interface IterationCallback {
+        /**
+         * Called for each iterated value.
+         *
+         * @param value The current value
+         * @return true to continue iteration, false to break
+         */
+        boolean iterate(JSValue value);
     }
 }

@@ -22,9 +22,9 @@ import com.caoccao.qjs4j.core.JSValue;
  * Represents compiled bytecode for a function.
  */
 public final class Bytecode {
-    private final byte[] instructions;
-    private final JSValue[] constantPool;
     private final String[] atomPool;
+    private final JSValue[] constantPool;
+    private final byte[] instructions;
 
     public Bytecode(byte[] instructions, JSValue[] constantPool, String[] atomPool) {
         this.instructions = instructions;
@@ -32,11 +32,35 @@ public final class Bytecode {
         this.atomPool = atomPool;
     }
 
-    public int readOpcode(int offset) {
-        return instructions[offset] & 0xFF;
+    public String getAtom(int index) {
+        return atomPool[index];
     }
 
-    public int readU8(int offset) {
+    public String[] getAtoms() {
+        return atomPool;
+    }
+
+    public JSValue getConstant(int index) {
+        return constantPool[index];
+    }
+
+    public JSValue[] getConstants() {
+        return constantPool;
+    }
+
+    public byte[] getInstructions() {
+        return instructions;
+    }
+
+    public int getLength() {
+        return instructions.length;
+    }
+
+    public int readI32(int offset) {
+        return readU32(offset);
+    }
+
+    public int readOpcode(int offset) {
         return instructions[offset] & 0xFF;
     }
 
@@ -51,31 +75,7 @@ public final class Bytecode {
                 (instructions[offset + 3] & 0xFF);
     }
 
-    public int readI32(int offset) {
-        return readU32(offset);
-    }
-
-    public JSValue getConstant(int index) {
-        return constantPool[index];
-    }
-
-    public String getAtom(int index) {
-        return atomPool[index];
-    }
-
-    public JSValue[] getConstants() {
-        return constantPool;
-    }
-
-    public String[] getAtoms() {
-        return atomPool;
-    }
-
-    public byte[] getInstructions() {
-        return instructions;
-    }
-
-    public int getLength() {
-        return instructions.length;
+    public int readU8(int offset) {
+        return instructions[offset] & 0xFF;
     }
 }

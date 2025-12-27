@@ -28,92 +28,18 @@ import static org.junit.jupiter.api.Assertions.*;
 public class MapPrototypeTest extends BaseTest {
 
     @Test
-    public void testGetSize() {
+    public void testClear() {
         JSMap map = new JSMap();
-
-        // Normal case: empty map
-        JSValue result = MapPrototype.getSize(ctx, map, new JSValue[]{});
-        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
-
-        // Normal case: map with entries
         map.mapSet(new JSString("key1"), new JSString("value1"));
         map.mapSet(new JSString("key2"), new JSString("value2"));
-        result = MapPrototype.getSize(ctx, map, new JSValue[]{});
-        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElse(0.0));
 
-        // Edge case: called on non-Map
-        assertTypeError(MapPrototype.getSize(ctx, new JSString("not map"), new JSValue[]{}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testSet() {
-        JSMap map = new JSMap();
-
-        // Normal case: set key-value pair
-        JSValue result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key"), new JSString("value")});
-        assertEquals(map, result); // Should return the map
-        assertEquals(1, map.size());
-        assertEquals("value", map.mapGet(new JSString("key")).asString().map(JSString::value).orElse(""));
-
-        // Normal case: update existing key
-        result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key"), new JSString("newValue")});
-        assertEquals(map, result);
-        assertEquals(1, map.size());
-        assertEquals("newValue", map.mapGet(new JSString("key")).asString().map(JSString::value).orElse(""));
-
-        // Normal case: set with undefined value
-        result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key2")});
-        assertEquals(map, result);
-        assertEquals(2, map.size());
-        assertTrue(map.mapGet(new JSString("key2")).isUndefined());
-
-        // Edge case: called on non-Map
-        assertTypeError(MapPrototype.set(ctx, new JSString("not map"), new JSValue[]{new JSString("key"), new JSString("value")}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testGet() {
-        JSMap map = new JSMap();
-        map.mapSet(new JSString("key1"), new JSString("value1"));
-
-        // Normal case: existing key
-        JSValue result = MapPrototype.get(ctx, map, new JSValue[]{new JSString("key1")});
-        assertEquals("value1", result.asString().map(JSString::value).orElse(""));
-
-        // Normal case: non-existing key
-        result = MapPrototype.get(ctx, map, new JSValue[]{new JSString("key2")});
+        // Normal case: clear map
+        JSValue result = MapPrototype.clear(ctx, map, new JSValue[]{});
         assertTrue(result.isUndefined());
-
-        // Normal case: no arguments
-        result = MapPrototype.get(ctx, map, new JSValue[]{});
-        assertTrue(result.isUndefined());
+        assertEquals(0, map.size());
 
         // Edge case: called on non-Map
-        assertTypeError(MapPrototype.get(ctx, new JSString("not map"), new JSValue[]{new JSString("key")}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testHas() {
-        JSMap map = new JSMap();
-        map.mapSet(new JSString("key1"), new JSString("value1"));
-
-        // Normal case: existing key
-        JSValue result = MapPrototype.has(ctx, map, new JSValue[]{new JSString("key1")});
-        assertTrue(result.isBooleanTrue());
-
-        // Normal case: non-existing key
-        result = MapPrototype.has(ctx, map, new JSValue[]{new JSString("key2")});
-        assertTrue(result.isBooleanFalse());
-
-        // Normal case: no arguments
-        result = MapPrototype.has(ctx, map, new JSValue[]{});
-        assertTrue(result.isBooleanFalse());
-
-        // Edge case: called on non-Map
-        assertTypeError(MapPrototype.has(ctx, new JSString("not map"), new JSValue[]{new JSString("key")}));
+        assertTypeError(MapPrototype.clear(ctx, new JSString("not map"), new JSValue[]{}));
         assertPendingException(ctx);
     }
 
@@ -140,57 +66,6 @@ public class MapPrototypeTest extends BaseTest {
 
         // Edge case: called on non-Map
         assertTypeError(MapPrototype.delete(ctx, new JSString("not map"), new JSValue[]{new JSString("key")}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testClear() {
-        JSMap map = new JSMap();
-        map.mapSet(new JSString("key1"), new JSString("value1"));
-        map.mapSet(new JSString("key2"), new JSString("value2"));
-
-        // Normal case: clear map
-        JSValue result = MapPrototype.clear(ctx, map, new JSValue[]{});
-        assertTrue(result.isUndefined());
-        assertEquals(0, map.size());
-
-        // Edge case: called on non-Map
-        assertTypeError(MapPrototype.clear(ctx, new JSString("not map"), new JSValue[]{}));
-        assertPendingException(ctx);
-    }
-
-    @Test
-    public void testForEach() {
-        JSMap map = new JSMap();
-        map.mapSet(new JSString("key1"), new JSString("value1"));
-        map.mapSet(new JSString("key2"), new JSString("value2"));
-
-        // Normal case: forEach with callback
-        final StringBuilder result = new StringBuilder();
-        JSFunction callback = new JSNativeFunction("testCallback", 3, (ctx, thisArg, args) -> {
-            String value = args[0].asString().map(JSString::value).orElse("");
-            String key = args[1].asString().map(JSString::value).orElse("");
-            result.append(key).append(":").append(value).append(",");
-            return JSUndefined.INSTANCE;
-        });
-
-        JSValue forEachResult = MapPrototype.forEach(ctx, map, new JSValue[]{callback});
-        assertTrue(forEachResult.isUndefined());
-        // Note: Order might vary, but both entries should be present
-        String resultStr = result.toString();
-        assertTrue(resultStr.contains("key1:value1"));
-        assertTrue(resultStr.contains("key2:value2"));
-
-        // Edge case: no callback function
-        assertTypeError(MapPrototype.forEach(ctx, map, new JSValue[]{}));
-        assertPendingException(ctx);
-
-        // Edge case: non-function callback
-        assertTypeError(MapPrototype.forEach(ctx, map, new JSValue[]{new JSString("not function")}));
-        assertPendingException(ctx);
-
-        // Edge case: called on non-Map
-        assertTypeError(MapPrototype.forEach(ctx, new JSString("not map"), new JSValue[]{callback}));
         assertPendingException(ctx);
     }
 
@@ -233,6 +108,104 @@ public class MapPrototypeTest extends BaseTest {
     }
 
     @Test
+    public void testForEach() {
+        JSMap map = new JSMap();
+        map.mapSet(new JSString("key1"), new JSString("value1"));
+        map.mapSet(new JSString("key2"), new JSString("value2"));
+
+        // Normal case: forEach with callback
+        final StringBuilder result = new StringBuilder();
+        JSFunction callback = new JSNativeFunction("testCallback", 3, (ctx, thisArg, args) -> {
+            String value = args[0].asString().map(JSString::value).orElse("");
+            String key = args[1].asString().map(JSString::value).orElse("");
+            result.append(key).append(":").append(value).append(",");
+            return JSUndefined.INSTANCE;
+        });
+
+        JSValue forEachResult = MapPrototype.forEach(ctx, map, new JSValue[]{callback});
+        assertTrue(forEachResult.isUndefined());
+        // Note: Order might vary, but both entries should be present
+        String resultStr = result.toString();
+        assertTrue(resultStr.contains("key1:value1"));
+        assertTrue(resultStr.contains("key2:value2"));
+
+        // Edge case: no callback function
+        assertTypeError(MapPrototype.forEach(ctx, map, new JSValue[]{}));
+        assertPendingException(ctx);
+
+        // Edge case: non-function callback
+        assertTypeError(MapPrototype.forEach(ctx, map, new JSValue[]{new JSString("not function")}));
+        assertPendingException(ctx);
+
+        // Edge case: called on non-Map
+        assertTypeError(MapPrototype.forEach(ctx, new JSString("not map"), new JSValue[]{callback}));
+        assertPendingException(ctx);
+    }
+
+    @Test
+    public void testGet() {
+        JSMap map = new JSMap();
+        map.mapSet(new JSString("key1"), new JSString("value1"));
+
+        // Normal case: existing key
+        JSValue result = MapPrototype.get(ctx, map, new JSValue[]{new JSString("key1")});
+        assertEquals("value1", result.asString().map(JSString::value).orElse(""));
+
+        // Normal case: non-existing key
+        result = MapPrototype.get(ctx, map, new JSValue[]{new JSString("key2")});
+        assertTrue(result.isUndefined());
+
+        // Normal case: no arguments
+        result = MapPrototype.get(ctx, map, new JSValue[]{});
+        assertTrue(result.isUndefined());
+
+        // Edge case: called on non-Map
+        assertTypeError(MapPrototype.get(ctx, new JSString("not map"), new JSValue[]{new JSString("key")}));
+        assertPendingException(ctx);
+    }
+
+    @Test
+    public void testGetSize() {
+        JSMap map = new JSMap();
+
+        // Normal case: empty map
+        JSValue result = MapPrototype.getSize(ctx, map, new JSValue[]{});
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+
+        // Normal case: map with entries
+        map.mapSet(new JSString("key1"), new JSString("value1"));
+        map.mapSet(new JSString("key2"), new JSString("value2"));
+        result = MapPrototype.getSize(ctx, map, new JSValue[]{});
+        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+
+        // Edge case: called on non-Map
+        assertTypeError(MapPrototype.getSize(ctx, new JSString("not map"), new JSValue[]{}));
+        assertPendingException(ctx);
+    }
+
+    @Test
+    public void testHas() {
+        JSMap map = new JSMap();
+        map.mapSet(new JSString("key1"), new JSString("value1"));
+
+        // Normal case: existing key
+        JSValue result = MapPrototype.has(ctx, map, new JSValue[]{new JSString("key1")});
+        assertTrue(result.isBooleanTrue());
+
+        // Normal case: non-existing key
+        result = MapPrototype.has(ctx, map, new JSValue[]{new JSString("key2")});
+        assertTrue(result.isBooleanFalse());
+
+        // Normal case: no arguments
+        result = MapPrototype.has(ctx, map, new JSValue[]{});
+        assertTrue(result.isBooleanFalse());
+
+        // Edge case: called on non-Map
+        assertTypeError(MapPrototype.has(ctx, new JSString("not map"), new JSValue[]{new JSString("key")}));
+        assertPendingException(ctx);
+    }
+
+    @Test
     public void testKeys() {
         JSMap map = new JSMap();
         map.mapSet(new JSString("key1"), new JSString("value1"));
@@ -258,6 +231,33 @@ public class MapPrototypeTest extends BaseTest {
 
         // Edge case: called on non-Map
         assertTypeError(MapPrototype.keys(ctx, new JSString("not map"), new JSValue[]{}));
+        assertPendingException(ctx);
+    }
+
+    @Test
+    public void testSet() {
+        JSMap map = new JSMap();
+
+        // Normal case: set key-value pair
+        JSValue result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key"), new JSString("value")});
+        assertEquals(map, result); // Should return the map
+        assertEquals(1, map.size());
+        assertEquals("value", map.mapGet(new JSString("key")).asString().map(JSString::value).orElse(""));
+
+        // Normal case: update existing key
+        result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key"), new JSString("newValue")});
+        assertEquals(map, result);
+        assertEquals(1, map.size());
+        assertEquals("newValue", map.mapGet(new JSString("key")).asString().map(JSString::value).orElse(""));
+
+        // Normal case: set with undefined value
+        result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key2")});
+        assertEquals(map, result);
+        assertEquals(2, map.size());
+        assertTrue(map.mapGet(new JSString("key2")).isUndefined());
+
+        // Edge case: called on non-Map
+        assertTypeError(MapPrototype.set(ctx, new JSString("not map"), new JSValue[]{new JSString("key"), new JSString("value")}));
         assertPendingException(ctx);
     }
 

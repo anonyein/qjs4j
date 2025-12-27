@@ -33,20 +33,14 @@ import java.util.Map;
  * - Static methods are added to the class itself
  */
 public final class JSClass extends JSObject implements JSFunction {
-    private final String name;
     private final JSFunction constructor;
-    private final JSClass superClass;
-    private final JSObject prototype;
-    private final Map<String, JSFunction> instanceMethods;
-    private final Map<String, JSFunction> staticMethods;
     private final Map<String, PropertyDescriptor> instanceFields;
+    private final Map<String, JSFunction> instanceMethods;
+    private final String name;
+    private final JSObject prototype;
     private final Map<String, PropertyDescriptor> staticFields;
-
-    /**
-         * Property descriptor for class fields.
-         */
-        public record PropertyDescriptor(JSValue value, boolean writable, boolean enumerable, boolean configurable) {
-    }
+    private final Map<String, JSFunction> staticMethods;
+    private final JSClass superClass;
 
     /**
      * Create a new class.
@@ -83,6 +77,17 @@ public final class JSClass extends JSObject implements JSFunction {
     }
 
     /**
+     * Add an instance field initializer.
+     * Instance fields are initialized in the constructor.
+     *
+     * @param fieldName  Field name
+     * @param descriptor Property descriptor
+     */
+    public void addInstanceField(String fieldName, PropertyDescriptor descriptor) {
+        instanceFields.put(fieldName, descriptor);
+    }
+
+    /**
      * Add an instance method to the class.
      * Instance methods are added to the prototype.
      *
@@ -95,29 +100,6 @@ public final class JSClass extends JSObject implements JSFunction {
     }
 
     /**
-     * Add a static method to the class.
-     * Static methods are added to the class itself.
-     *
-     * @param methodName Method name
-     * @param method     Method function
-     */
-    public void addStaticMethod(String methodName, JSFunction method) {
-        staticMethods.put(methodName, method);
-        this.set(methodName, method);
-    }
-
-    /**
-     * Add an instance field initializer.
-     * Instance fields are initialized in the constructor.
-     *
-     * @param fieldName  Field name
-     * @param descriptor Property descriptor
-     */
-    public void addInstanceField(String fieldName, PropertyDescriptor descriptor) {
-        instanceFields.put(fieldName, descriptor);
-    }
-
-    /**
      * Add a static field to the class.
      * Static fields are added to the class itself.
      *
@@ -127,6 +109,18 @@ public final class JSClass extends JSObject implements JSFunction {
     public void addStaticField(String fieldName, PropertyDescriptor descriptor) {
         staticFields.put(fieldName, descriptor);
         this.set(fieldName, descriptor.value);
+    }
+
+    /**
+     * Add a static method to the class.
+     * Static methods are added to the class itself.
+     *
+     * @param methodName Method name
+     * @param method     Method function
+     */
+    public void addStaticMethod(String methodName, JSFunction method) {
+        staticMethods.put(methodName, method);
+        this.set(methodName, method);
     }
 
     /**
@@ -175,11 +169,17 @@ public final class JSClass extends JSObject implements JSFunction {
     }
 
     /**
-     * Get the class name.
+     * Get the constructor function.
      */
-    @Override
-    public String getName() {
-        return name;
+    public JSFunction getConstructor() {
+        return constructor;
+    }
+
+    /**
+     * Get all instance methods.
+     */
+    public Map<String, JSFunction> getInstanceMethods() {
+        return instanceMethods;
     }
 
     /**
@@ -191,17 +191,11 @@ public final class JSClass extends JSObject implements JSFunction {
     }
 
     /**
-     * Get the constructor function.
+     * Get the class name.
      */
-    public JSFunction getConstructor() {
-        return constructor;
-    }
-
-    /**
-     * Get the super class.
-     */
-    public JSClass getSuperClass() {
-        return superClass;
+    @Override
+    public String getName() {
+        return name;
     }
 
     /**
@@ -212,22 +206,17 @@ public final class JSClass extends JSObject implements JSFunction {
     }
 
     /**
-     * Get all instance methods.
-     */
-    public Map<String, JSFunction> getInstanceMethods() {
-        return instanceMethods;
-    }
-
-    /**
      * Get all static methods.
      */
     public Map<String, JSFunction> getStaticMethods() {
         return staticMethods;
     }
 
-    @Override
-    public JSValueType type() {
-        return JSValueType.FUNCTION;
+    /**
+     * Get the super class.
+     */
+    public JSClass getSuperClass() {
+        return superClass;
     }
 
     @Override
@@ -238,5 +227,16 @@ public final class JSClass extends JSObject implements JSFunction {
     @Override
     public String toString() {
         return "class " + name + " { [native code] }";
+    }
+
+    @Override
+    public JSValueType type() {
+        return JSValueType.FUNCTION;
+    }
+
+    /**
+     * Property descriptor for class fields.
+     */
+    public record PropertyDescriptor(JSValue value, boolean writable, boolean enumerable, boolean configurable) {
     }
 }

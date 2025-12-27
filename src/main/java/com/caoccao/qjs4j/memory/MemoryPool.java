@@ -24,9 +24,9 @@ import java.util.function.Supplier;
  * Object pool for reducing allocation overhead.
  */
 public final class MemoryPool<T> {
-    private final Queue<T> pool;
     private final Supplier<T> factory;
     private final int maxSize;
+    private final Queue<T> pool;
 
     public MemoryPool(Supplier<T> factory, int maxSize) {
         this.factory = factory;

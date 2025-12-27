@@ -26,39 +26,6 @@ import com.caoccao.qjs4j.regexp.RegExpEngine;
 public final class RegExpPrototype {
 
     /**
-     * RegExp.prototype.test(str)
-     * ES2020 21.2.5.17
-     * Tests for a match in a string.
-     */
-    public static JSValue test(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSRegExp regexp)) {
-            return ctx.throwError("TypeError", "RegExp.prototype.test called on non-RegExp");
-        }
-
-        String str = args.length > 0 ? JSTypeConversions.toString(args[0]).value() : "";
-
-        // Get lastIndex
-        int lastIndex = regexp.isGlobal() ? regexp.getLastIndex() : 0;
-
-        // Execute regex
-        RegExpEngine.MatchResult result = regexp.getEngine().exec(str, lastIndex);
-
-        if (result != null && result.matched()) {
-            // Update lastIndex for global regexes
-            if (regexp.isGlobal()) {
-                regexp.setLastIndex(result.endIndex());
-            }
-            return JSBoolean.TRUE;
-        } else {
-            // Reset lastIndex on failure for global regexes
-            if (regexp.isGlobal()) {
-                regexp.setLastIndex(0);
-            }
-            return JSBoolean.FALSE;
-        }
-    }
-
-    /**
      * RegExp.prototype.exec(str)
      * ES2020 21.2.5.2.1
      * Executes a search for a match in a string.
@@ -115,30 +82,6 @@ public final class RegExpPrototype {
     }
 
     /**
-     * RegExp.prototype.toString()
-     * ES2020 21.2.5.14
-     */
-    public static JSValue toStringMethod(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSRegExp regexp)) {
-            return ctx.throwError("TypeError", "RegExp.prototype.toString called on non-RegExp");
-        }
-
-        return new JSString("/" + regexp.getPattern() + "/" + regexp.getFlags());
-    }
-
-    /**
-     * get RegExp.prototype.source
-     * ES2020 21.2.5.10
-     */
-    public static JSValue getSource(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSRegExp regexp)) {
-            return ctx.throwError("TypeError", "RegExp.prototype.source called on non-RegExp");
-        }
-
-        return new JSString(regexp.getPattern());
-    }
-
-    /**
      * get RegExp.prototype.flags
      * ES2020 21.2.5.3
      */
@@ -184,5 +127,62 @@ public final class RegExpPrototype {
         }
 
         return regexp.get("multiline");
+    }
+
+    /**
+     * get RegExp.prototype.source
+     * ES2020 21.2.5.10
+     */
+    public static JSValue getSource(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSRegExp regexp)) {
+            return ctx.throwError("TypeError", "RegExp.prototype.source called on non-RegExp");
+        }
+
+        return new JSString(regexp.getPattern());
+    }
+
+    /**
+     * RegExp.prototype.test(str)
+     * ES2020 21.2.5.17
+     * Tests for a match in a string.
+     */
+    public static JSValue test(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSRegExp regexp)) {
+            return ctx.throwError("TypeError", "RegExp.prototype.test called on non-RegExp");
+        }
+
+        String str = args.length > 0 ? JSTypeConversions.toString(args[0]).value() : "";
+
+        // Get lastIndex
+        int lastIndex = regexp.isGlobal() ? regexp.getLastIndex() : 0;
+
+        // Execute regex
+        RegExpEngine.MatchResult result = regexp.getEngine().exec(str, lastIndex);
+
+        if (result != null && result.matched()) {
+            // Update lastIndex for global regexes
+            if (regexp.isGlobal()) {
+                regexp.setLastIndex(result.endIndex());
+            }
+            return JSBoolean.TRUE;
+        } else {
+            // Reset lastIndex on failure for global regexes
+            if (regexp.isGlobal()) {
+                regexp.setLastIndex(0);
+            }
+            return JSBoolean.FALSE;
+        }
+    }
+
+    /**
+     * RegExp.prototype.toString()
+     * ES2020 21.2.5.14
+     */
+    public static JSValue toStringMethod(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSRegExp regexp)) {
+            return ctx.throwError("TypeError", "RegExp.prototype.toString called on non-RegExp");
+        }
+
+        return new JSString("/" + regexp.getPattern() + "/" + regexp.getFlags());
     }
 }

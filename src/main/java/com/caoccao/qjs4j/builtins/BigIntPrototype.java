@@ -25,6 +25,17 @@ import com.caoccao.qjs4j.core.*;
 public final class BigIntPrototype {
 
     /**
+     * BigInt.prototype.toLocaleString(locales, options)
+     * ES2020 20.2.3.2
+     * Returns a localized string representation.
+     * Simplified implementation - just calls toString.
+     */
+    public static JSValue toLocaleString(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        // For now, just delegate to toString with radix 10
+        return toString(ctx, thisArg, new JSValue[]{new JSNumber(10)});
+    }
+
+    /**
      * BigInt.prototype.toString(radix)
      * ES2020 20.2.3.3
      * Returns a string representation of the BigInt in the specified radix.
@@ -75,16 +86,5 @@ public final class BigIntPrototype {
         }
 
         return ctx.throwError("TypeError", "BigInt.prototype.valueOf called on non-BigInt");
-    }
-
-    /**
-     * BigInt.prototype.toLocaleString(locales, options)
-     * ES2020 20.2.3.2
-     * Returns a localized string representation.
-     * Simplified implementation - just calls toString.
-     */
-    public static JSValue toLocaleString(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        // For now, just delegate to toString with radix 10
-        return toString(ctx, thisArg, new JSValue[]{new JSNumber(10)});
     }
 }

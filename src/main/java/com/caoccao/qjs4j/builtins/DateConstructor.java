@@ -29,44 +29,6 @@ import java.time.format.DateTimeFormatter;
 public final class DateConstructor {
 
     /**
-     * Date.now()
-     * ES2020 20.3.3.1
-     * Returns the number of milliseconds elapsed since January 1, 1970 00:00:00 UTC.
-     */
-    public static JSValue now(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return new JSNumber(System.currentTimeMillis());
-    }
-
-    /**
-     * Date.parse(string)
-     * ES2020 20.3.3.2
-     * Parses a string representation of a date and returns the number of milliseconds since January 1, 1970, 00:00:00 UTC.
-     */
-    public static JSValue parse(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return new JSNumber(Double.NaN);
-        }
-
-        JSString dateString = JSTypeConversions.toString(args[0]);
-        String str = dateString.value();
-
-        try {
-            // Try ISO 8601 format first
-            Instant instant = Instant.parse(str);
-            return new JSNumber(instant.toEpochMilli());
-        } catch (Exception e1) {
-            try {
-                // Try RFC 1123 format
-                ZonedDateTime zdt = ZonedDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
-                return new JSNumber(zdt.toInstant().toEpochMilli());
-            } catch (Exception e2) {
-                // Return NaN for unparseable dates
-                return new JSNumber(Double.NaN);
-            }
-        }
-    }
-
-    /**
      * Date.UTC(year, month, date, hours, minutes, seconds, ms)
      * ES2020 20.3.3.4
      * Accepts the same parameters as the Date constructor, but treats them as UTC.
@@ -113,6 +75,44 @@ public final class DateConstructor {
             return new JSNumber(zdt.toInstant().toEpochMilli());
         } catch (Exception e) {
             return new JSNumber(Double.NaN);
+        }
+    }
+
+    /**
+     * Date.now()
+     * ES2020 20.3.3.1
+     * Returns the number of milliseconds elapsed since January 1, 1970 00:00:00 UTC.
+     */
+    public static JSValue now(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return new JSNumber(System.currentTimeMillis());
+    }
+
+    /**
+     * Date.parse(string)
+     * ES2020 20.3.3.2
+     * Parses a string representation of a date and returns the number of milliseconds since January 1, 1970, 00:00:00 UTC.
+     */
+    public static JSValue parse(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return new JSNumber(Double.NaN);
+        }
+
+        JSString dateString = JSTypeConversions.toString(args[0]);
+        String str = dateString.value();
+
+        try {
+            // Try ISO 8601 format first
+            Instant instant = Instant.parse(str);
+            return new JSNumber(instant.toEpochMilli());
+        } catch (Exception e1) {
+            try {
+                // Try RFC 1123 format
+                ZonedDateTime zdt = ZonedDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
+                return new JSNumber(zdt.toInstant().toEpochMilli());
+            } catch (Exception e2) {
+                // Return NaN for unparseable dates
+                return new JSNumber(Double.NaN);
+            }
         }
     }
 }

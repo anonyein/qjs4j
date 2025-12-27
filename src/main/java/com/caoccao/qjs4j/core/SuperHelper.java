@@ -56,27 +56,6 @@ public final class SuperHelper {
     }
 
     /**
-     * Get a method from the super class.
-     * Used for super.methodName() calls.
-     *
-     * @param derivedClass The derived class
-     * @param methodName   The method name to look up
-     * @return The method from the parent class, or null if not found
-     */
-    public static JSValue getSuperMethod(JSClass derivedClass, String methodName) {
-        JSClass superClass = derivedClass.getSuperClass();
-        if (superClass == null) {
-            return JSUndefined.INSTANCE;
-        }
-
-        // Look up method in parent class prototype
-        JSObject superPrototype = superClass.getPrototypeObject();
-        JSValue method = superPrototype.get(methodName);
-
-        return method != null ? method : JSUndefined.INSTANCE;
-    }
-
-    /**
      * Create a super reference object for use in bytecode.
      * This object provides access to super constructor and methods.
      *
@@ -110,6 +89,27 @@ public final class SuperHelper {
         }));
 
         return superRef;
+    }
+
+    /**
+     * Get a method from the super class.
+     * Used for super.methodName() calls.
+     *
+     * @param derivedClass The derived class
+     * @param methodName   The method name to look up
+     * @return The method from the parent class, or null if not found
+     */
+    public static JSValue getSuperMethod(JSClass derivedClass, String methodName) {
+        JSClass superClass = derivedClass.getSuperClass();
+        if (superClass == null) {
+            return JSUndefined.INSTANCE;
+        }
+
+        // Look up method in parent class prototype
+        JSObject superPrototype = superClass.getPrototypeObject();
+        JSValue method = superPrototype.get(methodName);
+
+        return method != null ? method : JSUndefined.INSTANCE;
     }
 
     /**

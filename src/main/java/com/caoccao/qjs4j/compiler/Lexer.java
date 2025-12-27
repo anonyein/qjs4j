@@ -34,12 +34,6 @@ import java.util.Map;
  * - Template literals (basic support)
  */
 public final class Lexer {
-    private final String source;
-    private int position;
-    private int line;
-    private int column;
-    private Token lookahead;
-
     // Keyword mapping
     private static final Map<String, TokenType> KEYWORDS = new HashMap<>();
 
@@ -83,12 +77,56 @@ public final class Lexer {
         KEYWORDS.put("as", TokenType.AS);
     }
 
+    private final String source;
+    private int column;
+    private int line;
+    private Token lookahead;
+    private int position;
+
     public Lexer(String source) {
         this.source = source;
         this.position = 0;
         this.line = 1;
         this.column = 1;
         this.lookahead = null;
+    }
+
+    private char advance() {
+        char c = source.charAt(position);
+        position++;
+        column++;
+        return c;
+    }
+
+    private boolean isAtEnd() {
+        return position >= source.length();
+    }
+
+    private boolean isHexDigit(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    }
+
+    // Core scanning logic
+
+    private boolean isIdentifierPart(char c) {
+        return Character.isLetterOrDigit(c) || c == '_' || c == '$' ||
+                UnicodeData.isIdentifierPart(c);
+    }
+
+    private boolean isIdentifierStart(char c) {
+        return Character.isLetter(c) || c == '_' || c == '$' ||
+                UnicodeData.isIdentifierStart(c);
+    }
+
+    private Token makeToken(TokenType type, String value) {
+        return new Token(type, value, line, column, position);
+    }
+
+    private boolean match(char expected) {
+        if (isAtEnd()) return false;
+        if (source.charAt(position) != expected) return false;
+        advance();
+        return true;
     }
 
     /**
@@ -101,6 +139,11 @@ public final class Lexer {
             return token;
         }
         return scanToken();
+    }
+
+    private char peek() {
+        if (isAtEnd()) return '\0';
+        return source.charAt(position);
     }
 
     /**
@@ -123,43 +166,22 @@ public final class Lexer {
         lookahead = null;
     }
 
-    // Core scanning logic
-
-    private Token scanToken() {
-        skipWhitespaceAndComments();
-
-        if (isAtEnd()) {
-            return makeToken(TokenType.EOF, "");
+    private Token scanBinaryNumber(int startPos, int startLine, int startColumn) {
+        while (!isAtEnd() && (peek() == '0' || peek() == '1')) {
+            advance();
         }
+        String value = source.substring(startPos, position);
+        return new Token(TokenType.NUMBER, value, startLine, startColumn, startPos);
+    }
 
-        int startPos = position;
-        int startLine = line;
-        int startColumn = column;
+    // Character utilities
 
-        char c = advance();
-
-        // Identifiers and keywords
-        if (isIdentifierStart(c)) {
-            return scanIdentifier(startPos, startLine, startColumn);
+    private Token scanHexNumber(int startPos, int startLine, int startColumn) {
+        while (!isAtEnd() && isHexDigit(peek())) {
+            advance();
         }
-
-        // Numbers
-        if (Character.isDigit(c)) {
-            return scanNumber(startPos, startLine, startColumn);
-        }
-
-        // Strings
-        if (c == '"' || c == '\'') {
-            return scanString(c, startPos, startLine, startColumn);
-        }
-
-        // Template literals
-        if (c == '`') {
-            return scanTemplate(startPos, startLine, startColumn);
-        }
-
-        // Operators and punctuation
-        return scanOperatorOrPunctuation(c, startPos, startLine, startColumn);
+        String value = source.substring(startPos, position);
+        return new Token(TokenType.NUMBER, value, startLine, startColumn, startPos);
     }
 
     private Token scanIdentifier(int startPos, int startLine, int startColumn) {
@@ -220,130 +242,12 @@ public final class Lexer {
         return new Token(TokenType.NUMBER, value, startLine, startColumn, startPos);
     }
 
-    private Token scanHexNumber(int startPos, int startLine, int startColumn) {
-        while (!isAtEnd() && isHexDigit(peek())) {
-            advance();
-        }
-        String value = source.substring(startPos, position);
-        return new Token(TokenType.NUMBER, value, startLine, startColumn, startPos);
-    }
-
-    private Token scanBinaryNumber(int startPos, int startLine, int startColumn) {
-        while (!isAtEnd() && (peek() == '0' || peek() == '1')) {
-            advance();
-        }
-        String value = source.substring(startPos, position);
-        return new Token(TokenType.NUMBER, value, startLine, startColumn, startPos);
-    }
-
     private Token scanOctalNumber(int startPos, int startLine, int startColumn) {
         while (!isAtEnd() && peek() >= '0' && peek() <= '7') {
             advance();
         }
         String value = source.substring(startPos, position);
         return new Token(TokenType.NUMBER, value, startLine, startColumn, startPos);
-    }
-
-    private Token scanString(char quote, int startPos, int startLine, int startColumn) {
-        StringBuilder value = new StringBuilder();
-
-        while (!isAtEnd() && peek() != quote) {
-            if (peek() == '\n') {
-                // Unterminated string
-                break;
-            }
-
-            if (peek() == '\\') {
-                advance(); // consume backslash
-                if (!isAtEnd()) {
-                    char escaped = advance();
-                    switch (escaped) {
-                        case 'n' -> value.append('\n');
-                        case 't' -> value.append('\t');
-                        case 'r' -> value.append('\r');
-                        case '\\' -> value.append('\\');
-                        case '\'' -> value.append('\'');
-                        case '"' -> value.append('"');
-                        case 'b' -> value.append('\b');
-                        case 'f' -> value.append('\f');
-                        case 'v' -> value.append('\u000B');
-                        case '0' -> value.append('\0');
-                        case 'x' -> {
-                            // Hex escape \xHH
-                            if (position + 1 < source.length()) {
-                                String hex = source.substring(position, position + 2);
-                                try {
-                                    value.append((char) Integer.parseInt(hex, 16));
-                                    position += 2;
-                                    column += 2;
-                                } catch (NumberFormatException e) {
-                                    value.append('x');
-                                }
-                            }
-                        }
-                        case 'u' -> {
-                            // Unicode escape: u+HHHH or u+{...}
-                            if (!isAtEnd() && peek() == '{') {
-                                advance(); // consume '{'
-                                StringBuilder codePoint = new StringBuilder();
-                                while (!isAtEnd() && peek() != '}') {
-                                    codePoint.append(advance());
-                                }
-                                if (!isAtEnd()) advance(); // consume '}'
-                                try {
-                                    int cp = Integer.parseInt(codePoint.toString(), 16);
-                                    value.appendCodePoint(cp);
-                                } catch (NumberFormatException e) {
-                                    value.append("u{").append(codePoint).append("}");
-                                }
-                            } else if (position + 3 < source.length()) {
-                                String hex = source.substring(position, position + 4);
-                                try {
-                                    value.append((char) Integer.parseInt(hex, 16));
-                                    position += 4;
-                                    column += 4;
-                                } catch (NumberFormatException e) {
-                                    value.append('u');
-                                }
-                            }
-                        }
-                        default -> value.append(escaped);
-                    }
-                }
-            } else {
-                value.append(advance());
-            }
-        }
-
-        if (!isAtEnd() && peek() == quote) {
-            advance(); // consume closing quote
-        }
-
-        return new Token(TokenType.STRING, value.toString(), startLine, startColumn, startPos);
-    }
-
-    private Token scanTemplate(int startPos, int startLine, int startColumn) {
-        StringBuilder value = new StringBuilder();
-
-        while (!isAtEnd() && peek() != '`') {
-            if (peek() == '\\') {
-                advance();
-                if (!isAtEnd()) {
-                    value.append(advance());
-                }
-            } else if (peek() == '$' && position + 1 < source.length() && source.charAt(position + 1) == '{') {
-                // Template interpolation - for now, just include it
-                value.append(advance());
-            } else {
-                value.append(advance());
-            }
-        }
-
-        if (!isAtEnd()) {
-            advance(); // consume closing backtick
-        }
-
-        return new Token(TokenType.TEMPLATE, value.toString(), startLine, startColumn, startPos);
     }
 
     private Token scanOperatorOrPunctuation(char c, int startPos, int startLine, int startColumn) {
@@ -475,7 +379,144 @@ public final class Lexer {
         return new Token(type, value, startLine, startColumn, startPos);
     }
 
-    // Character utilities
+    private Token scanString(char quote, int startPos, int startLine, int startColumn) {
+        StringBuilder value = new StringBuilder();
+
+        while (!isAtEnd() && peek() != quote) {
+            if (peek() == '\n') {
+                // Unterminated string
+                break;
+            }
+
+            if (peek() == '\\') {
+                advance(); // consume backslash
+                if (!isAtEnd()) {
+                    char escaped = advance();
+                    switch (escaped) {
+                        case 'n' -> value.append('\n');
+                        case 't' -> value.append('\t');
+                        case 'r' -> value.append('\r');
+                        case '\\' -> value.append('\\');
+                        case '\'' -> value.append('\'');
+                        case '"' -> value.append('"');
+                        case 'b' -> value.append('\b');
+                        case 'f' -> value.append('\f');
+                        case 'v' -> value.append('\u000B');
+                        case '0' -> value.append('\0');
+                        case 'x' -> {
+                            // Hex escape \xHH
+                            if (position + 1 < source.length()) {
+                                String hex = source.substring(position, position + 2);
+                                try {
+                                    value.append((char) Integer.parseInt(hex, 16));
+                                    position += 2;
+                                    column += 2;
+                                } catch (NumberFormatException e) {
+                                    value.append('x');
+                                }
+                            }
+                        }
+                        case 'u' -> {
+                            // Unicode escape: u+HHHH or u+{...}
+                            if (!isAtEnd() && peek() == '{') {
+                                advance(); // consume '{'
+                                StringBuilder codePoint = new StringBuilder();
+                                while (!isAtEnd() && peek() != '}') {
+                                    codePoint.append(advance());
+                                }
+                                if (!isAtEnd()) advance(); // consume '}'
+                                try {
+                                    int cp = Integer.parseInt(codePoint.toString(), 16);
+                                    value.appendCodePoint(cp);
+                                } catch (NumberFormatException e) {
+                                    value.append("u{").append(codePoint).append("}");
+                                }
+                            } else if (position + 3 < source.length()) {
+                                String hex = source.substring(position, position + 4);
+                                try {
+                                    value.append((char) Integer.parseInt(hex, 16));
+                                    position += 4;
+                                    column += 4;
+                                } catch (NumberFormatException e) {
+                                    value.append('u');
+                                }
+                            }
+                        }
+                        default -> value.append(escaped);
+                    }
+                }
+            } else {
+                value.append(advance());
+            }
+        }
+
+        if (!isAtEnd() && peek() == quote) {
+            advance(); // consume closing quote
+        }
+
+        return new Token(TokenType.STRING, value.toString(), startLine, startColumn, startPos);
+    }
+
+    private Token scanTemplate(int startPos, int startLine, int startColumn) {
+        StringBuilder value = new StringBuilder();
+
+        while (!isAtEnd() && peek() != '`') {
+            if (peek() == '\\') {
+                advance();
+                if (!isAtEnd()) {
+                    value.append(advance());
+                }
+            } else if (peek() == '$' && position + 1 < source.length() && source.charAt(position + 1) == '{') {
+                // Template interpolation - for now, just include it
+                value.append(advance());
+            } else {
+                value.append(advance());
+            }
+        }
+
+        if (!isAtEnd()) {
+            advance(); // consume closing backtick
+        }
+
+        return new Token(TokenType.TEMPLATE, value.toString(), startLine, startColumn, startPos);
+    }
+
+    private Token scanToken() {
+        skipWhitespaceAndComments();
+
+        if (isAtEnd()) {
+            return makeToken(TokenType.EOF, "");
+        }
+
+        int startPos = position;
+        int startLine = line;
+        int startColumn = column;
+
+        char c = advance();
+
+        // Identifiers and keywords
+        if (isIdentifierStart(c)) {
+            return scanIdentifier(startPos, startLine, startColumn);
+        }
+
+        // Numbers
+        if (Character.isDigit(c)) {
+            return scanNumber(startPos, startLine, startColumn);
+        }
+
+        // Strings
+        if (c == '"' || c == '\'') {
+            return scanString(c, startPos, startLine, startColumn);
+        }
+
+        // Template literals
+        if (c == '`') {
+            return scanTemplate(startPos, startLine, startColumn);
+        }
+
+        // Operators and punctuation
+        return scanOperatorOrPunctuation(c, startPos, startLine, startColumn);
+    }
 
     private void skipWhitespaceAndComments() {
         while (!isAtEnd()) {
@@ -534,46 +575,5 @@ public final class Lexer {
 
             break;
         }
-    }
-
-    private boolean isIdentifierStart(char c) {
-        return Character.isLetter(c) || c == '_' || c == '$' ||
-                UnicodeData.isIdentifierStart(c);
-    }
-
-    private boolean isIdentifierPart(char c) {
-        return Character.isLetterOrDigit(c) || c == '_' || c == '$' ||
-                UnicodeData.isIdentifierPart(c);
-    }
-
-    private boolean isHexDigit(char c) {
-        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-    }
-
-    private char peek() {
-        if (isAtEnd()) return '\0';
-        return source.charAt(position);
-    }
-
-    private char advance() {
-        char c = source.charAt(position);
-        position++;
-        column++;
-        return c;
-    }
-
-    private boolean match(char expected) {
-        if (isAtEnd()) return false;
-        if (source.charAt(position) != expected) return false;
-        advance();
-        return true;
-    }
-
-    private boolean isAtEnd() {
-        return position >= source.length();
-    }
-
-    private Token makeToken(TokenType type, String value) {
-        return new Token(type, value, line, column, position);
     }
 }

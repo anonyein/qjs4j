@@ -28,74 +28,12 @@ public class JSIterator extends JSObject {
     private boolean exhausted;
 
     /**
-     * Functional interface for iterator logic.
-     */
-    @FunctionalInterface
-    public interface IteratorFunction {
-        /**
-         * Get the next iteration result.
-         *
-         * @return IteratorResult with value and done status
-         */
-        IteratorResult next();
-    }
-
-    /**
-     * Represents an iterator result: { value: any, done: boolean }
-     */
-    public static class IteratorResult {
-        public final JSValue value;
-        public final boolean done;
-
-        public IteratorResult(JSValue value, boolean done) {
-            this.value = value;
-            this.done = done;
-        }
-
-        public static IteratorResult of(JSValue value) {
-            return new IteratorResult(value, false);
-        }
-
-        public static IteratorResult done() {
-            return new IteratorResult(JSUndefined.INSTANCE, true);
-        }
-
-        public JSObject toObject() {
-            JSObject obj = new JSObject();
-            obj.set("value", value);
-            obj.set("done", JSBoolean.valueOf(done));
-            return obj;
-        }
-    }
-
-    /**
      * Create an iterator with the given iteration logic.
      */
     public JSIterator(IteratorFunction iteratorFunction) {
         super();
         this.iteratorFunction = iteratorFunction;
         this.exhausted = false;
-    }
-
-    /**
-     * Get the next value in the iteration.
-     * Returns an object with 'value' and 'done' properties.
-     */
-    public JSObject next() {
-        if (exhausted) {
-            return IteratorResult.done().toObject();
-        }
-
-        IteratorResult result = iteratorFunction.next();
-        if (result.done) {
-            exhausted = true;
-        }
-        return result.toObject();
-    }
-
-    @Override
-    public String toString() {
-        return "[object Iterator]";
     }
 
     /**
@@ -187,5 +125,67 @@ public class JSIterator extends JSObject {
             }
             return IteratorResult.done();
         });
+    }
+
+    /**
+     * Get the next value in the iteration.
+     * Returns an object with 'value' and 'done' properties.
+     */
+    public JSObject next() {
+        if (exhausted) {
+            return IteratorResult.done().toObject();
+        }
+
+        IteratorResult result = iteratorFunction.next();
+        if (result.done) {
+            exhausted = true;
+        }
+        return result.toObject();
+    }
+
+    @Override
+    public String toString() {
+        return "[object Iterator]";
+    }
+
+    /**
+     * Functional interface for iterator logic.
+     */
+    @FunctionalInterface
+    public interface IteratorFunction {
+        /**
+         * Get the next iteration result.
+         *
+         * @return IteratorResult with value and done status
+         */
+        IteratorResult next();
+    }
+
+    /**
+     * Represents an iterator result: { value: any, done: boolean }
+     */
+    public static class IteratorResult {
+        public final boolean done;
+        public final JSValue value;
+
+        public IteratorResult(JSValue value, boolean done) {
+            this.value = value;
+            this.done = done;
+        }
+
+        public static IteratorResult done() {
+            return new IteratorResult(JSUndefined.INSTANCE, true);
+        }
+
+        public static IteratorResult of(JSValue value) {
+            return new IteratorResult(value, false);
+        }
+
+        public JSObject toObject() {
+            JSObject obj = new JSObject();
+            obj.set("value", value);
+            obj.set("done", JSBoolean.valueOf(done));
+            return obj;
+        }
     }
 }

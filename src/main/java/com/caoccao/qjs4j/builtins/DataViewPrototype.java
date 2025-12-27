@@ -54,55 +54,29 @@ public final class DataViewPrototype {
         return new JSNumber(dataView.getByteOffset());
     }
 
-    // Int8 methods
-    public static JSValue getInt8(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    // Float32 methods
+    public static JSValue getFloat32(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSDataView dataView)) {
-            return ctx.throwError("TypeError", "DataView.prototype.getInt8 called on non-DataView");
+            return ctx.throwError("TypeError", "DataView.prototype.getFloat32 called on non-DataView");
         }
         int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
+        boolean littleEndian = args.length > 1 && JSTypeConversions.toBoolean(args[1]) == JSBoolean.TRUE;
         try {
-            return new JSNumber(dataView.getInt8(byteOffset));
+            return new JSNumber(dataView.getFloat32(byteOffset, littleEndian));
         } catch (Exception e) {
             return ctx.throwError("RangeError", e.getMessage());
         }
     }
 
-    public static JSValue setInt8(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    // Float64 methods
+    public static JSValue getFloat64(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSDataView dataView)) {
-            return ctx.throwError("TypeError", "DataView.prototype.setInt8 called on non-DataView");
+            return ctx.throwError("TypeError", "DataView.prototype.getFloat64 called on non-DataView");
         }
         int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
-        byte value = args.length > 1 ? (byte) JSTypeConversions.toInt32(args[1]) : 0;
+        boolean littleEndian = args.length > 1 && JSTypeConversions.toBoolean(args[1]) == JSBoolean.TRUE;
         try {
-            dataView.setInt8(byteOffset, value);
-            return JSUndefined.INSTANCE;
-        } catch (Exception e) {
-            return ctx.throwError("RangeError", e.getMessage());
-        }
-    }
-
-    // Uint8 methods
-    public static JSValue getUint8(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSDataView dataView)) {
-            return ctx.throwError("TypeError", "DataView.prototype.getUint8 called on non-DataView");
-        }
-        int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
-        try {
-            return new JSNumber(dataView.getUint8(byteOffset));
-        } catch (Exception e) {
-            return ctx.throwError("RangeError", e.getMessage());
-        }
-    }
-
-    public static JSValue setUint8(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSDataView dataView)) {
-            return ctx.throwError("TypeError", "DataView.prototype.setUint8 called on non-DataView");
-        }
-        int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
-        int value = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : 0;
-        try {
-            dataView.setUint8(byteOffset, value);
-            return JSUndefined.INSTANCE;
+            return new JSNumber(dataView.getFloat64(byteOffset, littleEndian));
         } catch (Exception e) {
             return ctx.throwError("RangeError", e.getMessage());
         }
@@ -122,21 +96,6 @@ public final class DataViewPrototype {
         }
     }
 
-    public static JSValue setInt16(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSDataView dataView)) {
-            return ctx.throwError("TypeError", "DataView.prototype.setInt16 called on non-DataView");
-        }
-        int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
-        short value = args.length > 1 ? (short) JSTypeConversions.toInt32(args[1]) : 0;
-        boolean littleEndian = args.length > 2 && JSTypeConversions.toBoolean(args[2]) == JSBoolean.TRUE;
-        try {
-            dataView.setInt16(byteOffset, value, littleEndian);
-            return JSUndefined.INSTANCE;
-        } catch (Exception e) {
-            return ctx.throwError("RangeError", e.getMessage());
-        }
-    }
-
     // Int32 methods
     public static JSValue getInt32(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSDataView dataView)) {
@@ -151,30 +110,27 @@ public final class DataViewPrototype {
         }
     }
 
-    public static JSValue setInt32(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    // Int8 methods
+    public static JSValue getInt8(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSDataView dataView)) {
-            return ctx.throwError("TypeError", "DataView.prototype.setInt32 called on non-DataView");
+            return ctx.throwError("TypeError", "DataView.prototype.getInt8 called on non-DataView");
         }
         int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
-        int value = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : 0;
-        boolean littleEndian = args.length > 2 && JSTypeConversions.toBoolean(args[2]) == JSBoolean.TRUE;
         try {
-            dataView.setInt32(byteOffset, value, littleEndian);
-            return JSUndefined.INSTANCE;
+            return new JSNumber(dataView.getInt8(byteOffset));
         } catch (Exception e) {
             return ctx.throwError("RangeError", e.getMessage());
         }
     }
 
-    // Float32 methods
-    public static JSValue getFloat32(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    // Uint8 methods
+    public static JSValue getUint8(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSDataView dataView)) {
-            return ctx.throwError("TypeError", "DataView.prototype.getFloat32 called on non-DataView");
+            return ctx.throwError("TypeError", "DataView.prototype.getUint8 called on non-DataView");
         }
         int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
-        boolean littleEndian = args.length > 1 && JSTypeConversions.toBoolean(args[1]) == JSBoolean.TRUE;
         try {
-            return new JSNumber(dataView.getFloat32(byteOffset, littleEndian));
+            return new JSNumber(dataView.getUint8(byteOffset));
         } catch (Exception e) {
             return ctx.throwError("RangeError", e.getMessage());
         }
@@ -195,20 +151,6 @@ public final class DataViewPrototype {
         }
     }
 
-    // Float64 methods
-    public static JSValue getFloat64(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSDataView dataView)) {
-            return ctx.throwError("TypeError", "DataView.prototype.getFloat64 called on non-DataView");
-        }
-        int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
-        boolean littleEndian = args.length > 1 && JSTypeConversions.toBoolean(args[1]) == JSBoolean.TRUE;
-        try {
-            return new JSNumber(dataView.getFloat64(byteOffset, littleEndian));
-        } catch (Exception e) {
-            return ctx.throwError("RangeError", e.getMessage());
-        }
-    }
-
     public static JSValue setFloat64(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSDataView dataView)) {
             return ctx.throwError("TypeError", "DataView.prototype.setFloat64 called on non-DataView");
@@ -218,6 +160,64 @@ public final class DataViewPrototype {
         boolean littleEndian = args.length > 2 && JSTypeConversions.toBoolean(args[2]) == JSBoolean.TRUE;
         try {
             dataView.setFloat64(byteOffset, value, littleEndian);
+            return JSUndefined.INSTANCE;
+        } catch (Exception e) {
+            return ctx.throwError("RangeError", e.getMessage());
+        }
+    }
+
+    public static JSValue setInt16(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSDataView dataView)) {
+            return ctx.throwError("TypeError", "DataView.prototype.setInt16 called on non-DataView");
+        }
+        int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
+        short value = args.length > 1 ? (short) JSTypeConversions.toInt32(args[1]) : 0;
+        boolean littleEndian = args.length > 2 && JSTypeConversions.toBoolean(args[2]) == JSBoolean.TRUE;
+        try {
+            dataView.setInt16(byteOffset, value, littleEndian);
+            return JSUndefined.INSTANCE;
+        } catch (Exception e) {
+            return ctx.throwError("RangeError", e.getMessage());
+        }
+    }
+
+    public static JSValue setInt32(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSDataView dataView)) {
+            return ctx.throwError("TypeError", "DataView.prototype.setInt32 called on non-DataView");
+        }
+        int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
+        int value = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : 0;
+        boolean littleEndian = args.length > 2 && JSTypeConversions.toBoolean(args[2]) == JSBoolean.TRUE;
+        try {
+            dataView.setInt32(byteOffset, value, littleEndian);
+            return JSUndefined.INSTANCE;
+        } catch (Exception e) {
+            return ctx.throwError("RangeError", e.getMessage());
+        }
+    }
+
+    public static JSValue setInt8(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSDataView dataView)) {
+            return ctx.throwError("TypeError", "DataView.prototype.setInt8 called on non-DataView");
+        }
+        int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
+        byte value = args.length > 1 ? (byte) JSTypeConversions.toInt32(args[1]) : 0;
+        try {
+            dataView.setInt8(byteOffset, value);
+            return JSUndefined.INSTANCE;
+        } catch (Exception e) {
+            return ctx.throwError("RangeError", e.getMessage());
+        }
+    }
+
+    public static JSValue setUint8(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSDataView dataView)) {
+            return ctx.throwError("TypeError", "DataView.prototype.setUint8 called on non-DataView");
+        }
+        int byteOffset = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 0;
+        int value = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : 0;
+        try {
+            dataView.setUint8(byteOffset, value);
             return JSUndefined.INSTANCE;
         } catch (Exception e) {
             return ctx.throwError("RangeError", e.getMessage());

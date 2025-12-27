@@ -28,21 +28,8 @@ import java.util.Iterator;
  * - Identified by Symbol.asyncIterator
  */
 public class JSAsyncIterator extends JSObject {
-    private final AsyncIteratorFunction iteratorFunction;
     private final JSContext context;
-
-    /**
-     * Functional interface for async iterator next() implementation.
-     */
-    @FunctionalInterface
-    public interface AsyncIteratorFunction {
-        /**
-         * Get the next value asynchronously.
-         *
-         * @return A promise that resolves to an IteratorResult
-         */
-        JSPromise next();
-    }
+    private final AsyncIteratorFunction iteratorFunction;
 
     /**
      * Create a new async iterator.
@@ -69,15 +56,6 @@ public class JSAsyncIterator extends JSObject {
     }
 
     /**
-     * Call the async iterator's next() method.
-     *
-     * @return A promise that resolves to {value, done}
-     */
-    public JSPromise next() {
-        return iteratorFunction.next();
-    }
-
-    /**
      * Create an IteratorResult object that resolves in a promise.
      *
      * @param value The iterator value
@@ -91,24 +69,6 @@ public class JSAsyncIterator extends JSObject {
         result.set("done", JSBoolean.valueOf(done));
         promise.fulfill(result);
         return promise;
-    }
-
-    /**
-     * Create an async iterator from a regular iterator.
-     * Each iteration returns a promise that immediately resolves.
-     *
-     * @param iterator The synchronous iterator
-     * @param ctx      The execution context
-     * @return An async iterator
-     */
-    public static JSAsyncIterator fromIterator(JSIterator iterator, JSContext ctx) {
-        return new JSAsyncIterator(() -> {
-            JSObject result = iterator.next();
-            JSValue value = result.get("value");
-            JSValue doneValue = result.get("done");
-            boolean done = doneValue instanceof JSBoolean && ((JSBoolean) doneValue).value();
-            return createIteratorResultPromise(value, done);
-        }, ctx);
     }
 
     /**
@@ -150,6 +110,24 @@ public class JSAsyncIterator extends JSObject {
             }
             JSValue value = javaIterator.next();
             return createIteratorResultPromise(value, false);
+        }, ctx);
+    }
+
+    /**
+     * Create an async iterator from a regular iterator.
+     * Each iteration returns a promise that immediately resolves.
+     *
+     * @param iterator The synchronous iterator
+     * @param ctx      The execution context
+     * @return An async iterator
+     */
+    public static JSAsyncIterator fromIterator(JSIterator iterator, JSContext ctx) {
+        return new JSAsyncIterator(() -> {
+            JSObject result = iterator.next();
+            JSValue value = result.get("value");
+            JSValue doneValue = result.get("done");
+            boolean done = doneValue instanceof JSBoolean && ((JSBoolean) doneValue).value();
+            return createIteratorResultPromise(value, done);
         }, ctx);
     }
 
@@ -203,8 +181,30 @@ public class JSAsyncIterator extends JSObject {
         }, ctx);
     }
 
+    /**
+     * Call the async iterator's next() method.
+     *
+     * @return A promise that resolves to {value, done}
+     */
+    public JSPromise next() {
+        return iteratorFunction.next();
+    }
+
     @Override
     public String toString() {
         return "[object AsyncIterator]";
+    }
+
+    /**
+     * Functional interface for async iterator next() implementation.
+     */
+    @FunctionalInterface
+    public interface AsyncIteratorFunction {
+        /**
+         * Get the next value asynchronously.
+         *
+         * @return A promise that resolves to an IteratorResult
+         */
+        JSPromise next();
     }
 }

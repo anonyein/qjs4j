@@ -25,10 +25,10 @@ import com.caoccao.qjs4j.regexp.RegExpEngine;
  * Wraps a compiled regular expression with flags.
  */
 public final class JSRegExp extends JSObject {
-    private final String pattern;
-    private final String flags;
     private final RegExpEngine engine;
+    private final String flags;
     private final int lastIndex = 0;
+    private final String pattern;
 
     /**
      * Create a RegExp with pattern and flags.
@@ -60,10 +60,10 @@ public final class JSRegExp extends JSObject {
     }
 
     /**
-     * Get the pattern string.
+     * Get the RegExp engine.
      */
-    public String getPattern() {
-        return pattern;
+    public RegExpEngine getEngine() {
+        return engine;
     }
 
     /**
@@ -71,13 +71,6 @@ public final class JSRegExp extends JSObject {
      */
     public String getFlags() {
         return flags;
-    }
-
-    /**
-     * Get the RegExp engine.
-     */
-    public RegExpEngine getEngine() {
-        return engine;
     }
 
     /**
@@ -92,10 +85,10 @@ public final class JSRegExp extends JSObject {
     }
 
     /**
-     * Set lastIndex property.
+     * Get the pattern string.
      */
-    public void setLastIndex(int index) {
-        set("lastIndex", new JSNumber(index));
+    public String getPattern() {
+        return pattern;
     }
 
     /**
@@ -103,6 +96,13 @@ public final class JSRegExp extends JSObject {
      */
     public boolean isGlobal() {
         return flags.contains("g");
+    }
+
+    /**
+     * Set lastIndex property.
+     */
+    public void setLastIndex(int index) {
+        set("lastIndex", new JSNumber(index));
     }
 
     @Override

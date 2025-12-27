@@ -413,6 +413,48 @@ public final class DtoaConverter {
     }
 
     /**
+     * Format a value in exponential notation.
+     */
+    private static String formatExponential(double value, int fractionDigits) {
+        if (value == 0.0) {
+            // Special case for zero
+            StringBuilder sb = new StringBuilder("0");
+            if (fractionDigits > 0) {
+                sb.append('.');
+                for (int i = 0; i < fractionDigits; i++) {
+                    sb.append('0');
+                }
+            }
+            sb.append("e+0");
+            return sb.toString();
+        }
+
+        // Use BigDecimal to preserve the exact binary representation of the double
+        // Note: Use new BigDecimal(value) instead of BigDecimal.valueOf(value)
+        // to preserve the exact binary representation, matching JavaScript behavior.
+        BigDecimal bd = new BigDecimal(value);
+
+        // Calculate the exponent
+        int exponent = bd.precision() - bd.scale() - 1;
+
+        // Shift to get mantissa with proper decimal places
+        BigDecimal mantissa = bd.scaleByPowerOfTen(-exponent);
+
+        // Round to the desired number of fraction digits
+        mantissa = mantissa.setScale(fractionDigits, RoundingMode.HALF_UP);
+
+        // Format the result - keep the exact precision as specified by fractionDigits
+        String mantissaStr = mantissa.toPlainString();
+
+        String result = mantissaStr +
+                'e' +
+                (exponent >= 0 ? '+' : "") +
+                exponent;
+
+        return result;
+    }
+
+    /**
      * Format a value in exponential notation for toPrecision.
      * fractionDigits is the number of digits after the decimal point in the mantissa.
      */
@@ -466,48 +508,6 @@ public final class DtoaConverter {
         }
 
         return negative ? "-" + str : str;
-    }
-
-    /**
-     * Format a value in exponential notation.
-     */
-    private static String formatExponential(double value, int fractionDigits) {
-        if (value == 0.0) {
-            // Special case for zero
-            StringBuilder sb = new StringBuilder("0");
-            if (fractionDigits > 0) {
-                sb.append('.');
-                for (int i = 0; i < fractionDigits; i++) {
-                    sb.append('0');
-                }
-            }
-            sb.append("e+0");
-            return sb.toString();
-        }
-
-        // Use BigDecimal to preserve the exact binary representation of the double
-        // Note: Use new BigDecimal(value) instead of BigDecimal.valueOf(value)
-        // to preserve the exact binary representation, matching JavaScript behavior.
-        BigDecimal bd = new BigDecimal(value);
-
-        // Calculate the exponent
-        int exponent = bd.precision() - bd.scale() - 1;
-
-        // Shift to get mantissa with proper decimal places
-        BigDecimal mantissa = bd.scaleByPowerOfTen(-exponent);
-
-        // Round to the desired number of fraction digits
-        mantissa = mantissa.setScale(fractionDigits, RoundingMode.HALF_UP);
-
-        // Format the result - keep the exact precision as specified by fractionDigits
-        String mantissaStr = mantissa.toPlainString();
-
-        String result = mantissaStr +
-                'e' +
-                (exponent >= 0 ? '+' : "") +
-                exponent;
-
-        return result;
     }
 
     /**

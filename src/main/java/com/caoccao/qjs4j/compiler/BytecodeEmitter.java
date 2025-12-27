@@ -32,11 +32,11 @@ import java.util.Map;
  * Handles encoding of opcodes, operands, and manages constant/atom pools.
  */
 public final class BytecodeEmitter {
-    private final ByteArrayOutputStream code;
-    private final List<JSValue> constantPool;
-    private final AtomTable atoms;
-    private final Map<JSValue, Integer> constantIndexCache;
     private final List<String> atomPool;
+    private final AtomTable atoms;
+    private final ByteArrayOutputStream code;
+    private final Map<JSValue, Integer> constantIndexCache;
+    private final List<JSValue> constantPool;
 
     public BytecodeEmitter() {
         this.code = new ByteArrayOutputStream();
@@ -47,42 +47,21 @@ public final class BytecodeEmitter {
     }
 
     /**
-     * Emit a single opcode.
+     * Build the final Bytecode object.
      */
-    public void emitOpcode(Opcode op) {
-        code.write(op.getCode());
+    public Bytecode build() {
+        byte[] instructions = code.toByteArray();
+        JSValue[] constants = constantPool.toArray(new JSValue[0]);
+        String[] atoms = atomPool.toArray(new String[0]);
+
+        return new Bytecode(instructions, constants, atoms);
     }
 
     /**
-     * Emit an unsigned 8-bit value.
+     * Get the current bytecode offset.
      */
-    public void emitU8(int value) {
-        code.write(value & 0xFF);
-    }
-
-    /**
-     * Emit an unsigned 16-bit value (big-endian).
-     */
-    public void emitU16(int value) {
-        code.write((value >> 8) & 0xFF);
-        code.write(value & 0xFF);
-    }
-
-    /**
-     * Emit an unsigned 32-bit value (big-endian).
-     */
-    public void emitU32(int value) {
-        code.write((value >> 24) & 0xFF);
-        code.write((value >> 16) & 0xFF);
-        code.write((value >> 8) & 0xFF);
-        code.write(value & 0xFF);
-    }
-
-    /**
-     * Emit a signed 32-bit integer value.
-     */
-    public void emitI32(int value) {
-        emitU32(value);
+    public int currentOffset() {
+        return code.size();
     }
 
     /**
@@ -118,10 +97,10 @@ public final class BytecodeEmitter {
     }
 
     /**
-     * Get the current bytecode offset.
+     * Emit a signed 32-bit integer value.
      */
-    public int currentOffset() {
-        return code.size();
+    public void emitI32(int value) {
+        emitU32(value);
     }
 
     /**
@@ -135,20 +114,10 @@ public final class BytecodeEmitter {
     }
 
     /**
-     * Patch a previously emitted jump instruction with the target offset.
+     * Emit a single opcode.
      */
-    public void patchJump(int offset, int target) {
-        byte[] bytes = code.toByteArray();
-        int jumpDistance = target - (offset + 4);
-
-        bytes[offset] = (byte) ((jumpDistance >> 24) & 0xFF);
-        bytes[offset + 1] = (byte) ((jumpDistance >> 16) & 0xFF);
-        bytes[offset + 2] = (byte) ((jumpDistance >> 8) & 0xFF);
-        bytes[offset + 3] = (byte) (jumpDistance & 0xFF);
-
-        // Reset stream with patched bytes
-        code.reset();
-        code.write(bytes, 0, bytes.length);
+    public void emitOpcode(Opcode op) {
+        code.write(op.getCode());
     }
 
     /**
@@ -168,14 +137,6 @@ public final class BytecodeEmitter {
     }
 
     /**
-     * Emit an opcode with a u8 operand.
-     */
-    public void emitOpcodeU8(Opcode op, int value) {
-        emitOpcode(op);
-        emitU8(value);
-    }
-
-    /**
      * Emit an opcode with a u16 operand.
      */
     public void emitOpcodeU16(Opcode op, int value) {
@@ -192,21 +153,36 @@ public final class BytecodeEmitter {
     }
 
     /**
-     * Build the final Bytecode object.
+     * Emit an opcode with a u8 operand.
      */
-    public Bytecode build() {
-        byte[] instructions = code.toByteArray();
-        JSValue[] constants = constantPool.toArray(new JSValue[0]);
-        String[] atoms = atomPool.toArray(new String[0]);
-
-        return new Bytecode(instructions, constants, atoms);
+    public void emitOpcodeU8(Opcode op, int value) {
+        emitOpcode(op);
+        emitU8(value);
     }
 
     /**
-     * Get the constant pool.
+     * Emit an unsigned 16-bit value (big-endian).
      */
-    public List<JSValue> getConstantPool() {
-        return constantPool;
+    public void emitU16(int value) {
+        code.write((value >> 8) & 0xFF);
+        code.write(value & 0xFF);
+    }
+
+    /**
+     * Emit an unsigned 32-bit value (big-endian).
+     */
+    public void emitU32(int value) {
+        code.write((value >> 24) & 0xFF);
+        code.write((value >> 16) & 0xFF);
+        code.write((value >> 8) & 0xFF);
+        code.write(value & 0xFF);
+    }
+
+    /**
+     * Emit an unsigned 8-bit value.
+     */
+    public void emitU8(int value) {
+        code.write(value & 0xFF);
     }
 
     /**
@@ -228,5 +204,29 @@ public final class BytecodeEmitter {
      */
     public int getCodeSize() {
         return code.size();
+    }
+
+    /**
+     * Get the constant pool.
+     */
+    public List<JSValue> getConstantPool() {
+        return constantPool;
+    }
+
+    /**
+     * Patch a previously emitted jump instruction with the target offset.
+     */
+    public void patchJump(int offset, int target) {
+        byte[] bytes = code.toByteArray();
+        int jumpDistance = target - (offset + 4);
+
+        bytes[offset] = (byte) ((jumpDistance >> 24) & 0xFF);
+        bytes[offset + 1] = (byte) ((jumpDistance >> 16) & 0xFF);
+        bytes[offset + 2] = (byte) ((jumpDistance >> 8) & 0xFF);
+        bytes[offset + 3] = (byte) (jumpDistance & 0xFF);
+
+        // Reset stream with patched bytes
+        code.reset();
+        code.write(bytes, 0, bytes.length);
     }
 }

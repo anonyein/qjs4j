@@ -33,9 +33,9 @@ import java.util.Map;
  * Handles module resolution, loading, and caching.
  */
 public final class ModuleLoader implements JSModule.ModuleResolver {
+    private final Path basePath;
     private final JSContext context;
     private final Map<String, JSModule> moduleCache;
-    private final Path basePath;
 
     /**
      * Create a module loader.
@@ -54,6 +54,45 @@ public final class ModuleLoader implements JSModule.ModuleResolver {
      */
     public ModuleLoader(JSContext context) {
         this(context, null);
+    }
+
+    /**
+     * Clear the module cache.
+     */
+    public void clearCache() {
+        moduleCache.clear();
+    }
+
+    /**
+     * Evaluate a loaded module.
+     *
+     * @param module The module to evaluate
+     * @return The evaluation result
+     * @throws JSModule.ModuleEvaluationException if evaluation fails
+     */
+    public JSValue evaluate(JSModule module) throws JSModule.ModuleEvaluationException {
+        return module.evaluate(context);
+    }
+
+    /**
+     * Get the module cache.
+     */
+    public Map<String, JSModule> getCache() {
+        return moduleCache;
+    }
+
+    /**
+     * Load and evaluate a module in one step.
+     *
+     * @param specifier Module specifier
+     * @return The module namespace object
+     * @throws JSModule.ModuleLinkingException    if loading or linking fails
+     * @throws JSModule.ModuleEvaluationException if evaluation fails
+     */
+    public JSObject import_(String specifier) throws JSModule.ModuleLinkingException, JSModule.ModuleEvaluationException {
+        JSModule module = load(specifier);
+        evaluate(module);
+        return module.getNamespace();
     }
 
     /**
@@ -112,6 +151,34 @@ public final class ModuleLoader implements JSModule.ModuleResolver {
     }
 
     /**
+     * Resolve a module specifier from a referrer module.
+     * Implements JSModule.ModuleResolver interface.
+     */
+    @Override
+    public JSModule resolve(String specifier, JSModule referrer) {
+        try {
+            // If referrer exists, resolve relative to its location
+            if (referrer != null) {
+                String referrerUrl = referrer.getUrl();
+                Path referrerPath = Paths.get(referrerUrl).getParent();
+
+                // Create a temporary loader with the referrer's directory as base
+                ModuleLoader referrerLoader = new ModuleLoader(context, referrerPath);
+                referrerLoader.moduleCache.putAll(this.moduleCache); // Share cache
+
+                return referrerLoader.load(specifier);
+            } else {
+                // No referrer, resolve from base path
+                return load(specifier);
+            }
+        } catch (Exception e) {
+            // Return null to indicate resolution failure
+            // The caller will handle the error
+            return null;
+        }
+    }
+
+    /**
      * Resolve a module specifier to an absolute path.
      * ES2020 module resolution algorithm.
      */
@@ -153,72 +220,5 @@ public final class ModuleLoader implements JSModule.ModuleResolver {
         // In a full implementation, this would search node_modules
         // For now, just throw an error
         throw new JSModule.ModuleLinkingException("Bare module specifiers not yet supported: " + specifier);
-    }
-
-    /**
-     * Resolve a module specifier from a referrer module.
-     * Implements JSModule.ModuleResolver interface.
-     */
-    @Override
-    public JSModule resolve(String specifier, JSModule referrer) {
-        try {
-            // If referrer exists, resolve relative to its location
-            if (referrer != null) {
-                String referrerUrl = referrer.getUrl();
-                Path referrerPath = Paths.get(referrerUrl).getParent();
-
-                // Create a temporary loader with the referrer's directory as base
-                ModuleLoader referrerLoader = new ModuleLoader(context, referrerPath);
-                referrerLoader.moduleCache.putAll(this.moduleCache); // Share cache
-
-                return referrerLoader.load(specifier);
-            } else {
-                // No referrer, resolve from base path
-                return load(specifier);
-            }
-        } catch (Exception e) {
-            // Return null to indicate resolution failure
-            // The caller will handle the error
-            return null;
-        }
-    }
-
-    /**
-     * Evaluate a loaded module.
-     *
-     * @param module The module to evaluate
-     * @return The evaluation result
-     * @throws JSModule.ModuleEvaluationException if evaluation fails
-     */
-    public JSValue evaluate(JSModule module) throws JSModule.ModuleEvaluationException {
-        return module.evaluate(context);
-    }
-
-    /**
-     * Load and evaluate a module in one step.
-     *
-     * @param specifier Module specifier
-     * @return The module namespace object
-     * @throws JSModule.ModuleLinkingException    if loading or linking fails
-     * @throws JSModule.ModuleEvaluationException if evaluation fails
-     */
-    public JSObject import_(String specifier) throws JSModule.ModuleLinkingException, JSModule.ModuleEvaluationException {
-        JSModule module = load(specifier);
-        evaluate(module);
-        return module.getNamespace();
-    }
-
-    /**
-     * Get the module cache.
-     */
-    public Map<String, JSModule> getCache() {
-        return moduleCache;
-    }
-
-    /**
-     * Clear the module cache.
-     */
-    public void clearCache() {
-        moduleCache.clear();
     }
 }

@@ -38,12 +38,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class JSShape {
     private static final JSShape ROOT = new JSShape();
-
-    private final PropertyKey[] propertyKeys;
     private final PropertyDescriptor[] descriptors;
     private final JSShape parent;
     private final int propertyCount;
-
+    private final PropertyKey[] propertyKeys;
     // Transition map: property key -> child shape
     // Used to find or create child shapes when properties are added
     private final Map<TransitionKey, JSShape> transitions;
@@ -103,16 +101,16 @@ public final class JSShape {
     }
 
     /**
-     * Get the offset of a property in the property array.
-     * Returns -1 if property not found.
+     * Get the depth of this shape in the transition tree.
      */
-    public int getPropertyOffset(PropertyKey key) {
-        for (int i = 0; i < propertyCount; i++) {
-            if (propertyKeys[i].equals(key)) {
-                return i;
-            }
+    public int getDepth() {
+        int depth = 0;
+        JSShape current = this;
+        while (current.parent != null) {
+            depth++;
+            current = current.parent;
         }
-        return -1;
+        return depth;
     }
 
     /**
@@ -132,31 +130,10 @@ public final class JSShape {
     }
 
     /**
-     * Check if this shape has a property.
-     */
-    public boolean hasProperty(PropertyKey key) {
-        return getPropertyOffset(key) >= 0;
-    }
-
-    /**
-     * Get all property keys in this shape.
-     */
-    public PropertyKey[] getPropertyKeys() {
-        return Arrays.copyOf(propertyKeys, propertyCount);
-    }
-
-    /**
      * Get all property descriptors in this shape.
      */
     public PropertyDescriptor[] getDescriptors() {
         return Arrays.copyOf(descriptors, propertyCount);
-    }
-
-    /**
-     * Get the number of properties in this shape.
-     */
-    public int getPropertyCount() {
-        return propertyCount;
     }
 
     /**
@@ -167,23 +144,44 @@ public final class JSShape {
     }
 
     /**
+     * Get the number of properties in this shape.
+     */
+    public int getPropertyCount() {
+        return propertyCount;
+    }
+
+    /**
+     * Get all property keys in this shape.
+     */
+    public PropertyKey[] getPropertyKeys() {
+        return Arrays.copyOf(propertyKeys, propertyCount);
+    }
+
+    /**
+     * Get the offset of a property in the property array.
+     * Returns -1 if property not found.
+     */
+    public int getPropertyOffset(PropertyKey key) {
+        for (int i = 0; i < propertyCount; i++) {
+            if (propertyKeys[i].equals(key)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Check if this shape has a property.
+     */
+    public boolean hasProperty(PropertyKey key) {
+        return getPropertyOffset(key) >= 0;
+    }
+
+    /**
      * Check if this is the root shape.
      */
     public boolean isRoot() {
         return parent == null;
-    }
-
-    /**
-     * Get the depth of this shape in the transition tree.
-     */
-    public int getDepth() {
-        int depth = 0;
-        JSShape current = this;
-        while (current.parent != null) {
-            depth++;
-            current = current.parent;
-        }
-        return depth;
     }
 
     @Override
@@ -200,28 +198,26 @@ public final class JSShape {
     }
 
     /**
-         * Key for shape transitions.
-         * Combines property key and descriptor attributes to determine
-         * if two property additions should share a shape.
-         */
-        private record TransitionKey(PropertyKey propertyKey, int descriptorFlags) {
-            private TransitionKey(PropertyKey propertyKey, PropertyDescriptor descriptorFlags) {
-                this.propertyKey = propertyKey;
-                // Only care about enumerable/configurable for transitions
-                // (writable and value don't affect shape)
-                this.descriptorFlags =
-                        (descriptorFlags.isEnumerable() ? 1 : 0) |
-                                (descriptorFlags.isConfigurable() ? 2 : 0) |
-                                (descriptorFlags.isDataDescriptor() ? 4 : 0) |
-                                (descriptorFlags.isAccessorDescriptor() ? 8 : 0);
-            }
+     * Key for shape transitions.
+     * Combines property key and descriptor attributes to determine
+     * if two property additions should share a shape.
+     */
+    private record TransitionKey(PropertyKey propertyKey, int descriptorFlags) {
+        private TransitionKey(PropertyKey propertyKey, PropertyDescriptor descriptorFlags) {
+            // Call canonical constructor with computed flags
+            this(propertyKey,
+                    (descriptorFlags.isEnumerable() ? 1 : 0) |
+                            (descriptorFlags.isConfigurable() ? 2 : 0) |
+                            (descriptorFlags.isDataDescriptor() ? 4 : 0) |
+                            (descriptorFlags.isAccessorDescriptor() ? 8 : 0));
+        }
 
-            @Override
-            public boolean equals(Object obj) {
-                if (!(obj instanceof TransitionKey other)) return false;
-                return propertyKey.equals(other.propertyKey) &&
-                        descriptorFlags == other.descriptorFlags;
-            }
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof TransitionKey other)) return false;
+            return propertyKey.equals(other.propertyKey) &&
+                    descriptorFlags == other.descriptorFlags;
+        }
 
     }
 }

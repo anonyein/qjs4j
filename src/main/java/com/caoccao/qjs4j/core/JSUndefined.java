@@ -23,12 +23,12 @@ public record JSUndefined() implements JSValue {
     public static final JSUndefined INSTANCE = new JSUndefined();
 
     @Override
-    public JSValueType type() {
-        return JSValueType.UNDEFINED;
+    public Object toJavaObject() {
+        return null;
     }
 
     @Override
-    public Object toJavaObject() {
-        return null;
+    public JSValueType type() {
+        return JSValueType.UNDEFINED;
     }
 }

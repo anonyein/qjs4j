@@ -43,20 +43,43 @@ public final class SymbolConstructor {
     }
 
     /**
-     * Symbol.for(key)
-     * ES2020 19.4.2.1
-     * Returns a Symbol from the global symbol registry.
+     * Symbol.hasInstance
+     * ES2020 19.4.2.3
      */
-    public static JSValue symbolFor(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return ctx.throwError("TypeError", "Symbol.for requires a key");
-        }
+    public static JSValue getHasInstance(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return JSSymbol.HAS_INSTANCE;
+    }
 
-        String key = JSTypeConversions.toString(args[0]).value();
+    /**
+     * Symbol.isConcatSpreadable
+     * ES2020 19.4.2.5
+     */
+    public static JSValue getIsConcatSpreadable(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return JSSymbol.IS_CONCAT_SPREADABLE;
+    }
 
-        synchronized (symbolRegistry) {
-            return symbolRegistry.computeIfAbsent(key, k -> new JSSymbol(k));
-        }
+    /**
+     * Symbol.iterator
+     * ES2020 19.4.2.4
+     */
+    public static JSValue getIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return JSSymbol.ITERATOR;
+    }
+
+    /**
+     * Symbol.toPrimitive
+     * ES2020 19.4.2.13
+     */
+    public static JSValue getToPrimitive(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return JSSymbol.TO_PRIMITIVE;
+    }
+
+    /**
+     * Symbol.toStringTag
+     * ES2020 19.4.2.14
+     */
+    public static JSValue getToStringTag(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return JSSymbol.TO_STRING_TAG;
     }
 
     /**
@@ -88,42 +111,19 @@ public final class SymbolConstructor {
     }
 
     /**
-     * Symbol.iterator
-     * ES2020 19.4.2.4
+     * Symbol.for(key)
+     * ES2020 19.4.2.1
+     * Returns a Symbol from the global symbol registry.
      */
-    public static JSValue getIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return JSSymbol.ITERATOR;
-    }
+    public static JSValue symbolFor(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Symbol.for requires a key");
+        }
 
-    /**
-     * Symbol.toStringTag
-     * ES2020 19.4.2.14
-     */
-    public static JSValue getToStringTag(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return JSSymbol.TO_STRING_TAG;
-    }
+        String key = JSTypeConversions.toString(args[0]).value();
 
-    /**
-     * Symbol.hasInstance
-     * ES2020 19.4.2.3
-     */
-    public static JSValue getHasInstance(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return JSSymbol.HAS_INSTANCE;
-    }
-
-    /**
-     * Symbol.isConcatSpreadable
-     * ES2020 19.4.2.5
-     */
-    public static JSValue getIsConcatSpreadable(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return JSSymbol.IS_CONCAT_SPREADABLE;
-    }
-
-    /**
-     * Symbol.toPrimitive
-     * ES2020 19.4.2.13
-     */
-    public static JSValue getToPrimitive(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return JSSymbol.TO_PRIMITIVE;
+        synchronized (symbolRegistry) {
+            return symbolRegistry.computeIfAbsent(key, k -> new JSSymbol(k));
+        }
     }
 }

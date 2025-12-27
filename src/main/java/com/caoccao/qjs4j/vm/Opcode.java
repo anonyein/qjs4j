@@ -173,16 +173,16 @@ public enum Opcode {
 
     // This is a subset of QuickJS opcodes - full implementation would have ~244 opcodes
 
-    private final int code;
-    private final int size;
-    private final int nPop;
-    private final int nPush;
-
     private static final Opcode[] opcodes = new Opcode[values().length];
 
     static {
         Stream.of(values()).forEach(opcode -> opcodes[opcode.code] = opcode);
     }
+
+    private final int code;
+    private final int nPop;
+    private final int nPush;
+    private final int size;
 
     Opcode(int code, int size, int nPop, int nPush) {
         this.code = code;
@@ -191,12 +191,15 @@ public enum Opcode {
         this.nPush = nPush;
     }
 
-    public int getCode() {
-        return code;
+    public static Opcode fromInt(int code) {
+        if (code >= 0 && code < opcodes.length) {
+            return opcodes[code];
+        }
+        return INVALID;
     }
 
-    public int getSize() {
-        return size;
+    public int getCode() {
+        return code;
     }
 
     public int getNPop() {
@@ -207,10 +210,7 @@ public enum Opcode {
         return nPush;
     }
 
-    public static Opcode fromInt(int code) {
-        if (code >= 0 && code < opcodes.length) {
-            return opcodes[code];
-        }
-        return INVALID;
+    public int getSize() {
+        return size;
     }
 }

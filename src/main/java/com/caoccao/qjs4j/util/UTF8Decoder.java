@@ -32,6 +32,33 @@ public final class UTF8Decoder {
     public static final int UTF8_CHAR_LEN_MAX = 6;
 
     /**
+     * Count the number of UTF-8 code points in a byte array.
+     */
+    public static int countCodePoints(byte[] bytes) {
+        return countCodePoints(bytes, 0, bytes.length);
+    }
+
+    /**
+     * Count the number of UTF-8 code points in part of a byte array.
+     */
+    public static int countCodePoints(byte[] bytes, int offset, int length) {
+        int count = 0;
+        int end = offset + length;
+
+        while (offset < end) {
+            int seqLen = getSequenceLength(bytes[offset]);
+            if (seqLen <= 0) {
+                offset++;
+            } else {
+                offset += seqLen;
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
      * Decode UTF-8 bytes to a string.
      */
     public static String decode(byte[] bytes) {
@@ -70,52 +97,6 @@ public final class UTF8Decoder {
             return new byte[0];
         }
         return str.getBytes(StandardCharsets.UTF_8);
-    }
-
-    /**
-     * Get a Unicode code point from UTF-8 bytes at the specified offset.
-     * Returns -1 if invalid UTF-8 sequence.
-     */
-    public static int getCodePoint(byte[] bytes, int offset) {
-        if (bytes == null || offset >= bytes.length) {
-            return -1;
-        }
-
-        int b = bytes[offset] & 0xFF;
-
-        // ASCII character (1 byte)
-        if ((b & 0x80) == 0) {
-            return b;
-        }
-
-        // 2-byte sequence
-        if ((b & 0xE0) == 0xC0) {
-            if (offset + 1 >= bytes.length) return -1;
-            int b2 = bytes[offset + 1] & 0xFF;
-            if ((b2 & 0xC0) != 0x80) return -1;
-            return ((b & 0x1F) << 6) | (b2 & 0x3F);
-        }
-
-        // 3-byte sequence
-        if ((b & 0xF0) == 0xE0) {
-            if (offset + 2 >= bytes.length) return -1;
-            int b2 = bytes[offset + 1] & 0xFF;
-            int b3 = bytes[offset + 2] & 0xFF;
-            if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80) return -1;
-            return ((b & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
-        }
-
-        // 4-byte sequence
-        if ((b & 0xF8) == 0xF0) {
-            if (offset + 3 >= bytes.length) return -1;
-            int b2 = bytes[offset + 1] & 0xFF;
-            int b3 = bytes[offset + 2] & 0xFF;
-            int b4 = bytes[offset + 3] & 0xFF;
-            if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80 || (b4 & 0xC0) != 0x80) return -1;
-            return ((b & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);
-        }
-
-        return -1;
     }
 
     /**
@@ -165,6 +146,52 @@ public final class UTF8Decoder {
     }
 
     /**
+     * Get a Unicode code point from UTF-8 bytes at the specified offset.
+     * Returns -1 if invalid UTF-8 sequence.
+     */
+    public static int getCodePoint(byte[] bytes, int offset) {
+        if (bytes == null || offset >= bytes.length) {
+            return -1;
+        }
+
+        int b = bytes[offset] & 0xFF;
+
+        // ASCII character (1 byte)
+        if ((b & 0x80) == 0) {
+            return b;
+        }
+
+        // 2-byte sequence
+        if ((b & 0xE0) == 0xC0) {
+            if (offset + 1 >= bytes.length) return -1;
+            int b2 = bytes[offset + 1] & 0xFF;
+            if ((b2 & 0xC0) != 0x80) return -1;
+            return ((b & 0x1F) << 6) | (b2 & 0x3F);
+        }
+
+        // 3-byte sequence
+        if ((b & 0xF0) == 0xE0) {
+            if (offset + 2 >= bytes.length) return -1;
+            int b2 = bytes[offset + 1] & 0xFF;
+            int b3 = bytes[offset + 2] & 0xFF;
+            if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80) return -1;
+            return ((b & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+        }
+
+        // 4-byte sequence
+        if ((b & 0xF8) == 0xF0) {
+            if (offset + 3 >= bytes.length) return -1;
+            int b2 = bytes[offset + 1] & 0xFF;
+            int b3 = bytes[offset + 2] & 0xFF;
+            int b4 = bytes[offset + 3] & 0xFF;
+            if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80 || (b4 & 0xC0) != 0x80) return -1;
+            return ((b & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);
+        }
+
+        return -1;
+    }
+
+    /**
      * Get the length (in bytes) of the UTF-8 sequence starting at the given byte.
      */
     public static int getSequenceLength(byte firstByte) {
@@ -178,32 +205,5 @@ public final class UTF8Decoder {
         if ((b & 0xFE) == 0xFC) return 6;     // 1111110x (invalid in current Unicode)
 
         return -1; // Invalid UTF-8
-    }
-
-    /**
-     * Count the number of UTF-8 code points in a byte array.
-     */
-    public static int countCodePoints(byte[] bytes) {
-        return countCodePoints(bytes, 0, bytes.length);
-    }
-
-    /**
-     * Count the number of UTF-8 code points in part of a byte array.
-     */
-    public static int countCodePoints(byte[] bytes, int offset, int length) {
-        int count = 0;
-        int end = offset + length;
-
-        while (offset < end) {
-            int seqLen = getSequenceLength(bytes[offset]);
-            if (seqLen <= 0) {
-                offset++;
-            } else {
-                offset += seqLen;
-                count++;
-            }
-        }
-
-        return count;
     }
 }

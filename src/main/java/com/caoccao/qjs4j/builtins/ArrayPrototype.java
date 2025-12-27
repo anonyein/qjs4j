@@ -31,70 +31,72 @@ import java.util.List;
 public final class ArrayPrototype {
 
     /**
-     * Array.prototype.push(...items)
-     * Appends elements to the end of an array.
-     *
-     * @see <a href="https://tc39.es/ecma262/#sec-array.prototype.push">ECMAScript Array.prototype.push</a>
+     * Array.prototype.at(index)
+     * ES2022 23.1.3.1
+     * Returns the element at the specified index, supporting negative indices.
      */
-    public static JSValue push(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue at(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.push called on non-array");
+            return ctx.throwError("TypeError", "Array.prototype.at called on non-array");
         }
 
+        if (args.length == 0) {
+            return JSUndefined.INSTANCE;
+        }
+
+        long index = (long) JSTypeConversions.toInteger(args[0]);
+        long length = arr.getLength();
+
+        // Handle negative indices
+        if (index < 0) {
+            index = length + index;
+        }
+
+        // Check bounds
+        if (index < 0 || index >= length) {
+            return JSUndefined.INSTANCE;
+        }
+
+        return arr.get((int) index);
+    }
+
+    /**
+     * Array.prototype.concat(...items)
+     * Merges arrays and/or values.
+     */
+    public static JSValue concat(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.concat called on non-array");
+        }
+
+        JSArray result = new JSArray();
+
+        // Add original array elements
+        for (int i = 0; i < arr.getLength(); i++) {
+            result.push(arr.get(i));
+        }
+
+        // Add arguments
         for (JSValue arg : args) {
-            arr.push(arg);
+            if (arg instanceof JSArray argArr) {
+                for (int i = 0; i < argArr.getLength(); i++) {
+                    result.push(argArr.get(i));
+                }
+            } else {
+                result.push(arg);
+            }
         }
 
-        return new JSNumber(arr.getLength());
+        return result;
     }
 
     /**
-     * Array.prototype.pop()
-     * Removes and returns the last element of an array.
+     * Array.prototype.every(callbackFn[, thisArg])
+     * Tests whether all elements pass the test.
      */
-    public static JSValue pop(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue every(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.pop called on non-array");
-        }
-
-        return arr.pop();
-    }
-
-    /**
-     * Array.prototype.shift()
-     * Removes and returns the first element of an array.
-     */
-    public static JSValue shift(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.shift called on non-array");
-        }
-
-        return arr.shift();
-    }
-
-    /**
-     * Array.prototype.unshift(...items)
-     * Adds elements to the beginning of an array.
-     */
-    public static JSValue unshift(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.unshift called on non-array");
-        }
-
-        for (int i = args.length - 1; i >= 0; i--) {
-            arr.unshift(args[i]);
-        }
-
-        return new JSNumber(arr.getLength());
-    }
-
-    /**
-     * Array.prototype.map(callbackFn[, thisArg])
-     * Creates a new array with the results of calling a function on every element.
-     */
-    public static JSValue map(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.map called on non-array");
+            return ctx.throwError("TypeError", "Array.prototype.every called on non-array");
         }
 
         if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
@@ -103,16 +105,18 @@ public final class ArrayPrototype {
 
         JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
         long length = arr.getLength();
-        JSArray result = new JSArray();
 
         for (long i = 0; i < length; i++) {
             JSValue element = arr.get(i);
             JSValue[] callbackArgs = {element, new JSNumber(i), arr};
-            JSValue mapped = callback.call(ctx, callbackThis, callbackArgs);
-            result.push(mapped);
+            JSValue result = callback.call(ctx, callbackThis, callbackArgs);
+
+            if (JSTypeConversions.toBoolean(result) == JSBoolean.FALSE) {
+                return JSBoolean.FALSE;
+            }
         }
 
-        return result;
+        return JSBoolean.TRUE;
     }
 
     /**
@@ -143,105 +147,6 @@ public final class ArrayPrototype {
         }
 
         return result;
-    }
-
-    /**
-     * Array.prototype.reduce(callbackFn[, initialValue])
-     * Reduces array to a single value by calling a function on each element.
-     */
-    public static JSValue reduce(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.reduce called on non-array");
-        }
-
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
-            return ctx.throwError("TypeError", "Callback must be a function");
-        }
-
-        long length = arr.getLength();
-        if (length == 0 && args.length < 2) {
-            return ctx.throwError("TypeError", "Reduce of empty array with no initial value");
-        }
-
-        long startIndex = 0;
-        JSValue accumulator;
-
-        if (args.length >= 2) {
-            accumulator = args[1];
-        } else {
-            accumulator = arr.get(0);
-            startIndex = 1;
-        }
-
-        for (long i = startIndex; i < length; i++) {
-            JSValue element = arr.get(i);
-            JSValue[] callbackArgs = {accumulator, element, new JSNumber(i), arr};
-            accumulator = callback.call(ctx, JSUndefined.INSTANCE, callbackArgs);
-        }
-
-        return accumulator;
-    }
-
-    /**
-     * Array.prototype.reduceRight(callbackFn[, initialValue])
-     * Reduces array from right to left.
-     */
-    public static JSValue reduceRight(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.reduceRight called on non-array");
-        }
-
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
-            return ctx.throwError("TypeError", "Callback must be a function");
-        }
-
-        long length = arr.getLength();
-        if (length == 0 && args.length < 2) {
-            return ctx.throwError("TypeError", "Reduce of empty array with no initial value");
-        }
-
-        long startIndex = length - 1;
-        JSValue accumulator;
-
-        if (args.length >= 2) {
-            accumulator = args[1];
-        } else {
-            accumulator = arr.get(length - 1);
-            startIndex = length - 2;
-        }
-
-        for (long i = startIndex; i >= 0; i--) {
-            JSValue element = arr.get(i);
-            JSValue[] callbackArgs = {accumulator, element, new JSNumber(i), arr};
-            accumulator = callback.call(ctx, JSUndefined.INSTANCE, callbackArgs);
-        }
-
-        return accumulator;
-    }
-
-    /**
-     * Array.prototype.forEach(callbackFn[, thisArg])
-     * Executes a function for each array element.
-     */
-    public static JSValue forEach(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.forEach called on non-array");
-        }
-
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
-            return ctx.throwError("TypeError", "Callback must be a function");
-        }
-
-        JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
-        long length = arr.getLength();
-
-        for (long i = 0; i < length; i++) {
-            JSValue element = arr.get(i);
-            JSValue[] callbackArgs = {element, new JSNumber(i), arr};
-            callback.call(ctx, callbackThis, callbackArgs);
-        }
-
-        return JSUndefined.INSTANCE;
     }
 
     /**
@@ -365,6 +270,395 @@ public final class ArrayPrototype {
     }
 
     /**
+     * Array.prototype.flat([depth])
+     * Creates a new array with all sub-array elements concatenated.
+     */
+    public static JSValue flat(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.flat called on non-array");
+        }
+
+        int depth = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 1;
+        return flattenArray(arr, depth);
+    }
+
+    /**
+     * Array.prototype.flatMap(callback, thisArg)
+     * ES2019 22.1.3.11
+     * Maps each element using callback, then flattens the result by one level.
+     */
+    public static JSValue flatMap(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.flatMap called on non-array");
+        }
+
+        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+            return ctx.throwError("TypeError", "Array.prototype.flatMap requires a callback function");
+        }
+
+        JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
+
+        JSArray result = new JSArray();
+
+        for (int i = 0; i < arr.getLength(); i++) {
+            JSValue element = arr.get(i);
+
+            // Call the callback with (element, index, array)
+            JSValue[] callbackArgs = new JSValue[]{
+                    element,
+                    new JSNumber(i),
+                    arr
+            };
+            JSValue mapped = callback.call(ctx, callbackThisArg, callbackArgs);
+
+            // Flatten one level
+            if (mapped instanceof JSArray mappedArray) {
+                for (int j = 0; j < mappedArray.getLength(); j++) {
+                    result.push(mappedArray.get(j));
+                }
+            } else {
+                result.push(mapped);
+            }
+        }
+
+        return result;
+    }
+
+    private static JSArray flattenArray(JSArray arr, int depth) {
+        JSArray result = new JSArray();
+
+        for (int i = 0; i < arr.getLength(); i++) {
+            JSValue element = arr.get(i);
+
+            if (depth > 0 && element instanceof JSArray subArr) {
+                JSArray flattened = flattenArray(subArr, depth - 1);
+                for (int j = 0; j < flattened.getLength(); j++) {
+                    result.push(flattened.get(j));
+                }
+            } else {
+                result.push(element);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Array.prototype.forEach(callbackFn[, thisArg])
+     * Executes a function for each array element.
+     */
+    public static JSValue forEach(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.forEach called on non-array");
+        }
+
+        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+            return ctx.throwError("TypeError", "Callback must be a function");
+        }
+
+        JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
+        long length = arr.getLength();
+
+        for (long i = 0; i < length; i++) {
+            JSValue element = arr.get(i);
+            JSValue[] callbackArgs = {element, new JSNumber(i), arr};
+            callback.call(ctx, callbackThis, callbackArgs);
+        }
+
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Array.prototype.includes(searchElement[, fromIndex])
+     * Determines whether an array includes a certain element.
+     */
+    public static JSValue includes(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.includes called on non-array");
+        }
+
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+
+        JSValue searchElement = args[0];
+        long length = arr.getLength();
+        long fromIndex = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : 0;
+
+        if (fromIndex < 0) {
+            fromIndex = Math.max(0, length + fromIndex);
+        }
+
+        for (long i = fromIndex; i < length; i++) {
+            JSValue element = arr.get(i);
+            // includes uses SameValueZero (NaN equals NaN)
+            if (JSTypeConversions.strictEquals(element, searchElement)) {
+                return JSBoolean.TRUE;
+            }
+            // Special case for NaN
+            if (element instanceof JSNumber en && searchElement instanceof JSNumber sn) {
+                if (Double.isNaN(en.value()) && Double.isNaN(sn.value())) {
+                    return JSBoolean.TRUE;
+                }
+            }
+        }
+
+        return JSBoolean.FALSE;
+    }
+
+    /**
+     * Array.prototype.indexOf(searchElement[, fromIndex])
+     * Returns the first index at which a given element can be found.
+     */
+    public static JSValue indexOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.indexOf called on non-array");
+        }
+
+        if (args.length == 0) {
+            return new JSNumber(-1);
+        }
+
+        JSValue searchElement = args[0];
+        long length = arr.getLength();
+        long fromIndex = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : 0;
+
+        if (fromIndex < 0) {
+            fromIndex = Math.max(0, length + fromIndex);
+        }
+
+        for (long i = fromIndex; i < length; i++) {
+            if (JSTypeConversions.strictEquals(arr.get(i), searchElement)) {
+                return new JSNumber(i);
+            }
+        }
+
+        return new JSNumber(-1);
+    }
+
+    /**
+     * Array.prototype.join([separator])
+     * Joins all elements of an array into a string.
+     */
+    public static JSValue join(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.join called on non-array");
+        }
+
+        String separator = args.length > 0 && !(args[0] instanceof JSUndefined) ?
+                JSTypeConversions.toString(args[0]).value() : ",";
+
+        StringBuilder result = new StringBuilder();
+        long length = arr.getLength();
+
+        for (long i = 0; i < length; i++) {
+            if (i > 0) {
+                result.append(separator);
+            }
+            JSValue element = arr.get(i);
+            if (!(element instanceof JSNull) && !(element instanceof JSUndefined)) {
+                result.append(JSTypeConversions.toString(element).value());
+            }
+        }
+
+        return new JSString(result.toString());
+    }
+
+    /**
+     * Array.prototype.lastIndexOf(searchElement[, fromIndex])
+     * Returns the last index at which a given element can be found.
+     */
+    public static JSValue lastIndexOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.lastIndexOf called on non-array");
+        }
+
+        if (args.length == 0) {
+            return new JSNumber(-1);
+        }
+
+        JSValue searchElement = args[0];
+        long length = arr.getLength();
+        long fromIndex = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : length - 1;
+
+        if (fromIndex < 0) {
+            fromIndex = length + fromIndex;
+        } else {
+            fromIndex = Math.min(fromIndex, length - 1);
+        }
+
+        for (long i = fromIndex; i >= 0; i--) {
+            if (JSTypeConversions.strictEquals(arr.get(i), searchElement)) {
+                return new JSNumber(i);
+            }
+        }
+
+        return new JSNumber(-1);
+    }
+
+    /**
+     * Array.prototype.map(callbackFn[, thisArg])
+     * Creates a new array with the results of calling a function on every element.
+     */
+    public static JSValue map(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.map called on non-array");
+        }
+
+        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+            return ctx.throwError("TypeError", "Callback must be a function");
+        }
+
+        JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
+        long length = arr.getLength();
+        JSArray result = new JSArray();
+
+        for (long i = 0; i < length; i++) {
+            JSValue element = arr.get(i);
+            JSValue[] callbackArgs = {element, new JSNumber(i), arr};
+            JSValue mapped = callback.call(ctx, callbackThis, callbackArgs);
+            result.push(mapped);
+        }
+
+        return result;
+    }
+
+    /**
+     * Array.prototype.pop()
+     * Removes and returns the last element of an array.
+     */
+    public static JSValue pop(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.pop called on non-array");
+        }
+
+        return arr.pop();
+    }
+
+    /**
+     * Array.prototype.push(...items)
+     * Appends elements to the end of an array.
+     *
+     * @see <a href="https://tc39.es/ecma262/#sec-array.prototype.push">ECMAScript Array.prototype.push</a>
+     */
+    public static JSValue push(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.push called on non-array");
+        }
+
+        for (JSValue arg : args) {
+            arr.push(arg);
+        }
+
+        return new JSNumber(arr.getLength());
+    }
+
+    /**
+     * Array.prototype.reduce(callbackFn[, initialValue])
+     * Reduces array to a single value by calling a function on each element.
+     */
+    public static JSValue reduce(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.reduce called on non-array");
+        }
+
+        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+            return ctx.throwError("TypeError", "Callback must be a function");
+        }
+
+        long length = arr.getLength();
+        if (length == 0 && args.length < 2) {
+            return ctx.throwError("TypeError", "Reduce of empty array with no initial value");
+        }
+
+        long startIndex = 0;
+        JSValue accumulator;
+
+        if (args.length >= 2) {
+            accumulator = args[1];
+        } else {
+            accumulator = arr.get(0);
+            startIndex = 1;
+        }
+
+        for (long i = startIndex; i < length; i++) {
+            JSValue element = arr.get(i);
+            JSValue[] callbackArgs = {accumulator, element, new JSNumber(i), arr};
+            accumulator = callback.call(ctx, JSUndefined.INSTANCE, callbackArgs);
+        }
+
+        return accumulator;
+    }
+
+    /**
+     * Array.prototype.reduceRight(callbackFn[, initialValue])
+     * Reduces array from right to left.
+     */
+    public static JSValue reduceRight(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.reduceRight called on non-array");
+        }
+
+        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+            return ctx.throwError("TypeError", "Callback must be a function");
+        }
+
+        long length = arr.getLength();
+        if (length == 0 && args.length < 2) {
+            return ctx.throwError("TypeError", "Reduce of empty array with no initial value");
+        }
+
+        long startIndex = length - 1;
+        JSValue accumulator;
+
+        if (args.length >= 2) {
+            accumulator = args[1];
+        } else {
+            accumulator = arr.get(length - 1);
+            startIndex = length - 2;
+        }
+
+        for (long i = startIndex; i >= 0; i--) {
+            JSValue element = arr.get(i);
+            JSValue[] callbackArgs = {accumulator, element, new JSNumber(i), arr};
+            accumulator = callback.call(ctx, JSUndefined.INSTANCE, callbackArgs);
+        }
+
+        return accumulator;
+    }
+
+    /**
+     * Array.prototype.reverse()
+     * Reverses the elements of an array in place.
+     */
+    public static JSValue reverse(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.reverse called on non-array");
+        }
+
+        long length = arr.getLength();
+        for (long i = 0; i < length / 2; i++) {
+            JSValue temp = arr.get(i);
+            arr.set(i, arr.get(length - 1 - i));
+            arr.set(length - 1 - i, temp);
+        }
+
+        return arr;
+    }
+
+    /**
+     * Array.prototype.shift()
+     * Removes and returns the first element of an array.
+     */
+    public static JSValue shift(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.shift called on non-array");
+        }
+
+        return arr.shift();
+    }
+
+    /**
      * Array.prototype.slice([begin[, end]])
      * Returns a shallow copy of a portion of an array.
      */
@@ -401,6 +695,74 @@ public final class ArrayPrototype {
         }
 
         return result;
+    }
+
+    /**
+     * Array.prototype.some(callbackFn[, thisArg])
+     * Tests whether at least one element passes the test.
+     */
+    public static JSValue some(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.some called on non-array");
+        }
+
+        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+            return ctx.throwError("TypeError", "Callback must be a function");
+        }
+
+        JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
+        long length = arr.getLength();
+
+        for (long i = 0; i < length; i++) {
+            JSValue element = arr.get(i);
+            JSValue[] callbackArgs = {element, new JSNumber(i), arr};
+            JSValue result = callback.call(ctx, callbackThis, callbackArgs);
+
+            if (JSTypeConversions.toBoolean(result) == JSBoolean.TRUE) {
+                return JSBoolean.TRUE;
+            }
+        }
+
+        return JSBoolean.FALSE;
+    }
+
+    /**
+     * Array.prototype.sort([compareFn])
+     * Sorts the elements of an array in place.
+     */
+    public static JSValue sort(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.sort called on non-array");
+        }
+
+        JSFunction compareFn = args.length > 0 && args[0] instanceof JSFunction ?
+                (JSFunction) args[0] : null;
+
+        List<JSValue> elements = new ArrayList<>();
+        long length = arr.getLength();
+        for (long i = 0; i < length; i++) {
+            elements.add(arr.get(i));
+        }
+
+        Collections.sort(elements, (a, b) -> {
+            if (compareFn != null) {
+                JSValue[] compareArgs = {a, b};
+                JSValue result = compareFn.call(ctx, JSUndefined.INSTANCE, compareArgs);
+                return JSTypeConversions.toInt32(result);
+            } else {
+                // Default: convert to strings and compare
+                String aStr = JSTypeConversions.toString(a).value();
+                String bStr = JSTypeConversions.toString(b).value();
+                return aStr.compareTo(bStr);
+            }
+        });
+
+        // Update array with sorted elements
+        for (long i = 0; i < length; i++) {
+            arr.set(i, elements.get((int) i));
+        }
+
+        return arr;
     }
 
     /**
@@ -457,64 +819,6 @@ public final class ArrayPrototype {
         }
 
         return deleted;
-    }
-
-    /**
-     * Array.prototype.sort([compareFn])
-     * Sorts the elements of an array in place.
-     */
-    public static JSValue sort(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.sort called on non-array");
-        }
-
-        JSFunction compareFn = args.length > 0 && args[0] instanceof JSFunction ?
-                (JSFunction) args[0] : null;
-
-        List<JSValue> elements = new ArrayList<>();
-        long length = arr.getLength();
-        for (long i = 0; i < length; i++) {
-            elements.add(arr.get(i));
-        }
-
-        Collections.sort(elements, (a, b) -> {
-            if (compareFn != null) {
-                JSValue[] compareArgs = {a, b};
-                JSValue result = compareFn.call(ctx, JSUndefined.INSTANCE, compareArgs);
-                return JSTypeConversions.toInt32(result);
-            } else {
-                // Default: convert to strings and compare
-                String aStr = JSTypeConversions.toString(a).value();
-                String bStr = JSTypeConversions.toString(b).value();
-                return aStr.compareTo(bStr);
-            }
-        });
-
-        // Update array with sorted elements
-        for (long i = 0; i < length; i++) {
-            arr.set(i, elements.get((int) i));
-        }
-
-        return arr;
-    }
-
-    /**
-     * Array.prototype.reverse()
-     * Reverses the elements of an array in place.
-     */
-    public static JSValue reverse(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.reverse called on non-array");
-        }
-
-        long length = arr.getLength();
-        for (long i = 0; i < length / 2; i++) {
-            JSValue temp = arr.get(i);
-            arr.set(i, arr.get(length - 1 - i));
-            arr.set(length - 1 - i, temp);
-        }
-
-        return arr;
     }
 
     /**
@@ -629,6 +933,30 @@ public final class ArrayPrototype {
     }
 
     /**
+     * Array.prototype.toString()
+     * Returns a string representing the array.
+     */
+    public static JSValue toString(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return join(ctx, thisArg, new JSValue[0]);
+    }
+
+    /**
+     * Array.prototype.unshift(...items)
+     * Adds elements to the beginning of an array.
+     */
+    public static JSValue unshift(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.unshift called on non-array");
+        }
+
+        for (int i = args.length - 1; i >= 0; i--) {
+            arr.unshift(args[i]);
+        }
+
+        return new JSNumber(arr.getLength());
+    }
+
+    /**
      * Array.prototype.with(index, value)
      * ES2023 23.1.3.34
      * Returns a new array with the element at the given index replaced (immutable version of arr[index] = value).
@@ -668,333 +996,5 @@ public final class ArrayPrototype {
         }
 
         return result;
-    }
-
-    /**
-     * Array.prototype.join([separator])
-     * Joins all elements of an array into a string.
-     */
-    public static JSValue join(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.join called on non-array");
-        }
-
-        String separator = args.length > 0 && !(args[0] instanceof JSUndefined) ?
-                JSTypeConversions.toString(args[0]).value() : ",";
-
-        StringBuilder result = new StringBuilder();
-        long length = arr.getLength();
-
-        for (long i = 0; i < length; i++) {
-            if (i > 0) {
-                result.append(separator);
-            }
-            JSValue element = arr.get(i);
-            if (!(element instanceof JSNull) && !(element instanceof JSUndefined)) {
-                result.append(JSTypeConversions.toString(element).value());
-            }
-        }
-
-        return new JSString(result.toString());
-    }
-
-    /**
-     * Array.prototype.concat(...items)
-     * Merges arrays and/or values.
-     */
-    public static JSValue concat(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.concat called on non-array");
-        }
-
-        JSArray result = new JSArray();
-
-        // Add original array elements
-        for (int i = 0; i < arr.getLength(); i++) {
-            result.push(arr.get(i));
-        }
-
-        // Add arguments
-        for (JSValue arg : args) {
-            if (arg instanceof JSArray argArr) {
-                for (int i = 0; i < argArr.getLength(); i++) {
-                    result.push(argArr.get(i));
-                }
-            } else {
-                result.push(arg);
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Array.prototype.indexOf(searchElement[, fromIndex])
-     * Returns the first index at which a given element can be found.
-     */
-    public static JSValue indexOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.indexOf called on non-array");
-        }
-
-        if (args.length == 0) {
-            return new JSNumber(-1);
-        }
-
-        JSValue searchElement = args[0];
-        long length = arr.getLength();
-        long fromIndex = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : 0;
-
-        if (fromIndex < 0) {
-            fromIndex = Math.max(0, length + fromIndex);
-        }
-
-        for (long i = fromIndex; i < length; i++) {
-            if (JSTypeConversions.strictEquals(arr.get(i), searchElement)) {
-                return new JSNumber(i);
-            }
-        }
-
-        return new JSNumber(-1);
-    }
-
-    /**
-     * Array.prototype.lastIndexOf(searchElement[, fromIndex])
-     * Returns the last index at which a given element can be found.
-     */
-    public static JSValue lastIndexOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.lastIndexOf called on non-array");
-        }
-
-        if (args.length == 0) {
-            return new JSNumber(-1);
-        }
-
-        JSValue searchElement = args[0];
-        long length = arr.getLength();
-        long fromIndex = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : length - 1;
-
-        if (fromIndex < 0) {
-            fromIndex = length + fromIndex;
-        } else {
-            fromIndex = Math.min(fromIndex, length - 1);
-        }
-
-        for (long i = fromIndex; i >= 0; i--) {
-            if (JSTypeConversions.strictEquals(arr.get(i), searchElement)) {
-                return new JSNumber(i);
-            }
-        }
-
-        return new JSNumber(-1);
-    }
-
-    /**
-     * Array.prototype.includes(searchElement[, fromIndex])
-     * Determines whether an array includes a certain element.
-     */
-    public static JSValue includes(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.includes called on non-array");
-        }
-
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-
-        JSValue searchElement = args[0];
-        long length = arr.getLength();
-        long fromIndex = args.length > 1 ? JSTypeConversions.toInt32(args[1]) : 0;
-
-        if (fromIndex < 0) {
-            fromIndex = Math.max(0, length + fromIndex);
-        }
-
-        for (long i = fromIndex; i < length; i++) {
-            JSValue element = arr.get(i);
-            // includes uses SameValueZero (NaN equals NaN)
-            if (JSTypeConversions.strictEquals(element, searchElement)) {
-                return JSBoolean.TRUE;
-            }
-            // Special case for NaN
-            if (element instanceof JSNumber en && searchElement instanceof JSNumber sn) {
-                if (Double.isNaN(en.value()) && Double.isNaN(sn.value())) {
-                    return JSBoolean.TRUE;
-                }
-            }
-        }
-
-        return JSBoolean.FALSE;
-    }
-
-    /**
-     * Array.prototype.every(callbackFn[, thisArg])
-     * Tests whether all elements pass the test.
-     */
-    public static JSValue every(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.every called on non-array");
-        }
-
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
-            return ctx.throwError("TypeError", "Callback must be a function");
-        }
-
-        JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
-        long length = arr.getLength();
-
-        for (long i = 0; i < length; i++) {
-            JSValue element = arr.get(i);
-            JSValue[] callbackArgs = {element, new JSNumber(i), arr};
-            JSValue result = callback.call(ctx, callbackThis, callbackArgs);
-
-            if (JSTypeConversions.toBoolean(result) == JSBoolean.FALSE) {
-                return JSBoolean.FALSE;
-            }
-        }
-
-        return JSBoolean.TRUE;
-    }
-
-    /**
-     * Array.prototype.some(callbackFn[, thisArg])
-     * Tests whether at least one element passes the test.
-     */
-    public static JSValue some(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.some called on non-array");
-        }
-
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
-            return ctx.throwError("TypeError", "Callback must be a function");
-        }
-
-        JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
-        long length = arr.getLength();
-
-        for (long i = 0; i < length; i++) {
-            JSValue element = arr.get(i);
-            JSValue[] callbackArgs = {element, new JSNumber(i), arr};
-            JSValue result = callback.call(ctx, callbackThis, callbackArgs);
-
-            if (JSTypeConversions.toBoolean(result) == JSBoolean.TRUE) {
-                return JSBoolean.TRUE;
-            }
-        }
-
-        return JSBoolean.FALSE;
-    }
-
-    /**
-     * Array.prototype.flat([depth])
-     * Creates a new array with all sub-array elements concatenated.
-     */
-    public static JSValue flat(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.flat called on non-array");
-        }
-
-        int depth = args.length > 0 ? JSTypeConversions.toInt32(args[0]) : 1;
-        return flattenArray(arr, depth);
-    }
-
-    private static JSArray flattenArray(JSArray arr, int depth) {
-        JSArray result = new JSArray();
-
-        for (int i = 0; i < arr.getLength(); i++) {
-            JSValue element = arr.get(i);
-
-            if (depth > 0 && element instanceof JSArray subArr) {
-                JSArray flattened = flattenArray(subArr, depth - 1);
-                for (int j = 0; j < flattened.getLength(); j++) {
-                    result.push(flattened.get(j));
-                }
-            } else {
-                result.push(element);
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Array.prototype.flatMap(callback, thisArg)
-     * ES2019 22.1.3.11
-     * Maps each element using callback, then flattens the result by one level.
-     */
-    public static JSValue flatMap(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.flatMap called on non-array");
-        }
-
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
-            return ctx.throwError("TypeError", "Array.prototype.flatMap requires a callback function");
-        }
-
-        JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
-
-        JSArray result = new JSArray();
-
-        for (int i = 0; i < arr.getLength(); i++) {
-            JSValue element = arr.get(i);
-
-            // Call the callback with (element, index, array)
-            JSValue[] callbackArgs = new JSValue[]{
-                    element,
-                    new JSNumber(i),
-                    arr
-            };
-            JSValue mapped = callback.call(ctx, callbackThisArg, callbackArgs);
-
-            // Flatten one level
-            if (mapped instanceof JSArray mappedArray) {
-                for (int j = 0; j < mappedArray.getLength(); j++) {
-                    result.push(mappedArray.get(j));
-                }
-            } else {
-                result.push(mapped);
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Array.prototype.at(index)
-     * ES2022 23.1.3.1
-     * Returns the element at the specified index, supporting negative indices.
-     */
-    public static JSValue at(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.at called on non-array");
-        }
-
-        if (args.length == 0) {
-            return JSUndefined.INSTANCE;
-        }
-
-        long index = (long) JSTypeConversions.toInteger(args[0]);
-        long length = arr.getLength();
-
-        // Handle negative indices
-        if (index < 0) {
-            index = length + index;
-        }
-
-        // Check bounds
-        if (index < 0 || index >= length) {
-            return JSUndefined.INSTANCE;
-        }
-
-        return arr.get((int) index);
-    }
-
-    /**
-     * Array.prototype.toString()
-     * Returns a string representing the array.
-     */
-    public static JSValue toString(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return join(ctx, thisArg, new JSValue[0]);
     }
 }

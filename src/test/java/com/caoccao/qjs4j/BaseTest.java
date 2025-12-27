@@ -10,18 +10,18 @@ public abstract class BaseTest {
     protected JSContext ctx;
     protected JSString str;
 
-    protected void assertPendingException(JSContext ctx) {
-        assertTrue(ctx.hasPendingException());
-        ctx.clearPendingException();
-    }
-
-    protected void assertTypeError(JSValue value) {
+    protected void assertError(JSValue value) {
         if (value instanceof JSObject jsObject) {
             if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
-                assertEquals("TypeError", name.value());
+                assertEquals("Error", name.value());
                 assertNotNull(message.value());
             }
         }
+    }
+
+    protected void assertPendingException(JSContext ctx) {
+        assertTrue(ctx.hasPendingException());
+        ctx.clearPendingException();
     }
 
     protected void assertRangeError(JSValue value) {
@@ -42,10 +42,10 @@ public abstract class BaseTest {
         }
     }
 
-    protected void assertError(JSValue value) {
+    protected void assertTypeError(JSValue value) {
         if (value instanceof JSObject jsObject) {
             if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
-                assertEquals("Error", name.value());
+                assertEquals("TypeError", name.value());
                 assertNotNull(message.value());
             }
         }

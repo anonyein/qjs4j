@@ -23,12 +23,12 @@ import com.caoccao.qjs4j.core.JSValue;
  * Represents a call frame (activation record) on the call stack.
  */
 public final class StackFrame {
-    private final JSFunction function;
-    private final JSValue thisArg;
-    private final JSValue[] locals;
-    private final JSValue[] closureVars;
-    private int programCounter;
     private final StackFrame caller;
+    private final JSValue[] closureVars;
+    private final JSFunction function;
+    private final JSValue[] locals;
+    private final JSValue thisArg;
+    private int programCounter;
 
     public StackFrame(JSFunction function, JSValue thisArg, JSValue[] args, StackFrame caller) {
         this.function = function;
@@ -39,27 +39,27 @@ public final class StackFrame {
         this.caller = caller;
     }
 
-    public int getProgramCounter() {
-        return programCounter;
-    }
-
-    public void setProgramCounter(int pc) {
-        this.programCounter = pc;
+    public StackFrame getCaller() {
+        return caller;
     }
 
     public JSFunction getFunction() {
         return function;
     }
 
-    public JSValue getThisArg() {
-        return thisArg;
-    }
-
     public JSValue[] getLocals() {
         return locals;
     }
 
-    public StackFrame getCaller() {
-        return caller;
+    public int getProgramCounter() {
+        return programCounter;
+    }
+
+    public JSValue getThisArg() {
+        return thisArg;
+    }
+
+    public void setProgramCounter(int pc) {
+        this.programCounter = pc;
     }
 }

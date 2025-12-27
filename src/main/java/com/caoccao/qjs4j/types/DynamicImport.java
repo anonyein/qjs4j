@@ -30,6 +30,27 @@ import com.caoccao.qjs4j.core.*;
 public final class DynamicImport {
 
     /**
+     * Create a native function wrapper for import().
+     *
+     * @param ctx    The execution context
+     * @param loader Module loader to use
+     * @return A JSNativeFunction that implements import()
+     */
+    public static JSNativeFunction createImportFunction(JSContext ctx, ModuleLoader loader) {
+        return new JSNativeFunction("import", 1, (context, thisArg, args) -> {
+            if (args.length == 0) {
+                return context.throwError("TypeError", "import() requires a module specifier");
+            }
+
+            // Convert specifier to string
+            String specifier = JSTypeConversions.toString(args[0]).value();
+
+            // Return promise
+            return import_(context, specifier, loader);
+        });
+    }
+
+    /**
      * Implement dynamic import as a function.
      * Returns a promise that resolves to the module namespace.
      *
@@ -76,26 +97,5 @@ public final class DynamicImport {
         });
 
         return promise;
-    }
-
-    /**
-     * Create a native function wrapper for import().
-     *
-     * @param ctx    The execution context
-     * @param loader Module loader to use
-     * @return A JSNativeFunction that implements import()
-     */
-    public static JSNativeFunction createImportFunction(JSContext ctx, ModuleLoader loader) {
-        return new JSNativeFunction("import", 1, (context, thisArg, args) -> {
-            if (args.length == 0) {
-                return context.throwError("TypeError", "import() requires a module specifier");
-            }
-
-            // Convert specifier to string
-            String specifier = JSTypeConversions.toString(args[0]).value();
-
-            // Return promise
-            return import_(context, specifier, loader);
-        });
     }
 }

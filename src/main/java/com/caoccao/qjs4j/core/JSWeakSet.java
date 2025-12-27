@@ -39,6 +39,11 @@ public final class JSWeakSet extends JSObject {
         this.data = Collections.newSetFromMap(new WeakHashMap<>());
     }
 
+    @Override
+    public String toString() {
+        return "[object WeakSet]";
+    }
+
     /**
      * Add a value to the WeakSet.
      * Value must be an object.
@@ -48,21 +53,16 @@ public final class JSWeakSet extends JSObject {
     }
 
     /**
-     * Check if the WeakSet has a value.
-     */
-    public boolean weakSetHas(JSObject value) {
-        return data.contains(value);
-    }
-
-    /**
      * Delete a value from the WeakSet.
      */
     public boolean weakSetDelete(JSObject value) {
         return data.remove(value);
     }
 
-    @Override
-    public String toString() {
-        return "[object WeakSet]";
+    /**
+     * Check if the WeakSet has a value.
+     */
+    public boolean weakSetHas(JSObject value) {
+        return data.contains(value);
     }
 }

@@ -28,12 +28,12 @@ public sealed interface JSFunction extends JSValue
     JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args);
 
     /**
-     * Get the function name.
-     */
-    String getName();
-
-    /**
      * Get the number of formal parameters.
      */
     int getLength();
+
+    /**
+     * Get the function name.
+     */
+    String getName();
 }

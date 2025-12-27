@@ -37,17 +37,31 @@ public final class JSMap extends JSObject {
     }
 
     /**
-     * Get the number of entries in the Map.
+     * Get all entries as an iterable.
      */
-    public int size() {
-        return data.size();
+    public Iterable<Map.Entry<KeyWrapper, JSValue>> entries() {
+        return data.entrySet();
     }
 
     /**
-     * Set a key-value pair in the Map.
+     * Get all keys as an iterable.
      */
-    public void mapSet(JSValue key, JSValue value) {
-        data.put(new KeyWrapper(key), value);
+    public Iterable<KeyWrapper> keys() {
+        return data.keySet();
+    }
+
+    /**
+     * Clear all entries from the Map.
+     */
+    public void mapClear() {
+        data.clear();
+    }
+
+    /**
+     * Delete a key from the Map.
+     */
+    public boolean mapDelete(JSValue key) {
+        return data.remove(new KeyWrapper(key)) != null;
     }
 
     /**
@@ -66,31 +80,22 @@ public final class JSMap extends JSObject {
     }
 
     /**
-     * Delete a key from the Map.
+     * Set a key-value pair in the Map.
      */
-    public boolean mapDelete(JSValue key) {
-        return data.remove(new KeyWrapper(key)) != null;
+    public void mapSet(JSValue key, JSValue value) {
+        data.put(new KeyWrapper(key), value);
     }
 
     /**
-     * Clear all entries from the Map.
+     * Get the number of entries in the Map.
      */
-    public void mapClear() {
-        data.clear();
+    public int size() {
+        return data.size();
     }
 
-    /**
-     * Get all entries as an iterable.
-     */
-    public Iterable<Map.Entry<KeyWrapper, JSValue>> entries() {
-        return data.entrySet();
-    }
-
-    /**
-     * Get all keys as an iterable.
-     */
-    public Iterable<KeyWrapper> keys() {
-        return data.keySet();
+    @Override
+    public String toString() {
+        return "[object Map]";
     }
 
     /**
@@ -101,76 +106,71 @@ public final class JSMap extends JSObject {
     }
 
     /**
-         * Wrapper class for Map keys to handle JSValue equality using SameValueZero.
-         * SameValueZero is like === except NaN equals NaN.
-         */
-        public record KeyWrapper(JSValue value) {
+     * Wrapper class for Map keys to handle JSValue equality using SameValueZero.
+     * SameValueZero is like === except NaN equals NaN.
+     */
+    public record KeyWrapper(JSValue value) {
 
         @Override
-            public boolean equals(Object obj) {
-                if (this == obj) return true;
-                if (!(obj instanceof KeyWrapper other)) return false;
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (!(obj instanceof KeyWrapper other)) return false;
 
-                // SameValueZero algorithm
-                return sameValueZero(this.value, other.value);
-            }
-
-        /**
-             * SameValueZero comparison.
-             * Like === but NaN equals NaN, and +0 equals -0.
-             */
-            private boolean sameValueZero(JSValue x, JSValue y) {
-                // Same reference
-                if (x == y) return true;
-
-                // Different types
-                if (x.type() != y.type()) return false;
-
-                // Numbers
-                if (x instanceof JSNumber xNum && y instanceof JSNumber yNum) {
-                    double xVal = xNum.value();
-                    double yVal = yNum.value();
-
-                    // NaN == NaN in SameValueZero
-                    if (Double.isNaN(xVal) && Double.isNaN(yVal)) {
-                        return true;
-                    }
-
-                    // +0 == -0 in SameValueZero
-                    return xVal == yVal;
-                }
-
-                // Strings
-                if (x instanceof JSString xStr && y instanceof JSString yStr) {
-                    return xStr.value().equals(yStr.value());
-                }
-
-                // Booleans
-                if (x instanceof JSBoolean xBool && y instanceof JSBoolean yBool) {
-                    return xBool.value() == yBool.value();
-                }
-
-                // BigInt
-                if (x instanceof JSBigInt xBig && y instanceof JSBigInt yBig) {
-                    return xBig.value().equals(yBig.value());
-                }
-
-                // Symbols (compare by identity, each Symbol is unique except well-known ones)
-                if (x instanceof JSSymbol && y instanceof JSSymbol) {
-                    return x == y;
-                }
-
-                // null and undefined
-                if (x instanceof JSNull && y instanceof JSNull) return true;
-                if (x instanceof JSUndefined && y instanceof JSUndefined) return true;
-
-                // Objects (compare by identity)
-                return x == y;
-            }
+            // SameValueZero algorithm
+            return sameValueZero(this.value, other.value);
         }
 
-    @Override
-    public String toString() {
-        return "[object Map]";
+        /**
+         * SameValueZero comparison.
+         * Like === but NaN equals NaN, and +0 equals -0.
+         */
+        private boolean sameValueZero(JSValue x, JSValue y) {
+            // Same reference
+            if (x == y) return true;
+
+            // Different types
+            if (x.type() != y.type()) return false;
+
+            // Numbers
+            if (x instanceof JSNumber xNum && y instanceof JSNumber yNum) {
+                double xVal = xNum.value();
+                double yVal = yNum.value();
+
+                // NaN == NaN in SameValueZero
+                if (Double.isNaN(xVal) && Double.isNaN(yVal)) {
+                    return true;
+                }
+
+                // +0 == -0 in SameValueZero
+                return xVal == yVal;
+            }
+
+            // Strings
+            if (x instanceof JSString xStr && y instanceof JSString yStr) {
+                return xStr.value().equals(yStr.value());
+            }
+
+            // Booleans
+            if (x instanceof JSBoolean xBool && y instanceof JSBoolean yBool) {
+                return xBool.value() == yBool.value();
+            }
+
+            // BigInt
+            if (x instanceof JSBigInt xBig && y instanceof JSBigInt yBig) {
+                return xBig.value().equals(yBig.value());
+            }
+
+            // Symbols (compare by identity, each Symbol is unique except well-known ones)
+            if (x instanceof JSSymbol && y instanceof JSSymbol) {
+                return x == y;
+            }
+
+            // null and undefined
+            if (x instanceof JSNull && y instanceof JSNull) return true;
+            if (x instanceof JSUndefined && y instanceof JSUndefined) return true;
+
+            // Objects (compare by identity)
+            return x == y;
+        }
     }
 }

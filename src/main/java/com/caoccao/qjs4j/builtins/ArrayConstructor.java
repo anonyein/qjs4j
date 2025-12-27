@@ -25,34 +25,6 @@ import com.caoccao.qjs4j.core.*;
 public final class ArrayConstructor {
 
     /**
-     * Array.isArray(arg)
-     * ES2020 22.1.2.2
-     * Determines whether the passed value is an Array.
-     */
-    public static JSValue isArray(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-
-        return JSBoolean.valueOf(args[0] instanceof JSArray);
-    }
-
-    /**
-     * Array.of(...items)
-     * ES2020 22.1.2.3
-     * Creates a new Array instance with a variable number of arguments.
-     */
-    public static JSValue of(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSArray array = new JSArray();
-
-        for (JSValue item : args) {
-            array.push(item);
-        }
-
-        return array;
-    }
-
-    /**
      * Array.from(arrayLike, mapFn, thisArg)
      * ES2020 22.1.2.1
      * Creates a new Array instance from an array-like or iterable object.
@@ -129,5 +101,33 @@ public final class ArrayConstructor {
         }
 
         return ctx.throwError("TypeError", "object is not iterable");
+    }
+
+    /**
+     * Array.isArray(arg)
+     * ES2020 22.1.2.2
+     * Determines whether the passed value is an Array.
+     */
+    public static JSValue isArray(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
+        }
+
+        return JSBoolean.valueOf(args[0] instanceof JSArray);
+    }
+
+    /**
+     * Array.of(...items)
+     * ES2020 22.1.2.3
+     * Creates a new Array instance with a variable number of arguments.
+     */
+    public static JSValue of(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSArray array = new JSArray();
+
+        for (JSValue item : args) {
+            array.push(item);
+        }
+
+        return array;
     }
 }

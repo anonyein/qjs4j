@@ -21,12 +21,12 @@ package com.caoccao.qjs4j.core;
  */
 public record JSNumber(double value) implements JSValue {
     @Override
-    public JSValueType type() {
-        return JSValueType.NUMBER;
+    public Object toJavaObject() {
+        return value;
     }
 
     @Override
-    public Object toJavaObject() {
-        return value;
+    public JSValueType type() {
+        return JSValueType.NUMBER;
     }
 }

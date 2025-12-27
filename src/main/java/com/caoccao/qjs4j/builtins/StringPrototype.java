@@ -25,6 +25,35 @@ import com.caoccao.qjs4j.core.*;
 public final class StringPrototype {
 
     /**
+     * String.prototype.at(index)
+     * ES2022 22.1.3.1
+     * Returns the character at the specified index, supporting negative indices.
+     */
+    public static JSValue at(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSString str = JSTypeConversions.toString(thisArg);
+        String s = str.value();
+
+        if (args.length == 0) {
+            return JSUndefined.INSTANCE;
+        }
+
+        long index = (long) JSTypeConversions.toInteger(args[0]);
+        int length = s.length();
+
+        // Handle negative indices
+        if (index < 0) {
+            index = length + index;
+        }
+
+        // Check bounds
+        if (index < 0 || index >= length) {
+            return JSUndefined.INSTANCE;
+        }
+
+        return new JSString(String.valueOf(s.charAt((int) index)));
+    }
+
+    /**
      * String.prototype.charAt(index)
      * ES2020 21.1.3.1
      */
@@ -112,22 +141,12 @@ public final class StringPrototype {
     }
 
     /**
-     * String.prototype.startsWith(searchString[, position])
-     * ES2020 21.1.3.21
+     * get String.prototype.length
+     * ES2020 21.1.3.10
      */
-    public static JSValue startsWith(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getLength(JSContext ctx, JSValue thisArg, JSValue[] args) {
         JSString str = JSTypeConversions.toString(thisArg);
-        String s = str.value();
-
-        if (args.length == 0) {
-            return JSBoolean.FALSE;
-        }
-
-        String searchStr = JSTypeConversions.toString(args[0]).value();
-        long position = args.length > 1 ? (long) JSTypeConversions.toInteger(args[1]) : 0;
-        position = Math.max(0, Math.min(position, s.length()));
-
-        return JSBoolean.valueOf(s.substring((int) position).startsWith(searchStr));
+        return new JSNumber(str.value().length());
     }
 
     /**
@@ -187,6 +206,25 @@ public final class StringPrototype {
 
         int index = s.lastIndexOf(searchStr, (int) position);
         return new JSNumber(index);
+    }
+
+    /**
+     * String.prototype.match(regexp)
+     * ES2020 21.1.3.10 (stub - regex support not implemented yet)
+     */
+    public static JSValue match(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return ctx.throwError("Error", "String.prototype.match not implemented yet");
+    }
+
+    /**
+     * String.prototype.matchAll(regexp)
+     * ES2020 21.1.3.11
+     * Returns an iterator of all results matching a string against a regular expression,
+     * including capturing groups.
+     * (stub - regex support not implemented yet)
+     */
+    public static JSValue matchAll(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return ctx.throwError("Error", "String.prototype.matchAll not implemented yet");
     }
 
     /**
@@ -391,29 +429,22 @@ public final class StringPrototype {
     }
 
     /**
-     * String.prototype.substring(indexStart[, indexEnd])
-     * ES2020 21.1.3.19
+     * String.prototype.startsWith(searchString[, position])
+     * ES2020 21.1.3.21
      */
-    public static JSValue substring(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue startsWith(JSContext ctx, JSValue thisArg, JSValue[] args) {
         JSString str = JSTypeConversions.toString(thisArg);
         String s = str.value();
-        int len = s.length();
 
-        long start = args.length > 0 ? (long) JSTypeConversions.toInteger(args[0]) : 0;
-        long end = args.length > 1 ? (long) JSTypeConversions.toInteger(args[1]) : len;
-
-        // Clamp to [0, len]
-        start = Math.max(0, Math.min(start, len));
-        end = Math.max(0, Math.min(end, len));
-
-        // Swap if start > end
-        if (start > end) {
-            long temp = start;
-            start = end;
-            end = temp;
+        if (args.length == 0) {
+            return JSBoolean.FALSE;
         }
 
-        return new JSString(s.substring((int) start, (int) end));
+        String searchStr = JSTypeConversions.toString(args[0]).value();
+        long position = args.length > 1 ? (long) JSTypeConversions.toInteger(args[1]) : 0;
+        position = Math.max(0, Math.min(position, s.length()));
+
+        return JSBoolean.valueOf(s.substring((int) position).startsWith(searchStr));
     }
 
     /**
@@ -441,12 +472,49 @@ public final class StringPrototype {
     }
 
     /**
+     * String.prototype.substring(indexStart[, indexEnd])
+     * ES2020 21.1.3.19
+     */
+    public static JSValue substring(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSString str = JSTypeConversions.toString(thisArg);
+        String s = str.value();
+        int len = s.length();
+
+        long start = args.length > 0 ? (long) JSTypeConversions.toInteger(args[0]) : 0;
+        long end = args.length > 1 ? (long) JSTypeConversions.toInteger(args[1]) : len;
+
+        // Clamp to [0, len]
+        start = Math.max(0, Math.min(start, len));
+        end = Math.max(0, Math.min(end, len));
+
+        // Swap if start > end
+        if (start > end) {
+            long temp = start;
+            start = end;
+            end = temp;
+        }
+
+        return new JSString(s.substring((int) start, (int) end));
+    }
+
+    /**
      * String.prototype.toLowerCase()
      * ES2020 21.1.3.22
      */
     public static JSValue toLowerCase(JSContext ctx, JSValue thisArg, JSValue[] args) {
         JSString str = JSTypeConversions.toString(thisArg);
         return new JSString(str.value().toLowerCase());
+    }
+
+    /**
+     * String.prototype.toString()
+     * ES2020 21.1.3.23
+     */
+    public static JSValue toStringMethod(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (thisArg instanceof JSString str) {
+            return str;
+        }
+        return ctx.throwError("TypeError", "String.prototype.toString called on non-string");
     }
 
     /**
@@ -468,15 +536,6 @@ public final class StringPrototype {
     }
 
     /**
-     * String.prototype.trimStart() / trimLeft()
-     * ES2020 21.1.3.27
-     */
-    public static JSValue trimStart(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSString str = JSTypeConversions.toString(thisArg);
-        return new JSString(str.value().stripLeading());
-    }
-
-    /**
      * String.prototype.trimEnd() / trimRight()
      * ES2020 21.1.3.28
      */
@@ -486,14 +545,12 @@ public final class StringPrototype {
     }
 
     /**
-     * String.prototype.toString()
-     * ES2020 21.1.3.23
+     * String.prototype.trimStart() / trimLeft()
+     * ES2020 21.1.3.27
      */
-    public static JSValue toStringMethod(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (thisArg instanceof JSString str) {
-            return str;
-        }
-        return ctx.throwError("TypeError", "String.prototype.toString called on non-string");
+    public static JSValue trimStart(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSString str = JSTypeConversions.toString(thisArg);
+        return new JSString(str.value().stripLeading());
     }
 
     /**
@@ -505,62 +562,5 @@ public final class StringPrototype {
             return str;
         }
         return ctx.throwError("TypeError", "String.prototype.valueOf called on non-string");
-    }
-
-    /**
-     * get String.prototype.length
-     * ES2020 21.1.3.10
-     */
-    public static JSValue getLength(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSString str = JSTypeConversions.toString(thisArg);
-        return new JSNumber(str.value().length());
-    }
-
-    /**
-     * String.prototype.at(index)
-     * ES2022 22.1.3.1
-     * Returns the character at the specified index, supporting negative indices.
-     */
-    public static JSValue at(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSString str = JSTypeConversions.toString(thisArg);
-        String s = str.value();
-
-        if (args.length == 0) {
-            return JSUndefined.INSTANCE;
-        }
-
-        long index = (long) JSTypeConversions.toInteger(args[0]);
-        int length = s.length();
-
-        // Handle negative indices
-        if (index < 0) {
-            index = length + index;
-        }
-
-        // Check bounds
-        if (index < 0 || index >= length) {
-            return JSUndefined.INSTANCE;
-        }
-
-        return new JSString(String.valueOf(s.charAt((int) index)));
-    }
-
-    /**
-     * String.prototype.match(regexp)
-     * ES2020 21.1.3.10 (stub - regex support not implemented yet)
-     */
-    public static JSValue match(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return ctx.throwError("Error", "String.prototype.match not implemented yet");
-    }
-
-    /**
-     * String.prototype.matchAll(regexp)
-     * ES2020 21.1.3.11
-     * Returns an iterator of all results matching a string against a regular expression,
-     * including capturing groups.
-     * (stub - regex support not implemented yet)
-     */
-    public static JSValue matchAll(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return ctx.throwError("Error", "String.prototype.matchAll not implemented yet");
     }
 }

@@ -24,15 +24,8 @@ import java.util.Map;
  */
 public final class Scope {
     private final Scope parent;
-    private final Map<String, Variable> variables;
     private final ScopeType type;
-
-    public enum ScopeType {
-        GLOBAL,
-        FUNCTION,
-        BLOCK,
-        MODULE
-    }
+    private final Map<String, Variable> variables;
 
     public Scope(Scope parent, ScopeType type) {
         this.parent = parent;
@@ -43,12 +36,19 @@ public final class Scope {
     public void declareVariable(String name, Variable variable) {
     }
 
+    public Scope getParent() {
+        return parent;
+    }
+
     public Variable resolveVariable(String name) {
         return null;
     }
 
-    public Scope getParent() {
-        return parent;
+    public enum ScopeType {
+        GLOBAL,
+        FUNCTION,
+        BLOCK,
+        MODULE
     }
 
     public record Variable(String name, boolean isConst, boolean isLet, int index) {

@@ -28,18 +28,31 @@ package com.caoccao.qjs4j.core;
 public final class JSAsyncIteratorHelper {
 
     /**
-     * Callback interface for for-await-of iteration.
+     * Execute a for-await-of loop.
+     * Iterates asynchronously, waiting for each promise to resolve.
+     *
+     * @param iterable The iterable to loop over
+     * @param callback The callback to execute for each value
+     * @param ctx      The execution context
+     * @return A promise that resolves when iteration is complete
      */
-    @FunctionalInterface
-    public interface AsyncIterationCallback {
-        /**
-         * Process an iteration value.
-         * Called asynchronously for each value.
-         *
-         * @param value The current value
-         * @return A promise that resolves when processing is complete
-         */
-        JSPromise iterate(JSValue value);
+    public static JSPromise forAwaitOf(JSValue iterable, AsyncIterationCallback callback, JSContext ctx) {
+        JSPromise completionPromise = new JSPromise();
+
+        // Get async iterator
+        JSAsyncIterator iterator = getAsyncIterator(iterable, ctx);
+        if (iterator == null) {
+            JSObject error = new JSObject();
+            error.set("name", new JSString("TypeError"));
+            error.set("message", new JSString("Object is not async iterable"));
+            completionPromise.reject(error);
+            return completionPromise;
+        }
+
+        // Start iteration
+        iterateNext(iterator, callback, ctx, completionPromise);
+
+        return completionPromise;
     }
 
     /**
@@ -84,31 +97,27 @@ public final class JSAsyncIteratorHelper {
     }
 
     /**
-     * Execute a for-await-of loop.
-     * Iterates asynchronously, waiting for each promise to resolve.
+     * Check if a value is async iterable.
      *
-     * @param iterable The iterable to loop over
-     * @param callback The callback to execute for each value
-     * @param ctx      The execution context
-     * @return A promise that resolves when iteration is complete
+     * @param value The value to check
+     * @return True if the value has Symbol.asyncIterator or Symbol.iterator
      */
-    public static JSPromise forAwaitOf(JSValue iterable, AsyncIterationCallback callback, JSContext ctx) {
-        JSPromise completionPromise = new JSPromise();
-
-        // Get async iterator
-        JSAsyncIterator iterator = getAsyncIterator(iterable, ctx);
-        if (iterator == null) {
-            JSObject error = new JSObject();
-            error.set("name", new JSString("TypeError"));
-            error.set("message", new JSString("Object is not async iterable"));
-            completionPromise.reject(error);
-            return completionPromise;
+    public static boolean isAsyncIterable(JSValue value) {
+        if (!(value instanceof JSObject obj)) {
+            return false;
         }
 
-        // Start iteration
-        iterateNext(iterator, callback, ctx, completionPromise);
+        // Check for Symbol.asyncIterator
+        PropertyKey asyncIteratorKey = PropertyKey.fromSymbol(JSSymbol.ASYNC_ITERATOR);
+        JSValue asyncIteratorMethod = obj.get(asyncIteratorKey);
+        if (asyncIteratorMethod instanceof JSFunction) {
+            return true;
+        }
 
-        return completionPromise;
+        // Check for Symbol.iterator (can be converted to async)
+        PropertyKey iteratorKey = PropertyKey.fromSymbol(JSSymbol.ITERATOR);
+        JSValue iteratorMethod = obj.get(iteratorKey);
+        return iteratorMethod instanceof JSFunction;
     }
 
     /**
@@ -229,26 +238,17 @@ public final class JSAsyncIteratorHelper {
     }
 
     /**
-     * Check if a value is async iterable.
-     *
-     * @param value The value to check
-     * @return True if the value has Symbol.asyncIterator or Symbol.iterator
+     * Callback interface for for-await-of iteration.
      */
-    public static boolean isAsyncIterable(JSValue value) {
-        if (!(value instanceof JSObject obj)) {
-            return false;
-        }
-
-        // Check for Symbol.asyncIterator
-        PropertyKey asyncIteratorKey = PropertyKey.fromSymbol(JSSymbol.ASYNC_ITERATOR);
-        JSValue asyncIteratorMethod = obj.get(asyncIteratorKey);
-        if (asyncIteratorMethod instanceof JSFunction) {
-            return true;
-        }
-
-        // Check for Symbol.iterator (can be converted to async)
-        PropertyKey iteratorKey = PropertyKey.fromSymbol(JSSymbol.ITERATOR);
-        JSValue iteratorMethod = obj.get(iteratorKey);
-        return iteratorMethod instanceof JSFunction;
+    @FunctionalInterface
+    public interface AsyncIterationCallback {
+        /**
+         * Process an iteration value.
+         * Called asynchronously for each value.
+         *
+         * @param value The current value
+         * @return A promise that resolves when processing is complete
+         */
+        JSPromise iterate(JSValue value);
     }
 }

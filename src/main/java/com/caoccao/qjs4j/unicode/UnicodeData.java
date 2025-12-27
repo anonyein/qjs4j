@@ -22,13 +22,13 @@ package com.caoccao.qjs4j.unicode;
  */
 public final class UnicodeData {
 
+    public static final int UNICODE_C_DIGIT = (1 << 1);
+    public static final int UNICODE_C_DOLLAR = (1 << 5);
+    public static final int UNICODE_C_LOWER = (1 << 3);
     // Character type bits (from QuickJS)
     public static final int UNICODE_C_SPACE = (1 << 0);
-    public static final int UNICODE_C_DIGIT = (1 << 1);
-    public static final int UNICODE_C_UPPER = (1 << 2);
-    public static final int UNICODE_C_LOWER = (1 << 3);
     public static final int UNICODE_C_UNDER = (1 << 4);
-    public static final int UNICODE_C_DOLLAR = (1 << 5);
+    public static final int UNICODE_C_UPPER = (1 << 2);
     public static final int UNICODE_C_XDIGIT = (1 << 6);
 
     // ASCII character type table (0-255)
@@ -79,6 +79,100 @@ public final class UnicodeData {
     }
 
     /**
+     * Combine high and low surrogates into a codepoint.
+     */
+    public static int fromSurrogates(int high, int low) {
+        return 0x10000 + 0x400 * (high - 0xD800) + (low - 0xDC00);
+    }
+
+    /**
+     * Check if character is a decimal digit.
+     */
+    public static boolean isDigit(int codePoint) {
+        if (codePoint < 256) {
+            return (ASCII_CTYPE_BITS[codePoint] & UNICODE_C_DIGIT) != 0;
+        }
+        return Character.isDigit(codePoint);
+    }
+
+    /**
+     * Check if character is a hex digit.
+     */
+    public static boolean isHexDigit(int codePoint) {
+        if (codePoint < 256) {
+            return (ASCII_CTYPE_BITS[codePoint] & UNICODE_C_XDIGIT) != 0;
+        }
+        return false;
+    }
+
+    /**
+     * Check if codepoint is a high surrogate.
+     */
+    public static boolean isHighSurrogate(int codePoint) {
+        return (codePoint >> 10) == (0xD800 >> 10); // 0xD800-0xDBFF
+    }
+
+    /**
+     * Check if character can continue an identifier.
+     * Follows ECMAScript specification (ID_Continue property).
+     */
+    public static boolean isIdentifierPart(int codePoint) {
+        if (codePoint < 128) {
+            // ASCII fast path
+            return (ASCII_CTYPE_BITS[codePoint] & (UNICODE_C_UPPER | UNICODE_C_LOWER |
+                    UNICODE_C_UNDER | UNICODE_C_DOLLAR | UNICODE_C_DIGIT)) != 0;
+        }
+
+        // ZWNJ (U+200C) and ZWJ (U+200D) are allowed in identifiers
+        if (codePoint == 0x200C || codePoint == 0x200D) {
+            return true;
+        }
+
+        // Use Java's Character class for Unicode support
+        return Character.isUnicodeIdentifierPart(codePoint);
+    }
+
+    /**
+     * Check if character can start an identifier.
+     * Follows ECMAScript specification (ID_Start property).
+     */
+    public static boolean isIdentifierStart(int codePoint) {
+        if (codePoint < 128) {
+            // ASCII fast path
+            return (ASCII_CTYPE_BITS[codePoint] & (UNICODE_C_UPPER | UNICODE_C_LOWER |
+                    UNICODE_C_UNDER | UNICODE_C_DOLLAR)) != 0;
+        }
+
+        // Use Java's Character class for Unicode support
+        return Character.isUnicodeIdentifierStart(codePoint);
+    }
+
+    /**
+     * Check if character is a line terminator.
+     * ECMAScript recognizes: LF, CR, LS, PS
+     */
+    public static boolean isLineTerminator(int codePoint) {
+        return codePoint == 0x000A ||  // LINE FEED (LF)
+                codePoint == 0x000D ||  // CARRIAGE RETURN (CR)
+                codePoint == 0x2028 ||  // LINE SEPARATOR (LS)
+                codePoint == 0x2029;    // PARAGRAPH SEPARATOR (PS)
+    }
+
+    /**
+     * Check if codepoint is a low surrogate.
+     */
+    public static boolean isLowSurrogate(int codePoint) {
+        return (codePoint >> 10) == (0xDC00 >> 10); // 0xDC00-0xDFFF
+    }
+
+    /**
+     * Check if codepoint is a surrogate.
+     */
+    public static boolean isSurrogate(int codePoint) {
+        return (codePoint >> 11) == (0xD800 >> 11); // 0xD800-0xDFFF
+    }
+
+    /**
      * Check if character is a whitespace character.
      * Follows ECMAScript specification.
      */
@@ -113,72 +207,6 @@ public final class UnicodeData {
     }
 
     /**
-     * Check if character can start an identifier.
-     * Follows ECMAScript specification (ID_Start property).
-     */
-    public static boolean isIdentifierStart(int codePoint) {
-        if (codePoint < 128) {
-            // ASCII fast path
-            return (ASCII_CTYPE_BITS[codePoint] & (UNICODE_C_UPPER | UNICODE_C_LOWER |
-                    UNICODE_C_UNDER | UNICODE_C_DOLLAR)) != 0;
-        }
-
-        // Use Java's Character class for Unicode support
-        return Character.isUnicodeIdentifierStart(codePoint);
-    }
-
-    /**
-     * Check if character can continue an identifier.
-     * Follows ECMAScript specification (ID_Continue property).
-     */
-    public static boolean isIdentifierPart(int codePoint) {
-        if (codePoint < 128) {
-            // ASCII fast path
-            return (ASCII_CTYPE_BITS[codePoint] & (UNICODE_C_UPPER | UNICODE_C_LOWER |
-                    UNICODE_C_UNDER | UNICODE_C_DOLLAR | UNICODE_C_DIGIT)) != 0;
-        }
-
-        // ZWNJ (U+200C) and ZWJ (U+200D) are allowed in identifiers
-        if (codePoint == 0x200C || codePoint == 0x200D) {
-            return true;
-        }
-
-        // Use Java's Character class for Unicode support
-        return Character.isUnicodeIdentifierPart(codePoint);
-    }
-
-    /**
-     * Check if character is a line terminator.
-     * ECMAScript recognizes: LF, CR, LS, PS
-     */
-    public static boolean isLineTerminator(int codePoint) {
-        return codePoint == 0x000A ||  // LINE FEED (LF)
-                codePoint == 0x000D ||  // CARRIAGE RETURN (CR)
-                codePoint == 0x2028 ||  // LINE SEPARATOR (LS)
-                codePoint == 0x2029;    // PARAGRAPH SEPARATOR (PS)
-    }
-
-    /**
-     * Check if character is a decimal digit.
-     */
-    public static boolean isDigit(int codePoint) {
-        if (codePoint < 256) {
-            return (ASCII_CTYPE_BITS[codePoint] & UNICODE_C_DIGIT) != 0;
-        }
-        return Character.isDigit(codePoint);
-    }
-
-    /**
-     * Check if character is a hex digit.
-     */
-    public static boolean isHexDigit(int codePoint) {
-        if (codePoint < 256) {
-            return (ASCII_CTYPE_BITS[codePoint] & UNICODE_C_XDIGIT) != 0;
-        }
-        return false;
-    }
-
-    /**
      * Check if character is a word character (for regex \w).
      */
     public static boolean isWordChar(int codePoint) {
@@ -187,33 +215,5 @@ public final class UnicodeData {
                     UNICODE_C_UNDER | UNICODE_C_DIGIT)) != 0;
         }
         return false;
-    }
-
-    /**
-     * Check if codepoint is a surrogate.
-     */
-    public static boolean isSurrogate(int codePoint) {
-        return (codePoint >> 11) == (0xD800 >> 11); // 0xD800-0xDFFF
-    }
-
-    /**
-     * Check if codepoint is a high surrogate.
-     */
-    public static boolean isHighSurrogate(int codePoint) {
-        return (codePoint >> 10) == (0xD800 >> 10); // 0xD800-0xDBFF
-    }
-
-    /**
-     * Check if codepoint is a low surrogate.
-     */
-    public static boolean isLowSurrogate(int codePoint) {
-        return (codePoint >> 10) == (0xDC00 >> 10); // 0xDC00-0xDFFF
-    }
-
-    /**
-     * Combine high and low surrogates into a codepoint.
-     */
-    public static int fromSurrogates(int high, int low) {
-        return 0x10000 + 0x400 * (high - 0xD800) + (low - 0xDC00);
     }
 }

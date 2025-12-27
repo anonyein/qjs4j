@@ -36,12 +36,16 @@ public final class JSWeakMap extends JSObject {
         this.data = new WeakHashMap<>();
     }
 
+    @Override
+    public String toString() {
+        return "[object WeakMap]";
+    }
+
     /**
-     * Set a key-value pair in the WeakMap.
-     * Key must be an object.
+     * Delete a key from the WeakMap.
      */
-    public void weakMapSet(JSObject key, JSValue value) {
-        data.put(key, value);
+    public boolean weakMapDelete(JSObject key) {
+        return data.remove(key) != null;
     }
 
     /**
@@ -60,14 +64,10 @@ public final class JSWeakMap extends JSObject {
     }
 
     /**
-     * Delete a key from the WeakMap.
+     * Set a key-value pair in the WeakMap.
+     * Key must be an object.
      */
-    public boolean weakMapDelete(JSObject key) {
-        return data.remove(key) != null;
-    }
-
-    @Override
-    public String toString() {
-        return "[object WeakMap]";
+    public void weakMapSet(JSObject key, JSValue value) {
+        data.put(key, value);
     }
 }

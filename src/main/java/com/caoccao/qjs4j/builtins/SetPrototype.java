@@ -25,19 +25,6 @@ import com.caoccao.qjs4j.core.*;
 public final class SetPrototype {
 
     /**
-     * get Set.prototype.size
-     * ES2020 23.2.3.9
-     * Returns the number of values in the Set.
-     */
-    public static JSValue getSize(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSSet set)) {
-            return ctx.throwError("TypeError", "get Set.prototype.size called on non-Set");
-        }
-
-        return new JSNumber(set.size());
-    }
-
-    /**
      * Set.prototype.add(value)
      * ES2020 23.2.3.1
      * Adds the value to the Set. Returns the Set object.
@@ -53,17 +40,17 @@ public final class SetPrototype {
     }
 
     /**
-     * Set.prototype.has(value)
-     * ES2020 23.2.3.7
-     * Returns a boolean indicating whether a value exists in the Set.
+     * Set.prototype.clear()
+     * ES2020 23.2.3.2
+     * Removes all values from the Set.
      */
-    public static JSValue has(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue clear(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSSet set)) {
-            return ctx.throwError("TypeError", "Set.prototype.has called on non-Set");
+            return ctx.throwError("TypeError", "Set.prototype.clear called on non-Set");
         }
 
-        JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-        return JSBoolean.valueOf(set.setHas(value));
+        set.setClear();
+        return JSUndefined.INSTANCE;
     }
 
     /**
@@ -81,17 +68,26 @@ public final class SetPrototype {
     }
 
     /**
-     * Set.prototype.clear()
-     * ES2020 23.2.3.2
-     * Removes all values from the Set.
+     * Set.prototype.entries()
+     * ES2020 23.2.3.5
+     * Returns an iterator over [value, value] pairs.
+     * Simplified implementation - returns an array for now.
      */
-    public static JSValue clear(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSSet set)) {
-            return ctx.throwError("TypeError", "Set.prototype.clear called on non-Set");
+            return ctx.throwError("TypeError", "Set.prototype.entries called on non-Set");
         }
 
-        set.setClear();
-        return JSUndefined.INSTANCE;
+        JSArray result = new JSArray();
+        for (JSMap.KeyWrapper wrapper : set.values()) {
+            JSValue value = wrapper.value();
+            JSArray pair = new JSArray();
+            pair.push(value);
+            pair.push(value); // In Set, both elements are the same value
+            result.push(pair);
+        }
+
+        return result;
     }
 
     /**
@@ -124,26 +120,30 @@ public final class SetPrototype {
     }
 
     /**
-     * Set.prototype.entries()
-     * ES2020 23.2.3.5
-     * Returns an iterator over [value, value] pairs.
-     * Simplified implementation - returns an array for now.
+     * get Set.prototype.size
+     * ES2020 23.2.3.9
+     * Returns the number of values in the Set.
      */
-    public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getSize(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSSet set)) {
-            return ctx.throwError("TypeError", "Set.prototype.entries called on non-Set");
+            return ctx.throwError("TypeError", "get Set.prototype.size called on non-Set");
         }
 
-        JSArray result = new JSArray();
-        for (JSMap.KeyWrapper wrapper : set.values()) {
-            JSValue value = wrapper.value();
-            JSArray pair = new JSArray();
-            pair.push(value);
-            pair.push(value); // In Set, both elements are the same value
-            result.push(pair);
+        return new JSNumber(set.size());
+    }
+
+    /**
+     * Set.prototype.has(value)
+     * ES2020 23.2.3.7
+     * Returns a boolean indicating whether a value exists in the Set.
+     */
+    public static JSValue has(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSSet set)) {
+            return ctx.throwError("TypeError", "Set.prototype.has called on non-Set");
         }
 
-        return result;
+        JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+        return JSBoolean.valueOf(set.setHas(value));
     }
 
     /**

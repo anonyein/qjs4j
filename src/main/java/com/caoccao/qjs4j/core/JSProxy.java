@@ -22,9 +22,9 @@ package com.caoccao.qjs4j.core;
  * Based on ES2020 Proxy specification (simplified).
  */
 public final class JSProxy extends JSObject {
-    private final JSObject target;
-    private final JSObject handler;
     private final JSContext context;
+    private final JSObject handler;
+    private final JSObject target;
 
     /**
      * Create a new Proxy.
@@ -40,12 +40,25 @@ public final class JSProxy extends JSObject {
         this.context = context;
     }
 
-    public JSObject getTarget() {
-        return target;
-    }
+    /**
+     * Override delete to intercept property deletion.
+     */
+    @Override
+    public boolean delete(PropertyKey key) {
+        // Check if handler has 'deleteProperty' trap
+        JSValue deleteTrap = handler.get("deleteProperty");
+        if (deleteTrap instanceof JSFunction deleteTrapFunc) {
+            // Call the trap: handler.deleteProperty(target, property)
+            JSValue[] args = new JSValue[]{
+                    target,
+                    key.isString() ? new JSString(key.asString()) : key.asSymbol()
+            };
+            JSValue result = deleteTrapFunc.call(context, handler, args);
+            return JSTypeConversions.toBoolean(result) == JSBoolean.TRUE;
+        }
 
-    public JSObject getHandler() {
-        return handler;
+        // No trap, forward to target
+        return target.delete(key);
     }
 
     /**
@@ -69,27 +82,12 @@ public final class JSProxy extends JSObject {
         return target.get(key);
     }
 
-    /**
-     * Override set to intercept property assignment.
-     */
-    @Override
-    public void set(PropertyKey key, JSValue value) {
-        // Check if handler has 'set' trap
-        JSValue setTrap = handler.get("set");
-        if (setTrap instanceof JSFunction setTrapFunc) {
-            // Call the trap: handler.set(target, property, value, receiver)
-            JSValue[] args = new JSValue[]{
-                    target,
-                    key.isString() ? new JSString(key.asString()) : key.asSymbol(),
-                    value,
-                    this
-            };
-            setTrapFunc.call(context, handler, args);
-            return;
-        }
+    public JSObject getHandler() {
+        return handler;
+    }
 
-        // No trap, forward to target
-        target.set(key, value);
+    public JSObject getTarget() {
+        return target;
     }
 
     /**
@@ -111,27 +109,6 @@ public final class JSProxy extends JSObject {
 
         // No trap, forward to target
         return target.has(key);
-    }
-
-    /**
-     * Override delete to intercept property deletion.
-     */
-    @Override
-    public boolean delete(PropertyKey key) {
-        // Check if handler has 'deleteProperty' trap
-        JSValue deleteTrap = handler.get("deleteProperty");
-        if (deleteTrap instanceof JSFunction deleteTrapFunc) {
-            // Call the trap: handler.deleteProperty(target, property)
-            JSValue[] args = new JSValue[]{
-                    target,
-                    key.isString() ? new JSString(key.asString()) : key.asSymbol()
-            };
-            JSValue result = deleteTrapFunc.call(context, handler, args);
-            return JSTypeConversions.toBoolean(result) == JSBoolean.TRUE;
-        }
-
-        // No trap, forward to target
-        return target.delete(key);
     }
 
     /**
@@ -164,6 +141,29 @@ public final class JSProxy extends JSObject {
 
         // No trap, forward to target
         return target.ownPropertyKeys();
+    }
+
+    /**
+     * Override set to intercept property assignment.
+     */
+    @Override
+    public void set(PropertyKey key, JSValue value) {
+        // Check if handler has 'set' trap
+        JSValue setTrap = handler.get("set");
+        if (setTrap instanceof JSFunction setTrapFunc) {
+            // Call the trap: handler.set(target, property, value, receiver)
+            JSValue[] args = new JSValue[]{
+                    target,
+                    key.isString() ? new JSString(key.asString()) : key.asSymbol(),
+                    value,
+                    this
+            };
+            setTrapFunc.call(context, handler, args);
+            return;
+        }
+
+        // No trap, forward to target
+        target.set(key, value);
     }
 
     @Override

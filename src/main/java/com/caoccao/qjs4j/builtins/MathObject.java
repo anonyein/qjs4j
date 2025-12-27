@@ -112,6 +112,16 @@ public final class MathObject {
     }
 
     /**
+     * Math.atan2(y, x)
+     * ES2020 20.2.2.8
+     */
+    public static JSValue atan2(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        double y = args.length > 0 ? JSTypeConversions.toNumber(args[0]).value() : Double.NaN;
+        double x = args.length > 1 ? JSTypeConversions.toNumber(args[1]).value() : Double.NaN;
+        return new JSNumber(Math.atan2(y, x));
+    }
+
+    /**
      * Math.atanh(x)
      * ES2020 20.2.2.7
      */
@@ -122,16 +132,6 @@ public final class MathObject {
         double x = JSTypeConversions.toNumber(args[0]).value();
         // atanh(x) = 0.5 * ln((1+x)/(1-x))
         return new JSNumber(0.5 * Math.log((1 + x) / (1 - x)));
-    }
-
-    /**
-     * Math.atan2(y, x)
-     * ES2020 20.2.2.8
-     */
-    public static JSValue atan2(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        double y = args.length > 0 ? JSTypeConversions.toNumber(args[0]).value() : Double.NaN;
-        double x = args.length > 1 ? JSTypeConversions.toNumber(args[1]).value() : Double.NaN;
-        return new JSNumber(Math.atan2(y, x));
     }
 
     /**
@@ -289,6 +289,18 @@ public final class MathObject {
     }
 
     /**
+     * Math.log10(x)
+     * ES2020 20.2.2.22
+     */
+    public static JSValue log10(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return new JSNumber(Double.NaN);
+        }
+        double x = JSTypeConversions.toNumber(args[0]).value();
+        return new JSNumber(Math.log10(x));
+    }
+
+    /**
      * Math.log1p(x)
      * ES2020 20.2.2.21
      * Returns ln(1 + x)
@@ -299,18 +311,6 @@ public final class MathObject {
         }
         double x = JSTypeConversions.toNumber(args[0]).value();
         return new JSNumber(Math.log1p(x));
-    }
-
-    /**
-     * Math.log10(x)
-     * ES2020 20.2.2.22
-     */
-    public static JSValue log10(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0) {
-            return new JSNumber(Double.NaN);
-        }
-        double x = JSTypeConversions.toNumber(args[0]).value();
-        return new JSNumber(Math.log10(x));
     }
 
     /**

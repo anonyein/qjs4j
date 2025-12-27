@@ -26,12 +26,16 @@ import java.util.Set;
  * Implements mark-and-sweep for cycle detection.
  */
 public final class GarbageCollector {
-    private final Set<JSObject> rootSet;
     private final Set<JSObject> allObjects;
+    private final Set<JSObject> rootSet;
 
     public GarbageCollector() {
         this.rootSet = new HashSet<>();
         this.allObjects = new HashSet<>();
+    }
+
+    public void addRoot(JSObject obj) {
+        rootSet.add(obj);
     }
 
     public void collectGarbage() {
@@ -43,14 +47,10 @@ public final class GarbageCollector {
         return new HashSet<>();
     }
 
-    private void sweepPhase(Set<JSObject> reachable) {
-    }
-
-    public void addRoot(JSObject obj) {
-        rootSet.add(obj);
-    }
-
     public void removeRoot(JSObject obj) {
         rootSet.remove(obj);
+    }
+
+    private void sweepPhase(Set<JSObject> reachable) {
     }
 }

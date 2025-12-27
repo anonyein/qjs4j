@@ -58,15 +58,11 @@ public final class JSArrayBuffer extends JSObject {
     }
 
     /**
-     * Get the byte length of this buffer.
-     *
-     * @return The byte length
+     * Detach this ArrayBuffer, making it unusable.
+     * ES2020 24.1.1.3
      */
-    public int getByteLength() {
-        if (detached) {
-            return 0;
-        }
-        return buffer.capacity();
+    public void detach() {
+        this.detached = true;
     }
 
     /**
@@ -83,11 +79,15 @@ public final class JSArrayBuffer extends JSObject {
     }
 
     /**
-     * Detach this ArrayBuffer, making it unusable.
-     * ES2020 24.1.1.3
+     * Get the byte length of this buffer.
+     *
+     * @return The byte length
      */
-    public void detach() {
-        this.detached = true;
+    public int getByteLength() {
+        if (detached) {
+            return 0;
+        }
+        return buffer.capacity();
     }
 
     /**

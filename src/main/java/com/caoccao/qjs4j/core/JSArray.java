@@ -67,60 +67,17 @@ public final class JSArray extends JSObject {
     }
 
     /**
-     * Initialize the "length" property as a special data property.
+     * Ensure dense array has sufficient capacity.
      */
-    private void initializeLengthProperty() {
-        // The length property is special - it's writable but not enumerable or configurable
-        PropertyDescriptor lengthDesc = PropertyDescriptor.dataDescriptor(
-                new JSNumber(length),
-                true,  // writable
-                false, // not enumerable
-                false  // not configurable
-        );
-        super.defineProperty(PropertyKey.fromString("length"), lengthDesc);
-    }
-
-    /**
-     * Get the array length.
-     */
-    public long getLength() {
-        return length;
-    }
-
-    /**
-     * Set the array length.
-     * When length is reduced, elements beyond the new length are deleted.
-     */
-    public void setLength(long newLength) {
-        if (newLength < 0 || newLength > 0xFFFFFFFFL) {
-            throw new IllegalArgumentException("Invalid array length: " + newLength);
+    private void ensureDenseCapacity(int requiredCapacity) {
+        if (requiredCapacity <= denseArray.length) {
+            return;
         }
 
-        if (newLength < length) {
-            // Truncate array - delete elements beyond new length
-            int denseLimit = (int) Math.min(newLength, denseArray.length);
-            for (int i = denseLimit; i < Math.min(length, denseArray.length); i++) {
-                denseArray[i] = null;
-            }
+        int newCapacity = Math.max(denseArray.length * 2, requiredCapacity);
+        newCapacity = Math.min(newCapacity, MAX_DENSE_SIZE);
 
-            // Remove sparse elements beyond new length
-            if (sparseProperties != null) {
-                sparseProperties.entrySet().removeIf(entry -> entry.getKey() >= newLength);
-            }
-        }
-
-        this.length = newLength;
-        updateLengthProperty();
-    }
-
-    /**
-     * Update the length property value.
-     */
-    private void updateLengthProperty() {
-        int offset = shape.getPropertyOffset(PropertyKey.fromString("length"));
-        if (offset >= 0) {
-            propertyValues[offset] = new JSNumber(length);
-        }
+        denseArray = Arrays.copyOf(denseArray, newCapacity);
     }
 
     /**
@@ -145,6 +102,78 @@ public final class JSArray extends JSObject {
         }
 
         return JSUndefined.INSTANCE;
+    }
+
+    @Override
+    public JSValue get(int index) {
+        return get((long) index);
+    }
+
+    /**
+     * Get the array length.
+     */
+    public long getLength() {
+        return length;
+    }
+
+    /**
+     * Initialize the "length" property as a special data property.
+     */
+    private void initializeLengthProperty() {
+        // The length property is special - it's writable but not enumerable or configurable
+        PropertyDescriptor lengthDesc = PropertyDescriptor.dataDescriptor(
+                new JSNumber(length),
+                true,  // writable
+                false, // not enumerable
+                false  // not configurable
+        );
+        super.defineProperty(PropertyKey.fromString("length"), lengthDesc);
+    }
+
+    /**
+     * Check if array is dense (no holes).
+     */
+    public boolean isDense() {
+        if (sparseProperties != null && !sparseProperties.isEmpty()) {
+            return false;
+        }
+
+        for (int i = 0; i < Math.min(length, denseArray.length); i++) {
+            if (denseArray[i] == null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Remove and return the last element.
+     */
+    public JSValue pop() {
+        if (length == 0) {
+            return JSUndefined.INSTANCE;
+        }
+
+        long lastIndex = length - 1;
+        JSValue value = get(lastIndex);
+
+        // Remove the element
+        if (lastIndex < denseArray.length) {
+            denseArray[(int) lastIndex] = null;
+        } else if (sparseProperties != null) {
+            sparseProperties.remove((int) lastIndex);
+        }
+
+        setLength(lastIndex);
+        return value;
+    }
+
+    /**
+     * Add element to the end of the array.
+     */
+    public void push(JSValue value) {
+        set(length, value);
     }
 
     /**
@@ -175,47 +204,35 @@ public final class JSArray extends JSObject {
         }
     }
 
-    /**
-     * Ensure dense array has sufficient capacity.
-     */
-    private void ensureDenseCapacity(int requiredCapacity) {
-        if (requiredCapacity <= denseArray.length) {
-            return;
-        }
-
-        int newCapacity = Math.max(denseArray.length * 2, requiredCapacity);
-        newCapacity = Math.min(newCapacity, MAX_DENSE_SIZE);
-
-        denseArray = Arrays.copyOf(denseArray, newCapacity);
+    @Override
+    public void set(int index, JSValue value) {
+        set((long) index, value);
     }
 
     /**
-     * Add element to the end of the array.
+     * Set the array length.
+     * When length is reduced, elements beyond the new length are deleted.
      */
-    public void push(JSValue value) {
-        set(length, value);
-    }
-
-    /**
-     * Remove and return the last element.
-     */
-    public JSValue pop() {
-        if (length == 0) {
-            return JSUndefined.INSTANCE;
+    public void setLength(long newLength) {
+        if (newLength < 0 || newLength > 0xFFFFFFFFL) {
+            throw new IllegalArgumentException("Invalid array length: " + newLength);
         }
 
-        long lastIndex = length - 1;
-        JSValue value = get(lastIndex);
+        if (newLength < length) {
+            // Truncate array - delete elements beyond new length
+            int denseLimit = (int) Math.min(newLength, denseArray.length);
+            for (int i = denseLimit; i < Math.min(length, denseArray.length); i++) {
+                denseArray[i] = null;
+            }
 
-        // Remove the element
-        if (lastIndex < denseArray.length) {
-            denseArray[(int) lastIndex] = null;
-        } else if (sparseProperties != null) {
-            sparseProperties.remove((int) lastIndex);
+            // Remove sparse elements beyond new length
+            if (sparseProperties != null) {
+                sparseProperties.entrySet().removeIf(entry -> entry.getKey() >= newLength);
+            }
         }
 
-        setLength(lastIndex);
-        return value;
+        this.length = newLength;
+        updateLengthProperty();
     }
 
     /**
@@ -233,45 +250,6 @@ public final class JSArray extends JSObject {
 
         setLength(length - 1);
         return first;
-    }
-
-    /**
-     * Add element to the beginning of the array.
-     */
-    public void unshift(JSValue value) {
-        // Shift all elements up
-        shiftElementsRight(0, 1);
-
-        // Insert at position 0
-        set(0, value);
-    }
-
-    /**
-     * Shift elements right (for unshift operation).
-     */
-    private void shiftElementsRight(int start, int count) {
-        ensureDenseCapacity((int) Math.min(length + count, MAX_DENSE_SIZE));
-
-        // Shift dense elements
-        int denseEnd = (int) Math.min(length, denseArray.length);
-        for (int i = denseEnd - 1; i >= start; i--) {
-            if (i + count < denseArray.length) {
-                denseArray[i + count] = denseArray[i];
-            } else if (denseArray[i] != null) {
-                // Move to sparse storage
-                if (sparseProperties == null) {
-                    sparseProperties = new java.util.HashMap<>();
-                }
-                sparseProperties.put(i + count, denseArray[i]);
-            }
-        }
-
-        // Clear the gap
-        for (int i = start; i < start + count && i < denseArray.length; i++) {
-            denseArray[i] = null;
-        }
-
-        setLength(length + count);
     }
 
     /**
@@ -311,6 +289,34 @@ public final class JSArray extends JSObject {
     }
 
     /**
+     * Shift elements right (for unshift operation).
+     */
+    private void shiftElementsRight(int start, int count) {
+        ensureDenseCapacity((int) Math.min(length + count, MAX_DENSE_SIZE));
+
+        // Shift dense elements
+        int denseEnd = (int) Math.min(length, denseArray.length);
+        for (int i = denseEnd - 1; i >= start; i--) {
+            if (i + count < denseArray.length) {
+                denseArray[i + count] = denseArray[i];
+            } else if (denseArray[i] != null) {
+                // Move to sparse storage
+                if (sparseProperties == null) {
+                    sparseProperties = new java.util.HashMap<>();
+                }
+                sparseProperties.put(i + count, denseArray[i]);
+            }
+        }
+
+        // Clear the gap
+        for (int i = start; i < start + count && i < denseArray.length; i++) {
+            denseArray[i] = null;
+        }
+
+        setLength(length + count);
+    }
+
+    /**
      * Convert array to a Java array.
      */
     public JSValue[] toArray() {
@@ -319,33 +325,6 @@ public final class JSArray extends JSObject {
             result[i] = get(i);
         }
         return result;
-    }
-
-    /**
-     * Check if array is dense (no holes).
-     */
-    public boolean isDense() {
-        if (sparseProperties != null && !sparseProperties.isEmpty()) {
-            return false;
-        }
-
-        for (int i = 0; i < Math.min(length, denseArray.length); i++) {
-            if (denseArray[i] == null) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    @Override
-    public JSValue get(int index) {
-        return get((long) index);
-    }
-
-    @Override
-    public void set(int index, JSValue value) {
-        set((long) index, value);
     }
 
     @Override
@@ -368,5 +347,26 @@ public final class JSArray extends JSObject {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    /**
+     * Add element to the beginning of the array.
+     */
+    public void unshift(JSValue value) {
+        // Shift all elements up
+        shiftElementsRight(0, 1);
+
+        // Insert at position 0
+        set(0, value);
+    }
+
+    /**
+     * Update the length property value.
+     */
+    private void updateLengthProperty() {
+        int offset = shape.getPropertyOffset(PropertyKey.fromString("length"));
+        if (offset >= 0) {
+            propertyValues[offset] = new JSNumber(length);
+        }
     }
 }

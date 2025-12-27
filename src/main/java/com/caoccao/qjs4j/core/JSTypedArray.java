@@ -26,10 +26,10 @@ import java.nio.ByteBuffer;
  */
 public abstract class JSTypedArray extends JSObject {
     protected final JSArrayBuffer buffer;
-    protected final int byteOffset;
     protected final int byteLength;
-    protected final int length;
+    protected final int byteOffset;
     protected final int bytesPerElement;
+    protected final int length;
 
     /**
      * Create a TypedArray with a new buffer of the given length.
@@ -86,38 +86,22 @@ public abstract class JSTypedArray extends JSObject {
     }
 
     /**
+     * Check if an index is valid.
+     */
+    protected void checkIndex(int index) {
+        if (buffer.isDetached()) {
+            throw new IllegalStateException("TypedArray buffer is detached");
+        }
+        if (index < 0 || index >= length) {
+            throw new RangeError("TypedArray index out of range: " + index);
+        }
+    }
+
+    /**
      * Get the underlying ArrayBuffer.
      */
     public JSArrayBuffer getBuffer() {
         return buffer;
-    }
-
-    /**
-     * Get the byte offset within the buffer.
-     */
-    public int getByteOffset() {
-        return byteOffset;
-    }
-
-    /**
-     * Get the byte length of this view.
-     */
-    public int getByteLength() {
-        return byteLength;
-    }
-
-    /**
-     * Get the number of elements.
-     */
-    public int getLength() {
-        return length;
-    }
-
-    /**
-     * Get the number of bytes per element.
-     */
-    public int getBytesPerElement() {
-        return bytesPerElement;
     }
 
     /**
@@ -134,25 +118,36 @@ public abstract class JSTypedArray extends JSObject {
     }
 
     /**
+     * Get the byte length of this view.
+     */
+    public int getByteLength() {
+        return byteLength;
+    }
+
+    /**
+     * Get the byte offset within the buffer.
+     */
+    public int getByteOffset() {
+        return byteOffset;
+    }
+
+    /**
+     * Get the number of bytes per element.
+     */
+    public int getBytesPerElement() {
+        return bytesPerElement;
+    }
+
+    /**
      * Get an element as a number.
      */
     public abstract double getElement(int index);
 
     /**
-     * Set an element from a number.
+     * Get the number of elements.
      */
-    public abstract void setElement(int index, double value);
-
-    /**
-     * Check if an index is valid.
-     */
-    protected void checkIndex(int index) {
-        if (buffer.isDetached()) {
-            throw new IllegalStateException("TypedArray buffer is detached");
-        }
-        if (index < 0 || index >= length) {
-            throw new RangeError("TypedArray index out of range: " + index);
-        }
+    public int getLength() {
+        return length;
     }
 
     /**
@@ -184,6 +179,11 @@ public abstract class JSTypedArray extends JSObject {
             }
         }
     }
+
+    /**
+     * Set an element from a number.
+     */
+    public abstract void setElement(int index, double value);
 
     /**
      * TypedArray.prototype.subarray(begin, end)

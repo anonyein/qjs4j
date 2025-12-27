@@ -26,8 +26,8 @@ import com.caoccao.qjs4j.core.*;
  * Executes compiled bytecode using a stack-based architecture.
  */
 public final class VirtualMachine {
-    private final CallStack valueStack;
     private final JSContext context;
+    private final CallStack valueStack;
     private StackFrame currentFrame;
     private JSValue pendingException;
 
@@ -538,259 +538,12 @@ public final class VirtualMachine {
         }
     }
 
-    private void handleSub() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        double result = JSTypeConversions.toNumber(left).value() - JSTypeConversions.toNumber(right).value();
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleMul() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        double result = JSTypeConversions.toNumber(left).value() * JSTypeConversions.toNumber(right).value();
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleDiv() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        double result = JSTypeConversions.toNumber(left).value() / JSTypeConversions.toNumber(right).value();
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleMod() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        double result = JSTypeConversions.toNumber(left).value() % JSTypeConversions.toNumber(right).value();
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleExp() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        double result = Math.pow(JSTypeConversions.toNumber(left).value(), JSTypeConversions.toNumber(right).value());
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handlePlus() {
-        JSValue operand = valueStack.pop();
-        double result = JSTypeConversions.toNumber(operand).value();
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleNeg() {
-        JSValue operand = valueStack.pop();
-        double result = -JSTypeConversions.toNumber(operand).value();
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleInc() {
-        JSValue operand = valueStack.pop();
-        double result = JSTypeConversions.toNumber(operand).value() + 1;
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleDec() {
-        JSValue operand = valueStack.pop();
-        double result = JSTypeConversions.toNumber(operand).value() - 1;
-        valueStack.push(new JSNumber(result));
-    }
-
-    // ==================== Bitwise Operation Handlers ====================
-
-    private void handleShl() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        int leftInt = JSTypeConversions.toInt32(left);
-        int rightInt = JSTypeConversions.toInt32(right);
-        valueStack.push(new JSNumber(leftInt << (rightInt & 0x1F)));
-    }
-
-    private void handleSar() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        int leftInt = JSTypeConversions.toInt32(left);
-        int rightInt = JSTypeConversions.toInt32(right);
-        valueStack.push(new JSNumber(leftInt >> (rightInt & 0x1F)));
-    }
-
-    private void handleShr() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        int leftInt = JSTypeConversions.toInt32(left);
-        int rightInt = JSTypeConversions.toInt32(right);
-        valueStack.push(new JSNumber((leftInt >>> (rightInt & 0x1F)) & 0xFFFFFFFFL));
-    }
-
     private void handleAnd() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         int result = JSTypeConversions.toInt32(left) & JSTypeConversions.toInt32(right);
         valueStack.push(new JSNumber(result));
     }
-
-    private void handleOr() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        int result = JSTypeConversions.toInt32(left) | JSTypeConversions.toInt32(right);
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleXor() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        int result = JSTypeConversions.toInt32(left) ^ JSTypeConversions.toInt32(right);
-        valueStack.push(new JSNumber(result));
-    }
-
-    private void handleNot() {
-        JSValue operand = valueStack.pop();
-        int result = ~JSTypeConversions.toInt32(operand);
-        valueStack.push(new JSNumber(result));
-    }
-
-    // ==================== Comparison Operation Handlers ====================
-
-    private void handleEq() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = JSTypeConversions.abstractEquals(left, right);
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleNeq() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = !JSTypeConversions.abstractEquals(left, right);
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleStrictEq() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = JSTypeConversions.strictEquals(left, right);
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleStrictNeq() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = !JSTypeConversions.strictEquals(left, right);
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleLt() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = JSTypeConversions.lessThan(left, right);
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleLte() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = JSTypeConversions.lessThan(left, right) ||
-                JSTypeConversions.abstractEquals(left, right);
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleGt() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = JSTypeConversions.lessThan(right, left);
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleGte() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = JSTypeConversions.lessThan(right, left) ||
-                JSTypeConversions.abstractEquals(left, right);
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleInstanceof() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        // Simplified instanceof check
-        boolean result = right instanceof JSFunction && left instanceof JSObject;
-        // Simplified
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleIn() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        boolean result = false;
-        if (right instanceof JSObject jsObj) {
-            PropertyKey key = PropertyKey.fromValue(left);
-            result = jsObj.has(key);
-        }
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    // ==================== Logical Operation Handlers ====================
-
-    private void handleLogicalNot() {
-        JSValue operand = valueStack.pop();
-        boolean result = JSTypeConversions.toBoolean(operand) == JSBoolean.FALSE;
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    private void handleLogicalAnd() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        // Short-circuit: return left if falsy, otherwise right
-        if (JSTypeConversions.toBoolean(left) == JSBoolean.FALSE) {
-            valueStack.push(left);
-        } else {
-            valueStack.push(right);
-        }
-    }
-
-    private void handleLogicalOr() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        // Short-circuit: return left if truthy, otherwise right
-        if (JSTypeConversions.toBoolean(left) == JSBoolean.TRUE) {
-            valueStack.push(left);
-        } else {
-            valueStack.push(right);
-        }
-    }
-
-    private void handleNullishCoalesce() {
-        JSValue right = valueStack.pop();
-        JSValue left = valueStack.pop();
-        // Return right if left is null or undefined
-        if (left instanceof JSNull || left instanceof JSUndefined) {
-            valueStack.push(right);
-        } else {
-            valueStack.push(left);
-        }
-    }
-
-    // ==================== Type Operation Handlers ====================
-
-    private void handleTypeof() {
-        JSValue operand = valueStack.pop();
-        String type = JSTypeChecking.typeof(operand);
-        valueStack.push(new JSString(type));
-    }
-
-    private void handleDelete() {
-        JSValue property = valueStack.pop();
-        JSValue object = valueStack.pop();
-        boolean result = false;
-        if (object instanceof JSObject jsObj) {
-            PropertyKey key = PropertyKey.fromValue(property);
-            result = jsObj.delete(key);
-        }
-        valueStack.push(JSBoolean.valueOf(result));
-    }
-
-    // ==================== Function Call Handlers ====================
 
     private void handleCall(int argCount) {
         // Stack layout (bottom to top): method, receiver, arg1, arg2, ...
@@ -1232,6 +985,253 @@ public final class VirtualMachine {
         } else {
             throw new VMException("Cannot construct non-function value");
         }
+    }
+
+    private void handleDec() {
+        JSValue operand = valueStack.pop();
+        double result = JSTypeConversions.toNumber(operand).value() - 1;
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handleDelete() {
+        JSValue property = valueStack.pop();
+        JSValue object = valueStack.pop();
+        boolean result = false;
+        if (object instanceof JSObject jsObj) {
+            PropertyKey key = PropertyKey.fromValue(property);
+            result = jsObj.delete(key);
+        }
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleDiv() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        double result = JSTypeConversions.toNumber(left).value() / JSTypeConversions.toNumber(right).value();
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handleEq() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = JSTypeConversions.abstractEquals(left, right);
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleExp() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        double result = Math.pow(JSTypeConversions.toNumber(left).value(), JSTypeConversions.toNumber(right).value());
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handleGt() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = JSTypeConversions.lessThan(right, left);
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    // ==================== Bitwise Operation Handlers ====================
+
+    private void handleGte() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = JSTypeConversions.lessThan(right, left) ||
+                JSTypeConversions.abstractEquals(left, right);
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleIn() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = false;
+        if (right instanceof JSObject jsObj) {
+            PropertyKey key = PropertyKey.fromValue(left);
+            result = jsObj.has(key);
+        }
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleInc() {
+        JSValue operand = valueStack.pop();
+        double result = JSTypeConversions.toNumber(operand).value() + 1;
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handleInstanceof() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        // Simplified instanceof check
+        boolean result = right instanceof JSFunction && left instanceof JSObject;
+        // Simplified
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleLogicalAnd() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        // Short-circuit: return left if falsy, otherwise right
+        if (JSTypeConversions.toBoolean(left) == JSBoolean.FALSE) {
+            valueStack.push(left);
+        } else {
+            valueStack.push(right);
+        }
+    }
+
+    private void handleLogicalNot() {
+        JSValue operand = valueStack.pop();
+        boolean result = JSTypeConversions.toBoolean(operand) == JSBoolean.FALSE;
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleLogicalOr() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        // Short-circuit: return left if truthy, otherwise right
+        if (JSTypeConversions.toBoolean(left) == JSBoolean.TRUE) {
+            valueStack.push(left);
+        } else {
+            valueStack.push(right);
+        }
+    }
+
+    // ==================== Comparison Operation Handlers ====================
+
+    private void handleLt() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = JSTypeConversions.lessThan(left, right);
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleLte() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = JSTypeConversions.lessThan(left, right) ||
+                JSTypeConversions.abstractEquals(left, right);
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleMod() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        double result = JSTypeConversions.toNumber(left).value() % JSTypeConversions.toNumber(right).value();
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handleMul() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        double result = JSTypeConversions.toNumber(left).value() * JSTypeConversions.toNumber(right).value();
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handleNeg() {
+        JSValue operand = valueStack.pop();
+        double result = -JSTypeConversions.toNumber(operand).value();
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handleNeq() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = !JSTypeConversions.abstractEquals(left, right);
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleNot() {
+        JSValue operand = valueStack.pop();
+        int result = ~JSTypeConversions.toInt32(operand);
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handleNullishCoalesce() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        // Return right if left is null or undefined
+        if (left instanceof JSNull || left instanceof JSUndefined) {
+            valueStack.push(right);
+        } else {
+            valueStack.push(left);
+        }
+    }
+
+    private void handleOr() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        int result = JSTypeConversions.toInt32(left) | JSTypeConversions.toInt32(right);
+        valueStack.push(new JSNumber(result));
+    }
+
+    private void handlePlus() {
+        JSValue operand = valueStack.pop();
+        double result = JSTypeConversions.toNumber(operand).value();
+        valueStack.push(new JSNumber(result));
+    }
+
+    // ==================== Logical Operation Handlers ====================
+
+    private void handleSar() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        int leftInt = JSTypeConversions.toInt32(left);
+        int rightInt = JSTypeConversions.toInt32(right);
+        valueStack.push(new JSNumber(leftInt >> (rightInt & 0x1F)));
+    }
+
+    private void handleShl() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        int leftInt = JSTypeConversions.toInt32(left);
+        int rightInt = JSTypeConversions.toInt32(right);
+        valueStack.push(new JSNumber(leftInt << (rightInt & 0x1F)));
+    }
+
+    private void handleShr() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        int leftInt = JSTypeConversions.toInt32(left);
+        int rightInt = JSTypeConversions.toInt32(right);
+        valueStack.push(new JSNumber((leftInt >>> (rightInt & 0x1F)) & 0xFFFFFFFFL));
+    }
+
+    private void handleStrictEq() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = JSTypeConversions.strictEquals(left, right);
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    // ==================== Type Operation Handlers ====================
+
+    private void handleStrictNeq() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        boolean result = !JSTypeConversions.strictEquals(left, right);
+        valueStack.push(JSBoolean.valueOf(result));
+    }
+
+    private void handleSub() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        double result = JSTypeConversions.toNumber(left).value() - JSTypeConversions.toNumber(right).value();
+        valueStack.push(new JSNumber(result));
+    }
+
+    // ==================== Function Call Handlers ====================
+
+    private void handleTypeof() {
+        JSValue operand = valueStack.pop();
+        String type = JSTypeChecking.typeof(operand);
+        valueStack.push(new JSString(type));
+    }
+
+    private void handleXor() {
+        JSValue right = valueStack.pop();
+        JSValue left = valueStack.pop();
+        int result = JSTypeConversions.toInt32(left) ^ JSTypeConversions.toInt32(right);
+        valueStack.push(new JSNumber(result));
     }
 
     /**

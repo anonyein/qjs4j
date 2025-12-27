@@ -25,35 +25,10 @@ import java.util.List;
  * Promises represent the eventual result of an asynchronous operation.
  */
 public final class JSPromise extends JSObject {
-    /**
-     * Promise states as defined in ES2020.
-     */
-    public enum PromiseState {
-        PENDING,
-        FULFILLED,
-        REJECTED
-    }
-
-    private PromiseState state;
-    private JSValue result;
     private final List<ReactionRecord> fulfillReactions;
     private final List<ReactionRecord> rejectReactions;
-
-    /**
-     * A reaction record stores a callback and the promise it will affect.
-     */
-    public static class ReactionRecord {
-        public final JSFunction handler;
-        public final JSPromise promise;
-        public final JSContext context;
-
-        public ReactionRecord(JSFunction handler, JSPromise promise, JSContext context) {
-            this.handler = handler;
-            this.promise = promise;
-            this.context = context;
-        }
-    }
-
+    private JSValue result;
+    private PromiseState state;
     /**
      * Create a new Promise in pending state.
      */
@@ -66,17 +41,23 @@ public final class JSPromise extends JSObject {
     }
 
     /**
-     * Get the current state of the promise.
+     * Add reactions to be called when promise is fulfilled or rejected.
      */
-    public PromiseState getState() {
-        return state;
-    }
-
-    /**
-     * Get the result value (only meaningful when fulfilled or rejected).
-     */
-    public JSValue getResult() {
-        return result;
+    public void addReactions(ReactionRecord onFulfill, ReactionRecord onReject) {
+        if (state == PromiseState.PENDING) {
+            if (onFulfill != null) {
+                fulfillReactions.add(onFulfill);
+            }
+            if (onReject != null) {
+                rejectReactions.add(onReject);
+            }
+        } else if (state == PromiseState.FULFILLED && onFulfill != null) {
+            // Already fulfilled, trigger immediately
+            triggerReaction(onFulfill, result);
+        } else if (state == PromiseState.REJECTED && onReject != null) {
+            // Already rejected, trigger immediately
+            triggerReaction(onReject, result);
+        }
     }
 
     /**
@@ -102,6 +83,20 @@ public final class JSPromise extends JSObject {
     }
 
     /**
+     * Get the result value (only meaningful when fulfilled or rejected).
+     */
+    public JSValue getResult() {
+        return result;
+    }
+
+    /**
+     * Get the current state of the promise.
+     */
+    public PromiseState getState() {
+        return state;
+    }
+
+    /**
      * Reject the promise with a reason.
      * ES2020 25.6.1.7
      */
@@ -123,24 +118,9 @@ public final class JSPromise extends JSObject {
         rejectReactions.clear();
     }
 
-    /**
-     * Add reactions to be called when promise is fulfilled or rejected.
-     */
-    public void addReactions(ReactionRecord onFulfill, ReactionRecord onReject) {
-        if (state == PromiseState.PENDING) {
-            if (onFulfill != null) {
-                fulfillReactions.add(onFulfill);
-            }
-            if (onReject != null) {
-                rejectReactions.add(onReject);
-            }
-        } else if (state == PromiseState.FULFILLED && onFulfill != null) {
-            // Already fulfilled, trigger immediately
-            triggerReaction(onFulfill, result);
-        } else if (state == PromiseState.REJECTED && onReject != null) {
-            // Already rejected, trigger immediately
-            triggerReaction(onReject, result);
-        }
+    @Override
+    public String toString() {
+        return "[object Promise]";
     }
 
     /**
@@ -195,8 +175,27 @@ public final class JSPromise extends JSObject {
         });
     }
 
-    @Override
-    public String toString() {
-        return "[object Promise]";
+    /**
+     * Promise states as defined in ES2020.
+     */
+    public enum PromiseState {
+        PENDING,
+        FULFILLED,
+        REJECTED
+    }
+
+    /**
+     * A reaction record stores a callback and the promise it will affect.
+     */
+    public static class ReactionRecord {
+        public final JSContext context;
+        public final JSFunction handler;
+        public final JSPromise promise;
+
+        public ReactionRecord(JSFunction handler, JSPromise promise, JSContext context) {
+            this.handler = handler;
+            this.promise = promise;
+            this.context = context;
+        }
     }
 }

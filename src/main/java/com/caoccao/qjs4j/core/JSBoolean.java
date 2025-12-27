@@ -20,20 +20,20 @@ package com.caoccao.qjs4j.core;
  * Represents a JavaScript boolean value.
  */
 public record JSBoolean(boolean value) implements JSValue {
-    public static final JSBoolean TRUE = new JSBoolean(true);
     public static final JSBoolean FALSE = new JSBoolean(false);
+    public static final JSBoolean TRUE = new JSBoolean(true);
 
     public static JSBoolean valueOf(boolean value) {
         return value ? TRUE : FALSE;
     }
 
     @Override
-    public JSValueType type() {
-        return JSValueType.BOOLEAN;
+    public Object toJavaObject() {
+        return value;
     }
 
     @Override
-    public Object toJavaObject() {
-        return value;
+    public JSValueType type() {
+        return JSValueType.BOOLEAN;
     }
 }

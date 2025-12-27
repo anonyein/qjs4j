@@ -36,6 +36,11 @@ public final class QuickJSInterpreter {
         }
     }
 
+    private static void runREPL() {
+        REPL repl = new REPL();
+        repl.run();
+    }
+
     private static void runScript(String filename) throws Exception {
         JSRuntime runtime = new JSRuntime();
         JSContext ctx = runtime.createContext();
@@ -44,10 +49,5 @@ public final class QuickJSInterpreter {
         JSValue result = ctx.eval(code);
 
         runtime.runJobs();
-    }
-
-    private static void runREPL() {
-        REPL repl = new REPL();
-        repl.run();
     }
 }

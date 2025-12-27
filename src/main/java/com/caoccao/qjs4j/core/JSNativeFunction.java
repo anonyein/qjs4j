@@ -21,13 +21,8 @@ package com.caoccao.qjs4j.core;
  */
 public final class JSNativeFunction implements JSFunction {
     private final NativeCallback callback;
-    private final String name;
     private final int length;
-
-    @FunctionalInterface
-    public interface NativeCallback {
-        JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args);
-    }
+    private final String name;
 
     public JSNativeFunction(String name, int length, NativeCallback callback) {
         this.name = name;
@@ -41,13 +36,18 @@ public final class JSNativeFunction implements JSFunction {
     }
 
     @Override
+    public int getLength() {
+        return length;
+    }
+
+    @Override
     public String getName() {
         return name;
     }
 
     @Override
-    public int getLength() {
-        return length;
+    public Object toJavaObject() {
+        return this;
     }
 
     @Override
@@ -55,8 +55,8 @@ public final class JSNativeFunction implements JSFunction {
         return JSValueType.FUNCTION;
     }
 
-    @Override
-    public Object toJavaObject() {
-        return this;
+    @FunctionalInterface
+    public interface NativeCallback {
+        JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args);
     }
 }

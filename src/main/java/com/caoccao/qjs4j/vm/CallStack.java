@@ -30,23 +30,23 @@ public final class CallStack {
         this.stackTop = 0;
     }
 
-    public void push(JSValue value) {
-        stack[stackTop++] = value;
-    }
-
-    public JSValue pop() {
-        return stack[--stackTop];
-    }
-
-    public JSValue peek(int offset) {
-        return stack[stackTop - 1 - offset];
-    }
-
     public void drop(int count) {
         stackTop -= count;
     }
 
     public int getStackTop() {
         return stackTop;
+    }
+
+    public JSValue peek(int offset) {
+        return stack[stackTop - 1 - offset];
+    }
+
+    public JSValue pop() {
+        return stack[--stackTop];
+    }
+
+    public void push(JSValue value) {
+        stack[stackTop++] = value;
     }
 }

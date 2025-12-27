@@ -33,12 +33,12 @@ import java.util.*;
  * - Optimized for objects with similar structure
  */
 public non-sealed class JSObject implements JSValue {
-    protected JSShape shape;
-    protected JSValue[] propertyValues;
-    protected Map<Integer, JSValue> sparseProperties; // For array indices
-    protected JSObject prototype;
     protected boolean frozen = false;
+    protected JSValue[] propertyValues;
+    protected JSObject prototype;
     protected boolean sealed = false;
+    protected JSShape shape;
+    protected Map<Integer, JSValue> sparseProperties; // For array indices
 
     /**
      * Create an empty object with no prototype.
@@ -59,6 +59,102 @@ public non-sealed class JSObject implements JSValue {
     }
 
     // Property operations
+
+    /**
+     * Define a new property with a descriptor.
+     */
+    public void defineProperty(PropertyKey key, PropertyDescriptor descriptor) {
+        // Transition to new shape
+        JSShape newShape = shape.addProperty(key, descriptor);
+
+        // Allocate new property array
+        JSValue[] newValues = Arrays.copyOf(propertyValues, newShape.getPropertyCount());
+
+        // Set the new property value
+        if (descriptor.hasValue()) {
+            newValues[newShape.getPropertyCount() - 1] = descriptor.getValue();
+        } else {
+            newValues[newShape.getPropertyCount() - 1] = JSUndefined.INSTANCE;
+        }
+
+        // Update shape and values
+        this.shape = newShape;
+        this.propertyValues = newValues;
+    }
+
+    /**
+     * Delete a property.
+     * Returns true if deletion was successful.
+     */
+    public boolean delete(String propertyName) {
+        return delete(PropertyKey.fromString(propertyName));
+    }
+
+    /**
+     * Delete a property by key.
+     */
+    public boolean delete(PropertyKey key) {
+        // Cannot delete from sealed or frozen objects
+        if (sealed || frozen) {
+            return false;
+        }
+
+        // Check if property exists
+        int offset = shape.getPropertyOffset(key);
+        if (offset < 0) {
+            // Check sparse properties
+            if (key.isIndex() && sparseProperties != null) {
+                return sparseProperties.remove(key.asIndex()) != null;
+            }
+            return true; // Property doesn't exist, deletion successful
+        }
+
+        // Check if property is configurable
+        PropertyDescriptor desc = shape.getDescriptorAt(offset);
+        if (!desc.isConfigurable()) {
+            return false; // Cannot delete non-configurable property
+        }
+
+        // For simplicity, we don't actually remove from shape
+        // In a full implementation, we'd need to create a new shape without this property
+        // For now, just set to undefined
+        propertyValues[offset] = JSUndefined.INSTANCE;
+        return true;
+    }
+
+    /**
+     * Get own enumerable property keys.
+     */
+    public PropertyKey[] enumerableKeys() {
+        List<PropertyKey> keys = new ArrayList<>();
+
+        PropertyKey[] allKeys = shape.getPropertyKeys();
+        PropertyDescriptor[] descriptors = shape.getDescriptors();
+
+        for (int i = 0; i < allKeys.length; i++) {
+            if (descriptors[i].isEnumerable()) {
+                keys.add(allKeys[i]);
+            }
+        }
+
+        // Sparse properties are enumerable by default
+        if (sparseProperties != null) {
+            for (Integer index : sparseProperties.keySet()) {
+                keys.add(PropertyKey.fromIndex(index));
+            }
+        }
+
+        return keys.toArray(new PropertyKey[0]);
+    }
+
+    /**
+     * Freeze this object.
+     * Prevents adding new properties, deleting existing properties, and modifying existing properties.
+     */
+    public void freeze() {
+        this.frozen = true;
+        this.sealed = true; // Frozen objects are also sealed
+    }
 
     /**
      * Get a property value by string name.
@@ -100,6 +196,124 @@ public non-sealed class JSObject implements JSValue {
 
         return JSUndefined.INSTANCE;
     }
+
+    /**
+     * Get the property descriptor for a property.
+     */
+    public PropertyDescriptor getOwnPropertyDescriptor(PropertyKey key) {
+        return shape.getDescriptor(key);
+    }
+
+    /**
+     * Get all own property keys (not including prototype chain).
+     */
+    public List<PropertyKey> getOwnPropertyKeys() {
+        List<PropertyKey> keys = new ArrayList<>();
+
+        // Add shaped properties
+        PropertyKey[] shapeKeys = shape.getPropertyKeys();
+        keys.addAll(Arrays.asList(shapeKeys));
+
+        // Add sparse properties (array indices)
+        if (sparseProperties != null) {
+            for (Integer index : sparseProperties.keySet()) {
+                keys.add(PropertyKey.fromIndex(index));
+            }
+        }
+
+        return keys;
+    }
+
+    public JSObject getPrototype() {
+        return prototype;
+    }
+
+    /**
+     * Check if object has a property (including prototype chain).
+     */
+    public boolean has(String propertyName) {
+        return has(PropertyKey.fromString(propertyName));
+    }
+
+    /**
+     * Check if object has a property by key (including prototype chain).
+     */
+    public boolean has(PropertyKey key) {
+        if (hasOwnProperty(key)) {
+            return true;
+        }
+        if (prototype != null) {
+            return prototype.has(key);
+        }
+        return false;
+    }
+
+    /**
+     * Check if object has an own property.
+     */
+    public boolean hasOwnProperty(String propertyName) {
+        return hasOwnProperty(PropertyKey.fromString(propertyName));
+    }
+
+    /**
+     * Check if object has an own property by key.
+     */
+    public boolean hasOwnProperty(PropertyKey key) {
+        if (shape.hasProperty(key)) {
+            return true;
+        }
+        if (key.isIndex() && sparseProperties != null) {
+            return sparseProperties.containsKey(key.asIndex());
+        }
+        return false;
+    }
+
+    /**
+     * Check if this object is frozen.
+     */
+    public boolean isFrozen() {
+        return frozen;
+    }
+
+    /**
+     * Check if this object is sealed.
+     */
+    public boolean isSealed() {
+        return sealed;
+    }
+
+    // Prototype chain
+
+    /**
+     * Get all own property keys.
+     */
+    public PropertyKey[] ownPropertyKeys() {
+        List<PropertyKey> keys = new ArrayList<>();
+
+        // Add shape properties
+        PropertyKey[] shapeKeys = shape.getPropertyKeys();
+        Collections.addAll(keys, shapeKeys);
+
+        // Add sparse properties
+        if (sparseProperties != null) {
+            for (Integer index : sparseProperties.keySet()) {
+                keys.add(PropertyKey.fromIndex(index));
+            }
+        }
+
+        return keys.toArray(new PropertyKey[0]);
+    }
+
+    /**
+     * Seal this object.
+     * Prevents adding new properties and deleting existing properties.
+     * Existing properties can still be modified.
+     */
+    public void seal() {
+        this.sealed = true;
+    }
+
+    // Object integrity levels (ES5)
 
     /**
      * Set a property value by string name.
@@ -147,230 +361,11 @@ public non-sealed class JSObject implements JSValue {
         }
     }
 
-    /**
-     * Define a new property with a descriptor.
-     */
-    public void defineProperty(PropertyKey key, PropertyDescriptor descriptor) {
-        // Transition to new shape
-        JSShape newShape = shape.addProperty(key, descriptor);
-
-        // Allocate new property array
-        JSValue[] newValues = Arrays.copyOf(propertyValues, newShape.getPropertyCount());
-
-        // Set the new property value
-        if (descriptor.hasValue()) {
-            newValues[newShape.getPropertyCount() - 1] = descriptor.getValue();
-        } else {
-            newValues[newShape.getPropertyCount() - 1] = JSUndefined.INSTANCE;
-        }
-
-        // Update shape and values
-        this.shape = newShape;
-        this.propertyValues = newValues;
-    }
-
-    /**
-     * Check if object has an own property.
-     */
-    public boolean hasOwnProperty(String propertyName) {
-        return hasOwnProperty(PropertyKey.fromString(propertyName));
-    }
-
-    /**
-     * Check if object has an own property by key.
-     */
-    public boolean hasOwnProperty(PropertyKey key) {
-        if (shape.hasProperty(key)) {
-            return true;
-        }
-        if (key.isIndex() && sparseProperties != null) {
-            return sparseProperties.containsKey(key.asIndex());
-        }
-        return false;
-    }
-
-    /**
-     * Get all own property keys (not including prototype chain).
-     */
-    public List<PropertyKey> getOwnPropertyKeys() {
-        List<PropertyKey> keys = new ArrayList<>();
-
-        // Add shaped properties
-        PropertyKey[] shapeKeys = shape.getPropertyKeys();
-        keys.addAll(Arrays.asList(shapeKeys));
-
-        // Add sparse properties (array indices)
-        if (sparseProperties != null) {
-            for (Integer index : sparseProperties.keySet()) {
-                keys.add(PropertyKey.fromIndex(index));
-            }
-        }
-
-        return keys;
-    }
-
-    /**
-     * Check if object has a property (including prototype chain).
-     */
-    public boolean has(String propertyName) {
-        return has(PropertyKey.fromString(propertyName));
-    }
-
-    /**
-     * Check if object has a property by key (including prototype chain).
-     */
-    public boolean has(PropertyKey key) {
-        if (hasOwnProperty(key)) {
-            return true;
-        }
-        if (prototype != null) {
-            return prototype.has(key);
-        }
-        return false;
-    }
-
-    /**
-     * Delete a property.
-     * Returns true if deletion was successful.
-     */
-    public boolean delete(String propertyName) {
-        return delete(PropertyKey.fromString(propertyName));
-    }
-
-    /**
-     * Delete a property by key.
-     */
-    public boolean delete(PropertyKey key) {
-        // Cannot delete from sealed or frozen objects
-        if (sealed || frozen) {
-            return false;
-        }
-
-        // Check if property exists
-        int offset = shape.getPropertyOffset(key);
-        if (offset < 0) {
-            // Check sparse properties
-            if (key.isIndex() && sparseProperties != null) {
-                return sparseProperties.remove(key.asIndex()) != null;
-            }
-            return true; // Property doesn't exist, deletion successful
-        }
-
-        // Check if property is configurable
-        PropertyDescriptor desc = shape.getDescriptorAt(offset);
-        if (!desc.isConfigurable()) {
-            return false; // Cannot delete non-configurable property
-        }
-
-        // For simplicity, we don't actually remove from shape
-        // In a full implementation, we'd need to create a new shape without this property
-        // For now, just set to undefined
-        propertyValues[offset] = JSUndefined.INSTANCE;
-        return true;
-    }
-
-    /**
-     * Get all own property keys.
-     */
-    public PropertyKey[] ownPropertyKeys() {
-        List<PropertyKey> keys = new ArrayList<>();
-
-        // Add shape properties
-        PropertyKey[] shapeKeys = shape.getPropertyKeys();
-        Collections.addAll(keys, shapeKeys);
-
-        // Add sparse properties
-        if (sparseProperties != null) {
-            for (Integer index : sparseProperties.keySet()) {
-                keys.add(PropertyKey.fromIndex(index));
-            }
-        }
-
-        return keys.toArray(new PropertyKey[0]);
-    }
-
-    /**
-     * Get own enumerable property keys.
-     */
-    public PropertyKey[] enumerableKeys() {
-        List<PropertyKey> keys = new ArrayList<>();
-
-        PropertyKey[] allKeys = shape.getPropertyKeys();
-        PropertyDescriptor[] descriptors = shape.getDescriptors();
-
-        for (int i = 0; i < allKeys.length; i++) {
-            if (descriptors[i].isEnumerable()) {
-                keys.add(allKeys[i]);
-            }
-        }
-
-        // Sparse properties are enumerable by default
-        if (sparseProperties != null) {
-            for (Integer index : sparseProperties.keySet()) {
-                keys.add(PropertyKey.fromIndex(index));
-            }
-        }
-
-        return keys.toArray(new PropertyKey[0]);
-    }
-
-    /**
-     * Get the property descriptor for a property.
-     */
-    public PropertyDescriptor getOwnPropertyDescriptor(PropertyKey key) {
-        return shape.getDescriptor(key);
-    }
-
-    // Prototype chain
-
-    public JSObject getPrototype() {
-        return prototype;
-    }
-
     public void setPrototype(JSObject prototype) {
         this.prototype = prototype;
     }
 
-    // Object integrity levels (ES5)
-
-    /**
-     * Freeze this object.
-     * Prevents adding new properties, deleting existing properties, and modifying existing properties.
-     */
-    public void freeze() {
-        this.frozen = true;
-        this.sealed = true; // Frozen objects are also sealed
-    }
-
-    /**
-     * Seal this object.
-     * Prevents adding new properties and deleting existing properties.
-     * Existing properties can still be modified.
-     */
-    public void seal() {
-        this.sealed = true;
-    }
-
-    /**
-     * Check if this object is frozen.
-     */
-    public boolean isFrozen() {
-        return frozen;
-    }
-
-    /**
-     * Check if this object is sealed.
-     */
-    public boolean isSealed() {
-        return sealed;
-    }
-
     // JSValue implementation
-
-    @Override
-    public JSValueType type() {
-        return JSValueType.OBJECT;
-    }
 
     @Override
     public Object toJavaObject() {
@@ -380,5 +375,10 @@ public non-sealed class JSObject implements JSValue {
     @Override
     public String toString() {
         return "[object Object]";
+    }
+
+    @Override
+    public JSValueType type() {
+        return JSValueType.OBJECT;
     }
 }

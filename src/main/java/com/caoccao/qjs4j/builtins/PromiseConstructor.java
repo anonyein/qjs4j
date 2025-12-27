@@ -25,39 +25,6 @@ import com.caoccao.qjs4j.core.*;
 public final class PromiseConstructor {
 
     /**
-     * Promise.resolve(value)
-     * ES2020 25.6.4.6
-     * Returns a Promise that is resolved with the given value.
-     */
-    public static JSValue resolve(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-
-        // If value is already a promise, return it
-        if (value instanceof JSPromise) {
-            return value;
-        }
-
-        // Create a new promise and fulfill it
-        JSPromise promise = new JSPromise();
-        promise.fulfill(value);
-        return promise;
-    }
-
-    /**
-     * Promise.reject(reason)
-     * ES2020 25.6.4.4
-     * Returns a Promise that is rejected with the given reason.
-     */
-    public static JSValue reject(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSValue reason = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-
-        // Create a new promise and reject it
-        JSPromise promise = new JSPromise();
-        promise.reject(reason);
-        return promise;
-    }
-
-    /**
      * Promise.all(iterable)
      * ES2020 25.6.4.1
      * Returns a Promise that fulfills when all promises fulfill, or rejects when any promise rejects.
@@ -117,53 +84,6 @@ public final class PromiseConstructor {
                 if (remaining[0] == 0) {
                     resultPromise.fulfill(results);
                 }
-            }
-        }
-
-        return resultPromise;
-    }
-
-    /**
-     * Promise.race(iterable)
-     * ES2020 25.6.4.5
-     * Returns a Promise that settles as soon as any promise in the iterable settles.
-     * Simplified: takes an array for now.
-     */
-    public static JSValue race(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length == 0 || !(args[0] instanceof JSArray array)) {
-            return ctx.throwError("TypeError", "Promise.race requires an iterable");
-        }
-
-        int length = (int) array.getLength();
-        JSPromise resultPromise = new JSPromise();
-
-        for (int i = 0; i < length; i++) {
-            JSValue element = array.get(i);
-
-            if (element instanceof JSPromise elementPromise) {
-                // Add reaction to settle on first completion
-                elementPromise.addReactions(
-                        new JSPromise.ReactionRecord(
-                                new JSNativeFunction("onFulfill", 1, (context, thisValue, funcArgs) -> {
-                                    resultPromise.fulfill(funcArgs[0]);
-                                    return JSUndefined.INSTANCE;
-                                }),
-                                null,
-                                ctx
-                        ),
-                        new JSPromise.ReactionRecord(
-                                new JSNativeFunction("onReject", 1, (context, thisValue, funcArgs) -> {
-                                    resultPromise.reject(funcArgs[0]);
-                                    return JSUndefined.INSTANCE;
-                                }),
-                                null,
-                                ctx
-                        )
-                );
-            } else {
-                // Not a promise, fulfill immediately
-                resultPromise.fulfill(element);
-                break;
             }
         }
 
@@ -307,6 +227,86 @@ public final class PromiseConstructor {
         }
 
         return resultPromise;
+    }
+
+    /**
+     * Promise.race(iterable)
+     * ES2020 25.6.4.5
+     * Returns a Promise that settles as soon as any promise in the iterable settles.
+     * Simplified: takes an array for now.
+     */
+    public static JSValue race(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0 || !(args[0] instanceof JSArray array)) {
+            return ctx.throwError("TypeError", "Promise.race requires an iterable");
+        }
+
+        int length = (int) array.getLength();
+        JSPromise resultPromise = new JSPromise();
+
+        for (int i = 0; i < length; i++) {
+            JSValue element = array.get(i);
+
+            if (element instanceof JSPromise elementPromise) {
+                // Add reaction to settle on first completion
+                elementPromise.addReactions(
+                        new JSPromise.ReactionRecord(
+                                new JSNativeFunction("onFulfill", 1, (context, thisValue, funcArgs) -> {
+                                    resultPromise.fulfill(funcArgs[0]);
+                                    return JSUndefined.INSTANCE;
+                                }),
+                                null,
+                                ctx
+                        ),
+                        new JSPromise.ReactionRecord(
+                                new JSNativeFunction("onReject", 1, (context, thisValue, funcArgs) -> {
+                                    resultPromise.reject(funcArgs[0]);
+                                    return JSUndefined.INSTANCE;
+                                }),
+                                null,
+                                ctx
+                        )
+                );
+            } else {
+                // Not a promise, fulfill immediately
+                resultPromise.fulfill(element);
+                break;
+            }
+        }
+
+        return resultPromise;
+    }
+
+    /**
+     * Promise.reject(reason)
+     * ES2020 25.6.4.4
+     * Returns a Promise that is rejected with the given reason.
+     */
+    public static JSValue reject(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSValue reason = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+
+        // Create a new promise and reject it
+        JSPromise promise = new JSPromise();
+        promise.reject(reason);
+        return promise;
+    }
+
+    /**
+     * Promise.resolve(value)
+     * ES2020 25.6.4.6
+     * Returns a Promise that is resolved with the given value.
+     */
+    public static JSValue resolve(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+
+        // If value is already a promise, return it
+        if (value instanceof JSPromise) {
+            return value;
+        }
+
+        // Create a new promise and fulfill it
+        JSPromise promise = new JSPromise();
+        promise.fulfill(value);
+        return promise;
     }
 
     /**

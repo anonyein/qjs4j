@@ -27,61 +27,17 @@ import java.util.Map;
 public final class MapPrototype {
 
     /**
-     * get Map.prototype.size
-     * ES2020 23.1.3.10
-     * Returns the number of entries in the Map.
+     * Map.prototype.clear()
+     * ES2020 23.1.3.1
+     * Removes all elements from the Map.
      */
-    public static JSValue getSize(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue clear(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSMap map)) {
-            return ctx.throwError("TypeError", "get Map.prototype.size called on non-Map");
+            return ctx.throwError("TypeError", "Map.prototype.clear called on non-Map");
         }
 
-        return new JSNumber(map.size());
-    }
-
-    /**
-     * Map.prototype.set(key, value)
-     * ES2020 23.1.3.9
-     * Sets the value for the key in the Map object. Returns the Map object.
-     */
-    public static JSValue set(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSMap map)) {
-            return ctx.throwError("TypeError", "Map.prototype.set called on non-Map");
-        }
-
-        JSValue key = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-        JSValue value = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
-
-        map.mapSet(key, value);
-        return map; // Return the Map object for chaining
-    }
-
-    /**
-     * Map.prototype.get(key)
-     * ES2020 23.1.3.5
-     * Returns the value associated with the key, or undefined if none exists.
-     */
-    public static JSValue get(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSMap map)) {
-            return ctx.throwError("TypeError", "Map.prototype.get called on non-Map");
-        }
-
-        JSValue key = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-        return map.mapGet(key);
-    }
-
-    /**
-     * Map.prototype.has(key)
-     * ES2020 23.1.3.6
-     * Returns a boolean indicating whether an element with the specified key exists.
-     */
-    public static JSValue has(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSMap map)) {
-            return ctx.throwError("TypeError", "Map.prototype.has called on non-Map");
-        }
-
-        JSValue key = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-        return JSBoolean.valueOf(map.mapHas(key));
+        map.mapClear();
+        return JSUndefined.INSTANCE;
     }
 
     /**
@@ -99,17 +55,25 @@ public final class MapPrototype {
     }
 
     /**
-     * Map.prototype.clear()
-     * ES2020 23.1.3.1
-     * Removes all elements from the Map.
+     * Map.prototype.entries()
+     * ES2020 23.1.3.4
+     * Returns an iterator over [key, value] pairs.
+     * Simplified implementation - returns an array for now.
      */
-    public static JSValue clear(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSMap map)) {
-            return ctx.throwError("TypeError", "Map.prototype.clear called on non-Map");
+            return ctx.throwError("TypeError", "Map.prototype.entries called on non-Map");
         }
 
-        map.mapClear();
-        return JSUndefined.INSTANCE;
+        JSArray result = new JSArray();
+        for (Map.Entry<JSMap.KeyWrapper, JSValue> entry : map.entries()) {
+            JSArray pair = new JSArray();
+            pair.push(entry.getKey().value());
+            pair.push(entry.getValue());
+            result.push(pair);
+        }
+
+        return result;
     }
 
     /**
@@ -142,25 +106,44 @@ public final class MapPrototype {
     }
 
     /**
-     * Map.prototype.entries()
-     * ES2020 23.1.3.4
-     * Returns an iterator over [key, value] pairs.
-     * Simplified implementation - returns an array for now.
+     * Map.prototype.get(key)
+     * ES2020 23.1.3.5
+     * Returns the value associated with the key, or undefined if none exists.
      */
-    public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue get(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSMap map)) {
-            return ctx.throwError("TypeError", "Map.prototype.entries called on non-Map");
+            return ctx.throwError("TypeError", "Map.prototype.get called on non-Map");
         }
 
-        JSArray result = new JSArray();
-        for (Map.Entry<JSMap.KeyWrapper, JSValue> entry : map.entries()) {
-            JSArray pair = new JSArray();
-            pair.push(entry.getKey().value());
-            pair.push(entry.getValue());
-            result.push(pair);
+        JSValue key = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+        return map.mapGet(key);
+    }
+
+    /**
+     * get Map.prototype.size
+     * ES2020 23.1.3.10
+     * Returns the number of entries in the Map.
+     */
+    public static JSValue getSize(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSMap map)) {
+            return ctx.throwError("TypeError", "get Map.prototype.size called on non-Map");
         }
 
-        return result;
+        return new JSNumber(map.size());
+    }
+
+    /**
+     * Map.prototype.has(key)
+     * ES2020 23.1.3.6
+     * Returns a boolean indicating whether an element with the specified key exists.
+     */
+    public static JSValue has(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSMap map)) {
+            return ctx.throwError("TypeError", "Map.prototype.has called on non-Map");
+        }
+
+        JSValue key = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+        return JSBoolean.valueOf(map.mapHas(key));
     }
 
     /**
@@ -180,6 +163,23 @@ public final class MapPrototype {
         }
 
         return result;
+    }
+
+    /**
+     * Map.prototype.set(key, value)
+     * ES2020 23.1.3.9
+     * Sets the value for the key in the Map object. Returns the Map object.
+     */
+    public static JSValue set(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSMap map)) {
+            return ctx.throwError("TypeError", "Map.prototype.set called on non-Map");
+        }
+
+        JSValue key = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+        JSValue value = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
+
+        map.mapSet(key, value);
+        return map; // Return the Map object for chaining
     }
 
     /**

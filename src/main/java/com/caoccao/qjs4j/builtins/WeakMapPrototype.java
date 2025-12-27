@@ -25,31 +25,27 @@ import com.caoccao.qjs4j.core.*;
 public final class WeakMapPrototype {
 
     /**
-     * WeakMap.prototype.set(key, value)
-     * ES2020 23.3.3.5
-     * Sets the value for the key in the WeakMap object. Returns the WeakMap object.
-     * Key must be an object.
+     * WeakMap.prototype.delete(key)
+     * ES2020 23.3.3.2
+     * Removes the element with the specified key. Returns true if an element existed and was removed.
      */
-    public static JSValue set(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue delete(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSWeakMap weakMap)) {
-            return ctx.throwError("TypeError", "WeakMap.prototype.set called on non-WeakMap");
+            return ctx.throwError("TypeError", "WeakMap.prototype.delete called on non-WeakMap");
         }
 
         if (args.length == 0) {
-            return ctx.throwError("TypeError", "WeakMap.prototype.set requires a key");
+            return JSBoolean.FALSE;
         }
 
         JSValue key = args[0];
 
         // Key must be an object
         if (!(key instanceof JSObject keyObj)) {
-            return ctx.throwError("TypeError", "Invalid value used as weak map key");
+            return JSBoolean.FALSE;
         }
 
-        JSValue value = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
-
-        weakMap.weakMapSet(keyObj, value);
-        return weakMap; // Return the WeakMap object for chaining
+        return JSBoolean.valueOf(weakMap.weakMapDelete(keyObj));
     }
 
     /**
@@ -101,26 +97,30 @@ public final class WeakMapPrototype {
     }
 
     /**
-     * WeakMap.prototype.delete(key)
-     * ES2020 23.3.3.2
-     * Removes the element with the specified key. Returns true if an element existed and was removed.
+     * WeakMap.prototype.set(key, value)
+     * ES2020 23.3.3.5
+     * Sets the value for the key in the WeakMap object. Returns the WeakMap object.
+     * Key must be an object.
      */
-    public static JSValue delete(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue set(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSWeakMap weakMap)) {
-            return ctx.throwError("TypeError", "WeakMap.prototype.delete called on non-WeakMap");
+            return ctx.throwError("TypeError", "WeakMap.prototype.set called on non-WeakMap");
         }
 
         if (args.length == 0) {
-            return JSBoolean.FALSE;
+            return ctx.throwError("TypeError", "WeakMap.prototype.set requires a key");
         }
 
         JSValue key = args[0];
 
         // Key must be an object
         if (!(key instanceof JSObject keyObj)) {
-            return JSBoolean.FALSE;
+            return ctx.throwError("TypeError", "Invalid value used as weak map key");
         }
 
-        return JSBoolean.valueOf(weakMap.weakMapDelete(keyObj));
+        JSValue value = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
+
+        weakMap.weakMapSet(keyObj, value);
+        return weakMap; // Return the WeakMap object for chaining
     }
 }

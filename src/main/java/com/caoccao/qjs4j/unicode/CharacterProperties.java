@@ -23,22 +23,6 @@ package com.caoccao.qjs4j.unicode;
 public final class CharacterProperties {
 
     /**
-     * Convert code point to uppercase.
-     * Returns the uppercase variant or the same codepoint if no mapping exists.
-     */
-    public static int toUpperCase(int codePoint) {
-        return Character.toUpperCase(codePoint);
-    }
-
-    /**
-     * Convert code point to lowercase.
-     * Returns the lowercase variant or the same codepoint if no mapping exists.
-     */
-    public static int toLowerCase(int codePoint) {
-        return Character.toLowerCase(codePoint);
-    }
-
-    /**
      * Convert code point using case folding.
      * Case folding is used for case-insensitive matching.
      * For most characters, it's the same as toLowerCase, but there are exceptions.
@@ -109,15 +93,6 @@ public final class CharacterProperties {
     }
 
     /**
-     * Check if character is cased (has uppercase or lowercase variants).
-     */
-    public static boolean isCased(int codePoint) {
-        return Character.isUpperCase(codePoint) ||
-                Character.isLowerCase(codePoint) ||
-                Character.isTitleCase(codePoint);
-    }
-
-    /**
      * Check if character is case ignorable.
      * Case ignorable characters don't affect case-insensitive matching.
      */
@@ -131,10 +106,12 @@ public final class CharacterProperties {
     }
 
     /**
-     * Convert codepoint to string representation for display.
+     * Check if character is cased (has uppercase or lowercase variants).
      */
-    public static String toString(int codePoint) {
-        return new String(Character.toChars(codePoint));
+    public static boolean isCased(int codePoint) {
+        return Character.isUpperCase(codePoint) ||
+                Character.isLowerCase(codePoint) ||
+                Character.isTitleCase(codePoint);
     }
 
     /**
@@ -142,5 +119,28 @@ public final class CharacterProperties {
      */
     public static String toHexString(int codePoint) {
         return String.format("U+%04X", codePoint);
+    }
+
+    /**
+     * Convert code point to lowercase.
+     * Returns the lowercase variant or the same codepoint if no mapping exists.
+     */
+    public static int toLowerCase(int codePoint) {
+        return Character.toLowerCase(codePoint);
+    }
+
+    /**
+     * Convert codepoint to string representation for display.
+     */
+    public static String toString(int codePoint) {
+        return new String(Character.toChars(codePoint));
+    }
+
+    /**
+     * Convert code point to uppercase.
+     * Returns the uppercase variant or the same codepoint if no mapping exists.
+     */
+    public static int toUpperCase(int codePoint) {
+        return Character.toUpperCase(codePoint);
     }
 }

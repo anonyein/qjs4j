@@ -25,28 +25,6 @@ import com.caoccao.qjs4j.core.*;
 public final class FunctionPrototype {
 
     /**
-     * Function.prototype.call(thisArg, ...args)
-     * ES2020 19.2.3.3
-     */
-    public static JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        // thisArg for call() is the function itself
-        if (!(thisArg instanceof JSFunction func)) {
-            return ctx.throwError("TypeError", "Function.prototype.call called on non-function");
-        }
-
-        // First argument is the 'this' value for the called function
-        JSValue callThisArg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-
-        // Remaining arguments are passed to the function
-        JSValue[] callArgs = new JSValue[args.length - 1];
-        if (args.length > 1) {
-            System.arraycopy(args, 1, callArgs, 0, args.length - 1);
-        }
-
-        return func.call(ctx, callThisArg, callArgs);
-    }
-
-    /**
      * Function.prototype.apply(thisArg, argArray)
      * ES2020 19.2.3.1
      */
@@ -103,21 +81,25 @@ public final class FunctionPrototype {
     }
 
     /**
-     * Function.prototype.toString()
-     * ES2020 19.2.3.5
+     * Function.prototype.call(thisArg, ...args)
+     * ES2020 19.2.3.3
      */
-    public static JSValue toStringMethod(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        // thisArg for call() is the function itself
         if (!(thisArg instanceof JSFunction func)) {
-            return ctx.throwError("TypeError", "Function.prototype.toString called on non-function");
+            return ctx.throwError("TypeError", "Function.prototype.call called on non-function");
         }
 
-        // Simplified implementation - return a generic function string
-        String name = func.getName();
-        if (name == null || name.isEmpty()) {
-            name = "anonymous";
+        // First argument is the 'this' value for the called function
+        JSValue callThisArg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+
+        // Remaining arguments are passed to the function
+        JSValue[] callArgs = new JSValue[args.length - 1];
+        if (args.length > 1) {
+            System.arraycopy(args, 1, callArgs, 0, args.length - 1);
         }
 
-        return new JSString("function " + name + "() { [native code] }");
+        return func.call(ctx, callThisArg, callArgs);
     }
 
     /**
@@ -143,5 +125,23 @@ public final class FunctionPrototype {
 
         String name = func.getName();
         return new JSString(name != null ? name : "");
+    }
+
+    /**
+     * Function.prototype.toString()
+     * ES2020 19.2.3.5
+     */
+    public static JSValue toStringMethod(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSFunction func)) {
+            return ctx.throwError("TypeError", "Function.prototype.toString called on non-function");
+        }
+
+        // Simplified implementation - return a generic function string
+        String name = func.getName();
+        if (name == null || name.isEmpty()) {
+            name = "anonymous";
+        }
+
+        return new JSString("function " + name + "() { [native code] }");
     }
 }

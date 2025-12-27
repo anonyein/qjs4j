@@ -25,53 +25,6 @@ import com.caoccao.qjs4j.core.*;
 public final class SymbolPrototype {
 
     /**
-     * Symbol.prototype.toString()
-     * ES2020 19.4.3.2
-     * Returns a string representation of the Symbol.
-     */
-    public static JSValue toString(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSSymbol symbol;
-
-        if (thisArg instanceof JSSymbol sym) {
-            symbol = sym;
-        } else if (thisArg instanceof JSObject obj) {
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSSymbol sym) {
-                symbol = sym;
-            } else {
-                return ctx.throwError("TypeError", "Symbol.prototype.toString called on non-Symbol");
-            }
-        } else {
-            return ctx.throwError("TypeError", "Symbol.prototype.toString called on non-Symbol");
-        }
-
-        String description = symbol.getDescription();
-        if (description != null) {
-            return new JSString("Symbol(" + description + ")");
-        } else {
-            return new JSString("Symbol()");
-        }
-    }
-
-    /**
-     * Symbol.prototype.valueOf()
-     * ES2020 19.4.3.3
-     * Returns the primitive value of the Symbol.
-     */
-    public static JSValue valueOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (thisArg instanceof JSSymbol symbol) {
-            return symbol;
-        } else if (thisArg instanceof JSObject obj) {
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSSymbol symbol) {
-                return symbol;
-            }
-        }
-
-        return ctx.throwError("TypeError", "Symbol.prototype.valueOf called on non-Symbol");
-    }
-
-    /**
      * Symbol.prototype.description
      * ES2020 19.4.3.1
      * Getter for the Symbol's description.
@@ -106,11 +59,58 @@ public final class SymbolPrototype {
     }
 
     /**
+     * Symbol.prototype.toString()
+     * ES2020 19.4.3.2
+     * Returns a string representation of the Symbol.
+     */
+    public static JSValue toString(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        JSSymbol symbol;
+
+        if (thisArg instanceof JSSymbol sym) {
+            symbol = sym;
+        } else if (thisArg instanceof JSObject obj) {
+            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+            if (primitiveValue instanceof JSSymbol sym) {
+                symbol = sym;
+            } else {
+                return ctx.throwError("TypeError", "Symbol.prototype.toString called on non-Symbol");
+            }
+        } else {
+            return ctx.throwError("TypeError", "Symbol.prototype.toString called on non-Symbol");
+        }
+
+        String description = symbol.getDescription();
+        if (description != null) {
+            return new JSString("Symbol(" + description + ")");
+        } else {
+            return new JSString("Symbol()");
+        }
+    }
+
+    /**
      * Symbol.prototype[@@toStringTag]
      * ES2020 19.4.3.5
      * Returns "Symbol".
      */
     public static JSValue toStringTag(JSContext ctx, JSValue thisArg, JSValue[] args) {
         return new JSString("Symbol");
+    }
+
+    /**
+     * Symbol.prototype.valueOf()
+     * ES2020 19.4.3.3
+     * Returns the primitive value of the Symbol.
+     */
+    public static JSValue valueOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (thisArg instanceof JSSymbol symbol) {
+            return symbol;
+        } else if (thisArg instanceof JSObject obj) {
+            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+            if (primitiveValue instanceof JSSymbol symbol) {
+                return symbol;
+            }
+        }
+
+        return ctx.throwError("TypeError", "Symbol.prototype.valueOf called on non-Symbol");
     }
 }

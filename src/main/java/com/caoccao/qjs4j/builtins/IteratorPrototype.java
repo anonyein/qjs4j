@@ -25,48 +25,6 @@ import com.caoccao.qjs4j.core.*;
 public final class IteratorPrototype {
 
     /**
-     * Iterator.prototype.next()
-     * Returns the next value in the iteration.
-     */
-    public static JSValue next(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSIterator iterator)) {
-            return ctx.throwError("TypeError", "Iterator.prototype.next called on non-iterator");
-        }
-
-        return iterator.next();
-    }
-
-    /**
-     * Array.prototype.values()
-     * Returns an iterator of array values.
-     */
-    public static JSValue arrayValues(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray array)) {
-            return ctx.throwError("TypeError", "Array.prototype.values called on non-array");
-        }
-
-        return JSIterator.arrayIterator(array);
-    }
-
-    /**
-     * Array.prototype.keys()
-     * Returns an iterator of array indices.
-     */
-    public static JSValue arrayKeys(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray array)) {
-            return ctx.throwError("TypeError", "Array.prototype.keys called on non-array");
-        }
-
-        final int[] index = {0};
-        return new JSIterator(() -> {
-            if (index[0] < array.getLength()) {
-                return JSIterator.IteratorResult.of(new JSNumber(index[0]++));
-            }
-            return JSIterator.IteratorResult.done();
-        });
-    }
-
-    /**
      * Array.prototype.entries()
      * Returns an iterator of [index, value] pairs.
      */
@@ -89,22 +47,33 @@ public final class IteratorPrototype {
     }
 
     /**
-     * String.prototype[Symbol.iterator]()
-     * Returns an iterator of string characters.
+     * Array.prototype.keys()
+     * Returns an iterator of array indices.
      */
-    public static JSValue stringIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSString str)) {
-            // Try to get primitive value for boxed strings
-            if (thisArg instanceof JSObject obj) {
-                JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-                if (primitiveValue instanceof JSString boxedStr) {
-                    return JSIterator.stringIterator(boxedStr);
-                }
-            }
-            return ctx.throwError("TypeError", "String iterator called on non-string");
+    public static JSValue arrayKeys(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray array)) {
+            return ctx.throwError("TypeError", "Array.prototype.keys called on non-array");
         }
 
-        return JSIterator.stringIterator(str);
+        final int[] index = {0};
+        return new JSIterator(() -> {
+            if (index[0] < array.getLength()) {
+                return JSIterator.IteratorResult.of(new JSNumber(index[0]++));
+            }
+            return JSIterator.IteratorResult.done();
+        });
+    }
+
+    /**
+     * Array.prototype.values()
+     * Returns an iterator of array values.
+     */
+    public static JSValue arrayValues(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray array)) {
+            return ctx.throwError("TypeError", "Array.prototype.values called on non-array");
+        }
+
+        return JSIterator.arrayIterator(array);
     }
 
     /**
@@ -144,23 +113,15 @@ public final class IteratorPrototype {
     }
 
     /**
-     * Set.prototype.values() - returns iterator
-     * Returns an iterator of values.
+     * Iterator.prototype.next()
+     * Returns the next value in the iteration.
      */
-    public static JSValue setValuesIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSSet set)) {
-            return ctx.throwError("TypeError", "Set.prototype.values called on non-Set");
+    public static JSValue next(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSIterator iterator)) {
+            return ctx.throwError("TypeError", "Iterator.prototype.next called on non-iterator");
         }
 
-        return JSIterator.setValuesIterator(set);
-    }
-
-    /**
-     * Set.prototype.keys() - returns iterator
-     * In Set, keys() is the same as values().
-     */
-    public static JSValue setKeysIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return setValuesIterator(ctx, thisArg, args);
+        return iterator.next();
     }
 
     /**
@@ -183,5 +144,44 @@ public final class IteratorPrototype {
             }
             return JSIterator.IteratorResult.done();
         });
+    }
+
+    /**
+     * Set.prototype.keys() - returns iterator
+     * In Set, keys() is the same as values().
+     */
+    public static JSValue setKeysIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        return setValuesIterator(ctx, thisArg, args);
+    }
+
+    /**
+     * Set.prototype.values() - returns iterator
+     * Returns an iterator of values.
+     */
+    public static JSValue setValuesIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSSet set)) {
+            return ctx.throwError("TypeError", "Set.prototype.values called on non-Set");
+        }
+
+        return JSIterator.setValuesIterator(set);
+    }
+
+    /**
+     * String.prototype[Symbol.iterator]()
+     * Returns an iterator of string characters.
+     */
+    public static JSValue stringIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSString str)) {
+            // Try to get primitive value for boxed strings
+            if (thisArg instanceof JSObject obj) {
+                JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+                if (primitiveValue instanceof JSString boxedStr) {
+                    return JSIterator.stringIterator(boxedStr);
+                }
+            }
+            return ctx.throwError("TypeError", "String iterator called on non-string");
+        }
+
+        return JSIterator.stringIterator(str);
     }
 }

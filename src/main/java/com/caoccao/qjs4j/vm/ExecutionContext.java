@@ -22,19 +22,19 @@ import com.caoccao.qjs4j.core.JSContext;
  * Represents the current execution context.
  */
 public final class ExecutionContext {
-    private final JSContext jsContext;
     private final StackFrame currentFrame;
+    private final JSContext jsContext;
 
     public ExecutionContext(JSContext jsContext, StackFrame currentFrame) {
         this.jsContext = jsContext;
         this.currentFrame = currentFrame;
     }
 
-    public JSContext getJSContext() {
-        return jsContext;
-    }
-
     public StackFrame getCurrentFrame() {
         return currentFrame;
+    }
+
+    public JSContext getJSContext() {
+        return jsContext;
     }
 }

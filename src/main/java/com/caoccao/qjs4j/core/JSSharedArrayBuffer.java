@@ -55,6 +55,16 @@ public final class JSSharedArrayBuffer extends JSObject {
     }
 
     /**
+     * Get the underlying ByteBuffer.
+     * This is for internal use by TypedArrays, DataView, and Atomics.
+     *
+     * @return The direct ByteBuffer
+     */
+    public ByteBuffer getBuffer() {
+        return buffer;
+    }
+
+    /**
      * Get the byte length of this buffer.
      * ES2017 24.2.4.1 get SharedArrayBuffer.prototype.byteLength
      *
@@ -65,13 +75,13 @@ public final class JSSharedArrayBuffer extends JSObject {
     }
 
     /**
-     * Get the underlying ByteBuffer.
-     * This is for internal use by TypedArrays, DataView, and Atomics.
+     * Check if this buffer is a SharedArrayBuffer.
+     * Used to distinguish from regular ArrayBuffer.
      *
-     * @return The direct ByteBuffer
+     * @return Always true
      */
-    public ByteBuffer getBuffer() {
-        return buffer;
+    public boolean isShared() {
+        return true;
     }
 
     /**
@@ -117,16 +127,6 @@ public final class JSSharedArrayBuffer extends JSObject {
         }
 
         return newBuffer;
-    }
-
-    /**
-     * Check if this buffer is a SharedArrayBuffer.
-     * Used to distinguish from regular ArrayBuffer.
-     *
-     * @return Always true
-     */
-    public boolean isShared() {
-        return true;
     }
 
     @Override

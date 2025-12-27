@@ -30,15 +30,15 @@ public final class ReferenceCounter {
         refCount++;
     }
 
-    public void release() {
-        refCount--;
-    }
-
     public int getRefCount() {
         return refCount;
     }
 
     public boolean isAlive() {
         return refCount > 0;
+    }
+
+    public void release() {
+        refCount--;
     }
 }

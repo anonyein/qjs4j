@@ -20,9 +20,9 @@ package com.caoccao.qjs4j.core;
  * Represents a bound JavaScript function (created via Function.prototype.bind).
  */
 public final class JSBoundFunction implements JSFunction {
-    private final JSFunction target;
-    private final JSValue boundThis;
     private final JSValue[] boundArgs;
+    private final JSValue boundThis;
+    private final JSFunction target;
 
     public JSBoundFunction(JSFunction target, JSValue boundThis, JSValue[] boundArgs) {
         this.target = target;
@@ -40,22 +40,22 @@ public final class JSBoundFunction implements JSFunction {
     }
 
     @Override
-    public String getName() {
-        return "bound " + target.getName();
-    }
-
-    @Override
     public int getLength() {
         return Math.max(0, target.getLength() - boundArgs.length);
     }
 
     @Override
-    public JSValueType type() {
-        return JSValueType.FUNCTION;
+    public String getName() {
+        return "bound " + target.getName();
     }
 
     @Override
     public Object toJavaObject() {
         return this;
+    }
+
+    @Override
+    public JSValueType type() {
+        return JSValueType.FUNCTION;
     }
 }

@@ -37,41 +37,33 @@ public record JSBigInt(BigInteger value) implements JSValue {
         return new JSBigInt(value.add(other.value));
     }
 
-    public JSBigInt subtract(JSBigInt other) {
-        return new JSBigInt(value.subtract(other.value));
-    }
-
-    public JSBigInt multiply(JSBigInt other) {
-        return new JSBigInt(value.multiply(other.value));
+    // Bitwise operations
+    public JSBigInt and(JSBigInt other) {
+        return new JSBigInt(value.and(other.value));
     }
 
     public JSBigInt divide(JSBigInt other) {
         return new JSBigInt(value.divide(other.value));
     }
 
-    public JSBigInt remainder(JSBigInt other) {
-        return new JSBigInt(value.remainder(other.value));
+    public JSBigInt multiply(JSBigInt other) {
+        return new JSBigInt(value.multiply(other.value));
     }
 
-    public JSBigInt power(JSBigInt exponent) {
-        return new JSBigInt(value.pow(exponent.value.intValue()));
-    }
-
-    // Bitwise operations
-    public JSBigInt and(JSBigInt other) {
-        return new JSBigInt(value.and(other.value));
+    public JSBigInt not() {
+        return new JSBigInt(value.not());
     }
 
     public JSBigInt or(JSBigInt other) {
         return new JSBigInt(value.or(other.value));
     }
 
-    public JSBigInt xor(JSBigInt other) {
-        return new JSBigInt(value.xor(other.value));
+    public JSBigInt power(JSBigInt exponent) {
+        return new JSBigInt(value.pow(exponent.value.intValue()));
     }
 
-    public JSBigInt not() {
-        return new JSBigInt(value.not());
+    public JSBigInt remainder(JSBigInt other) {
+        return new JSBigInt(value.remainder(other.value));
     }
 
     public JSBigInt shiftLeft(long bits) {
@@ -82,13 +74,21 @@ public record JSBigInt(BigInteger value) implements JSValue {
         return new JSBigInt(value.shiftRight((int) bits));
     }
 
-    @Override
-    public JSValueType type() {
-        return JSValueType.BIGINT;
+    public JSBigInt subtract(JSBigInt other) {
+        return new JSBigInt(value.subtract(other.value));
     }
 
     @Override
     public Object toJavaObject() {
         return value;
+    }
+
+    @Override
+    public JSValueType type() {
+        return JSValueType.BIGINT;
+    }
+
+    public JSBigInt xor(JSBigInt other) {
+        return new JSBigInt(value.xor(other.value));
     }
 }
