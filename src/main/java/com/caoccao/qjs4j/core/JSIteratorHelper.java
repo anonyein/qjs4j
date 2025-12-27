@@ -168,6 +168,27 @@ public final class JSIteratorHelper {
     }
 
     /**
+     * Convert a JSIterator to an array.
+     *
+     * @param iterator The iterator to convert
+     * @return A JSArray containing all values from the iterator
+     */
+    public static JSArray toArray(JSIterator iterator) {
+        JSArray result = new JSArray();
+        while (true) {
+            JSObject iterResult = iterator.next();
+            JSValue doneValue = iterResult.get("done");
+            boolean done = JSTypeConversions.toBoolean(doneValue).isBooleanTrue();
+            if (done) {
+                break;
+            }
+            JSValue value = iterResult.get("value");
+            result.push(value);
+        }
+        return result;
+    }
+
+    /**
      * Functional interface for iteration callbacks.
      */
     @FunctionalInterface

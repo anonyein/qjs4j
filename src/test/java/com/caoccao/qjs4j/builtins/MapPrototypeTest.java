@@ -223,26 +223,18 @@ public class MapPrototypeTest extends BaseTest {
         JSValue result = MapPrototype.keys(ctx, map, new JSValue[]{});
         JSIterator keys = result.asIterator().orElse(null);
         assertNotNull(keys);
-        JSObject jsObject = keys.next();
-        assertNotNull(jsObject);
-        assertEquals("key1", jsObject.get("value").asString().map(JSString::value).orElse(null));
-        assertTrue(jsObject.get("done").asBoolean().map(JSBoolean::isBooleanFalse).orElse(false));
-        jsObject = keys.next();
-        assertNotNull(jsObject);
-        assertEquals("key2", jsObject.get("value").asString().map(JSString::value).orElse(null));
-        assertTrue(jsObject.get("done").asBoolean().map(JSBoolean::isBooleanFalse).orElse(false));
-        jsObject = keys.next();
-        assertTrue(jsObject.get("value").isUndefined());
-        assertTrue(jsObject.get("done").asBoolean().map(JSBoolean::isBooleanTrue).orElse(false));
+        JSArray jsArray = JSIteratorHelper.toArray(keys);
+        assertEquals(2, jsArray.getLength());
+        assertEquals("key1", jsArray.get(0).asString().map(JSString::value).orElse(null));
+        assertEquals("key2", jsArray.get(1).asString().map(JSString::value).orElse(null));
 
         // Normal case: empty map
         JSMap emptyMap = new JSMap();
         result = MapPrototype.keys(ctx, emptyMap, new JSValue[]{});
         keys = result.asIterator().orElse(null);
         assertNotNull(keys);
-        jsObject = keys.next();
-        assertTrue(jsObject.get("value").isUndefined());
-        assertTrue(jsObject.get("done").asBoolean().map(JSBoolean::isBooleanTrue).orElse(false));
+        jsArray = JSIteratorHelper.toArray(keys);
+        assertEquals(0, jsArray.getLength());
 
         // Edge case: called on non-Map
         assertTypeError(MapPrototype.keys(ctx, new JSString("not map"), new JSValue[]{}));
@@ -286,26 +278,18 @@ public class MapPrototypeTest extends BaseTest {
         JSValue result = MapPrototype.values(ctx, map, new JSValue[]{});
         JSIterator values = result.asIterator().orElse(null);
         assertNotNull(values);
-        JSObject jsObject = values.next();
-        assertNotNull(jsObject);
-        assertEquals("value1", jsObject.get("value").asString().map(JSString::value).orElse(null));
-        assertTrue(jsObject.get("done").asBoolean().map(JSBoolean::isBooleanFalse).orElse(false));
-        jsObject = values.next();
-        assertNotNull(jsObject);
-        assertEquals("value2", jsObject.get("value").asString().map(JSString::value).orElse(null));
-        assertTrue(jsObject.get("done").asBoolean().map(JSBoolean::isBooleanFalse).orElse(false));
-        jsObject = values.next();
-        assertTrue(jsObject.get("value").isUndefined());
-        assertTrue(jsObject.get("done").asBoolean().map(JSBoolean::isBooleanTrue).orElse(false));
+        JSArray jsArray = JSIteratorHelper.toArray(values);
+        assertEquals(2, jsArray.getLength());
+        assertEquals("value1", jsArray.get(0).asString().map(JSString::value).orElse(null));
+        assertEquals("value2", jsArray.get(1).asString().map(JSString::value).orElse(null));
 
         // Normal case: empty map
         JSMap emptyMap = new JSMap();
         result = MapPrototype.values(ctx, emptyMap, new JSValue[]{});
         values = result.asIterator().orElse(null);
         assertNotNull(values);
-        jsObject = values.next();
-        assertTrue(jsObject.get("value").isUndefined());
-        assertTrue(jsObject.get("done").asBoolean().map(JSBoolean::isBooleanTrue).orElse(false));
+        jsArray = JSIteratorHelper.toArray(values);
+        assertEquals(0, jsArray.getLength());
 
         // Edge case: called on non-Map
         assertTypeError(MapPrototype.values(ctx, new JSString("not map"), new JSValue[]{}));
