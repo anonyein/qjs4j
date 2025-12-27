@@ -16,7 +16,10 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSNumber;
+import com.caoccao.qjs4j.core.JSTypeConversions;
+import com.caoccao.qjs4j.core.JSValue;
 
 /**
  * Implementation of JavaScript Math object.
@@ -239,7 +242,7 @@ public final class MathObject {
             return new JSNumber(Double.NaN);
         }
         double x = JSTypeConversions.toNumber(args[0]).value();
-        return new JSNumber((double) (float) x);
+        return new JSNumber(x);
     }
 
     /**

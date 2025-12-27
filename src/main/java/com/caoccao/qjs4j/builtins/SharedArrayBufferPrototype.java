@@ -16,7 +16,10 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSNumber;
+import com.caoccao.qjs4j.core.JSSharedArrayBuffer;
+import com.caoccao.qjs4j.core.JSValue;
 
 /**
  * SharedArrayBuffer.prototype methods implementation.

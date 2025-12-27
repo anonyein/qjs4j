@@ -100,14 +100,14 @@ public final class DateConstructor {
         try {
             // Create UTC ZonedDateTime
             ZonedDateTime zdt = ZonedDateTime.of(
-                year,
-                month + 1, // JavaScript months are 0-based
-                date,
-                hours,
-                minutes,
-                seconds,
-                ms * 1_000_000, // Convert ms to nanoseconds
-                java.time.ZoneId.of("UTC")
+                    year,
+                    month + 1, // JavaScript months are 0-based
+                    date,
+                    hours,
+                    minutes,
+                    seconds,
+                    ms * 1_000_000, // Convert ms to nanoseconds
+                    java.time.ZoneId.of("UTC")
             );
 
             return new JSNumber(zdt.toInstant().toEpochMilli());

@@ -24,7 +24,7 @@ import java.util.List;
 /**
  * Implementation of JavaScript JSON object.
  * Based on ES2020 JSON specification.
- *
+ * <p>
  * This is a simplified implementation. Full JSON support requires:
  * - Complete recursive object/array serialization
  * - Proper handling of circular references

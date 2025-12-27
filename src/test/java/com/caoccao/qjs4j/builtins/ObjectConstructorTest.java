@@ -27,6 +27,60 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class ObjectConstructorTest extends BaseTest {
     @Test
+    public void testFromEntries() {
+        // Test using eval to create proper arrays with prototypes
+        ctx.eval("var entries = [['a', 1], ['b', 2]]");
+        JSValue entries = ctx.getGlobalObject().get("entries");
+
+        // For now, just test that fromEntries doesn't crash
+        JSValue result = ObjectConstructor.fromEntries(ctx, JSUndefined.INSTANCE, new JSValue[]{entries});
+        JSObject obj = result.asObject().orElse(null);
+        assertNotNull(obj);
+        assertEquals(1.0, obj.get("a").asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(2.0, obj.get("b").asNumber().map(JSNumber::value).orElse(0.0));
+
+        // Edge case: empty array
+        ctx.eval("var emptyEntries = []");
+        JSValue emptyEntries = ctx.getGlobalObject().get("emptyEntries");
+        result = ObjectConstructor.fromEntries(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyEntries});
+        obj = result.asObject().orElse(null);
+        assertNotNull(obj);
+        assertEquals(0, obj.getOwnPropertyKeys().size());
+
+        // Edge case: no arguments
+        assertTypeError(ObjectConstructor.fromEntries(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
+        assertPendingException(ctx);
+
+        // Edge case: non-iterable argument
+        assertTypeError(ObjectConstructor.fromEntries(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(42)}));
+        assertPendingException(ctx);
+
+        // Test with string keys and various value types - use manual creation
+        JSArray mixedEntries = new JSArray();
+        JSArray mixedEntry1 = new JSArray();
+        mixedEntry1.push(new JSString("key1"));
+        mixedEntry1.push(new JSString("value1"));
+        mixedEntries.push(mixedEntry1);
+
+        JSArray mixedEntry2 = new JSArray();
+        mixedEntry2.push(new JSString("key2"));
+        mixedEntry2.push(JSBoolean.TRUE);
+        mixedEntries.push(mixedEntry2);
+
+        // Set prototype for the arrays
+        JSObject arrayProto = ctx.getGlobalObject().get("Array").asObject().orElse(null).get("prototype").asObject().orElse(null);
+        mixedEntries.setPrototype(arrayProto);
+        mixedEntry1.setPrototype(arrayProto);
+        mixedEntry2.setPrototype(arrayProto);
+
+        result = ObjectConstructor.fromEntries(ctx, JSUndefined.INSTANCE, new JSValue[]{mixedEntries});
+        obj = result.asObject().orElse(null);
+        assertNotNull(obj);
+        assertEquals("value1", obj.get("key1").asString().map(JSString::getValue).orElse(""));
+        assertEquals(JSBoolean.TRUE, obj.get("key2"));
+    }
+
+    @Test
     public void testObjectAssign() {
         JSObject target = new JSObject();
         target.set("a", new JSNumber(1));

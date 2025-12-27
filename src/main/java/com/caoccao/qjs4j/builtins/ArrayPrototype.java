@@ -704,6 +704,48 @@ public final class ArrayPrototype {
     }
 
     /**
+     * Array.prototype.flatMap(callback, thisArg)
+     * ES2019 22.1.3.11
+     * Maps each element using callback, then flattens the result by one level.
+     */
+    public static JSValue flatMap(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSArray arr)) {
+            return ctx.throwError("TypeError", "Array.prototype.flatMap called on non-array");
+        }
+
+        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+            return ctx.throwError("TypeError", "Array.prototype.flatMap requires a callback function");
+        }
+
+        JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
+
+        JSArray result = new JSArray();
+
+        for (int i = 0; i < arr.getLength(); i++) {
+            JSValue element = arr.get(i);
+
+            // Call the callback with (element, index, array)
+            JSValue[] callbackArgs = new JSValue[]{
+                    element,
+                    new JSNumber(i),
+                    arr
+            };
+            JSValue mapped = callback.call(ctx, callbackThisArg, callbackArgs);
+
+            // Flatten one level
+            if (mapped instanceof JSArray mappedArray) {
+                for (int j = 0; j < mappedArray.getLength(); j++) {
+                    result.push(mappedArray.get(j));
+                }
+            } else {
+                result.push(mapped);
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Array.prototype.toString()
      * Returns a string representing the array.
      */

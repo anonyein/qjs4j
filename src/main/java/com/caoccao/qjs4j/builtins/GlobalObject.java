@@ -18,7 +18,6 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.*;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -26,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * The global object with built-in functions.
  * Based on ECMAScript specification global properties and functions.
- *
+ * <p>
  * Implements:
  * - Global value properties (NaN, Infinity, undefined)
  * - Global function properties (parseInt, parseFloat, isNaN, isFinite, eval)
@@ -115,6 +114,7 @@ public final class GlobalObject {
         objectConstructor.set("keys", createNativeFunction(ctx, "keys", ObjectConstructor::keys, 1));
         objectConstructor.set("values", createNativeFunction(ctx, "values", ObjectConstructor::values, 1));
         objectConstructor.set("entries", createNativeFunction(ctx, "entries", ObjectConstructor::entries, 1));
+        objectConstructor.set("fromEntries", createNativeFunction(ctx, "fromEntries", ObjectConstructor::fromEntries, 1));
         objectConstructor.set("assign", createNativeFunction(ctx, "assign", ObjectConstructor::assign, 2));
         objectConstructor.set("create", createNativeFunction(ctx, "create", ObjectConstructor::create, 2));
         objectConstructor.set("getPrototypeOf", createNativeFunction(ctx, "getPrototypeOf", ObjectConstructor::getPrototypeOf, 1));
@@ -167,16 +167,18 @@ public final class GlobalObject {
         arrayPrototype.set("reduce", createNativeFunction(ctx, "reduce", ArrayPrototype::reduce, 1));
         arrayPrototype.set("reduceRight", createNativeFunction(ctx, "reduceRight", ArrayPrototype::reduceRight, 1));
         arrayPrototype.set("forEach", createNativeFunction(ctx, "forEach", ArrayPrototype::forEach, 1));
-        arrayPrototype.set("values", createNativeFunction(ctx, "values", IteratorPrototype::arrayValues, 0));
+        // Array.prototype.values and Array.prototype[Symbol.iterator] should be the same function
+        JSNativeFunction valuesFunction = createNativeFunction(ctx, "values", IteratorPrototype::arrayValues, 0);
+        arrayPrototype.set("values", valuesFunction);
+        arrayPrototype.set(PropertyKey.fromSymbol(JSSymbol.ITERATOR), valuesFunction);
         arrayPrototype.set("keys", createNativeFunction(ctx, "keys", IteratorPrototype::arrayKeys, 0));
         arrayPrototype.set("entries", createNativeFunction(ctx, "entries", IteratorPrototype::arrayEntries, 0));
-        // Array.prototype[Symbol.iterator] is the same as values()
-        arrayPrototype.set(PropertyKey.fromSymbol(JSSymbol.ITERATOR), createNativeFunction(ctx, "[Symbol.iterator]", IteratorPrototype::arrayValues, 0));
         arrayPrototype.set("find", createNativeFunction(ctx, "find", ArrayPrototype::find, 1));
         arrayPrototype.set("findIndex", createNativeFunction(ctx, "findIndex", ArrayPrototype::findIndex, 1));
         arrayPrototype.set("every", createNativeFunction(ctx, "every", ArrayPrototype::every, 1));
         arrayPrototype.set("some", createNativeFunction(ctx, "some", ArrayPrototype::some, 1));
         arrayPrototype.set("flat", createNativeFunction(ctx, "flat", ArrayPrototype::flat, 0));
+        arrayPrototype.set("flatMap", createNativeFunction(ctx, "flatMap", ArrayPrototype::flatMap, 1));
         arrayPrototype.set("toString", createNativeFunction(ctx, "toString", ArrayPrototype::toString, 0));
 
         // Create Array constructor with static methods
@@ -833,8 +835,8 @@ public final class GlobalObject {
         // Auto-detect radix 16 for "0x" prefix
         if (radix == 0 || radix == 16) {
             if (index + 1 < inputString.length() &&
-                inputString.charAt(index) == '0' &&
-                (inputString.charAt(index + 1) == 'x' || inputString.charAt(index + 1) == 'X')) {
+                    inputString.charAt(index) == '0' &&
+                    (inputString.charAt(index + 1) == 'x' || inputString.charAt(index + 1) == 'X')) {
                 radix = 16;
                 index += 2;
             } else if (radix == 0) {
@@ -918,7 +920,7 @@ public final class GlobalObject {
                     hasExponent = true;
                     // Check for exponent sign
                     if (i + 1 < inputString.length() &&
-                        (inputString.charAt(i + 1) == '+' || inputString.charAt(i + 1) == '-')) {
+                            (inputString.charAt(i + 1) == '+' || inputString.charAt(i + 1) == '-')) {
                         i++;
                         validPart.append(inputString.charAt(i));
                     }
@@ -998,16 +1000,16 @@ public final class GlobalObject {
 
             // Restore characters that should not be encoded by encodeURI
             encoded = encoded
-                .replace("%3B", ";").replace("%2C", ",")
-                .replace("%2F", "/").replace("%3F", "?")
-                .replace("%3A", ":").replace("%40", "@")
-                .replace("%26", "&").replace("%3D", "=")
-                .replace("%2B", "+").replace("%24", "$")
-                .replace("%2D", "-").replace("%5F", "_")
-                .replace("%2E", ".").replace("%21", "!")
-                .replace("%7E", "~").replace("%2A", "*")
-                .replace("%27", "'").replace("%28", "(")
-                .replace("%29", ")").replace("%23", "#");
+                    .replace("%3B", ";").replace("%2C", ",")
+                    .replace("%2F", "/").replace("%3F", "?")
+                    .replace("%3A", ":").replace("%40", "@")
+                    .replace("%26", "&").replace("%3D", "=")
+                    .replace("%2B", "+").replace("%24", "$")
+                    .replace("%2D", "-").replace("%5F", "_")
+                    .replace("%2E", ".").replace("%21", "!")
+                    .replace("%7E", "~").replace("%2A", "*")
+                    .replace("%27", "'").replace("%28", "(")
+                    .replace("%29", ")").replace("%23", "#");
 
             return new JSString(encoded);
         } catch (Exception e) {
@@ -1049,11 +1051,11 @@ public final class GlobalObject {
 
             // Restore only the unreserved characters: - _ . ! ~ * ' ( )
             encoded = encoded
-                .replace("%2D", "-").replace("%5F", "_")
-                .replace("%2E", ".").replace("%21", "!")
-                .replace("%7E", "~").replace("%2A", "*")
-                .replace("%27", "'").replace("%28", "(")
-                .replace("%29", ")");
+                    .replace("%2D", "-").replace("%5F", "_")
+                    .replace("%2E", ".").replace("%21", "!")
+                    .replace("%7E", "~").replace("%2A", "*")
+                    .replace("%27", "'").replace("%28", "(")
+                    .replace("%29", ")");
 
             return new JSString(encoded);
         } catch (Exception e) {

@@ -33,12 +33,9 @@ public final class ProxyConstructor {
      * Simplified implementation: returns a basic proxy for now.
      */
     public static JSValue revocable(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (args.length < 2 || !(args[0] instanceof JSObject) || !(args[1] instanceof JSObject)) {
+        if (args.length < 2 || !(args[0] instanceof JSObject target) || !(args[1] instanceof JSObject handler)) {
             return ctx.throwError("TypeError", "Proxy.revocable requires target and handler objects");
         }
-
-        JSObject target = (JSObject) args[0];
-        JSObject handler = (JSObject) args[1];
 
         // Create the proxy
         JSProxy proxy = new JSProxy(target, handler, ctx);

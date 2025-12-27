@@ -16,12 +16,15 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSFinalizationRegistry;
+import com.caoccao.qjs4j.core.JSFunction;
+import com.caoccao.qjs4j.core.JSValue;
 
 /**
  * FinalizationRegistry constructor implementation.
  * Based on ES2021 FinalizationRegistry specification.
- *
+ * <p>
  * FinalizationRegistry(cleanupCallback) creates a registry for cleanup callbacks.
  */
 public final class FinalizationRegistryConstructor {
@@ -30,9 +33,9 @@ public final class FinalizationRegistryConstructor {
      * FinalizationRegistry constructor function.
      * Cannot be called without 'new'.
      *
-     * @param ctx The execution context
+     * @param ctx     The execution context
      * @param thisArg The this value
-     * @param args Constructor arguments [cleanupCallback]
+     * @param args    Constructor arguments [cleanupCallback]
      * @return TypeError (FinalizationRegistry must be called with 'new')
      */
     public static JSValue construct(JSContext ctx, JSValue thisArg, JSValue[] args) {
@@ -45,7 +48,7 @@ public final class FinalizationRegistryConstructor {
      * Create a FinalizationRegistry instance.
      * Called by VM when 'new FinalizationRegistry(cleanupCallback)' is executed.
      *
-     * @param ctx The execution context
+     * @param ctx             The execution context
      * @param cleanupCallback The cleanup callback function
      * @return A new FinalizationRegistry instance or error
      */

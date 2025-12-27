@@ -16,7 +16,10 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSGenerator;
+import com.caoccao.qjs4j.core.JSUndefined;
+import com.caoccao.qjs4j.core.JSValue;
 
 /**
  * Implementation of Generator.prototype methods.

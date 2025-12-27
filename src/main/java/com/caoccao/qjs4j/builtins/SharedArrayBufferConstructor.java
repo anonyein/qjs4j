@@ -28,9 +28,9 @@ public final class SharedArrayBufferConstructor {
      * SharedArrayBuffer constructor function.
      * Cannot be called without 'new'.
      *
-     * @param ctx The execution context
+     * @param ctx     The execution context
      * @param thisArg The this value
-     * @param args Constructor arguments [byteLength]
+     * @param args    Constructor arguments [byteLength]
      * @return TypeError (SharedArrayBuffer must be called with 'new')
      */
     public static JSValue construct(JSContext ctx, JSValue thisArg, JSValue[] args) {
@@ -43,7 +43,7 @@ public final class SharedArrayBufferConstructor {
      * Create a SharedArrayBuffer instance.
      * Called by VM when 'new SharedArrayBuffer(length)' is executed.
      *
-     * @param ctx The execution context
+     * @param ctx    The execution context
      * @param length The byte length
      * @return A new SharedArrayBuffer instance or error
      */

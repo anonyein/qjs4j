@@ -296,6 +296,60 @@ public class ArrayPrototypeTest extends BaseTest {
     }
 
     @Test
+    public void testFlatMap() {
+        JSArray arr = new JSArray();
+        arr.push(new JSNumber(1));
+        arr.push(new JSNumber(2));
+        arr.push(new JSNumber(3));
+
+        // Normal case: flatMap with function that returns arrays
+        JSFunction doubleAndWrapFn = createTestFunction(args -> {
+            double val = args[0].asNumber().map(JSNumber::value).orElse(0D);
+            JSArray result = new JSArray();
+            result.push(new JSNumber(val));
+            result.push(new JSNumber(val * 2));
+            return result;
+        });
+
+        JSValue result = ArrayPrototype.flatMap(ctx, arr, new JSValue[]{doubleAndWrapFn});
+        JSArray flattened = result.asArray().orElse(null);
+        assertNotNull(flattened);
+        assertEquals(6, flattened.getLength());
+        assertEquals(1.0, flattened.get(0).asNumber().map(JSNumber::value).orElse(0D));
+        assertEquals(2.0, flattened.get(1).asNumber().map(JSNumber::value).orElse(0D));
+        assertEquals(2.0, flattened.get(2).asNumber().map(JSNumber::value).orElse(0D));
+        assertEquals(4.0, flattened.get(3).asNumber().map(JSNumber::value).orElse(0D));
+        assertEquals(3.0, flattened.get(4).asNumber().map(JSNumber::value).orElse(0D));
+        assertEquals(6.0, flattened.get(5).asNumber().map(JSNumber::value).orElse(0D));
+
+        // Case where callback returns non-array
+        JSFunction identityFn = createTestFunction(args -> args[0]);
+        result = ArrayPrototype.flatMap(ctx, arr, new JSValue[]{identityFn});
+        flattened = result.asArray().orElse(null);
+        assertNotNull(flattened);
+        assertEquals(3, flattened.getLength());
+        assertEquals(1.0, flattened.get(0).asNumber().map(JSNumber::value).orElse(0D));
+        assertEquals(2.0, flattened.get(1).asNumber().map(JSNumber::value).orElse(0D));
+        assertEquals(3.0, flattened.get(2).asNumber().map(JSNumber::value).orElse(0D));
+
+        // Edge case: empty array
+        JSArray emptyArr = new JSArray();
+        result = ArrayPrototype.flatMap(ctx, emptyArr, new JSValue[]{doubleAndWrapFn});
+        JSArray arr1 = result.asArray().orElse(null);
+        assertNotNull(arr1);
+        assertEquals(0, arr1.getLength());
+
+        // Edge case: flatMap on non-array
+        JSValue nonArray = new JSString("not an array");
+        assertTypeError(ArrayPrototype.flatMap(ctx, nonArray, new JSValue[]{doubleAndWrapFn}));
+        assertPendingException(ctx);
+
+        // Edge case: no callback
+        assertTypeError(ArrayPrototype.flatMap(ctx, arr, new JSValue[]{}));
+        assertPendingException(ctx);
+    }
+
+    @Test
     public void testForEach() {
         JSArray arr = new JSArray();
         arr.push(new JSNumber(1));
@@ -936,6 +990,54 @@ public class ArrayPrototypeTest extends BaseTest {
         JSValue nonArray = new JSString("not an array");
         assertTypeError(ArrayPrototype.splice(ctx, nonArray, new JSValue[]{new JSNumber(0), new JSNumber(1)}));
         assertPendingException(ctx);
+    }
+
+    @Test
+    public void testSymbolIterator() {
+        JSArray arr = new JSArray();
+        arr.push(new JSNumber(1));
+        arr.push(new JSNumber(2));
+        arr.push(new JSNumber(3));
+
+        // Set prototype to Array.prototype
+        JSObject arrayProto = ctx.getGlobalObject().get("Array").asObject().orElse(null).get("prototype").asObject().orElse(null);
+        arr.setPrototype(arrayProto);
+
+        // Get Symbol.iterator
+        PropertyKey iteratorKey = PropertyKey.fromSymbol(JSSymbol.ITERATOR);
+        JSValue iteratorFn = arr.get(iteratorKey);
+        assertNotNull(iteratorFn);
+        assertTrue(iteratorFn.isFunction());
+
+        // Get values function
+        JSValue valuesFn = arr.get("values");
+        assertNotNull(valuesFn);
+        assertTrue(valuesFn.isFunction());
+
+        // Symbol.iterator should be the same as values
+        assertSame(valuesFn, iteratorFn);
+
+        // Test that calling Symbol.iterator works
+        JSValue iteratorResult = ((JSFunction) iteratorFn).call(ctx, arr, new JSValue[0]);
+        assertTrue(iteratorResult.isIterator());
+
+        // Test iteration
+        JSIterator iterator = (JSIterator) iteratorResult;
+        JSObject result1 = iterator.next();
+        assertTrue(result1.get("done").isBooleanFalse());
+        assertEquals(1.0, result1.get("value").asNumber().map(JSNumber::value).orElse(0.0));
+
+        JSObject result2 = iterator.next();
+        assertTrue(result2.get("done").isBooleanFalse());
+        assertEquals(2.0, result2.get("value").asNumber().map(JSNumber::value).orElse(0.0));
+
+        JSObject result3 = iterator.next();
+        assertTrue(result3.get("done").isBooleanFalse());
+        assertEquals(3.0, result3.get("value").asNumber().map(JSNumber::value).orElse(0.0));
+
+        JSObject result4 = iterator.next();
+        assertTrue(result4.get("done").isBooleanTrue());
+        assertTrue(result4.get("value").isUndefined());
     }
 
     @Test

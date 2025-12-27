@@ -523,6 +523,15 @@ public sealed interface JSValue permits
 
     /**
      * Check if this value is a function.
+     *
+     * @return true if this value is a function, false otherwise
+     */
+    default boolean isFunction() {
+        return this instanceof JSFunction;
+    }
+
+    /**
+     * Check if this value is a function.
      * <p>
      * /**
      * Check if this value is a generator.

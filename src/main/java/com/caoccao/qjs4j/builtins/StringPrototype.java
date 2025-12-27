@@ -246,7 +246,7 @@ public final class StringPrototype {
             }
         }
 
-        return new JSString(padding.toString() + s);
+        return new JSString(padding + s);
     }
 
     /**
@@ -369,8 +369,8 @@ public final class StringPrototype {
 
         String separator = JSTypeConversions.toString(args[0]).getValue();
         long limit = args.length > 1 && !(args[1] instanceof JSUndefined)
-            ? JSTypeConversions.toUint32(args[1])
-            : Long.MAX_VALUE;
+                ? JSTypeConversions.toUint32(args[1])
+                : Long.MAX_VALUE;
 
         JSArray arr = new JSArray();
 

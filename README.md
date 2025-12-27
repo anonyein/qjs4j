@@ -29,9 +29,9 @@ qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Ja
 - **Spread operator**: Array and object spread
 
 #### ✅ Built-in Objects
-- **Object**: keys, values, entries, assign, create, freeze, seal, getPrototypeOf, setPrototypeOf
-- **Array**: push, pop, shift, unshift, slice, splice, concat, join, reverse, sort, map, filter, reduce, find, every, some, includes
-- **String**: charAt, charCodeAt, substring, substr, indexOf, lastIndexOf, split, replace, toUpperCase, toLowerCase, trim, repeat, startsWith, endsWith, includes, padStart, padEnd
+- **Object**: keys, values, entries, fromEntries (ES2019), assign, create, freeze, seal, getPrototypeOf, setPrototypeOf
+- **Array**: push, pop, shift, unshift, slice, splice, concat, join, reverse, sort, map, filter, reduce, find, every, some, includes, flat (ES2019), flatMap (ES2019)
+- **String**: charAt, charCodeAt, substring, substr, indexOf, lastIndexOf, split, replace, toUpperCase, toLowerCase, trim, trimStart (ES2019), trimEnd (ES2019), repeat, startsWith, endsWith, includes, padStart, padEnd
 - **Number**: parseInt, parseFloat, isNaN, isFinite, toFixed, toPrecision, toExponential
 - **Boolean**: toString, valueOf
 - **Date**: Date constructor with current time, date manipulation methods

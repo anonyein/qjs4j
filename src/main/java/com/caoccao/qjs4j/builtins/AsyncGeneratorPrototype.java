@@ -71,7 +71,7 @@ public final class AsyncGeneratorPrototype {
 
     /**
      * Create a simple async generator that yields a sequence of promises.
-     *
+     * <p>
      * Example usage:
      * <pre>
      * JSAsyncGenerator gen = AsyncGeneratorPrototype.createFromValues(
@@ -80,7 +80,7 @@ public final class AsyncGeneratorPrototype {
      * );
      * </pre>
      *
-     * @param ctx The execution context
+     * @param ctx    The execution context
      * @param values Values to yield (each wrapped in a promise)
      * @return An async generator that yields the values
      */
@@ -90,7 +90,7 @@ public final class AsyncGeneratorPrototype {
             final int[] index = {0};
 
             return new JSAsyncGenerator.AsyncYieldFunction() {
-                private int currentIndex = index[0]++;
+                private final int currentIndex = index[0]++;
 
                 @Override
                 public JSPromise yieldNext(JSValue input) {
@@ -120,7 +120,7 @@ public final class AsyncGeneratorPrototype {
      * Create an async generator that yields values from a promise array.
      * Each promise is awaited before yielding its value.
      *
-     * @param ctx The execution context
+     * @param ctx      The execution context
      * @param promises Array of promises to yield
      * @return An async generator
      */
@@ -152,27 +152,27 @@ public final class AsyncGeneratorPrototype {
             JSPromise resultPromise = new JSPromise();
 
             currentPromise.addReactions(
-                new JSPromise.ReactionRecord(
-                    new JSNativeFunction("onFulfilled", 1, (context, thisArg, args) -> {
-                        JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-                        JSObject result = new JSObject();
-                        result.set("value", value);
-                        result.set("done", JSBoolean.FALSE);
-                        resultPromise.fulfill(result);
-                        return JSUndefined.INSTANCE;
-                    }),
-                    resultPromise,
-                    ctx
-                ),
-                new JSPromise.ReactionRecord(
-                    new JSNativeFunction("onRejected", 1, (context, thisArg, args) -> {
-                        JSValue error = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-                        resultPromise.reject(error);
-                        return JSUndefined.INSTANCE;
-                    }),
-                    resultPromise,
-                    ctx
-                )
+                    new JSPromise.ReactionRecord(
+                            new JSNativeFunction("onFulfilled", 1, (context, thisArg, args) -> {
+                                JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+                                JSObject result = new JSObject();
+                                result.set("value", value);
+                                result.set("done", JSBoolean.FALSE);
+                                resultPromise.fulfill(result);
+                                return JSUndefined.INSTANCE;
+                            }),
+                            resultPromise,
+                            ctx
+                    ),
+                    new JSPromise.ReactionRecord(
+                            new JSNativeFunction("onRejected", 1, (context, thisArg, args) -> {
+                                JSValue error = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+                                resultPromise.reject(error);
+                                return JSUndefined.INSTANCE;
+                            }),
+                            resultPromise,
+                            ctx
+                    )
             );
 
             return resultPromise;
@@ -182,11 +182,11 @@ public final class AsyncGeneratorPrototype {
     /**
      * Create an async generator that yields values with a delay.
      * Useful for simulating async operations.
-     *
+     * <p>
      * Note: This is a simplified version. A full implementation would use
      * actual timers or scheduled microtasks.
      *
-     * @param ctx The execution context
+     * @param ctx    The execution context
      * @param values Values to yield
      * @return An async generator that yields values "asynchronously"
      */

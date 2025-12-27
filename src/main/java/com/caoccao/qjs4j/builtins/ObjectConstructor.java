@@ -18,7 +18,6 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -331,5 +330,117 @@ public final class ObjectConstructor {
         PropertyKey key = PropertyKey.fromString(propName.getValue());
 
         return JSBoolean.valueOf(obj.hasOwnProperty(key));
+    }
+
+    /**
+     * Object.fromEntries(iterable)
+     * ES2019 19.1.2.5
+     * Creates an object from an iterable of key-value pairs.
+     */
+    public static JSValue fromEntries(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0) {
+            return ctx.throwError("TypeError", "Object.fromEntries requires an iterable argument");
+        }
+
+        JSValue iterable = args[0];
+
+        // Special case: if it's a JSArray, iterate directly for efficiency
+        if (iterable instanceof JSArray arr) {
+            JSObject result = new JSObject();
+
+            for (int i = 0; i < arr.getLength(); i++) {
+                JSValue entry = arr.get(i);
+
+                // Each entry should be an array-like object with [key, value]
+                if (!(entry instanceof JSObject entryObj)) {
+                    return ctx.throwError("TypeError", "Iterator value must be an object");
+                }
+
+                // Get key (element 0) and value (element 1)
+                JSValue keyValue;
+                JSValue entryValue;
+
+                // If it's an array, use integer index access
+                if (entryObj instanceof JSArray entryArr) {
+                    keyValue = entryArr.get(0);
+                    entryValue = entryArr.get(1);
+                } else {
+                    // Otherwise use property key access
+                    keyValue = entryObj.get("0");
+                    entryValue = entryObj.get("1");
+                }
+
+                // Convert key to string
+                JSString keyString = JSTypeConversions.toString(keyValue);
+                PropertyKey key = PropertyKey.fromString(keyString.getValue());
+
+                // Set property
+                result.set(key, entryValue);
+            }
+
+            return result;
+        }
+
+        // General case: use iterator protocol
+        // Get the iterator method
+        JSValue iteratorMethod = null;
+        if (iterable instanceof JSObject obj) {
+            PropertyKey iteratorKey = PropertyKey.fromSymbol(JSSymbol.ITERATOR);
+            iteratorMethod = obj.get(iteratorKey);
+        }
+
+        if (!(iteratorMethod instanceof JSFunction iterFunc)) {
+            return ctx.throwError("TypeError", "Object.fromEntries requires an iterable");
+        }
+
+        // Call the iterator method to get the iterator
+        JSValue iteratorValue = iterFunc.call(ctx, iterable, new JSValue[0]);
+        if (!(iteratorValue instanceof JSIterator iterator)) {
+            return ctx.throwError("TypeError", "Iterator method must return an iterator");
+        }
+
+        // Create result object
+        JSObject result = new JSObject();
+
+        // Iterate over entries
+        while (true) {
+            JSObject iterResult = iterator.next();
+            JSValue doneValue = iterResult.get("done");
+            boolean done = doneValue instanceof JSBoolean && ((JSBoolean) doneValue).value();
+
+            if (done) {
+                break;
+            }
+
+            JSValue value = iterResult.get("value");
+
+            // Each entry must be an object with at least 2 elements
+            if (!(value instanceof JSObject entryObj)) {
+                return ctx.throwError("TypeError", "Iterator value must be an object");
+            }
+
+            // Get key (element 0) and value (element 1)
+            JSValue keyValue;
+            JSValue entryValue;
+
+            // If it's an array, use integer index access
+            if (entryObj instanceof JSArray entryArr) {
+                keyValue = entryArr.get(0);
+                entryValue = entryArr.get(1);
+            } else {
+                // Otherwise use property key access
+                keyValue = entryObj.get("0");
+                entryValue = entryObj.get("1");
+            }
+
+            // Convert key to string
+            JSString keyString = JSTypeConversions.toString(keyValue);
+            PropertyKey key = PropertyKey.fromString(keyString.getValue());
+
+            // Set property
+            result.set(key, entryValue);
+        }
+
+        return result;
     }
 }

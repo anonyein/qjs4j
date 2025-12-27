@@ -505,6 +505,46 @@ All symbols available as Symbol.* properties and via getWellKnownSymbol() helper
 - **Lock-free operations**: Java supports lock-free operations on 1, 2, 4, and 8-byte values
 - **ES2017 compliance**: Full specification adherence for shared memory semantics
 
+### Phase 25: ES2019 Features ✅
+**Completed**: Object.fromEntries, Array.flatMap, and String trim methods
+
+#### Phase 25.1: Object.fromEntries
+- ObjectConstructor.java: Object.fromEntries(iterable) static method
+  - Creates object from iterable of key-value pairs (inverse of Object.entries)
+  - Accepts any iterable (arrays, Maps, etc.)
+  - Each entry must be array-like with [key, value]
+  - Uses iterator protocol via Symbol.iterator
+  - Converts keys to strings, preserves values as-is
+  - Proper error handling for non-iterables
+- GlobalObject integration: Registered as Object.fromEntries()
+- ES2019 19.1.2.5 specification compliance
+
+#### Phase 25.2: Array.flatMap
+- ArrayPrototype.java: Array.prototype.flatMap(callback, thisArg)
+  - Maps each element using callback function
+  - Flattens result by exactly one level
+  - Callback receives (element, index, array)
+  - More efficient than map().flat() combination
+  - Returns new array with mapped and flattened results
+- GlobalObject integration: Registered on Array.prototype
+- ES2019 22.1.3.11 specification compliance
+
+#### Phase 25.3: String Trim Methods (Already Implemented)
+- StringPrototype.java: String trim methods
+  - String.prototype.trim(): Removes whitespace from both ends
+  - String.prototype.trimStart(): Removes whitespace from start (alias: trimLeft)
+  - String.prototype.trimEnd(): Removes whitespace from end (alias: trimRight)
+  - Uses Java String.strip(), stripLeading(), stripTrailing()
+  - Unicode-aware whitespace handling
+- GlobalObject integration: All methods registered on String.prototype
+- ES2019 21.1.3.26-28 specification compliance
+
+#### Key Features Already Present
+- Array.prototype.flat(depth): Already implemented in previous phases
+  - Flattens nested arrays up to specified depth
+  - Default depth is 1, Infinity flattens all levels
+  - Recursive flattening with depth control
+
 ## Next Steps (Planned)
 
 ### Phase 16.2: Async/Await - Part 2

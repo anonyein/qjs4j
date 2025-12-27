@@ -19,13 +19,11 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.core.*;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Implementation of Atomics object static methods.
  * Based on ES2017 Atomics specification.
- *
+ * <p>
  * The Atomics object provides atomic operations on SharedArrayBuffer and TypedArray views.
  * These operations guarantee atomic read-modify-write sequences and memory ordering.
  */
