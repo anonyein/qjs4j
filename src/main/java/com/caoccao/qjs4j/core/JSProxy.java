@@ -99,15 +99,19 @@ public final class JSProxy extends JSObject {
         checkRevoked();
 
         // Check if handler has 'get' trap
-        JSValue getTrap = handler.get("get");
-        if (getTrap instanceof JSFunction getTrapFunc) {
-            // Call the trap: handler.get(target, property, receiver)
-            JSValue[] args = new JSValue[]{
-                    target,
-                    key.isString() ? new JSString(key.asString()) : key.asSymbol(),
-                    this
-            };
-            return getTrapFunc.call(context, handler, args);
+        JSValue getTrap = handler.get(PropertyKey.fromString("get"));
+        if (getTrap != null && !(getTrap instanceof JSUndefined) && !(getTrap instanceof JSNull)) {
+            if (getTrap instanceof JSFunction getTrapFunc) {
+                // Call the trap: handler.get(target, property, receiver)
+                JSValue[] args = new JSValue[]{
+                        target,
+                        key.isString() ? new JSString(key.asString()) : key.asSymbol(),
+                        this
+                };
+                return getTrapFunc.call(context, handler, args);
+            } else {
+                throw new JSException(context.throwError("TypeError", "proxy trap 'get' must be a function"));
+            }
         }
 
         // No trap, forward to target

@@ -45,6 +45,7 @@ public final class JSContext {
     private final JSMicrotaskQueue microtaskQueue;
     private final Map<String, JSModule> moduleCache;
     private final JSRuntime runtime;
+    private final com.caoccao.qjs4j.vm.VirtualMachine virtualMachine;
     private JSValue currentThis;
     private boolean inCatchHandler;
     private int maxStackDepth;
@@ -70,6 +71,7 @@ public final class JSContext {
         this.currentThis = globalObject;
         this.errorStackTrace = new ArrayList<>();
         this.microtaskQueue = new JSMicrotaskQueue();
+        this.virtualMachine = new com.caoccao.qjs4j.vm.VirtualMachine(this);
 
         initializeGlobalObject();
     }
@@ -208,8 +210,7 @@ public final class JSContext {
             JSBytecodeFunction func = com.caoccao.qjs4j.compiler.Compiler.compile(code, filename);
 
             // Phase 4: Execute bytecode in the virtual machine
-            com.caoccao.qjs4j.vm.VirtualMachine vm = new com.caoccao.qjs4j.vm.VirtualMachine(this);
-            JSValue result = vm.execute(func, globalObject, new JSValue[0]);
+            JSValue result = virtualMachine.execute(func, globalObject, new JSValue[0]);
 
             // Check if there's a pending exception
             if (hasPendingException()) {
@@ -313,6 +314,13 @@ public final class JSContext {
 
     public JSRuntime getRuntime() {
         return runtime;
+    }
+
+    /**
+     * Get the virtual machine for this context.
+     */
+    public com.caoccao.qjs4j.vm.VirtualMachine getVirtualMachine() {
+        return virtualMachine;
     }
 
     // Stack trace capture

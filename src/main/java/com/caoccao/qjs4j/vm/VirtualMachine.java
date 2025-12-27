@@ -101,6 +101,15 @@ public final class VirtualMachine {
                         pc += op.getSize();
                         break;
 
+                    case FCLOSURE:
+                        // Load function from constant pool and create closure
+                        int funcIndex = bytecode.readU32(pc + 1);
+                        JSValue funcValue = bytecode.getConstants()[funcIndex];
+                        // The function is already a JSBytecodeFunction, just push it
+                        valueStack.push(funcValue);
+                        pc += op.getSize();
+                        break;
+
                     case UNDEFINED:
                         valueStack.push(JSUndefined.INSTANCE);
                         pc += op.getSize();

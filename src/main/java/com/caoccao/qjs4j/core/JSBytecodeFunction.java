@@ -73,14 +73,9 @@ public final class JSBytecodeFunction implements JSFunction {
 
     @Override
     public JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        // In full implementation, this would:
-        // 1. Create a new stack frame
-        // 2. Bind arguments to parameters
-        // 3. Execute bytecode in the VM
-        // 4. Return the result
-        //
-        // For now, return undefined as placeholder
-        return JSUndefined.INSTANCE;
+        // Execute bytecode in the VM
+        // The VM will create a stack frame, bind arguments, and execute bytecode
+        return ctx.getVirtualMachine().execute(this, thisArg, args);
     }
 
     /**

@@ -17,8 +17,10 @@
 package com.caoccao.qjs4j.compiler;
 
 import com.caoccao.qjs4j.compiler.ast.*;
+import com.caoccao.qjs4j.core.JSBytecodeFunction;
 import com.caoccao.qjs4j.core.JSNumber;
 import com.caoccao.qjs4j.core.JSString;
+import com.caoccao.qjs4j.core.JSValue;
 import com.caoccao.qjs4j.vm.Bytecode;
 import com.caoccao.qjs4j.vm.Opcode;
 
@@ -69,9 +71,60 @@ public final class BytecodeCompiler {
     // ==================== Statement Compilation ====================
 
     private void compileArrowFunctionExpression(ArrowFunctionExpression arrowExpr) {
-        // For now, emit a placeholder
-        // Full implementation would compile function body into separate bytecode
-        emitter.emitOpcode(Opcode.UNDEFINED);
+        // Create a new compiler for the function body
+        BytecodeCompiler functionCompiler = new BytecodeCompiler();
+
+        // Enter function scope and add parameters as locals
+        functionCompiler.enterScope();
+        functionCompiler.inGlobalScope = false;
+
+        for (Identifier param : arrowExpr.params()) {
+            functionCompiler.currentScope().declareLocal(param.name());
+        }
+
+        // Compile function body
+        // Arrow functions can have expression body or block statement body
+        if (arrowExpr.body() instanceof BlockStatement block) {
+            // Compile block body statements (don't call compileBlockStatement as it would create a new scope)
+            for (Statement stmt : block.body()) {
+                functionCompiler.compileStatement(stmt);
+            }
+
+            // If body doesn't end with return, add implicit return undefined
+            List<Statement> bodyStatements = block.body();
+            if (bodyStatements.isEmpty() || !(bodyStatements.get(bodyStatements.size() - 1) instanceof ReturnStatement)) {
+                functionCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
+                functionCompiler.emitter.emitOpcode(Opcode.RETURN);
+            }
+        } else if (arrowExpr.body() instanceof Expression expr) {
+            // Expression body - implicitly returns the expression value
+            functionCompiler.compileExpression(expr);
+            functionCompiler.emitter.emitOpcode(Opcode.RETURN);
+        }
+
+        functionCompiler.exitScope();
+
+        // Build the function bytecode
+        Bytecode functionBytecode = functionCompiler.emitter.build();
+
+        // Arrow functions are always anonymous
+        String functionName = "";
+
+        // Create JSBytecodeFunction
+        // Arrow functions cannot be constructors
+        JSBytecodeFunction function = new JSBytecodeFunction(
+            functionBytecode,
+            functionName,
+            arrowExpr.params().size(),
+            new JSValue[0],  // closure vars - for now empty
+            null,            // prototype - arrow functions don't have prototype
+            false,           // isConstructor - arrow functions cannot be constructors
+            arrowExpr.isAsync(),
+            false            // Arrow functions cannot be generators
+        );
+
+        // Emit FCLOSURE opcode with function in constant pool
+        emitter.emitOpcodeConstant(Opcode.FCLOSURE, function);
     }
 
     private void compileAssignmentExpression(AssignmentExpression assignExpr) {
@@ -384,9 +437,52 @@ public final class BytecodeCompiler {
     }
 
     private void compileFunctionExpression(FunctionExpression funcExpr) {
-        // For now, emit a placeholder
-        // Full implementation would compile function body into separate bytecode
-        emitter.emitOpcode(Opcode.UNDEFINED);
+        // Create a new compiler for the function body
+        BytecodeCompiler functionCompiler = new BytecodeCompiler();
+
+        // Enter function scope and add parameters as locals
+        functionCompiler.enterScope();
+        functionCompiler.inGlobalScope = false;
+
+        for (Identifier param : funcExpr.params()) {
+            functionCompiler.currentScope().declareLocal(param.name());
+        }
+
+        // Compile function body statements (don't call compileBlockStatement as it would create a new scope)
+        for (Statement stmt : funcExpr.body().body()) {
+            functionCompiler.compileStatement(stmt);
+        }
+
+        // If body doesn't end with return, add implicit return undefined
+        // Check if last statement is a return statement
+        List<Statement> bodyStatements = funcExpr.body().body();
+        if (bodyStatements.isEmpty() || !(bodyStatements.get(bodyStatements.size() - 1) instanceof ReturnStatement)) {
+            functionCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
+            functionCompiler.emitter.emitOpcode(Opcode.RETURN);
+        }
+
+        functionCompiler.exitScope();
+
+        // Build the function bytecode
+        Bytecode functionBytecode = functionCompiler.emitter.build();
+
+        // Get function name (empty string for anonymous)
+        String functionName = funcExpr.id() != null ? funcExpr.id().name() : "";
+
+        // Create JSBytecodeFunction
+        JSBytecodeFunction function = new JSBytecodeFunction(
+            functionBytecode,
+            functionName,
+            funcExpr.params().size(),
+            new JSValue[0],  // closure vars - for now empty
+            null,            // prototype - will be set by VM
+            true,            // isConstructor - regular functions can be constructors
+            funcExpr.isAsync(),
+            funcExpr.isGenerator()
+        );
+
+        // Emit FCLOSURE opcode with function in constant pool
+        emitter.emitOpcodeConstant(Opcode.FCLOSURE, function);
     }
 
     private void compileIdentifier(Identifier id) {
