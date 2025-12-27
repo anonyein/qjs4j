@@ -58,22 +58,13 @@ public final class MapPrototype {
      * Map.prototype.entries()
      * ES2020 23.1.3.4
      * Returns an iterator over [key, value] pairs.
-     * Simplified implementation - returns an array for now.
      */
     public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSMap map)) {
             return ctx.throwError("TypeError", "Map.prototype.entries called on non-Map");
         }
 
-        JSArray result = new JSArray();
-        for (Map.Entry<JSMap.KeyWrapper, JSValue> entry : map.entries()) {
-            JSArray pair = new JSArray();
-            pair.push(entry.getKey().value());
-            pair.push(entry.getValue());
-            result.push(pair);
-        }
-
-        return result;
+        return JSIterator.mapEntriesIterator(map);
     }
 
     /**
@@ -150,19 +141,13 @@ public final class MapPrototype {
      * Map.prototype.keys()
      * ES2020 23.1.3.7
      * Returns an iterator over keys.
-     * Simplified implementation - returns an array for now.
      */
     public static JSValue keys(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSMap map)) {
             return ctx.throwError("TypeError", "Map.prototype.keys called on non-Map");
         }
 
-        JSArray result = new JSArray();
-        for (Map.Entry<JSMap.KeyWrapper, JSValue> entry : map.entries()) {
-            result.push(entry.getKey().value());
-        }
-
-        return result;
+        return JSIterator.mapKeysIterator(map);
     }
 
     /**
@@ -186,18 +171,12 @@ public final class MapPrototype {
      * Map.prototype.values()
      * ES2020 23.1.3.11
      * Returns an iterator over values.
-     * Simplified implementation - returns an array for now.
      */
     public static JSValue values(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSMap map)) {
             return ctx.throwError("TypeError", "Map.prototype.values called on non-Map");
         }
 
-        JSArray result = new JSArray();
-        for (Map.Entry<JSMap.KeyWrapper, JSValue> entry : map.entries()) {
-            result.push(entry.getValue());
-        }
-
-        return result;
+        return JSIterator.mapValuesIterator(map);
     }
 }

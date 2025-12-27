@@ -71,23 +71,13 @@ public final class SetPrototype {
      * Set.prototype.entries()
      * ES2020 23.2.3.5
      * Returns an iterator over [value, value] pairs.
-     * Simplified implementation - returns an array for now.
      */
     public static JSValue entries(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSSet set)) {
             return ctx.throwError("TypeError", "Set.prototype.entries called on non-Set");
         }
 
-        JSArray result = new JSArray();
-        for (JSMap.KeyWrapper wrapper : set.values()) {
-            JSValue value = wrapper.value();
-            JSArray pair = new JSArray();
-            pair.push(value);
-            pair.push(value); // In Set, both elements are the same value
-            result.push(pair);
-        }
-
-        return result;
+        return JSIterator.setEntriesIterator(set);
     }
 
     /**
@@ -150,7 +140,6 @@ public final class SetPrototype {
      * Set.prototype.keys()
      * ES2020 23.2.3.8
      * Returns an iterator over values (same as values()).
-     * Simplified implementation - returns an array for now.
      */
     public static JSValue keys(JSContext ctx, JSValue thisArg, JSValue[] args) {
         // In Set, keys() is the same as values()
@@ -161,18 +150,12 @@ public final class SetPrototype {
      * Set.prototype.values()
      * ES2020 23.2.3.10
      * Returns an iterator over values.
-     * Simplified implementation - returns an array for now.
      */
     public static JSValue values(JSContext ctx, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSSet set)) {
             return ctx.throwError("TypeError", "Set.prototype.values called on non-Set");
         }
 
-        JSArray result = new JSArray();
-        for (JSMap.KeyWrapper wrapper : set.values()) {
-            result.push(wrapper.value());
-        }
-
-        return result;
+        return JSIterator.setValuesIterator(set);
     }
 }

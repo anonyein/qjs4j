@@ -96,6 +96,24 @@ public class JSIterator extends JSObject {
     }
 
     /**
+     * Create a Set entries iterator.
+     * Returns [value, value] pairs (Set uses value twice for consistency with Map).
+     */
+    public static JSIterator setEntriesIterator(JSSet set) {
+        final java.util.Iterator<JSMap.KeyWrapper> iter = set.values().iterator();
+        return new JSIterator(() -> {
+            if (iter.hasNext()) {
+                JSValue value = iter.next().value();
+                JSArray pair = new JSArray();
+                pair.push(value);
+                pair.push(value); // In Set, both elements are the same value
+                return IteratorResult.of(pair);
+            }
+            return IteratorResult.done();
+        });
+    }
+
+    /**
      * Create a Set values iterator.
      */
     public static JSIterator setValuesIterator(JSSet set) {
