@@ -45,6 +45,14 @@ public final class CallStack {
     }
 
     /**
+     * Set the stack top position.
+     * Used to restore stack state after function calls.
+     */
+    public void setStackTop(int top) {
+        this.stackTop = top;
+    }
+
+    /**
      * Peek at a value on the stack (QuickJS: sp[-1-offset]).
      * offset=0 means sp[-1], offset=1 means sp[-2], etc.
      */

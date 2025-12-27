@@ -809,6 +809,31 @@ public final class BytecodeCompiler {
     }
 
     private void compileUnaryExpression(UnaryExpression unaryExpr) {
+        // DELETE operator needs special handling - it doesn't evaluate the operand,
+        // but instead emits object and property separately
+        if (unaryExpr.operator() == UnaryExpression.UnaryOperator.DELETE) {
+            Expression operand = unaryExpr.operand();
+
+            if (operand instanceof MemberExpression memberExpr) {
+                // delete obj.prop or delete obj[expr]
+                compileExpression(memberExpr.object());
+
+                if (memberExpr.computed()) {
+                    // obj[expr]
+                    compileExpression(memberExpr.property());
+                } else if (memberExpr.property() instanceof Identifier propId) {
+                    // obj.prop
+                    emitter.emitOpcodeConstant(Opcode.PUSH_CONST, new JSString(propId.name()));
+                }
+
+                emitter.emitOpcode(Opcode.DELETE);
+            } else {
+                // delete identifier or delete literal - always returns true
+                emitter.emitOpcode(Opcode.PUSH_TRUE);
+            }
+            return;
+        }
+
         compileExpression(unaryExpr.operand());
 
         Opcode op;
@@ -831,9 +856,6 @@ public final class BytecodeCompiler {
             case VOID:
                 emitter.emitOpcode(Opcode.DROP);
                 op = Opcode.UNDEFINED;
-                break;
-            case DELETE:
-                op = Opcode.DELETE;
                 break;
             case INC:
                 op = Opcode.INC;

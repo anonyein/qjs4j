@@ -42,6 +42,10 @@ public final class VirtualMachine {
      * Execute a bytecode function.
      */
     public JSValue execute(JSBytecodeFunction function, JSValue thisArg, JSValue[] args) {
+        // Save the current value stack position
+        // This ensures that nested function calls don't corrupt the caller's stack
+        int savedStackTop = valueStack.getStackTop();
+
         // Create new stack frame
         StackFrame frame = new StackFrame(function, thisArg, args, currentFrame);
         StackFrame previousFrame = currentFrame;
@@ -428,6 +432,8 @@ public final class VirtualMachine {
                             PropertyKey key = PropertyKey.fromValue(putElIndex);
                             jsObj.set(key, putElValue);
                         }
+                        // Assignment expressions return the assigned value
+                        valueStack.push(putElValue);
                         pc += op.getSize();
                         break;
 
@@ -461,10 +467,14 @@ public final class VirtualMachine {
 
                     case RETURN:
                         JSValue returnValue = valueStack.pop();
+                        // Restore stack to saved position before returning
+                        valueStack.setStackTop(savedStackTop);
                         currentFrame = previousFrame;
                         return returnValue;
 
                     case RETURN_UNDEF:
+                        // Restore stack to saved position before returning
+                        valueStack.setStackTop(savedStackTop);
                         currentFrame = previousFrame;
                         return JSUndefined.INSTANCE;
 
@@ -546,9 +556,13 @@ public final class VirtualMachine {
                 }
             }
         } catch (VMException e) {
+            // Restore stack on exception
+            valueStack.setStackTop(savedStackTop);
             currentFrame = previousFrame;
             throw e;
         } catch (Exception e) {
+            // Restore stack on exception
+            valueStack.setStackTop(savedStackTop);
             currentFrame = previousFrame;
             throw new VMException("VM error: " + e.getMessage(), e);
         }
