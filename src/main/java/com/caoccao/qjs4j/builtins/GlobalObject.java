@@ -769,7 +769,8 @@ public final class GlobalObject {
         // Create Object.prototype
         JSObject objectPrototype = new JSObject();
         objectPrototype.set("hasOwnProperty", createNativeFunction(ctx, "hasOwnProperty", ObjectConstructor::hasOwnProperty, 1));
-        objectPrototype.set("toString", createNativeFunction(ctx, "toString", ObjectConstructor::hasOwnProperty, 0)); // TODO: implement proper toString
+        objectPrototype.set("toString", createNativeFunction(ctx, "toString", ObjectPrototype::toString, 0));
+        objectPrototype.set("valueOf", createNativeFunction(ctx, "valueOf", ObjectPrototype::valueOf, 0));
 
         // Create Object constructor
         JSObject objectConstructor = new JSObject();

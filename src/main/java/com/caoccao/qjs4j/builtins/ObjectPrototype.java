@@ -241,23 +241,101 @@ public final class ObjectPrototype {
 
     /**
      * Object.prototype.toString()
+     * ES2020 19.1.3.6
+     * Returns a string representing the object with Symbol.toStringTag support.
      */
     public static JSValue toString(JSContext ctx, JSValue thisArg, JSValue[] args) {
+        // Handle primitives
         if (thisArg instanceof JSUndefined) {
             return new JSString("[object Undefined]");
         }
         if (thisArg instanceof JSNull) {
             return new JSString("[object Null]");
         }
-        if (thisArg instanceof JSArray) {
-            return new JSString("[object Array]");
-        }
+
+        // Check for Function before Object (functions may not extend JSObject)
         if (thisArg instanceof JSFunction) {
             return new JSString("[object Function]");
         }
-        if (thisArg instanceof JSObject) {
+
+        // For objects, check Symbol.toStringTag first
+        if (thisArg instanceof JSObject obj) {
+            // Try to get Symbol.toStringTag
+            PropertyKey toStringTagKey = PropertyKey.fromSymbol(JSSymbol.TO_STRING_TAG);
+            JSValue tag = obj.get(toStringTagKey);
+
+            if (tag instanceof JSString tagStr) {
+                return new JSString("[object " + tagStr.value() + "]");
+            }
+
+            // Determine built-in type
+            if (thisArg instanceof JSArray) {
+                return new JSString("[object Array]");
+            }
+            if (thisArg instanceof JSPromise) {
+                return new JSString("[object Promise]");
+            }
+            if (thisArg instanceof JSMap) {
+                return new JSString("[object Map]");
+            }
+            if (thisArg instanceof JSSet) {
+                return new JSString("[object Set]");
+            }
+            if (thisArg instanceof JSWeakMap) {
+                return new JSString("[object WeakMap]");
+            }
+            if (thisArg instanceof JSWeakSet) {
+                return new JSString("[object WeakSet]");
+            }
+            if (thisArg instanceof JSSharedArrayBuffer) {
+                return new JSString("[object SharedArrayBuffer]");
+            }
+            if (thisArg instanceof JSArrayBuffer) {
+                return new JSString("[object ArrayBuffer]");
+            }
+            if (thisArg instanceof JSDataView) {
+                return new JSString("[object DataView]");
+            }
+            // TypedArray instances - check specific types
+            if (thisArg instanceof JSInt8Array) {
+                return new JSString("[object Int8Array]");
+            }
+            if (thisArg instanceof JSUint8Array) {
+                return new JSString("[object Uint8Array]");
+            }
+            if (thisArg instanceof JSUint8ClampedArray) {
+                return new JSString("[object Uint8ClampedArray]");
+            }
+            if (thisArg instanceof JSInt16Array) {
+                return new JSString("[object Int16Array]");
+            }
+            if (thisArg instanceof JSUint16Array) {
+                return new JSString("[object Uint16Array]");
+            }
+            if (thisArg instanceof JSInt32Array) {
+                return new JSString("[object Int32Array]");
+            }
+            if (thisArg instanceof JSUint32Array) {
+                return new JSString("[object Uint32Array]");
+            }
+            if (thisArg instanceof JSFloat32Array) {
+                return new JSString("[object Float32Array]");
+            }
+            if (thisArg instanceof JSFloat64Array) {
+                return new JSString("[object Float64Array]");
+            }
+            if (thisArg instanceof JSRegExp) {
+                return new JSString("[object RegExp]");
+            }
+            if (thisArg instanceof JSDate) {
+                return new JSString("[object Date]");
+            }
+
+            // Default for generic objects
             return new JSString("[object Object]");
         }
+
+        // Primitives (when boxed)
         if (thisArg instanceof JSString) {
             return new JSString("[object String]");
         }
@@ -267,7 +345,14 @@ public final class ObjectPrototype {
         if (thisArg instanceof JSBoolean) {
             return new JSString("[object Boolean]");
         }
-        return new JSString("[object Unknown]");
+        if (thisArg instanceof JSSymbol) {
+            return new JSString("[object Symbol]");
+        }
+        if (thisArg instanceof JSBigInt) {
+            return new JSString("[object BigInt]");
+        }
+
+        return new JSString("[object Object]");
     }
 
     /**

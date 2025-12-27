@@ -85,8 +85,71 @@ public final class ObjectConstructor {
         }
         // null prototype is allowed - object stays with null prototype
 
-        // TODO: Handle propertiesObject parameter (args[1]) if present
-        // For now, simplified implementation
+        // Handle propertiesObject parameter (args[1]) if present
+        if (args.length > 1 && !(args[1] instanceof JSUndefined)) {
+            if (!(args[1] instanceof JSObject propsObj)) {
+                return ctx.throwError("TypeError", "Properties must be an object");
+            }
+
+            // Get all own property keys from properties object
+            List<PropertyKey> propKeys = propsObj.getOwnPropertyKeys();
+
+            for (PropertyKey key : propKeys) {
+                // Get the descriptor for this property
+                JSValue descValue = propsObj.get(key);
+                if (!(descValue instanceof JSObject descObj)) {
+                    return ctx.throwError("TypeError", "Property descriptor must be an object");
+                }
+
+                // Build property descriptor
+                PropertyDescriptor descriptor = new PropertyDescriptor();
+
+                // Check for value
+                JSValue value = descObj.get("value");
+                if (!(value instanceof JSUndefined)) {
+                    descriptor.setValue(value);
+                }
+
+                // Check for writable
+                JSValue writable = descObj.get("writable");
+                if (!(writable instanceof JSUndefined)) {
+                    descriptor.setWritable(JSTypeConversions.toBoolean(writable) == JSBoolean.TRUE);
+                }
+
+                // Check for enumerable
+                JSValue enumerable = descObj.get("enumerable");
+                if (!(enumerable instanceof JSUndefined)) {
+                    descriptor.setEnumerable(JSTypeConversions.toBoolean(enumerable) == JSBoolean.TRUE);
+                }
+
+                // Check for configurable
+                JSValue configurable = descObj.get("configurable");
+                if (!(configurable instanceof JSUndefined)) {
+                    descriptor.setConfigurable(JSTypeConversions.toBoolean(configurable) == JSBoolean.TRUE);
+                }
+
+                // Check for getter
+                JSValue getter = descObj.get("get");
+                if (!(getter instanceof JSUndefined)) {
+                    if (!(getter instanceof JSFunction)) {
+                        return ctx.throwError("TypeError", "Getter must be a function");
+                    }
+                    descriptor.setGetter((JSFunction) getter);
+                }
+
+                // Check for setter
+                JSValue setter = descObj.get("set");
+                if (!(setter instanceof JSUndefined)) {
+                    if (!(setter instanceof JSFunction)) {
+                        return ctx.throwError("TypeError", "Setter must be a function");
+                    }
+                    descriptor.setSetter((JSFunction) setter);
+                }
+
+                // Define the property on the new object
+                newObj.defineProperty(key, descriptor);
+            }
+        }
 
         return newObj;
     }

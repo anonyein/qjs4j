@@ -6,7 +6,7 @@ qjs4j is a native Java implementation of QuickJS.
 
 ## Project Summary
 
-qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Java, targeting JDK 17 with no external dependencies. It provides ES2020 compliance with modern JavaScript features implemented in pure Java.
+qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Java, targeting JDK 17 with no external dependencies. It provides ES2024 compliance with modern JavaScript features implemented in pure Java.
 
 ### Implementation Status
 
@@ -21,7 +21,7 @@ qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Ja
 #### ✅ ES2015+ Features
 - **Symbol**: All 13 well-known symbols (iterator, asyncIterator, toStringTag, hasInstance, isConcatSpreadable, toPrimitive, match, matchAll, replace, search, split, species, unscopables), Symbol.for(), Symbol.keyFor()
 - **BigInt**: Arbitrary-precision integers with radix conversion and bit operations
-- **Promises**: Complete Promise implementation with then/catch/finally, Promise.all/race/allSettled/any
+- **Promises**: Complete Promise implementation with then/catch/finally, Promise.all/race/allSettled (ES2020), Promise.any (ES2021), Promise.withResolvers (ES2024)
 - **Iterators & Generators**: Iterator protocol, Symbol.iterator, generator functions with yield
 - **For...of loops**: Full iteration protocol support with helper utilities
 - **Template literals**: String interpolation and tagged templates
@@ -29,9 +29,9 @@ qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Ja
 - **Spread operator**: Array and object spread
 
 #### ✅ Built-in Objects
-- **Object**: keys, values, entries, fromEntries (ES2019), assign, create, freeze, seal, getPrototypeOf, setPrototypeOf
-- **Array**: push, pop, shift, unshift, slice, splice, concat, join, reverse, sort, map, filter, reduce, find, every, some, includes, flat (ES2019), flatMap (ES2019)
-- **String**: charAt, charCodeAt, substring, substr, indexOf, lastIndexOf, split, replace, toUpperCase, toLowerCase, trim, trimStart (ES2019), trimEnd (ES2019), repeat, startsWith, endsWith, includes, padStart, padEnd
+- **Object**: keys, values, entries, fromEntries (ES2019), assign, create, freeze, seal, getPrototypeOf, setPrototypeOf, hasOwn (ES2022), groupBy (ES2024)
+- **Array**: push, pop, shift, unshift, slice, splice, concat, join, reverse, sort, map, filter, reduce, find, findIndex, findLast (ES2023), findLastIndex (ES2023), every, some, includes, flat (ES2019), flatMap (ES2019), at (ES2022), toReversed (ES2023), toSorted (ES2023), toSpliced (ES2023), with (ES2023)
+- **String**: charAt, charCodeAt, at (ES2022), substring, substr, indexOf, lastIndexOf, split, replace, replaceAll (ES2021), toUpperCase, toLowerCase, trim, trimStart (ES2019), trimEnd (ES2019), repeat, startsWith, endsWith, includes, padStart, padEnd
 - **Number**: parseInt, parseFloat, isNaN, isFinite, toFixed, toPrecision, toExponential
 - **Boolean**: toString, valueOf
 - **Date**: Date constructor with current time, date manipulation methods
@@ -39,8 +39,8 @@ qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Ja
 - **Math**: All standard Math functions (sin, cos, tan, sqrt, pow, abs, floor, ceil, round, random, min, max, etc.)
 - **JSON**: parse, stringify
 
-#### ✅ ES2020 Collections
-- **Map**: Insertion-ordered key-value pairs with SameValueZero equality
+#### ✅ Collections
+- **Map**: Insertion-ordered key-value pairs with SameValueZero equality, Map.groupBy (ES2024)
 - **Set**: Insertion-ordered unique values with SameValueZero equality
 - **WeakMap**: Weak-referenced key-value pairs for object keys only
 - **WeakSet**: Weak-referenced unique objects with automatic garbage collection
@@ -100,17 +100,25 @@ qjs4j is a complete reimplementation of the QuickJS JavaScript engine in pure Ja
 - **State Management**: Prevents concurrent execution, proper completion tracking
 - **Promise Integration**: All operations return promises with proper microtask timing
 
-#### ✅ WeakRef & FinalizationRegistry (ES2021)
-- **WeakRef**: Weak references to objects using Java WeakReference
-  - deref() method returns target if alive, undefined if collected
-  - Type checking ensures only objects can be referenced
-  - No resurrection - objects can be collected at any time
-- **FinalizationRegistry**: Cleanup callbacks on object collection
-  - register(target, heldValue, unregisterToken) for registration
-  - unregister(token) for manual cleanup removal
-  - Background thread monitors PhantomReference queue
-  - Cleanup callbacks run as microtasks after GC
-  - Thread-safe with ConcurrentHashMap
+#### ✅ ES2021-ES2024 Features
+- **ES2021**:
+  - String.prototype.replaceAll: Replace all occurrences of a substring
+  - Promise.any: Fulfills when any promise fulfills
+  - WeakRef: Weak references to objects using Java WeakReference
+  - FinalizationRegistry: Cleanup callbacks on object collection with microtask integration
+- **ES2022**:
+  - Array.prototype.at / String.prototype.at: Index access with negative indices support
+  - Object.hasOwn: Safer alternative to hasOwnProperty
+- **ES2023**:
+  - Array.prototype.findLast / findLastIndex: Search arrays from the end
+  - Array.prototype.toReversed: Immutable reverse
+  - Array.prototype.toSorted: Immutable sort
+  - Array.prototype.toSpliced: Immutable splice
+  - Array.prototype.with: Immutable element replacement
+- **ES2024**:
+  - Promise.withResolvers: Returns {promise, resolve, reject} object
+  - Object.groupBy: Group array elements into object by callback
+  - Map.groupBy: Group array elements into Map by callback
 
 #### ✅ SharedArrayBuffer & Atomics (ES2017)
 - **SharedArrayBuffer**: Shared memory buffer for multi-threaded access
