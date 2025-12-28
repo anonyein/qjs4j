@@ -15,7 +15,11 @@ public abstract class BaseTest {
             if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
                 assertEquals("Error", name.value());
                 assertNotNull(message.value());
+            } else {
+                fail("Error object does not have name or message property");
             }
+        } else {
+            fail("Value is not an error object");
         }
     }
 
@@ -29,7 +33,11 @@ public abstract class BaseTest {
             if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
                 assertEquals("RangeError", name.value());
                 assertNotNull(message.value());
+            } else {
+                fail("Error object does not have name or message property");
             }
+        } else {
+            fail("Value is not an error object");
         }
     }
 
@@ -38,7 +46,11 @@ public abstract class BaseTest {
             if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
                 assertEquals("SyntaxError", name.value());
                 assertNotNull(message.value());
+            } else {
+                fail("Error object does not have name or message property");
             }
+        } else {
+            fail("Value is not an error object");
         }
     }
 
@@ -47,7 +59,11 @@ public abstract class BaseTest {
             if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
                 assertEquals("TypeError", name.value());
                 assertNotNull(message.value());
+            } else {
+                fail("Error object does not have name or message property");
             }
+        } else {
+            fail("Value is not an error object");
         }
     }
 

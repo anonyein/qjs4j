@@ -1577,7 +1577,7 @@ public final class VirtualMachine {
 
         // Validate that construct trap returned an object
         if (!(result instanceof JSObject)) {
-            throw new VMException("construct trap must return an object");
+            throw new JSException(context.throwError("TypeError", "construct trap must return an object"));
         }
 
         return result;
@@ -1658,6 +1658,14 @@ public final class VirtualMachine {
                     // Copy function properties
                     wrapper.set("name", new JSString(func.getName()));
                     wrapper.set("length", new JSNumber(func.getLength()));
+
+                    // Add prototype property for constructors
+                    // Every function (except arrow functions) has a prototype property
+                    JSObject funcPrototype = new JSObject();
+                    // The function's prototype object has a constructor property pointing back to the function
+                    funcPrototype.set("constructor", func);
+                    wrapper.set("prototype", funcPrototype);
+
                     return wrapper;
                 }
             }
