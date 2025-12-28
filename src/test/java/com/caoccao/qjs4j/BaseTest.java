@@ -11,10 +11,18 @@ public abstract class BaseTest {
     protected JSString str;
 
     protected void assertError(JSValue value) {
+        assertError(value, "Error", null);
+    }
+
+    protected void assertError(JSValue value, String expectedType, String expectedMessage) {
         if (value instanceof JSObject jsObject) {
             if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
-                assertEquals("Error", name.value());
-                assertNotNull(message.value());
+                assertEquals(expectedType, name.value());
+                if (expectedMessage == null) {
+                    assertNotNull(message.value());
+                } else {
+                    assertEquals(expectedMessage, message.value());
+                }
             } else {
                 fail("Error object does not have name or message property");
             }
@@ -29,42 +37,19 @@ public abstract class BaseTest {
     }
 
     protected void assertRangeError(JSValue value) {
-        if (value instanceof JSObject jsObject) {
-            if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
-                assertEquals("RangeError", name.value());
-                assertNotNull(message.value());
-            } else {
-                fail("Error object does not have name or message property");
-            }
-        } else {
-            fail("Value is not an error object");
-        }
+        assertError(value, "RangeError", null);
     }
 
     protected void assertSyntaxError(JSValue value) {
-        if (value instanceof JSObject jsObject) {
-            if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
-                assertEquals("SyntaxError", name.value());
-                assertNotNull(message.value());
-            } else {
-                fail("Error object does not have name or message property");
-            }
-        } else {
-            fail("Value is not an error object");
-        }
+        assertError(value, "SyntaxError", null);
     }
 
     protected void assertTypeError(JSValue value) {
-        if (value instanceof JSObject jsObject) {
-            if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
-                assertEquals("TypeError", name.value());
-                assertNotNull(message.value());
-            } else {
-                fail("Error object does not have name or message property");
-            }
-        } else {
-            fail("Value is not an error object");
-        }
+        assertError(value, "TypeError", null);
+    }
+
+    protected void assertTypeError(JSValue value, String expectedMessage) {
+        assertError(value, "TypeError", expectedMessage);
     }
 
     protected boolean awaitPromise(JSPromise promise) {

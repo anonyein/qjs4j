@@ -17,7 +17,9 @@
 package com.caoccao.qjs4j.core;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Represents a JavaScript Proxy object.
@@ -215,7 +217,21 @@ public final class JSProxy extends JSObject {
                     key.isString() ? new JSString(key.asString()) : key.asSymbol()
             };
             JSValue result = deleteTrapFunc.call(context, handler, args);
-            return JSTypeConversions.toBoolean(result) == JSBoolean.TRUE;
+            boolean success = JSTypeConversions.toBoolean(result) == JSBoolean.TRUE;
+
+            // Check invariant: cannot delete non-configurable properties
+            JSObject targetObj = getTargetAsObject();
+            PropertyDescriptor targetDesc = targetObj.getOwnPropertyDescriptor(key);
+            if (success && targetDesc != null && !targetDesc.isConfigurable()) {
+                throw new JSException(context.throwError("TypeError",
+                        "'deleteProperty' on proxy: trap returned truish for property '" + key.asString() + "' which is non-configurable in the proxy target"));
+            }
+
+            if (!success && context.isStrictMode()) {
+                throw new JSException(context.throwError("TypeError",
+                        "'deleteProperty' on proxy: trap returned falsish for property '" + key.asString() + "'"));
+            }
+            return success;
         }
 
         // No trap, forward to target
@@ -291,7 +307,31 @@ public final class JSProxy extends JSObject {
                         key.isString() ? new JSString(key.asString()) : key.asSymbol(),
                         this
                 };
-                return getTrapFunc.call(context, handler, args);
+                JSValue trapResult = getTrapFunc.call(context, handler, args);
+
+                // Check invariant: non-configurable accessor without getter must return undefined
+                JSObject targetObj = getTargetAsObject();
+                PropertyDescriptor targetDesc = targetObj.getOwnPropertyDescriptor(key);
+                if (targetDesc != null && !targetDesc.isConfigurable() &&
+                        targetDesc.isAccessorDescriptor() && targetDesc.getGetter() == null) {
+                    // Non-configurable accessor without getter
+                    if (!(trapResult instanceof JSUndefined)) {
+                        throw new JSException(context.throwError("TypeError",
+                                "'get' on proxy: property '" + key.asString() + "' is a non-configurable accessor property on the proxy target and does not have a getter function, but the trap did not return 'undefined' (got '" + JSTypeConversions.toString(trapResult).value() + "')"));
+                    }
+                }
+
+                // Check invariant: non-writable, non-configurable data property must return same value
+                if (targetDesc != null && targetDesc.isDataDescriptor() &&
+                        !targetDesc.isConfigurable() && !targetDesc.isWritable()) {
+                    // Non-writable, non-configurable data property
+                    if (!JSTypeConversions.strictEquals(trapResult, targetDesc.getValue())) {
+                        throw new JSException(context.throwError("TypeError",
+                                "'get' on proxy: property '" + key.asString() + "' is a read-only and non-configurable data property on the proxy target but the proxy did not return its actual"));
+                    }
+                }
+
+                return trapResult;
             } else {
                 throw new JSException(context.throwError("TypeError", "proxy trap 'get' must be a function"));
             }
@@ -423,8 +463,40 @@ public final class JSProxy extends JSObject {
                 }
             }
 
-            // TODO: Check for duplicate properties
-            // TODO: Validate invariants (non-configurable properties, extensibility)
+            // Check for duplicate properties
+            Set<PropertyKey> propertyKeySet = new HashSet<>();
+            for (PropertyKey key : keys) {
+                if (!propertyKeySet.add(key)) {
+                    throw new JSException(context.throwError("TypeError",
+                            "'ownKeys' on proxy: trap returned duplicate entries"));
+                }
+            }
+
+            // Validate invariants
+            JSObject targetObj = getTargetAsObject();
+            List<PropertyKey> targetKeys = targetObj.getOwnPropertyKeys();
+            boolean targetExtensible = targetObj.isExtensible();
+
+            // Check that all non-configurable own properties are included
+            for (PropertyKey targetKey : targetKeys) {
+                PropertyDescriptor desc = targetObj.getOwnPropertyDescriptor(targetKey);
+                if (desc != null && !desc.isConfigurable()) {
+                    if (!keys.contains(targetKey)) {
+                        throw new JSException(context.throwError("TypeError",
+                                "'ownKeys' on proxy: trap result did not include '" + targetKey.asString() + "'"));
+                    }
+                }
+            }
+
+            // If target is not extensible, result must not include extra keys
+            if (!targetExtensible) {
+                for (PropertyKey key : keys) {
+                    if (!targetKeys.contains(key)) {
+                        throw new JSException(context.throwError("TypeError",
+                                "'ownKeys' on proxy: trap returned extra key '" + key.asString() + "'"));
+                    }
+                }
+            }
 
             return keys;
         }
@@ -521,7 +593,23 @@ public final class JSProxy extends JSObject {
                     key.isString() ? new JSString(key.asString()) : key.asSymbol()
             };
             JSValue result = hasTrapFunc.call(context, handler, args);
-            return JSTypeConversions.toBoolean(result) == JSBoolean.TRUE;
+            boolean trapResult = JSTypeConversions.toBoolean(result) == JSBoolean.TRUE;
+
+            // Check invariant: non-configurable properties must be reported as present
+            JSObject targetObj = getTargetAsObject();
+            PropertyDescriptor targetDesc = targetObj.getOwnPropertyDescriptor(key);
+            if (targetDesc != null && !targetDesc.isConfigurable() && !trapResult) {
+                throw new JSException(context.throwError("TypeError",
+                        "'has' on proxy: trap returned falsish for property '" + key.asString() + "' which exists in the proxy target as non-configurable"));
+            }
+
+            // Check invariant: if target is not extensible, trap result must match target's has
+            if (!targetObj.isExtensible() && trapResult != targetObj.has(key)) {
+                throw new JSException(context.throwError("TypeError",
+                        "'has' on proxy: trap returned " + (trapResult ? "truish" : "falsish") + " for property '" + key.asString() + "' but the proxy target is not extensible"));
+            }
+
+            return trapResult;
         }
 
         // No trap, forward to target
@@ -751,7 +839,12 @@ public final class JSProxy extends JSObject {
                     value,
                     this
             };
-            setTrapFunc.call(context, handler, args);
+            JSValue result = setTrapFunc.call(context, handler, args);
+            // Check if trap returned falsy in strict mode
+            if (context.isStrictMode() && JSTypeConversions.toBoolean(result) != JSBoolean.TRUE) {
+                throw new JSException(context.throwError("TypeError",
+                        "'set' on proxy: trap returned falsish for property '" + key.asString() + "'"));
+            }
             return;
         }
 

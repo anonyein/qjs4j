@@ -221,7 +221,13 @@ public non-sealed class JSObject implements JSValue {
             }
         }
 
-        // Fall back to string property
+        // Check string property
+        JSValue stringValue = get(String.valueOf(index));
+        if (!(stringValue instanceof JSUndefined)) {
+            return stringValue;
+        }
+
+        // Fall back to index property
         return get(PropertyKey.fromIndex(index));
     }
 

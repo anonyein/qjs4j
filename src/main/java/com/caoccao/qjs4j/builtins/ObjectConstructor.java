@@ -44,7 +44,7 @@ public final class ObjectConstructor {
         // Copy properties from each source object
         for (int i = 1; i < args.length; i++) {
             JSValue source = args[i];
-            if (source instanceof JSNull || source instanceof JSUndefined) {
+            if (source.isNullOrUndefined()) {
                 continue;
             }
 

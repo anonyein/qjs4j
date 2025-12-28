@@ -830,8 +830,18 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Edge case: join on non-array
         JSValue nonArray = new JSString("not an array");
-        assertTypeError(ArrayPrototype.join(ctx, nonArray, new JSValue[]{}));
-        assertPendingException(ctx);
+        assertEquals("", ArrayPrototype.join(ctx, nonArray, new JSValue[]{}).asString().map(JSString::value).orElseThrow());
+
+        // Edge case: join called on array-like object
+        assertEquals(
+                "a,,,d,e",
+                ctx.eval("Array.prototype.join.call({ 0: 'a', 1: null, 2: undefined, 3: 'd', 4: 'e', length: 5 }, ',')").asString().map(JSString::value).orElseThrow());
+        assertEquals(
+                "a,,,d,e",
+                ctx.eval("Array.prototype.join.call({ 0: 'a', 1: null, 2: undefined, 3: 'd', 4: 'e', length: 5 })").asString().map(JSString::value).orElseThrow());
+        assertEquals(
+                "a----",
+                ctx.eval("Array.prototype.join.call({ 0: 'a', 0.1: 'b', length: 5 }, '-')").asString().map(JSString::value).orElseThrow());
     }
 
     @Test
@@ -1550,18 +1560,31 @@ public class ArrayPrototypeTest extends BaseTest {
 
     @Test
     public void testToString() {
-        JSArray arr = new JSArray();
-        arr.push(new JSString("a"));
-        arr.push(new JSString("b"));
-        arr.push(new JSString("c"));
+        JSArray jsArray = new JSArray();
+        jsArray.push(new JSString("a"));
+        jsArray.push(new JSNumber(1));
+        jsArray.push(new JSString("c"));
 
         // Normal case
-        JSValue result = ArrayPrototype.toString(ctx, arr, new JSValue[]{});
-        assertEquals("a,b,c", result.asString().map(JSString::value).orElseThrow());
+        JSValue result = ArrayPrototype.toString(ctx, jsArray, new JSValue[]{});
+        assertEquals("a,1,c", result.asString().map(JSString::value).orElseThrow());
 
-        // Edge case: toString on non-array
-        JSValue nonArray = new JSString("not an array");
-        assertTypeError(ArrayPrototype.toString(ctx, nonArray, new JSValue[]{}));
+        // Edge case: toString on string
+        assertEquals(
+                "[object String]",
+                ArrayPrototype.toString(ctx, new JSString("a"), new JSValue[]{}).asString().map(JSString::value).orElseThrow());
+
+        // Edge case: toString on object
+        assertEquals(
+                "[object Object]",
+                ArrayPrototype.toString(ctx, new JSObject(), new JSValue[]{}).asString().map(JSString::value).orElseThrow());
+
+        // Edge case: toString on null
+        assertTypeError(ArrayPrototype.toString(ctx, new JSNull(), new JSValue[]{}), "Cannot convert undefined or null to object");
+        assertPendingException(ctx);
+
+        // Edge case: toString on undefined
+        assertTypeError(ArrayPrototype.toString(ctx, new JSUndefined(), new JSValue[]{}), "Cannot convert undefined or null to object");
         assertPendingException(ctx);
     }
 

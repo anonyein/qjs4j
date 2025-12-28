@@ -606,6 +606,15 @@ public sealed interface JSValue extends JSStackValue permits
     }
 
     /**
+     * Check if this value is null or undefined.
+     *
+     * @return true if this value is null or undefined, false otherwise
+     */
+    default boolean isNullOrUndefined() {
+        return isNull() || isUndefined();
+    }
+
+    /**
      * Check if this value is a number.
      *
      * @return true if this value is a number, false otherwise

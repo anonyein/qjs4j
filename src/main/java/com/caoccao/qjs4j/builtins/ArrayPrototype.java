@@ -585,26 +585,41 @@ public final class ArrayPrototype {
      * Joins all elements of an array into a string.
      */
     public static JSValue join(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return ctx.throwError("TypeError", "Array.prototype.join called on non-array");
-        }
-
-        String separator = args.length > 0 && !(args[0] instanceof JSUndefined) ?
-                JSTypeConversions.toString(args[0]).value() : ",";
-
         StringBuilder result = new StringBuilder();
-        long length = arr.getLength();
-
-        for (long i = 0; i < length; i++) {
-            if (i > 0) {
-                result.append(separator);
+        if (thisArg instanceof JSArray jsArray) {
+            String separator = args.length > 0 && !(args[0] instanceof JSUndefined) ?
+                    JSTypeConversions.toString(args[0]).value() : ",";
+            long length = jsArray.getLength();
+            for (long i = 0; i < length; i++) {
+                if (i > 0) {
+                    result.append(separator);
+                }
+                JSValue element = jsArray.get(i);
+                if (!(element instanceof JSNull) && !(element instanceof JSUndefined)) {
+                    result.append(JSTypeConversions.toString(element).value());
+                }
             }
-            JSValue element = arr.get(i);
-            if (!(element instanceof JSNull) && !(element instanceof JSUndefined)) {
-                result.append(JSTypeConversions.toString(element).value());
+        } else if (thisArg instanceof JSObject jsObject) {
+            int length = (int) JSTypeConversions.toLength(jsObject.get("length"));
+            if (length > 0) {
+                String separator = args.length > 0 && !args[0].isUndefined() ?
+                        JSTypeConversions.toString(args[0]).value() : ",";
+                for (int i = 0; i < length; i++) {
+                    if (i > 0) {
+                        result.append(separator);
+                    }
+                    JSValue element = jsObject.get(i);
+                    if (!element.isNullOrUndefined()) {
+                        result.append(JSTypeConversions.toString(element).value());
+                    } else {
+                        element = jsObject.get(String.valueOf(i));
+                        if (!element.isNullOrUndefined()) {
+                            result.append(JSTypeConversions.toString(element).value());
+                        }
+                    }
+                }
             }
         }
-
         return new JSString(result.toString());
     }
 
@@ -1111,7 +1126,13 @@ public final class ArrayPrototype {
      * Returns a string representing the array.
      */
     public static JSValue toString(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return join(ctx, thisArg, new JSValue[0]);
+        if (thisArg.isArray()) {
+            return join(ctx, thisArg, new JSValue[0]);
+        }
+        if (thisArg.isNullOrUndefined()) {
+            return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
+        }
+        return ObjectPrototype.toString(ctx, thisArg, args);
     }
 
     /**

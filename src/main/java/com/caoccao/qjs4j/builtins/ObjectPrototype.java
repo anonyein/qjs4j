@@ -37,7 +37,7 @@ public final class ObjectPrototype {
         }
 
         JSValue targetArg = args[0];
-        if (targetArg instanceof JSNull || targetArg instanceof JSUndefined) {
+        if (targetArg.isNullOrUndefined()) {
             return ctx.throwError("TypeError", "Cannot convert undefined or null to object");
         }
 
@@ -48,7 +48,7 @@ public final class ObjectPrototype {
         for (int i = 1; i < args.length; i++) {
             JSValue source = args[i];
 
-            if (source instanceof JSNull || source instanceof JSUndefined) {
+            if (source.isNullOrUndefined()) {
                 continue;
             }
 
@@ -77,7 +77,7 @@ public final class ObjectPrototype {
         JSObject proto = null;
         if (protoArg instanceof JSObject obj) {
             proto = obj;
-        } else if (!(protoArg instanceof JSNull)) {
+        } else if (!(protoArg.isNull())) {
             return ctx.throwError("TypeError", "Object prototype may only be an Object or null");
         }
 
@@ -85,7 +85,7 @@ public final class ObjectPrototype {
         JSObject newObj = new JSObject(proto);
 
         // Handle propertiesObject parameter (args[1]) if present
-        if (args.length > 1 && !(args[1] instanceof JSUndefined)) {
+        if (args.length > 1 && !(args[1].isUndefined())) {
             if (!(args[1] instanceof JSObject propsObj)) {
                 return ctx.throwError("TypeError", "Properties must be an object");
             }

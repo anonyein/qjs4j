@@ -47,24 +47,23 @@ public final class JSTypeConversions {
         }
 
         // null == undefined
-        if ((x instanceof JSNull && y instanceof JSUndefined) ||
-                (x instanceof JSUndefined && y instanceof JSNull)) {
+        if ((x.isNull() && y.isUndefined()) || (x.isUndefined() && y.isNull())) {
             return true;
         }
 
         // Number comparison
-        if (x instanceof JSNumber && y instanceof JSString) {
+        if (x.isNumber() && y.isString()) {
             return abstractEquals(x, toNumber(y));
         }
-        if (x instanceof JSString && y instanceof JSNumber) {
+        if (x.isString() && y.isNumber()) {
             return abstractEquals(toNumber(x), y);
         }
 
         // Boolean to number
-        if (x instanceof JSBoolean) {
+        if (x.isBoolean()) {
             return abstractEquals(toNumber(x), y);
         }
-        if (y instanceof JSBoolean) {
+        if (y.isBoolean()) {
             return abstractEquals(x, toNumber(y));
         }
 

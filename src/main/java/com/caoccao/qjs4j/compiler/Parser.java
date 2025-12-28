@@ -452,6 +452,30 @@ public final class Parser {
         return new Identifier(name, location);
     }
 
+    private Expression parsePropertyName() {
+        SourceLocation location = getLocation();
+        return switch (currentToken.type()) {
+            case IDENTIFIER -> {
+                String name = currentToken.value();
+                advance();
+                yield new Identifier(name, location);
+            }
+            case STRING -> {
+                String value = currentToken.value();
+                advance();
+                yield new Literal(value, location);
+            }
+            case NUMBER -> {
+                String value = currentToken.value();
+                advance();
+                // Numeric keys are converted to strings
+                yield new Literal(value, location);
+            }
+            default -> throw new RuntimeException("Expected property name but got " + currentToken.type() +
+                    " at line " + currentToken.line() + ", column " + currentToken.column());
+        };
+    }
+
     private Statement parseIfStatement() {
         SourceLocation location = getLocation();
         expect(TokenType.IF);
@@ -550,7 +574,7 @@ public final class Parser {
         List<ObjectExpression.Property> properties = new ArrayList<>();
 
         while (!match(TokenType.RBRACE) && !match(TokenType.EOF)) {
-            Identifier key = parseIdentifier();
+            Expression key = parsePropertyName();
             expect(TokenType.COLON);
             Expression value = parseExpression();
 
@@ -741,7 +765,11 @@ public final class Parser {
             case THROW -> parseThrowStatement();
             case TRY -> parseTryStatement();
             case SWITCH -> parseSwitchStatement();
-            case LBRACE -> parseBlockStatement();
+            case LBRACE -> {
+                Expression expr = parseObjectExpression();
+                consumeSemicolon();
+                yield new ExpressionStatement(expr, getLocation());
+            }
             case VAR, LET, CONST -> parseVariableDeclaration();
             case FUNCTION -> {
                 // Function declarations are treated as statements in JavaScript
