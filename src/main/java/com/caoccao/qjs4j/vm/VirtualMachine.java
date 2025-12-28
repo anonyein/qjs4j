@@ -1449,18 +1449,18 @@ public final class VirtualMachine {
      * @return The result of the call
      */
     private JSValue proxyApply(JSProxy proxy, JSValue thisArg, JSValue[] args) {
+        // Following QuickJS js_proxy_call:
+        // Check if target is callable BEFORE checking for apply trap
+        JSValue target = proxy.getTarget();
+        if (!(target instanceof JSFunction)) {
+            throw new JSException(context.throwError("TypeError", "not a function"));
+        }
+
         // Get the apply trap from the handler
         JSValue applyTrap = proxy.getHandler().get("apply");
 
         // If no apply trap, forward to target
         if (applyTrap == JSUndefined.INSTANCE || applyTrap == null) {
-            JSValue target = proxy.getTarget();
-
-            // Check that target is callable
-            if (!(target instanceof JSFunction)) {
-                throw new VMException("not a function");
-            }
-
             // Forward call to target
             if (target instanceof JSNativeFunction nativeFunc) {
                 return nativeFunc.call(context, thisArg, args);
@@ -1473,7 +1473,7 @@ public final class VirtualMachine {
 
         // Check that apply trap is a function
         if (!(applyTrap instanceof JSFunction applyFunc)) {
-            throw new VMException("apply trap is not a function");
+            throw new JSException(context.throwError("TypeError", "apply trap is not a function"));
         }
 
         // Create arguments array

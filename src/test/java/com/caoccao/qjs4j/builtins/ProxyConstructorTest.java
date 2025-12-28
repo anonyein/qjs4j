@@ -113,10 +113,6 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(10.0, (Double) result.toJavaObject());
     }
 
-    // ============================================================
-    // getPrototypeOf trap tests
-    // ============================================================
-
     @Test
     public void testProxyConstructNonObject() {
         // Test that construct trap must return an object
@@ -156,6 +152,18 @@ public class ProxyConstructorTest extends BaseTest {
     }
 
     @Test
+    public void testProxyDefinePropertyForward() {
+        // Test that defineProperty without trap forwards to target
+        JSValue result = ctx.eval(
+                "var target = {}; " +
+                        "var proxy = new Proxy(target, {}); " +
+                        "Object.defineProperty(proxy, 'x', {value: 42, writable: true}); " +
+                        "proxy.x"
+        );
+        assertEquals(42.0, (Double) result.toJavaObject());
+    }
+
+    @Test
     public void testProxyDefinePropertyInvariantNonExtensible() {
         // Test invariant: can't add property to non-extensible target
         try {
@@ -176,10 +184,6 @@ public class ProxyConstructorTest extends BaseTest {
                     e.getMessage().contains("TypeError"));
         }
     }
-
-    // ============================================================
-    // setPrototypeOf trap tests
-    // ============================================================
 
     @Test
     public void testProxyDeletePropertyBasic() {
@@ -209,10 +213,6 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(false, result.toJavaObject());
     }
 
-    // ============================================================
-    // isExtensible trap tests
-    // ============================================================
-
     @Test
     public void testProxyGetBasic() {
         JSValue result = ctx.eval(
@@ -238,10 +238,6 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(1.0, (Double) result.toJavaObject());
     }
 
-    // ============================================================
-    // preventExtensions trap tests
-    // ============================================================
-
     @Test
     public void testProxyGetOwnPropertyDescriptorBasic() {
         JSValue result = ctx.eval(
@@ -256,6 +252,18 @@ public class ProxyConstructorTest extends BaseTest {
                         "desc.value"
         );
         assertEquals(1.0, (Double) result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyGetOwnPropertyDescriptorForward() {
+        // Test that getOwnPropertyDescriptor without trap forwards to target
+        JSValue result = ctx.eval(
+                "var target = {x: 42}; " +
+                        "var proxy = new Proxy(target, {}); " +
+                        "var desc = Object.getOwnPropertyDescriptor(proxy, 'x'); " +
+                        "desc.value"
+        );
+        assertEquals(42.0, (Double) result.toJavaObject());
     }
 
     @Test
@@ -282,10 +290,6 @@ public class ProxyConstructorTest extends BaseTest {
                     e.getMessage().contains("TypeError"));
         }
     }
-
-    // ============================================================
-    // getOwnPropertyDescriptor trap tests
-    // ============================================================
 
     @Test
     public void testProxyGetOwnPropertyDescriptorUndefined() {
@@ -330,10 +334,6 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(1.0, (Double) result.toJavaObject());
     }
 
-    // ============================================================
-    // defineProperty trap tests
-    // ============================================================
-
     @Test
     public void testProxyGetPrototypeOfInvariant() {
         // Test invariant: if target is non-extensible, trap must return target's prototype
@@ -373,10 +373,6 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(true, result.toJavaObject());
     }
 
-    // ============================================================
-    // has trap tests
-    // ============================================================
-
     @Test
     public void testProxyHasForward() {
         JSValue result = ctx.eval(
@@ -402,9 +398,16 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(true, result.toJavaObject());
     }
 
-    // ============================================================
-    // get trap tests
-    // ============================================================
+    @Test
+    public void testProxyIsExtensibleForward() {
+        // Test that isExtensible without trap forwards to target
+        JSValue result = ctx.eval(
+                "var target = {}; " +
+                        "var proxy = new Proxy(target, {}); " +
+                        "Object.isExtensible(proxy)"
+        );
+        assertEquals(true, result.toJavaObject());
+    }
 
     @Test
     public void testProxyIsExtensibleInvariant() {
@@ -452,9 +455,18 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(true, result.toJavaObject());
     }
 
-    // ============================================================
-    // set trap tests
-    // ============================================================
+    @Test
+    public void testProxyNestedRevocation() {
+        // Test that revoking outer proxy doesn't affect inner proxy
+        JSValue result = ctx.eval(
+                "var target = {x: 1}; " +
+                        "var {proxy: inner, revoke: revokeInner} = Proxy.revocable(target, {}); " +
+                        "var {proxy: outer, revoke: revokeOuter} = Proxy.revocable(inner, {}); " +
+                        "revokeOuter(); " +
+                        "inner.x"  // Inner proxy should still work
+        );
+        assertEquals(1.0, (Double) result.toJavaObject());
+    }
 
     @Test
     public void testProxyOwnKeysBasic() {
@@ -481,10 +493,6 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(2.0, (Double) result.toJavaObject());
     }
 
-    // ============================================================
-    // deleteProperty trap tests
-    // ============================================================
-
     @Test
     public void testProxyPreventExtensionsBasic() {
         JSValue result = ctx.eval(
@@ -496,6 +504,18 @@ public class ProxyConstructorTest extends BaseTest {
                         "  } " +
                         "}; " +
                         "var proxy = new Proxy(target, handler); " +
+                        "Object.preventExtensions(proxy); " +
+                        "Object.isExtensible(proxy)"
+        );
+        assertEquals(false, result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyPreventExtensionsForward() {
+        // Test that preventExtensions without trap forwards to target
+        JSValue result = ctx.eval(
+                "var target = {}; " +
+                        "var proxy = new Proxy(target, {}); " +
                         "Object.preventExtensions(proxy); " +
                         "Object.isExtensible(proxy)"
         );
@@ -523,9 +543,41 @@ public class ProxyConstructorTest extends BaseTest {
         }
     }
 
-    // ============================================================
-    // ownKeys trap tests
-    // ============================================================
+    @Test
+    public void testProxyReceiverInGet() {
+        // Test that get trap receives correct receiver
+        JSValue result = ctx.eval(
+                "var target = {x: 1}; " +
+                        "var handler = { " +
+                        "  get: function(target, prop, receiver) { " +
+                        "    return receiver === proxy ? 'correct' : 'wrong'; " +
+                        "  } " +
+                        "}; " +
+                        "var proxy = new Proxy(target, handler); " +
+                        "proxy.x"
+        );
+        assertEquals("correct", result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyReceiverInSet() {
+        // Test that set trap receives correct receiver
+        JSValue result = ctx.eval(
+                "var target = {}; " +
+                        "var handler = { " +
+                        "  set: function(target, prop, value, receiver) { " +
+                        "    if (receiver === proxy) { " +
+                        "      target.result = 'correct'; " +
+                        "    } " +
+                        "    return true; " +
+                        "  } " +
+                        "}; " +
+                        "var proxy = new Proxy(target, handler); " +
+                        "proxy.x = 1; " +
+                        "target.result"
+        );
+        assertEquals("correct", result.toJavaObject());
+    }
 
     @Test
     public void testProxyRevocableAccessAfterRevoke() {
@@ -560,10 +612,6 @@ public class ProxyConstructorTest extends BaseTest {
         // Proxy access returns the value
         assertEquals(1.0, (Double) result.toJavaObject());
     }
-
-    // ============================================================
-    // apply trap tests
-    // ============================================================
 
     @Test
     public void testProxyRevocableBasic() {
@@ -617,10 +665,6 @@ public class ProxyConstructorTest extends BaseTest {
         }
     }
 
-    // ============================================================
-    // construct trap tests
-    // ============================================================
-
     @Test
     public void testProxySetBasic() {
         JSValue result = ctx.eval(
@@ -649,10 +693,6 @@ public class ProxyConstructorTest extends BaseTest {
         assertEquals(42.0, (Double) result.toJavaObject());
     }
 
-    // ============================================================
-    // Combined/Complex tests
-    // ============================================================
-
     @Test
     public void testProxySetPrototypeOfBasic() {
         JSValue result = ctx.eval(
@@ -669,6 +709,19 @@ public class ProxyConstructorTest extends BaseTest {
                         "Object.getPrototypeOf(proxy).x"
         );
         assertEquals(2.0, (Double) result.toJavaObject());
+    }
+
+    @Test
+    public void testProxySetPrototypeOfForward() {
+        // Test that setPrototypeOf without trap forwards to target
+        JSValue result = ctx.eval(
+                "var newProto = {x: 42}; " +
+                        "var target = {}; " +
+                        "var proxy = new Proxy(target, {}); " +
+                        "Object.setPrototypeOf(proxy, newProto); " +
+                        "Object.getPrototypeOf(proxy).x"
+        );
+        assertEquals(42.0, (Double) result.toJavaObject());
     }
 
     @Test
@@ -693,5 +746,41 @@ public class ProxyConstructorTest extends BaseTest {
             assertTrue(e.getMessage().contains("inconsistent") ||
                     e.getMessage().contains("TypeError"));
         }
+    }
+
+    @Test
+    public void testProxyWithNullPrototype() {
+        // Test proxy with null prototype target
+        JSValue result = ctx.eval(
+                "var target = Object.create(null); " +
+                        "target.x = 42; " +
+                        "var handler = { " +
+                        "  get: function(target, prop) { " +
+                        "    return target[prop]; " +
+                        "  } " +
+                        "}; " +
+                        "var proxy = new Proxy(target, handler); " +
+                        "proxy.x"
+        );
+        assertEquals(42.0, (Double) result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyWithNumericProperties() {
+        // Test that proxy works with object having numeric property names
+        JSValue result = ctx.eval(
+                "var target = {}; " +
+                        "target['0'] = 1; " +
+                        "target['1'] = 2; " +
+                        "var handler = { " +
+                        "  get: function(target, prop, receiver) { " +
+                        "    var val = target[prop]; " +
+                        "    return val !== undefined ? val * 2 : undefined; " +
+                        "  } " +
+                        "}; " +
+                        "var proxy = new Proxy(target, handler); " +
+                        "proxy['0']"
+        );
+        assertEquals(2.0, (Double) result.toJavaObject());  // 1 * 2
     }
 }
