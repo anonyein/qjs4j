@@ -23,7 +23,7 @@ import com.caoccao.qjs4j.core.JSString;
 import com.caoccao.qjs4j.core.JSValue;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for SharedArrayBuffer.prototype methods.
@@ -36,12 +36,12 @@ public class SharedArrayBufferPrototypeTest extends BaseTest {
 
         // Normal case: get byte length
         JSValue result = SharedArrayBufferPrototype.getByteLength(ctx, sab, new JSValue[]{});
-        assertEquals(64.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(64.0, result.asNumber().map(JSNumber::value).orElseThrow());
 
         // Normal case: empty buffer
         JSSharedArrayBuffer emptySab = new JSSharedArrayBuffer(0);
         result = SharedArrayBufferPrototype.getByteLength(ctx, emptySab, new JSValue[]{});
-        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElseThrow());
 
         // Edge case: called on non-SharedArrayBuffer
         assertTypeError(SharedArrayBufferPrototype.getByteLength(ctx, new JSString("not sab"), new JSValue[]{}));
@@ -54,39 +54,27 @@ public class SharedArrayBufferPrototypeTest extends BaseTest {
 
         // Normal case: slice entire buffer
         JSValue result = SharedArrayBufferPrototype.slice(ctx, sab, new JSValue[]{});
-        assertInstanceOf(JSSharedArrayBuffer.class, result);
-        JSSharedArrayBuffer sliced = (JSSharedArrayBuffer) result;
-        assertEquals(16, sliced.getByteLength());
+        assertEquals(16, result.asSharedArrayBuffer().map(JSSharedArrayBuffer::getByteLength).orElseThrow());
 
         // Normal case: slice with start only
         result = SharedArrayBufferPrototype.slice(ctx, sab, new JSValue[]{new JSNumber(4)});
-        assertInstanceOf(JSSharedArrayBuffer.class, result);
-        sliced = (JSSharedArrayBuffer) result;
-        assertEquals(12, sliced.getByteLength()); // 16 - 4
+        assertEquals(12, result.asSharedArrayBuffer().map(JSSharedArrayBuffer::getByteLength).orElseThrow()); // 16 - 4
 
         // Normal case: slice with start and end
         result = SharedArrayBufferPrototype.slice(ctx, sab, new JSValue[]{new JSNumber(4), new JSNumber(12)});
-        assertInstanceOf(JSSharedArrayBuffer.class, result);
-        sliced = (JSSharedArrayBuffer) result;
-        assertEquals(8, sliced.getByteLength()); // 12 - 4
+        assertEquals(8, result.asSharedArrayBuffer().map(JSSharedArrayBuffer::getByteLength).orElseThrow()); // 12 - 4
 
         // Normal case: negative start (from end)
         result = SharedArrayBufferPrototype.slice(ctx, sab, new JSValue[]{new JSNumber(-8)});
-        assertInstanceOf(JSSharedArrayBuffer.class, result);
-        sliced = (JSSharedArrayBuffer) result;
-        assertEquals(8, sliced.getByteLength()); // 16 - 8
+        assertEquals(8, result.asSharedArrayBuffer().map(JSSharedArrayBuffer::getByteLength).orElseThrow()); // 16 - 8
 
         // Normal case: negative end (from end)
         result = SharedArrayBufferPrototype.slice(ctx, sab, new JSValue[]{new JSNumber(4), new JSNumber(-4)});
-        assertInstanceOf(JSSharedArrayBuffer.class, result);
-        sliced = (JSSharedArrayBuffer) result;
-        assertEquals(8, sliced.getByteLength()); // 12 - 4
+        assertEquals(8, result.asSharedArrayBuffer().map(JSSharedArrayBuffer::getByteLength).orElseThrow()); // 12 - 4
 
         // Edge case: start >= end (empty slice)
         result = SharedArrayBufferPrototype.slice(ctx, sab, new JSValue[]{new JSNumber(8), new JSNumber(4)});
-        assertInstanceOf(JSSharedArrayBuffer.class, result);
-        sliced = (JSSharedArrayBuffer) result;
-        assertEquals(0, sliced.getByteLength());
+        assertEquals(0, result.asSharedArrayBuffer().map(JSSharedArrayBuffer::getByteLength).orElseThrow());
 
         // Edge case: called on non-SharedArrayBuffer
         assertTypeError(SharedArrayBufferPrototype.slice(ctx, new JSString("not sab"), new JSValue[]{}));

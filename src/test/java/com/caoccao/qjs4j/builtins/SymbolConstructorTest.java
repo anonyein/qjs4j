@@ -31,33 +31,27 @@ public class SymbolConstructorTest extends BaseTest {
     public void testCall() {
         // Normal case: with description
         JSValue result = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("test")});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        JSSymbol symbol = result.asSymbol().orElseThrow();
         assertEquals("test", symbol.getDescription());
 
         // Normal case: with numeric description
         result = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(42)});
-        symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        symbol = result.asSymbol().orElseThrow();
         assertEquals("42", symbol.getDescription());
 
         // Normal case: with undefined description
         result = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{JSUndefined.INSTANCE});
-        symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        symbol = result.asSymbol().orElseThrow();
         assertNull(symbol.getDescription());
 
         // Normal case: no arguments
         result = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        symbol = result.asSymbol().orElseThrow();
         assertNull(symbol.getDescription());
 
         // Normal case: symbols are unique
-        JSSymbol symbol1 = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("same")}).asSymbol().orElse(null);
-        assertNotNull(symbol1);
-        JSSymbol symbol2 = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("same")}).asSymbol().orElse(null);
-        assertNotNull(symbol2);
+        JSSymbol symbol1 = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("same")}).asSymbol().orElseThrow();
+        JSSymbol symbol2 = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("same")}).asSymbol().orElseThrow();
         assertNotEquals(symbol1, symbol2);
         assertEquals("same", symbol1.getDescription());
         assertEquals("same", symbol2.getDescription());
@@ -66,54 +60,47 @@ public class SymbolConstructorTest extends BaseTest {
     @Test
     public void testGetHasInstance() {
         JSValue result = SymbolConstructor.getHasInstance(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        JSSymbol symbol = result.asSymbol().orElseThrow();
         assertEquals(JSSymbol.HAS_INSTANCE, symbol);
     }
 
     @Test
     public void testGetIsConcatSpreadable() {
         JSValue result = SymbolConstructor.getIsConcatSpreadable(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        JSSymbol symbol = result.asSymbol().orElseThrow();
         assertEquals(JSSymbol.IS_CONCAT_SPREADABLE, symbol);
     }
 
     @Test
     public void testGetIterator() {
         JSValue result = SymbolConstructor.getIterator(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        JSSymbol symbol = result.asSymbol().orElseThrow();
         assertEquals(JSSymbol.ITERATOR, symbol);
     }
 
     @Test
     public void testGetToPrimitive() {
         JSValue result = SymbolConstructor.getToPrimitive(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        JSSymbol symbol = result.asSymbol().orElseThrow();
         assertEquals(JSSymbol.TO_PRIMITIVE, symbol);
     }
 
     @Test
     public void testGetToStringTag() {
         JSValue result = SymbolConstructor.getToStringTag(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        JSSymbol symbol = result.asSymbol().orElse(null);
-        assertNotNull(symbol);
+        JSSymbol symbol = result.asSymbol().orElseThrow();
         assertEquals(JSSymbol.TO_STRING_TAG, symbol);
     }
 
     @Test
     public void testKeyFor() {
         // Normal case: symbol from registry
-        JSSymbol symbol = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("registryKey")}).asSymbol().orElse(null);
-        assertNotNull(symbol);
+        JSSymbol symbol = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("registryKey")}).asSymbol().orElseThrow();
         JSValue result = SymbolConstructor.keyFor(ctx, JSUndefined.INSTANCE, new JSValue[]{symbol});
-        assertEquals("registryKey", result.asString().map(JSString::value).orElse(""));
+        assertEquals("registryKey", result.asString().map(JSString::value).orElseThrow());
 
         // Normal case: symbol not in registry
-        JSSymbol unregisteredSymbol = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("unregistered")}).asSymbol().orElse(null);
-        assertNotNull(unregisteredSymbol);
+        JSSymbol unregisteredSymbol = SymbolConstructor.call(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("unregistered")}).asSymbol().orElseThrow();
         result = SymbolConstructor.keyFor(ctx, JSUndefined.INSTANCE, new JSValue[]{unregisteredSymbol});
         assertTrue(result.isUndefined());
 
@@ -142,27 +129,23 @@ public class SymbolConstructorTest extends BaseTest {
     public void testSymbolFor() {
         // Normal case: create new symbol in registry
         JSValue result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("test")});
-        JSSymbol symbol1 = result.asSymbol().orElse(null);
-        assertNotNull(symbol1);
+        JSSymbol symbol1 = result.asSymbol().orElseThrow();
         assertEquals("test", symbol1.getDescription());
 
         // Normal case: get existing symbol from registry
         result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("test")});
-        JSSymbol symbol2 = result.asSymbol().orElse(null);
-        assertNotNull(symbol2);
+        JSSymbol symbol2 = result.asSymbol().orElseThrow();
         assertEquals(symbol1, symbol2); // Same symbol instance
 
         // Normal case: different keys create different symbols
         result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("other")});
-        JSSymbol symbol3 = result.asSymbol().orElse(null);
-        assertNotNull(symbol3);
+        JSSymbol symbol3 = result.asSymbol().orElseThrow();
         assertNotEquals(symbol1, symbol3);
         assertEquals("other", symbol3.getDescription());
 
         // Normal case: numeric key
         result = SymbolConstructor.symbolFor(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(123)});
-        JSSymbol symbol4 = result.asSymbol().orElse(null);
-        assertNotNull(symbol4);
+        JSSymbol symbol4 = result.asSymbol().orElseThrow();
         assertEquals("123", symbol4.getDescription());
 
         // Edge case: no arguments

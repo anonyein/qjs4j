@@ -317,19 +317,19 @@ public final class JSContext {
     }
 
     /**
-     * Get the virtual machine for this context.
+     * Get the current call stack depth.
      */
-    public com.caoccao.qjs4j.vm.VirtualMachine getVirtualMachine() {
-        return virtualMachine;
+    public int getStackDepth() {
+        return stackDepth;
     }
 
     // Stack trace capture
 
     /**
-     * Get the current call stack depth.
+     * Get the virtual machine for this context.
      */
-    public int getStackDepth() {
-        return stackDepth;
+    public com.caoccao.qjs4j.vm.VirtualMachine getVirtualMachine() {
+        return virtualMachine;
     }
 
     /**

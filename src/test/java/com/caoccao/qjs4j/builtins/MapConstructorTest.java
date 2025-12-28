@@ -20,7 +20,7 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for Map constructor static methods.
@@ -37,36 +37,32 @@ public class MapConstructorTest extends BaseTest {
 
         // Callback function: group by even/odd
         JSFunction callback = new JSNativeFunction("testCallback", 3, (ctx, thisArg, args) -> {
-            double num = args[0].asNumber().map(JSNumber::value).orElse(0.0);
+            double num = args[0].asNumber().map(JSNumber::value).orElseThrow();
             return (num % 2 == 0) ? new JSString("even") : new JSString("odd");
         });
 
         // Normal case: group by even/odd
         JSValue result = MapConstructor.groupBy(ctx, JSUndefined.INSTANCE, new JSValue[]{items, callback});
-        assertInstanceOf(JSMap.class, result);
-        JSMap map = (JSMap) result;
+        JSMap map = result.asMap().orElseThrow();
 
         // Check even group
         JSValue evenGroup = map.mapGet(new JSString("even"));
-        assertInstanceOf(JSArray.class, evenGroup);
-        JSArray evenArray = (JSArray) evenGroup;
+        JSArray evenArray = evenGroup.asArray().orElseThrow();
         assertEquals(2, evenArray.getLength());
-        assertEquals(2.0, evenArray.get(0).asNumber().map(JSNumber::value).orElse(0.0));
-        assertEquals(4.0, evenArray.get(1).asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(2.0, evenArray.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertEquals(4.0, evenArray.get(1).asNumber().map(JSNumber::value).orElseThrow());
 
         // Check odd group
         JSValue oddGroup = map.mapGet(new JSString("odd"));
-        assertInstanceOf(JSArray.class, oddGroup);
-        JSArray oddArray = (JSArray) oddGroup;
+        JSArray oddArray = oddGroup.asArray().orElseThrow();
         assertEquals(2, oddArray.getLength());
-        assertEquals(1.0, oddArray.get(0).asNumber().map(JSNumber::value).orElse(0.0));
-        assertEquals(3.0, oddArray.get(1).asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(1.0, oddArray.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertEquals(3.0, oddArray.get(1).asNumber().map(JSNumber::value).orElseThrow());
 
         // Edge case: empty array
         JSArray emptyItems = new JSArray();
         result = MapConstructor.groupBy(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyItems, callback});
-        assertInstanceOf(JSMap.class, result);
-        map = (JSMap) result;
+        map = result.asMap().orElseThrow();
         assertEquals(0, map.size());
 
         // Edge case: insufficient arguments

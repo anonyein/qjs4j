@@ -30,8 +30,7 @@ public class ArrayBufferConstructorTest extends BaseTest {
     @Test
     public void testGetSpecies() {
         // Get ArrayBuffer constructor from global
-        JSObject arrayBufferConstructor = ctx.getGlobalObject().get("ArrayBuffer").asObject().orElse(null);
-        assertNotNull(arrayBufferConstructor);
+        JSObject arrayBufferConstructor = ctx.getGlobalObject().get("ArrayBuffer").asObject().orElseThrow();
 
         // Call the getter with the constructor as thisArg
         JSValue result = ArrayBufferConstructor.getSpecies(ctx, arrayBufferConstructor, new JSValue[]{});

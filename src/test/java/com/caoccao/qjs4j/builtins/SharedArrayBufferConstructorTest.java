@@ -20,7 +20,7 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for SharedArrayBuffer constructor methods.
@@ -42,15 +42,11 @@ public class SharedArrayBufferConstructorTest extends BaseTest {
     public void testCreateSharedArrayBuffer() {
         // Normal case: create with valid length
         JSValue result = SharedArrayBufferConstructor.createSharedArrayBuffer(ctx, new JSNumber(32));
-        assertInstanceOf(JSSharedArrayBuffer.class, result);
-        JSSharedArrayBuffer sab = (JSSharedArrayBuffer) result;
-        assertEquals(32, sab.getByteLength());
+        assertEquals(32, result.asSharedArrayBuffer().map(JSSharedArrayBuffer::getByteLength).orElseThrow());
 
         // Normal case: create with zero length
         result = SharedArrayBufferConstructor.createSharedArrayBuffer(ctx, new JSNumber(0));
-        assertInstanceOf(JSSharedArrayBuffer.class, result);
-        sab = (JSSharedArrayBuffer) result;
-        assertEquals(0, sab.getByteLength());
+        assertEquals(0, result.asSharedArrayBuffer().map(JSSharedArrayBuffer::getByteLength).orElseThrow());
 
         // Edge case: negative length
         assertRangeError(SharedArrayBufferConstructor.createSharedArrayBuffer(ctx, new JSNumber(-1)));

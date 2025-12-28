@@ -41,16 +41,16 @@ public class ObjectConstructorTest extends BaseTest {
         // Normal case
         JSValue result = ObjectConstructor.assign(ctx, JSUndefined.INSTANCE, new JSValue[]{target, source1, source2});
         assertSame(target, result);
-        assertEquals(10.0, target.get("a").asNumber().map(JSNumber::value).orElse(0.0));
-        assertEquals(2.0, target.get("b").asNumber().map(JSNumber::value).orElse(0.0));
-        assertEquals(3.0, target.get("c").asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(10.0, target.get("a").asNumber().map(JSNumber::value).orElseThrow());
+        assertEquals(2.0, target.get("b").asNumber().map(JSNumber::value).orElseThrow());
+        assertEquals(3.0, target.get("c").asNumber().map(JSNumber::value).orElseThrow());
 
         // Edge case: null/undefined sources (should be ignored)
         JSObject target2 = new JSObject();
         target2.set("x", new JSNumber(1));
         result = ObjectConstructor.assign(ctx, JSUndefined.INSTANCE, new JSValue[]{target2, JSNull.INSTANCE, JSUndefined.INSTANCE});
         assertSame(target2, result);
-        assertEquals(1.0, target2.get("x").asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(1.0, target2.get("x").asNumber().map(JSNumber::value).orElseThrow());
 
         // Edge case: no arguments
         assertTypeError(ObjectConstructor.assign(ctx, JSUndefined.INSTANCE, new JSValue[]{}));
@@ -72,14 +72,12 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case: create object with prototype
         JSValue result = ObjectConstructor.create(ctx, JSUndefined.INSTANCE, new JSValue[]{proto});
-        JSObject obj = result.asObject().orElse(null);
-        assertNotNull(obj);
+        JSObject obj = result.asObject().orElseThrow();
         assertSame(proto, obj.getPrototype());
 
         // Edge case: create with null prototype
         result = ObjectConstructor.create(ctx, JSUndefined.INSTANCE, new JSValue[]{JSNull.INSTANCE});
-        obj = result.asObject().orElse(null);
-        assertNotNull(obj);
+        obj = result.asObject().orElseThrow();
         assertNull(obj.getPrototype());
 
         // Edge case: no arguments
@@ -136,14 +134,12 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case
         JSValue result = ObjectConstructor.entries(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        JSArray entries = result.asArray().orElse(null);
-        assertNotNull(entries);
+        JSArray entries = result.asArray().orElseThrow();
         assertEquals(2, entries.getLength());
 
         // Check first entry
         JSValue firstEntry = entries.get(0);
-        JSArray firstPair = firstEntry.asArray().orElse(null);
-        assertNotNull(firstPair);
+        JSArray firstPair = firstEntry.asArray().orElseThrow();
         assertEquals(2, firstPair.getLength());
         assertTrue(firstPair.get(0).asString().isPresent());
         assertTrue(firstPair.get(1).asNumber().isPresent());
@@ -151,8 +147,7 @@ public class ObjectConstructorTest extends BaseTest {
         // Edge case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectConstructor.entries(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        entries = result.asArray().orElse(null);
-        assertNotNull(entries);
+        entries = result.asArray().orElseThrow();
         assertEquals(0, entries.getLength());
 
         // Edge case: no arguments
@@ -188,17 +183,15 @@ public class ObjectConstructorTest extends BaseTest {
 
         // For now, just test that fromEntries doesn't crash
         JSValue result = ObjectConstructor.fromEntries(ctx, JSUndefined.INSTANCE, new JSValue[]{entries});
-        JSObject obj = result.asObject().orElse(null);
-        assertNotNull(obj);
-        assertEquals(1.0, obj.get("a").asNumber().map(JSNumber::value).orElse(0.0));
-        assertEquals(2.0, obj.get("b").asNumber().map(JSNumber::value).orElse(0.0));
+        JSObject obj = result.asObject().orElseThrow();
+        assertEquals(1.0, obj.get("a").asNumber().map(JSNumber::value).orElseThrow());
+        assertEquals(2.0, obj.get("b").asNumber().map(JSNumber::value).orElseThrow());
 
         // Edge case: empty array
         ctx.eval("var emptyEntries = []");
         JSValue emptyEntries = ctx.getGlobalObject().get("emptyEntries");
         result = ObjectConstructor.fromEntries(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyEntries});
-        obj = result.asObject().orElse(null);
-        assertNotNull(obj);
+        obj = result.asObject().orElseThrow();
         assertEquals(0, obj.getOwnPropertyKeys().size());
 
         // Edge case: no arguments
@@ -222,15 +215,14 @@ public class ObjectConstructorTest extends BaseTest {
         mixedEntries.push(mixedEntry2);
 
         // Set prototype for the arrays
-        JSObject arrayProto = ctx.getGlobalObject().get("Array").asObject().orElse(null).get("prototype").asObject().orElse(null);
+        JSObject arrayProto = ctx.getGlobalObject().get("Array").asObject().orElseThrow().get("prototype").asObject().orElseThrow();
         mixedEntries.setPrototype(arrayProto);
         mixedEntry1.setPrototype(arrayProto);
         mixedEntry2.setPrototype(arrayProto);
 
         result = ObjectConstructor.fromEntries(ctx, JSUndefined.INSTANCE, new JSValue[]{mixedEntries});
-        obj = result.asObject().orElse(null);
-        assertNotNull(obj);
-        assertEquals("value1", obj.get("key1").asString().map(JSString::value).orElse(""));
+        obj = result.asObject().orElseThrow();
+        assertEquals("value1", obj.get("key1").asString().map(JSString::value).orElseThrow());
         assertEquals(JSBoolean.TRUE, obj.get("key2"));
     }
 
@@ -241,12 +233,11 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case: existing property
         JSValue result = ObjectConstructor.getOwnPropertyDescriptor(ctx, JSUndefined.INSTANCE, new JSValue[]{obj, new JSString("testProp")});
-        assertInstanceOf(JSObject.class, result);
-        JSObject desc = (JSObject) result;
-        assertEquals("testValue", desc.get("value").asString().map(JSString::value).orElse(""));
-        assertTrue(desc.get("writable").asBoolean().map(JSBoolean::isBooleanTrue).orElse(false));
-        assertTrue(desc.get("enumerable").asBoolean().map(JSBoolean::isBooleanTrue).orElse(false));
-        assertTrue(desc.get("configurable").asBoolean().map(JSBoolean::isBooleanTrue).orElse(false));
+        JSObject desc = result.asObject().orElseThrow();
+        assertEquals("testValue", desc.get("value").asString().map(JSString::value).orElseThrow());
+        assertTrue(desc.get("writable").asBoolean().map(JSBoolean::isBooleanTrue).orElseThrow());
+        assertTrue(desc.get("enumerable").asBoolean().map(JSBoolean::isBooleanTrue).orElseThrow());
+        assertTrue(desc.get("configurable").asBoolean().map(JSBoolean::isBooleanTrue).orElseThrow());
 
         // Normal case: non-existing property
         result = ObjectConstructor.getOwnPropertyDescriptor(ctx, JSUndefined.INSTANCE, new JSValue[]{obj, new JSString("nonexistent")});
@@ -279,19 +270,17 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case: object with properties
         JSValue result = ObjectConstructor.getOwnPropertyNames(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray names = (JSArray) result;
+        JSArray names = result.asArray().orElseThrow();
         assertEquals(2, names.getLength());
         // Note: order may vary, so check both are present
-        String name0 = names.get(0).asString().map(JSString::value).orElse("");
-        String name1 = names.get(1).asString().map(JSString::value).orElse("");
+        String name0 = names.get(0).asString().map(JSString::value).orElseThrow();
+        String name1 = names.get(1).asString().map(JSString::value).orElseThrow();
         assertTrue((name0.equals("prop1") && name1.equals("prop2")) || (name0.equals("prop2") && name1.equals("prop1")));
 
         // Normal case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectConstructor.getOwnPropertyNames(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        assertInstanceOf(JSArray.class, result);
-        names = (JSArray) result;
+        names = result.asArray().orElseThrow();
         assertEquals(0, names.getLength());
 
         // Edge case: no arguments
@@ -313,28 +302,24 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case: object with symbol properties
         JSValue result = ObjectConstructor.getOwnPropertySymbols(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertInstanceOf(JSArray.class, result);
-        JSArray symbols = (JSArray) result;
+        JSArray symbols = result.asArray().orElseThrow();
         assertEquals(2, symbols.getLength());
 
         // Normal case: object with no symbol properties
         JSObject regularObj = new JSObject();
         regularObj.set("prop", new JSString("value"));
         result = ObjectConstructor.getOwnPropertySymbols(ctx, JSUndefined.INSTANCE, new JSValue[]{regularObj});
-        assertInstanceOf(JSArray.class, result);
-        symbols = (JSArray) result;
+        symbols = result.asArray().orElseThrow();
         assertEquals(0, symbols.getLength());
 
         // Edge case: no arguments
         result = ObjectConstructor.getOwnPropertySymbols(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        assertInstanceOf(JSArray.class, result);
-        symbols = (JSArray) result;
+        symbols = result.asArray().orElseThrow();
         assertEquals(0, symbols.getLength());
 
         // Edge case: non-object (should return empty array)
         result = ObjectConstructor.getOwnPropertySymbols(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSString("not object")});
-        assertInstanceOf(JSArray.class, result);
-        symbols = (JSArray) result;
+        symbols = result.asArray().orElseThrow();
         assertEquals(0, symbols.getLength());
     }
 
@@ -378,36 +363,32 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Callback function: group by even/odd
         JSFunction callback = new JSNativeFunction("testCallback", 3, (ctx, thisArg, args) -> {
-            double num = args[0].asNumber().map(JSNumber::value).orElse(0.0);
+            double num = args[0].asNumber().map(JSNumber::value).orElseThrow();
             return (num % 2 == 0) ? new JSString("even") : new JSString("odd");
         });
 
         // Normal case: group by even/odd
         JSValue result = ObjectConstructor.groupBy(ctx, JSUndefined.INSTANCE, new JSValue[]{items, callback});
-        assertInstanceOf(JSObject.class, result);
-        JSObject groups = (JSObject) result;
+        JSObject groups = result.asObject().orElseThrow();
 
         // Check even group
         JSValue evenGroup = groups.get("even");
-        assertInstanceOf(JSArray.class, evenGroup);
-        JSArray evenArray = (JSArray) evenGroup;
+        JSArray evenArray = evenGroup.asArray().orElseThrow();
         assertEquals(2, evenArray.getLength());
-        assertEquals(2.0, evenArray.get(0).asNumber().map(JSNumber::value).orElse(0.0));
-        assertEquals(4.0, evenArray.get(1).asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(2.0, evenArray.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertEquals(4.0, evenArray.get(1).asNumber().map(JSNumber::value).orElseThrow());
 
         // Check odd group
         JSValue oddGroup = groups.get("odd");
-        assertInstanceOf(JSArray.class, oddGroup);
-        JSArray oddArray = (JSArray) oddGroup;
+        JSArray oddArray = oddGroup.asArray().orElseThrow();
         assertEquals(2, oddArray.getLength());
-        assertEquals(1.0, oddArray.get(0).asNumber().map(JSNumber::value).orElse(0.0));
-        assertEquals(3.0, oddArray.get(1).asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(1.0, oddArray.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertEquals(3.0, oddArray.get(1).asNumber().map(JSNumber::value).orElseThrow());
 
         // Edge case: empty array
         JSArray emptyItems = new JSArray();
         result = ObjectConstructor.groupBy(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyItems, callback});
-        assertInstanceOf(JSObject.class, result);
-        groups = (JSObject) result;
+        groups = result.asObject().orElseThrow();
         // Should have no properties
         assertTrue(groups.get("even").isUndefined());
         assertTrue(groups.get("odd").isUndefined());
@@ -586,15 +567,13 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case
         JSValue result = ObjectConstructor.keys(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        JSArray keys = result.asArray().orElse(null);
-        assertNotNull(keys);
+        JSArray keys = result.asArray().orElseThrow();
         assertEquals(3, keys.getLength());
 
         // Edge case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectConstructor.keys(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        keys = result.asArray().orElse(null);
-        assertNotNull(keys);
+        keys = result.asArray().orElseThrow();
         assertEquals(0, keys.getLength());
 
         // Edge case: no arguments
@@ -681,15 +660,13 @@ public class ObjectConstructorTest extends BaseTest {
 
         // Normal case
         JSValue result = ObjectConstructor.values(ctx, JSUndefined.INSTANCE, new JSValue[]{obj});
-        JSArray values = result.asArray().orElse(null);
-        assertNotNull(values);
+        JSArray values = result.asArray().orElseThrow();
         assertEquals(3, values.getLength());
 
         // Edge case: empty object
         JSObject emptyObj = new JSObject();
         result = ObjectConstructor.values(ctx, JSUndefined.INSTANCE, new JSValue[]{emptyObj});
-        values = result.asArray().orElse(null);
-        assertNotNull(values);
+        values = result.asArray().orElseThrow();
         assertEquals(0, values.getLength());
 
         // Edge case: no arguments

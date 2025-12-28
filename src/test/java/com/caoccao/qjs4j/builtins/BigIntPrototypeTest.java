@@ -38,14 +38,12 @@ public class BigIntPrototypeTest extends BaseTest {
         JSBigInt bigInt = new JSBigInt(BigInteger.valueOf(12345));
         // Normal case: default
         JSValue result = BigIntPrototype.toLocaleString(ctx, bigInt, new JSValue[]{});
-        JSString str = result.asString().orElse(null);
-        assertNotNull(str);
+        JSString str = result.asString().orElseThrow();
         assertEquals("12345", str.value());
 
         // Normal case: with arguments (ignored in simplified implementation)
         result = BigIntPrototype.toLocaleString(ctx, bigInt, new JSValue[]{new JSString("en-US")});
-        str = result.asString().orElse(null);
-        assertNotNull(str);
+        str = result.asString().orElseThrow();
         assertEquals("12345", str.value());
 
         // Edge case: called on non-BigInt
@@ -59,45 +57,38 @@ public class BigIntPrototypeTest extends BaseTest {
         JSBigInt bigInt = new JSBigInt(BigInteger.valueOf(12345));
         // Normal case: default radix (10)
         JSValue result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{});
-        JSString str = result.asString().orElse(null);
-        assertNotNull(str);
+        JSString str = result.asString().orElseThrow();
         assertEquals("12345", str.value());
 
         // Normal case: explicit radix 10
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(10)});
-        str = result.asString().orElse(null);
-        assertNotNull(str);
+        str = result.asString().orElseThrow();
         assertEquals("12345", str.value());
 
         // Normal case: radix 16
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(16)});
-        str = result.asString().orElse(null);
-        assertNotNull(str);
+        str = result.asString().orElseThrow();
         assertEquals("3039", str.value());
 
         // Normal case: radix 2
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(2)});
-        str = result.asString().orElse(null);
-        assertNotNull(str);
+        str = result.asString().orElseThrow();
         assertEquals("11000000111001", str.value());
 
         // Normal case: negative BigInt
         JSBigInt negativeBigInt = new JSBigInt(BigInteger.valueOf(-12345));
         result = BigIntPrototype.toString(ctx, negativeBigInt, new JSValue[]{});
-        str = result.asString().orElse(null);
-        assertNotNull(str);
+        str = result.asString().orElseThrow();
         assertEquals("-12345", str.value());
 
         // Edge case: radix 2 (minimum)
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(2)});
-        str = result.asString().orElse(null);
-        assertNotNull(str);
+        str = result.asString().orElseThrow();
         assertEquals("11000000111001", str.value());
 
         // Edge case: radix 36 (maximum)
         result = BigIntPrototype.toString(ctx, bigInt, new JSValue[]{new JSNumber(36)});
-        str = result.asString().orElse(null);
-        assertNotNull(str);
+        str = result.asString().orElseThrow();
         assertEquals("9ix", str.value());
 
         // Edge case: radix too small

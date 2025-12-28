@@ -69,7 +69,7 @@ public final class VirtualMachine {
                         if (val instanceof CatchOffset catchOffset) {
                             // Found catch handler - push exception and jump to it
                             valueStack.push(exception);
-                            pc = catchOffset.getOffset();
+                            pc = catchOffset.offset();
                             foundHandler = true;
                             context.clearPendingException();
                             break;
@@ -1498,95 +1498,12 @@ public final class VirtualMachine {
     }
 
     /**
-     * Convert a value to an object (auto-boxing for primitives).
-     * Returns null for null and undefined.
-     */
-    private JSObject toObject(JSValue value) {
-        if (value instanceof JSObject jsObj) {
-            return jsObj;
-        }
-
-        if (value instanceof JSNull || value instanceof JSUndefined) {
-            return null;
-        }
-
-        // Auto-box primitives
-        if (value instanceof JSString str) {
-            // Get String.prototype from global object
-            JSObject global = context.getGlobalObject();
-            JSValue stringCtor = global.get("String");
-            if (stringCtor instanceof JSObject ctorObj) {
-                JSValue prototype = ctorObj.get("prototype");
-                if (prototype instanceof JSObject protoObj) {
-                    // Create a temporary wrapper object with String.prototype
-                    JSObject wrapper = new JSObject();
-                    wrapper.setPrototype(protoObj);
-                    // Store the primitive value
-                    wrapper.set("[[PrimitiveValue]]", str);
-                    return wrapper;
-                }
-            }
-        }
-
-        if (value instanceof JSNumber num) {
-            // Get Number.prototype from global object
-            JSObject global = context.getGlobalObject();
-            JSValue numberCtor = global.get("Number");
-            if (numberCtor instanceof JSObject ctorObj) {
-                JSValue prototype = ctorObj.get("prototype");
-                if (prototype instanceof JSObject protoObj) {
-                    JSObject wrapper = new JSObject();
-                    wrapper.setPrototype(protoObj);
-                    wrapper.set("[[PrimitiveValue]]", num);
-                    return wrapper;
-                }
-            }
-        }
-
-        if (value instanceof JSBoolean bool) {
-            // Get Boolean.prototype from global object
-            JSObject global = context.getGlobalObject();
-            JSValue booleanCtor = global.get("Boolean");
-            if (booleanCtor instanceof JSObject ctorObj) {
-                JSValue prototype = ctorObj.get("prototype");
-                if (prototype instanceof JSObject protoObj) {
-                    JSObject wrapper = new JSObject();
-                    wrapper.setPrototype(protoObj);
-                    wrapper.set("[[PrimitiveValue]]", bool);
-                    return wrapper;
-                }
-            }
-        }
-
-        if (value instanceof JSFunction func) {
-            // Get Function.prototype from global object
-            JSObject global = context.getGlobalObject();
-            JSValue functionCtor = global.get("Function");
-            if (functionCtor instanceof JSObject ctorObj) {
-                JSValue prototype = ctorObj.get("prototype");
-                if (prototype instanceof JSObject protoObj) {
-                    JSObject wrapper = new JSObject();
-                    wrapper.setPrototype(protoObj);
-                    // Store the function value so it can be called
-                    wrapper.set("[[FunctionValue]]", func);
-                    // Copy function properties
-                    wrapper.set("name", new JSString(func.getName()));
-                    wrapper.set("length", new JSNumber(func.getLength()));
-                    return wrapper;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Invoke proxy apply trap when calling a proxy as a function.
      * Based on QuickJS js_proxy_call (quickjs.c:50338).
      *
-     * @param proxy    The proxy being called
-     * @param thisArg  The 'this' value for the call
-     * @param args     The arguments
+     * @param proxy   The proxy being called
+     * @param thisArg The 'this' value for the call
+     * @param args    The arguments
      * @return The result of the call
      */
     private JSValue proxyApply(JSProxy proxy, JSValue thisArg, JSValue[] args) {
@@ -1722,6 +1639,89 @@ public final class VirtualMachine {
         }
 
         return result;
+    }
+
+    /**
+     * Convert a value to an object (auto-boxing for primitives).
+     * Returns null for null and undefined.
+     */
+    private JSObject toObject(JSValue value) {
+        if (value instanceof JSObject jsObj) {
+            return jsObj;
+        }
+
+        if (value instanceof JSNull || value instanceof JSUndefined) {
+            return null;
+        }
+
+        // Auto-box primitives
+        if (value instanceof JSString str) {
+            // Get String.prototype from global object
+            JSObject global = context.getGlobalObject();
+            JSValue stringCtor = global.get("String");
+            if (stringCtor instanceof JSObject ctorObj) {
+                JSValue prototype = ctorObj.get("prototype");
+                if (prototype instanceof JSObject protoObj) {
+                    // Create a temporary wrapper object with String.prototype
+                    JSObject wrapper = new JSObject();
+                    wrapper.setPrototype(protoObj);
+                    // Store the primitive value
+                    wrapper.set("[[PrimitiveValue]]", str);
+                    return wrapper;
+                }
+            }
+        }
+
+        if (value instanceof JSNumber num) {
+            // Get Number.prototype from global object
+            JSObject global = context.getGlobalObject();
+            JSValue numberCtor = global.get("Number");
+            if (numberCtor instanceof JSObject ctorObj) {
+                JSValue prototype = ctorObj.get("prototype");
+                if (prototype instanceof JSObject protoObj) {
+                    JSObject wrapper = new JSObject();
+                    wrapper.setPrototype(protoObj);
+                    wrapper.set("[[PrimitiveValue]]", num);
+                    return wrapper;
+                }
+            }
+        }
+
+        if (value instanceof JSBoolean bool) {
+            // Get Boolean.prototype from global object
+            JSObject global = context.getGlobalObject();
+            JSValue booleanCtor = global.get("Boolean");
+            if (booleanCtor instanceof JSObject ctorObj) {
+                JSValue prototype = ctorObj.get("prototype");
+                if (prototype instanceof JSObject protoObj) {
+                    JSObject wrapper = new JSObject();
+                    wrapper.setPrototype(protoObj);
+                    wrapper.set("[[PrimitiveValue]]", bool);
+                    return wrapper;
+                }
+            }
+        }
+
+        if (value instanceof JSFunction func) {
+            // Get Function.prototype from global object
+            JSObject global = context.getGlobalObject();
+            JSValue functionCtor = global.get("Function");
+            if (functionCtor instanceof JSObject ctorObj) {
+                JSValue prototype = ctorObj.get("prototype");
+                if (prototype instanceof JSObject protoObj) {
+                    JSObject wrapper = new JSObject();
+                    wrapper.setPrototype(protoObj);
+                    // Store the function value so it can be called
+                    wrapper.set("[[FunctionValue]]", func);
+                    // Copy function properties
+                    wrapper.set("name", new JSString(func.getName()));
+                    wrapper.set("length", new JSNumber(func.getLength()));
+                    return wrapper;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

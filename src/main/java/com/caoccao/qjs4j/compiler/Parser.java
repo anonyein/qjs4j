@@ -136,6 +136,32 @@ public final class Parser {
         return new ArrayExpression(elements, location);
     }
 
+    private ArrayPattern parseArrayPattern() {
+        SourceLocation location = getLocation();
+        expect(TokenType.LBRACKET);
+
+        List<Pattern> elements = new ArrayList<>();
+
+        while (!match(TokenType.RBRACKET) && !match(TokenType.EOF)) {
+            if (!elements.isEmpty()) {
+                expect(TokenType.COMMA);
+                if (match(TokenType.RBRACKET)) {
+                    break; // Trailing comma
+                }
+            }
+
+            if (match(TokenType.COMMA)) {
+                // Hole in array pattern: [a, , c]
+                elements.add(null);
+            } else {
+                elements.add(parsePattern());
+            }
+        }
+
+        expect(TokenType.RBRACKET);
+        return new ArrayPattern(elements, location);
+    }
+
     private Expression parseAssignmentExpression() {
         Expression left = parseConditionalExpression();
 
@@ -216,14 +242,14 @@ public final class Parser {
         return new BlockStatement(body, location);
     }
 
+    // Expression parsing with precedence
+
     private Statement parseBreakStatement() {
         SourceLocation location = getLocation();
         expect(TokenType.BREAK);
         consumeSemicolon();
         return new BreakStatement(null, location);
     }
-
-    // Expression parsing with precedence
 
     private Expression parseCallExpression() {
         Expression expr = parseMemberExpression();
@@ -541,6 +567,50 @@ public final class Parser {
         return new ObjectExpression(properties, location);
     }
 
+    private ObjectPattern parseObjectPattern() {
+        SourceLocation location = getLocation();
+        expect(TokenType.LBRACE);
+
+        List<ObjectPattern.Property> properties = new ArrayList<>();
+
+        while (!match(TokenType.RBRACE) && !match(TokenType.EOF)) {
+            if (!properties.isEmpty()) {
+                expect(TokenType.COMMA);
+                if (match(TokenType.RBRACE)) {
+                    break; // Trailing comma
+                }
+            }
+
+            Identifier key = parseIdentifier();
+            Pattern value;
+            boolean shorthand = false;
+
+            if (match(TokenType.COLON)) {
+                advance();
+                value = parsePattern();
+            } else {
+                // Shorthand: { x } means { x: x }
+                value = key;
+                shorthand = true;
+            }
+
+            properties.add(new ObjectPattern.Property(key, value, shorthand));
+        }
+
+        expect(TokenType.RBRACE);
+        return new ObjectPattern(properties, location);
+    }
+
+    private Pattern parsePattern() {
+        if (match(TokenType.LBRACE)) {
+            return parseObjectPattern();
+        } else if (match(TokenType.LBRACKET)) {
+            return parseArrayPattern();
+        } else {
+            return parseIdentifier();
+        }
+    }
+
     private Expression parsePostfixExpression() {
         Expression expr = parseCallExpression();
 
@@ -614,6 +684,8 @@ public final class Parser {
         return left;
     }
 
+    // Utility methods
+
     private Statement parseReturnStatement() {
         SourceLocation location = getLocation();
         expect(TokenType.RETURN);
@@ -671,8 +743,6 @@ public final class Parser {
             default -> parseExpressionStatement();
         };
     }
-
-    // Utility methods
 
     private Statement parseSwitchStatement() {
         SourceLocation location = getLocation();
@@ -814,76 +884,6 @@ public final class Parser {
 
         consumeSemicolon();
         return new VariableDeclaration(declarations, kind, location);
-    }
-
-    private Pattern parsePattern() {
-        if (match(TokenType.LBRACE)) {
-            return parseObjectPattern();
-        } else if (match(TokenType.LBRACKET)) {
-            return parseArrayPattern();
-        } else {
-            return parseIdentifier();
-        }
-    }
-
-    private ObjectPattern parseObjectPattern() {
-        SourceLocation location = getLocation();
-        expect(TokenType.LBRACE);
-
-        List<ObjectPattern.Property> properties = new ArrayList<>();
-
-        while (!match(TokenType.RBRACE) && !match(TokenType.EOF)) {
-            if (!properties.isEmpty()) {
-                expect(TokenType.COMMA);
-                if (match(TokenType.RBRACE)) {
-                    break; // Trailing comma
-                }
-            }
-
-            Identifier key = parseIdentifier();
-            Pattern value;
-            boolean shorthand = false;
-
-            if (match(TokenType.COLON)) {
-                advance();
-                value = parsePattern();
-            } else {
-                // Shorthand: { x } means { x: x }
-                value = key;
-                shorthand = true;
-            }
-
-            properties.add(new ObjectPattern.Property(key, value, shorthand));
-        }
-
-        expect(TokenType.RBRACE);
-        return new ObjectPattern(properties, location);
-    }
-
-    private ArrayPattern parseArrayPattern() {
-        SourceLocation location = getLocation();
-        expect(TokenType.LBRACKET);
-
-        List<Pattern> elements = new ArrayList<>();
-
-        while (!match(TokenType.RBRACKET) && !match(TokenType.EOF)) {
-            if (!elements.isEmpty()) {
-                expect(TokenType.COMMA);
-                if (match(TokenType.RBRACKET)) {
-                    break; // Trailing comma
-                }
-            }
-
-            if (match(TokenType.COMMA)) {
-                // Hole in array pattern: [a, , c]
-                elements.add(null);
-            } else {
-                elements.add(parsePattern());
-            }
-        }
-
-        expect(TokenType.RBRACKET);
-        return new ArrayPattern(elements, location);
     }
 
     private Statement parseWhileStatement() {

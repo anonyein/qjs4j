@@ -77,26 +77,23 @@ public class MapPrototypeTest extends BaseTest {
 
         // Normal case: get entries (returns iterator)
         JSValue result = MapPrototype.entries(ctx, map, new JSValue[]{});
-        JSIterator iterator = result.asIterator().orElse(null);
-        assertNotNull(iterator);
+        JSIterator iterator = result.asIterator().orElseThrow();
 
         // Check first entry
         JSObject iterResult1 = iterator.next();
         assertFalse((Boolean) iterResult1.get("done").toJavaObject());
-        JSArray entry1 = iterResult1.get("value").asArray().orElse(null);
-        assertNotNull(entry1);
+        JSArray entry1 = iterResult1.get("value").asArray().orElseThrow();
         assertEquals(2, entry1.getLength());
-        assertEquals("key1", entry1.get(0).asString().map(JSString::value).orElse(""));
-        assertEquals("value1", entry1.get(1).asString().map(JSString::value).orElse(""));
+        assertEquals("key1", entry1.get(0).asString().map(JSString::value).orElseThrow());
+        assertEquals("value1", entry1.get(1).asString().map(JSString::value).orElseThrow());
 
         // Check second entry
         JSObject iterResult2 = iterator.next();
         assertFalse((Boolean) iterResult2.get("done").toJavaObject());
-        JSArray entry2 = iterResult2.get("value").asArray().orElse(null);
-        assertNotNull(entry2);
+        JSArray entry2 = iterResult2.get("value").asArray().orElseThrow();
         assertEquals(2, entry2.getLength());
-        assertEquals("key2", entry2.get(0).asString().map(JSString::value).orElse(""));
-        assertEquals("value2", entry2.get(1).asString().map(JSString::value).orElse(""));
+        assertEquals("key2", entry2.get(0).asString().map(JSString::value).orElseThrow());
+        assertEquals("value2", entry2.get(1).asString().map(JSString::value).orElseThrow());
 
         // Iterator should be exhausted
         JSObject iterResult3 = iterator.next();
@@ -105,8 +102,7 @@ public class MapPrototypeTest extends BaseTest {
         // Normal case: empty map
         JSMap emptyMap = new JSMap();
         result = MapPrototype.entries(ctx, emptyMap, new JSValue[]{});
-        iterator = result.asIterator().orElse(null);
-        assertNotNull(iterator);
+        iterator = result.asIterator().orElseThrow();
         JSObject emptyResult = iterator.next();
         assertTrue((Boolean) emptyResult.get("done").toJavaObject());
 
@@ -124,8 +120,8 @@ public class MapPrototypeTest extends BaseTest {
         // Normal case: forEach with callback
         final StringBuilder result = new StringBuilder();
         JSFunction callback = new JSNativeFunction("testCallback", 3, (ctx, thisArg, args) -> {
-            String value = args[0].asString().map(JSString::value).orElse("");
-            String key = args[1].asString().map(JSString::value).orElse("");
+            String value = args[0].asString().map(JSString::value).orElseThrow();
+            String key = args[1].asString().map(JSString::value).orElseThrow();
             result.append(key).append(":").append(value).append(",");
             return JSUndefined.INSTANCE;
         });
@@ -157,7 +153,7 @@ public class MapPrototypeTest extends BaseTest {
 
         // Normal case: existing key
         JSValue result = MapPrototype.get(ctx, map, new JSValue[]{new JSString("key1")});
-        assertEquals("value1", result.asString().map(JSString::value).orElse(""));
+        assertEquals("value1", result.asString().map(JSString::value).orElseThrow());
 
         // Normal case: non-existing key
         result = MapPrototype.get(ctx, map, new JSValue[]{new JSString("key2")});
@@ -178,13 +174,13 @@ public class MapPrototypeTest extends BaseTest {
 
         // Normal case: empty map
         JSValue result = MapPrototype.getSize(ctx, map, new JSValue[]{});
-        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElseThrow());
 
         // Normal case: map with entries
         map.mapSet(new JSString("key1"), new JSString("value1"));
         map.mapSet(new JSString("key2"), new JSString("value2"));
         result = MapPrototype.getSize(ctx, map, new JSValue[]{});
-        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElseThrow());
 
         // Edge case: called on non-Map
         assertTypeError(MapPrototype.getSize(ctx, new JSString("not map"), new JSValue[]{}));
@@ -221,8 +217,7 @@ public class MapPrototypeTest extends BaseTest {
 
         // Normal case: get keys
         JSValue result = MapPrototype.keys(ctx, map, new JSValue[]{});
-        JSIterator keys = result.asIterator().orElse(null);
-        assertNotNull(keys);
+        JSIterator keys = result.asIterator().orElseThrow();
         JSArray jsArray = JSIteratorHelper.toArray(keys);
         assertEquals(2, jsArray.getLength());
         assertEquals("key1", jsArray.get(0).asString().map(JSString::value).orElse(null));
@@ -231,8 +226,7 @@ public class MapPrototypeTest extends BaseTest {
         // Normal case: empty map
         JSMap emptyMap = new JSMap();
         result = MapPrototype.keys(ctx, emptyMap, new JSValue[]{});
-        keys = result.asIterator().orElse(null);
-        assertNotNull(keys);
+        keys = result.asIterator().orElseThrow();
         jsArray = JSIteratorHelper.toArray(keys);
         assertEquals(0, jsArray.getLength());
 
@@ -249,13 +243,13 @@ public class MapPrototypeTest extends BaseTest {
         JSValue result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key"), new JSString("value")});
         assertEquals(map, result); // Should return the map
         assertEquals(1, map.size());
-        assertEquals("value", map.mapGet(new JSString("key")).asString().map(JSString::value).orElse(""));
+        assertEquals("value", map.mapGet(new JSString("key")).asString().map(JSString::value).orElseThrow());
 
         // Normal case: update existing key
         result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key"), new JSString("newValue")});
         assertEquals(map, result);
         assertEquals(1, map.size());
-        assertEquals("newValue", map.mapGet(new JSString("key")).asString().map(JSString::value).orElse(""));
+        assertEquals("newValue", map.mapGet(new JSString("key")).asString().map(JSString::value).orElseThrow());
 
         // Normal case: set with undefined value
         result = MapPrototype.set(ctx, map, new JSValue[]{new JSString("key2")});
@@ -276,8 +270,7 @@ public class MapPrototypeTest extends BaseTest {
 
         // Normal case: get values
         JSValue result = MapPrototype.values(ctx, map, new JSValue[]{});
-        JSIterator values = result.asIterator().orElse(null);
-        assertNotNull(values);
+        JSIterator values = result.asIterator().orElseThrow();
         JSArray jsArray = JSIteratorHelper.toArray(values);
         assertEquals(2, jsArray.getLength());
         assertEquals("value1", jsArray.get(0).asString().map(JSString::value).orElse(null));
@@ -286,8 +279,7 @@ public class MapPrototypeTest extends BaseTest {
         // Normal case: empty map
         JSMap emptyMap = new JSMap();
         result = MapPrototype.values(ctx, emptyMap, new JSValue[]{});
-        values = result.asIterator().orElse(null);
-        assertNotNull(values);
+        values = result.asIterator().orElseThrow();
         jsArray = JSIteratorHelper.toArray(values);
         assertEquals(0, jsArray.getLength());
 

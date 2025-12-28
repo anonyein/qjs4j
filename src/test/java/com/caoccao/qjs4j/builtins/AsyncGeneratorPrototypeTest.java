@@ -99,14 +99,12 @@ public class AsyncGeneratorPrototypeTest extends BaseTest {
 
         // Test next() method
         JSValue result = AsyncGeneratorPrototype.next(ctx, generator, new JSValue[0]);
-        JSPromise promise = result.asPromise().orElse(null);
-        assertNotNull(promise);
+        JSPromise promise = result.asPromise().orElseThrow();
         assertTrue(awaitPromise(promise));
 
         // Check the result
         JSValue promiseResult = promise.getResult();
-        JSObject resultObj = promiseResult.asObject().orElse(null);
-        assertNotNull(resultObj);
+        JSObject resultObj = promiseResult.asObject().orElseThrow();
 
         assertEquals(new JSNumber(42), resultObj.get("value"));
         assertEquals(JSBoolean.FALSE, resultObj.get("done"));
@@ -129,14 +127,12 @@ public class AsyncGeneratorPrototypeTest extends BaseTest {
         // Test next() with a value parameter
         JSValue result = AsyncGeneratorPrototype.next(ctx, generator, new JSValue[]{new JSString("ignored")});
 
-        JSPromise promise = result.asPromise().orElse(null);
-        assertNotNull(promise);
+        JSPromise promise = result.asPromise().orElseThrow();
         assertTrue(awaitPromise(promise));
 
         // Check the result
         JSValue promiseResult = promise.getResult();
-        JSObject resultObj = promiseResult.asObject().orElse(null);
-        assertNotNull(resultObj);
+        JSObject resultObj = promiseResult.asObject().orElseThrow();
 
         assertEquals(new JSNumber(100), resultObj.get("value"));
         assertEquals(JSBoolean.FALSE, resultObj.get("done"));
@@ -152,14 +148,12 @@ public class AsyncGeneratorPrototypeTest extends BaseTest {
         JSValue returnValue = new JSString("early return");
         JSValue result = AsyncGeneratorPrototype.return_(ctx, generator, new JSValue[]{returnValue});
 
-        JSPromise promise = result.asPromise().orElse(null);
-        assertNotNull(promise);
+        JSPromise promise = result.asPromise().orElseThrow();
         assertTrue(awaitPromise(promise));
 
         // Check the result
         JSValue promiseResult = promise.getResult();
-        JSObject resultObj = promiseResult.asObject().orElse(null);
-        assertNotNull(resultObj);
+        JSObject resultObj = promiseResult.asObject().orElseThrow();
 
         assertEquals(returnValue, resultObj.get("value"));
         assertEquals(JSBoolean.TRUE, resultObj.get("done"));
@@ -183,8 +177,7 @@ public class AsyncGeneratorPrototypeTest extends BaseTest {
         JSValue exception = new JSString("test exception");
         JSValue result = AsyncGeneratorPrototype.throw_(ctx, generator, new JSValue[]{exception});
 
-        JSPromise promise = result.asPromise().orElse(null);
-        assertNotNull(promise);
+        JSPromise promise = result.asPromise().orElseThrow();
         assertTrue(awaitPromise(promise));
 
         // The promise should be rejected with the exception

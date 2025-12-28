@@ -27,9 +27,9 @@ import java.nio.ByteOrder;
  * It cannot be read or written directly - use TypedArrays or DataView.
  */
 public final class JSArrayBuffer extends JSObject implements JSArrayBufferable {
+    private final ByteBuffer buffer;
     private final int maxByteLength;
     private final boolean resizable;
-    private final ByteBuffer buffer;
     private boolean detached;
 
     /**

@@ -115,14 +115,14 @@ public final class BytecodeCompiler {
         // Create JSBytecodeFunction
         // Arrow functions cannot be constructors
         JSBytecodeFunction function = new JSBytecodeFunction(
-            functionBytecode,
-            functionName,
-            arrowExpr.params().size(),
-            new JSValue[0],  // closure vars - for now empty
-            null,            // prototype - arrow functions don't have prototype
-            false,           // isConstructor - arrow functions cannot be constructors
-            arrowExpr.isAsync(),
-            false            // Arrow functions cannot be generators
+                functionBytecode,
+                functionName,
+                arrowExpr.params().size(),
+                new JSValue[0],  // closure vars - for now empty
+                null,            // prototype - arrow functions don't have prototype
+                false,           // isConstructor - arrow functions cannot be constructors
+                arrowExpr.isAsync(),
+                false            // Arrow functions cannot be generators
         );
 
         // Emit FCLOSURE opcode with function in constant pool
@@ -474,14 +474,14 @@ public final class BytecodeCompiler {
 
         // Create JSBytecodeFunction
         JSBytecodeFunction function = new JSBytecodeFunction(
-            functionBytecode,
-            functionName,
-            funcExpr.params().size(),
-            new JSValue[0],  // closure vars - for now empty
-            null,            // prototype - will be set by VM
-            true,            // isConstructor - regular functions can be constructors
-            funcExpr.isAsync(),
-            funcExpr.isGenerator()
+                functionBytecode,
+                functionName,
+                funcExpr.params().size(),
+                new JSValue[0],  // closure vars - for now empty
+                null,            // prototype - will be set by VM
+                true,            // isConstructor - regular functions can be constructors
+                funcExpr.isAsync(),
+                funcExpr.isGenerator()
         );
 
         // Emit FCLOSURE opcode with function in constant pool
@@ -606,6 +606,55 @@ public final class BytecodeCompiler {
 
             // Define property
             emitter.emitOpcode(Opcode.DEFINE_PROP);
+        }
+    }
+
+    private void compilePatternAssignment(Pattern pattern) {
+        if (pattern instanceof Identifier id) {
+            // Simple identifier: value is on stack, just assign it
+            String varName = id.name();
+            if (inGlobalScope) {
+                emitter.emitOpcodeAtom(Opcode.PUT_VAR, varName);
+            } else {
+                int localIndex = currentScope().declareLocal(varName);
+                emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
+            }
+        } else if (pattern instanceof ObjectPattern objPattern) {
+            // Object destructuring: { proxy, revoke } = value
+            // Stack: [object]
+            for (ObjectPattern.Property prop : objPattern.properties()) {
+                // Get the property name
+                String propName = ((Identifier) prop.key()).name();
+
+                // Duplicate object for each property access
+                emitter.emitOpcode(Opcode.DUP);
+                // Get the property value
+                emitter.emitOpcodeAtom(Opcode.GET_FIELD, propName);
+                // Assign to the pattern (could be nested)
+                compilePatternAssignment(prop.value());
+            }
+            // Drop the original object
+            emitter.emitOpcode(Opcode.DROP);
+        } else if (pattern instanceof ArrayPattern arrPattern) {
+            // Array destructuring: [a, b] = value
+            // Stack: [array]
+            int index = 0;
+            for (Pattern element : arrPattern.elements()) {
+                if (element != null) {
+                    // Duplicate array
+                    emitter.emitOpcode(Opcode.DUP);
+                    // Push index
+                    emitter.emitOpcode(Opcode.PUSH_I32);
+                    emitter.emitI32(index);
+                    // Get array element
+                    emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+                    // Assign to the pattern
+                    compilePatternAssignment(element);
+                }
+                index++;
+            }
+            // Drop the original array
+            emitter.emitOpcode(Opcode.DROP);
         }
     }
 
@@ -884,55 +933,6 @@ public final class BytecodeCompiler {
 
             // Assign to pattern (handles Identifier, ObjectPattern, ArrayPattern)
             compilePatternAssignment(declarator.id());
-        }
-    }
-
-    private void compilePatternAssignment(Pattern pattern) {
-        if (pattern instanceof Identifier id) {
-            // Simple identifier: value is on stack, just assign it
-            String varName = id.name();
-            if (inGlobalScope) {
-                emitter.emitOpcodeAtom(Opcode.PUT_VAR, varName);
-            } else {
-                int localIndex = currentScope().declareLocal(varName);
-                emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
-            }
-        } else if (pattern instanceof ObjectPattern objPattern) {
-            // Object destructuring: { proxy, revoke } = value
-            // Stack: [object]
-            for (ObjectPattern.Property prop : objPattern.properties()) {
-                // Get the property name
-                String propName = ((Identifier) prop.key()).name();
-
-                // Duplicate object for each property access
-                emitter.emitOpcode(Opcode.DUP);
-                // Get the property value
-                emitter.emitOpcodeAtom(Opcode.GET_FIELD, propName);
-                // Assign to the pattern (could be nested)
-                compilePatternAssignment(prop.value());
-            }
-            // Drop the original object
-            emitter.emitOpcode(Opcode.DROP);
-        } else if (pattern instanceof ArrayPattern arrPattern) {
-            // Array destructuring: [a, b] = value
-            // Stack: [array]
-            int index = 0;
-            for (Pattern element : arrPattern.elements()) {
-                if (element != null) {
-                    // Duplicate array
-                    emitter.emitOpcode(Opcode.DUP);
-                    // Push index
-                    emitter.emitOpcode(Opcode.PUSH_I32);
-                    emitter.emitI32(index);
-                    // Get array element
-                    emitter.emitOpcode(Opcode.GET_ARRAY_EL);
-                    // Assign to the pattern
-                    compilePatternAssignment(element);
-                }
-                index++;
-            }
-            // Drop the original array
-            emitter.emitOpcode(Opcode.DROP);
         }
     }
 

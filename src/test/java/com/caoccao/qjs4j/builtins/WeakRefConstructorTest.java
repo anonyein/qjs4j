@@ -40,7 +40,7 @@ public class WeakRefConstructorTest extends BaseTest {
 
         // Normal case: create WeakRef with object
         JSValue result = WeakRefConstructor.createWeakRef(ctx, target);
-        assertTrue(result instanceof JSWeakRef);
+        assertInstanceOf(JSWeakRef.class, result);
         JSWeakRef weakRef = (JSWeakRef) result;
         assertSame(target, weakRef.deref());
 

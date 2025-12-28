@@ -109,7 +109,7 @@ public class SetPrototypeTest extends BaseTest {
         // Normal case: forEach with callback
         final StringBuilder result = new StringBuilder();
         JSFunction callback = new JSNativeFunction("testCallback", 3, (ctx, thisArg, args) -> {
-            String value = args[0].asString().map(JSString::value).orElse("");
+            String value = args[0].asString().map(JSString::value).orElseThrow();
             result.append(value).append(",");
             return JSUndefined.INSTANCE;
         });
@@ -140,13 +140,13 @@ public class SetPrototypeTest extends BaseTest {
 
         // Normal case: empty set
         JSValue result = SetPrototype.getSize(ctx, set, new JSValue[]{});
-        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElseThrow());
 
         // Normal case: set with values
         set.setAdd(new JSString("value1"));
         set.setAdd(new JSString("value2"));
         result = SetPrototype.getSize(ctx, set, new JSValue[]{});
-        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElse(0.0));
+        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElseThrow());
 
         // Edge case: called on non-Set
         assertTypeError(SetPrototype.getSize(ctx, new JSString("not set"), new JSValue[]{}));
