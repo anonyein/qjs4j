@@ -38,6 +38,7 @@ public final class Lexer {
     private static final Map<String, TokenType> KEYWORDS = new HashMap<>();
 
     static {
+        KEYWORDS.put("as", TokenType.AS);
         KEYWORDS.put("async", TokenType.ASYNC);
         KEYWORDS.put("await", TokenType.AWAIT);
         KEYWORDS.put("break", TokenType.BREAK);
@@ -52,6 +53,7 @@ public final class Lexer {
         KEYWORDS.put("else", TokenType.ELSE);
         KEYWORDS.put("export", TokenType.EXPORT);
         KEYWORDS.put("extends", TokenType.EXTENDS);
+        KEYWORDS.put("false", TokenType.FALSE);
         KEYWORDS.put("finally", TokenType.FINALLY);
         KEYWORDS.put("for", TokenType.FOR);
         KEYWORDS.put("from", TokenType.FROM);
@@ -62,19 +64,20 @@ public final class Lexer {
         KEYWORDS.put("instanceof", TokenType.INSTANCEOF);
         KEYWORDS.put("let", TokenType.LET);
         KEYWORDS.put("new", TokenType.NEW);
+        KEYWORDS.put("null", TokenType.NULL);
         KEYWORDS.put("of", TokenType.OF);
         KEYWORDS.put("return", TokenType.RETURN);
         KEYWORDS.put("super", TokenType.SUPER);
         KEYWORDS.put("switch", TokenType.SWITCH);
         KEYWORDS.put("this", TokenType.THIS);
         KEYWORDS.put("throw", TokenType.THROW);
+        KEYWORDS.put("true", TokenType.TRUE);
         KEYWORDS.put("try", TokenType.TRY);
         KEYWORDS.put("typeof", TokenType.TYPEOF);
         KEYWORDS.put("var", TokenType.VAR);
         KEYWORDS.put("void", TokenType.VOID);
         KEYWORDS.put("while", TokenType.WHILE);
         KEYWORDS.put("yield", TokenType.YIELD);
-        KEYWORDS.put("as", TokenType.AS);
     }
 
     private final String source;

@@ -36,19 +36,18 @@ public final class CharacterProperties {
         int lower = Character.toLowerCase(codePoint);
 
         // Special cases for case folding
-        switch (codePoint) {
+        return switch (codePoint) {
             // Turkish I with dot
-            case 0x0130: // İ (LATIN CAPITAL LETTER I WITH DOT ABOVE)
-                return 0x0069; // i (LATIN SMALL LETTER I)
+            case 0x0130 -> // İ (LATIN CAPITAL LETTER I WITH DOT ABOVE)
+                    0x0069; // i (LATIN SMALL LETTER I)
 
             // Greek sigma at end of word
-            case 0x03A3: // Σ (GREEK CAPITAL LETTER SIGMA)
-                return 0x03C3; // σ (GREEK SMALL LETTER SIGMA)
+            case 0x03A3 -> // Σ (GREEK CAPITAL LETTER SIGMA)
+                    0x03C3; // σ (GREEK SMALL LETTER SIGMA)
 
             // Other special cases can be added as needed
-            default:
-                return lower;
-        }
+            default -> lower;
+        };
     }
 
     /**

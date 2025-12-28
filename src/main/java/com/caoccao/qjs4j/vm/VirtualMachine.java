@@ -91,87 +91,73 @@ public final class VirtualMachine {
 
                 switch (op) {
                     // ==================== Constants and Literals ====================
-                    case INVALID:
-                        throw new VMException("Invalid opcode at PC " + pc);
-
-                    case PUSH_I32:
+                    case INVALID -> throw new VMException("Invalid opcode at PC " + pc);
+                    case PUSH_I32 -> {
                         valueStack.push(new JSNumber(bytecode.readI32(pc + 1)));
                         pc += op.getSize();
-                        break;
-
-                    case PUSH_CONST:
+                    }
+                    case PUSH_CONST -> {
                         int constIndex = bytecode.readU32(pc + 1);
                         valueStack.push(bytecode.getConstants()[constIndex]);
                         pc += op.getSize();
-                        break;
-
-                    case FCLOSURE:
+                    }
+                    case FCLOSURE -> {
                         // Load function from constant pool and create closure
                         int funcIndex = bytecode.readU32(pc + 1);
                         JSValue funcValue = bytecode.getConstants()[funcIndex];
                         // The function is already a JSBytecodeFunction, just push it
                         valueStack.push(funcValue);
                         pc += op.getSize();
-                        break;
-
-                    case UNDEFINED:
+                    }
+                    case UNDEFINED -> {
                         valueStack.push(JSUndefined.INSTANCE);
                         pc += op.getSize();
-                        break;
-
-                    case NULL:
+                    }
+                    case NULL -> {
                         valueStack.push(JSNull.INSTANCE);
                         pc += op.getSize();
-                        break;
-
-                    case PUSH_THIS:
+                    }
+                    case PUSH_THIS -> {
                         valueStack.push(currentFrame.getThisArg());
                         pc += op.getSize();
-                        break;
-
-                    case PUSH_FALSE:
+                    }
+                    case PUSH_FALSE -> {
                         valueStack.push(JSBoolean.FALSE);
                         pc += op.getSize();
-                        break;
-
-                    case PUSH_TRUE:
+                    }
+                    case PUSH_TRUE -> {
                         valueStack.push(JSBoolean.TRUE);
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Stack Manipulation ====================
-                    case DROP:
+                    case DROP -> {
                         valueStack.pop();
                         pc += op.getSize();
-                        break;
-
-                    case NIP:
+                    }
+                    case NIP -> {
                         JSValue top = valueStack.pop();
                         valueStack.pop();
                         valueStack.push(top);
                         pc += op.getSize();
-                        break;
-
-                    case DUP:
+                    }
+                    case DUP -> {
                         valueStack.push(valueStack.peek(0));
                         pc += op.getSize();
-                        break;
-
-                    case DUP2:
+                    }
+                    case DUP2 -> {
                         valueStack.push(valueStack.peek(1));
                         valueStack.push(valueStack.peek(1));
                         pc += op.getSize();
-                        break;
-
-                    case SWAP:
+                    }
+                    case SWAP -> {
                         JSValue v1 = valueStack.pop();
                         JSValue v2 = valueStack.pop();
                         valueStack.push(v1);
                         valueStack.push(v2);
                         pc += op.getSize();
-                        break;
-
-                    case ROT3L:
+                    }
+                    case ROT3L -> {
                         JSValue a = valueStack.pop();
                         JSValue b = valueStack.pop();
                         JSValue c = valueStack.pop();
@@ -179,213 +165,181 @@ public final class VirtualMachine {
                         valueStack.push(a);
                         valueStack.push(c);
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Arithmetic Operations ====================
-                    case ADD:
+                    case ADD -> {
                         handleAdd();
                         pc += op.getSize();
-                        break;
-
-                    case SUB:
+                    }
+                    case SUB -> {
                         handleSub();
                         pc += op.getSize();
-                        break;
-
-                    case MUL:
+                    }
+                    case MUL -> {
                         handleMul();
                         pc += op.getSize();
-                        break;
-
-                    case DIV:
+                    }
+                    case DIV -> {
                         handleDiv();
                         pc += op.getSize();
-                        break;
-
-                    case MOD:
+                    }
+                    case MOD -> {
                         handleMod();
                         pc += op.getSize();
-                        break;
-
-                    case EXP:
+                    }
+                    case EXP -> {
                         handleExp();
                         pc += op.getSize();
-                        break;
-
-                    case PLUS:
+                    }
+                    case PLUS -> {
                         handlePlus();
                         pc += op.getSize();
-                        break;
-
-                    case NEG:
+                    }
+                    case NEG -> {
                         handleNeg();
                         pc += op.getSize();
-                        break;
-
-                    case INC:
+                    }
+                    case INC -> {
                         handleInc();
                         pc += op.getSize();
-                        break;
-
-                    case DEC:
+                    }
+                    case DEC -> {
                         handleDec();
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Bitwise Operations ====================
-                    case SHL:
+                    case SHL -> {
                         handleShl();
                         pc += op.getSize();
-                        break;
-
-                    case SAR:
+                    }
+                    case SAR -> {
                         handleSar();
                         pc += op.getSize();
-                        break;
-
-                    case SHR:
+                    }
+                    case SHR -> {
                         handleShr();
                         pc += op.getSize();
-                        break;
-
-                    case AND:
+                    }
+                    case AND -> {
                         handleAnd();
                         pc += op.getSize();
-                        break;
-
-                    case OR:
+                    }
+                    case OR -> {
                         handleOr();
                         pc += op.getSize();
-                        break;
-
-                    case XOR:
+                    }
+                    case XOR -> {
                         handleXor();
                         pc += op.getSize();
-                        break;
-
-                    case NOT:
+                    }
+                    case NOT -> {
                         handleNot();
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Comparison Operations ====================
-                    case EQ:
+                    case EQ -> {
                         handleEq();
                         pc += op.getSize();
-                        break;
-
-                    case NEQ:
+                    }
+                    case NEQ -> {
                         handleNeq();
                         pc += op.getSize();
-                        break;
-
-                    case STRICT_EQ:
+                    }
+                    case STRICT_EQ -> {
                         handleStrictEq();
                         pc += op.getSize();
-                        break;
-
-                    case STRICT_NEQ:
+                    }
+                    case STRICT_NEQ -> {
                         handleStrictNeq();
                         pc += op.getSize();
-                        break;
-
-                    case LT:
+                    }
+                    case LT -> {
                         handleLt();
                         pc += op.getSize();
-                        break;
-
-                    case LTE:
+                    }
+                    case LTE -> {
                         handleLte();
                         pc += op.getSize();
-                        break;
-
-                    case GT:
+                    }
+                    case GT -> {
                         handleGt();
                         pc += op.getSize();
-                        break;
-
-                    case GTE:
+                    }
+                    case GTE -> {
                         handleGte();
                         pc += op.getSize();
-                        break;
-
-                    case INSTANCEOF:
+                    }
+                    case INSTANCEOF -> {
                         handleInstanceof();
                         pc += op.getSize();
-                        break;
-
-                    case IN:
+                    }
+                    case IN -> {
                         handleIn();
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Logical Operations ====================
-                    case LOGICAL_NOT:
+                    case LOGICAL_NOT -> {
                         handleLogicalNot();
                         pc += op.getSize();
-                        break;
-
-                    case LOGICAL_AND:
+                    }
+                    case LOGICAL_AND -> {
                         handleLogicalAnd();
                         pc += op.getSize();
-                        break;
-
-                    case LOGICAL_OR:
+                    }
+                    case LOGICAL_OR -> {
                         handleLogicalOr();
                         pc += op.getSize();
-                        break;
-
-                    case NULLISH_COALESCE:
+                    }
+                    case NULLISH_COALESCE -> {
                         handleNullishCoalesce();
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Variable Access ====================
-                    case GET_VAR:
+                    case GET_VAR -> {
                         int getVarAtom = bytecode.readU32(pc + 1);
                         String getVarName = bytecode.getAtoms()[getVarAtom];
                         JSValue varValue = context.getGlobalObject().get(PropertyKey.fromString(getVarName));
                         valueStack.push(varValue);
                         pc += op.getSize();
-                        break;
-
-                    case PUT_VAR:
+                    }
+                    case PUT_VAR -> {
                         int putVarAtom = bytecode.readU32(pc + 1);
                         String putVarName = bytecode.getAtoms()[putVarAtom];
                         JSValue putValue = valueStack.pop();
                         context.getGlobalObject().set(PropertyKey.fromString(putVarName), putValue);
                         pc += op.getSize();
-                        break;
-
-                    case SET_VAR:
+                    }
+                    case SET_VAR -> {
                         int setVarAtom = bytecode.readU32(pc + 1);
                         String setVarName = bytecode.getAtoms()[setVarAtom];
                         JSValue setValue = valueStack.peek(0);
                         context.getGlobalObject().set(PropertyKey.fromString(setVarName), setValue);
                         pc += op.getSize();
-                        break;
-
-                    case GET_LOCAL:
+                    }
+                    case GET_LOCAL -> {
                         int getLocalIndex = bytecode.readU16(pc + 1);
                         JSValue localValue = currentFrame.getLocals()[getLocalIndex];
                         valueStack.push(localValue);
                         pc += op.getSize();
-                        break;
-
-                    case PUT_LOCAL:
+                    }
+                    case PUT_LOCAL -> {
                         int putLocalIndex = bytecode.readU16(pc + 1);
                         currentFrame.getLocals()[putLocalIndex] = valueStack.pop();
                         pc += op.getSize();
-                        break;
-
-                    case SET_LOCAL:
+                    }
+                    case SET_LOCAL -> {
                         int setLocalIndex = bytecode.readU16(pc + 1);
                         currentFrame.getLocals()[setLocalIndex] = valueStack.peek(0);
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Property Access ====================
-                    case GET_FIELD:
+                    case GET_FIELD -> {
                         int getFieldAtom = bytecode.readU32(pc + 1);
                         String fieldName = bytecode.getAtoms()[getFieldAtom];
                         JSValue obj = valueStack.pop();
@@ -398,9 +352,8 @@ public final class VirtualMachine {
                             valueStack.push(JSUndefined.INSTANCE);
                         }
                         pc += op.getSize();
-                        break;
-
-                    case PUT_FIELD:
+                    }
+                    case PUT_FIELD -> {
                         int putFieldAtom = bytecode.readU32(pc + 1);
                         String putFieldName = bytecode.getAtoms()[putFieldAtom];
                         JSValue putFieldObj = valueStack.pop();
@@ -410,9 +363,8 @@ public final class VirtualMachine {
                             jsObj.set(PropertyKey.fromString(putFieldName), putFieldValue);
                         }
                         pc += op.getSize();
-                        break;
-
-                    case GET_ARRAY_EL:
+                    }
+                    case GET_ARRAY_EL -> {
                         JSValue index = valueStack.pop();
                         JSValue arrayObj = valueStack.pop();
                         if (arrayObj instanceof JSObject jsObj) {
@@ -436,9 +388,8 @@ public final class VirtualMachine {
                             valueStack.push(JSUndefined.INSTANCE);
                         }
                         pc += op.getSize();
-                        break;
-
-                    case PUT_ARRAY_EL:
+                    }
+                    case PUT_ARRAY_EL -> {
                         // Stack layout: [value, object, property] (property on top)
                         JSValue putElIndex = valueStack.pop();   // Pop property
                         JSValue putElObj = valueStack.pop();     // Pop object
@@ -450,10 +401,10 @@ public final class VirtualMachine {
                         // Assignment expressions return the assigned value
                         valueStack.push(putElValue);
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Control Flow ====================
-                    case IF_FALSE:
+                    case IF_FALSE -> {
                         JSValue condition = valueStack.pop();
                         boolean isFalsy = JSTypeConversions.toBoolean(condition) == JSBoolean.FALSE;
                         if (isFalsy) {
@@ -462,9 +413,8 @@ public final class VirtualMachine {
                         } else {
                             pc += op.getSize();
                         }
-                        break;
-
-                    case IF_TRUE:
+                    }
+                    case IF_TRUE -> {
                         JSValue trueCondition = valueStack.pop();
                         boolean isTruthy = JSTypeConversions.toBoolean(trueCondition) == JSBoolean.TRUE;
                         if (isTruthy) {
@@ -473,61 +423,55 @@ public final class VirtualMachine {
                         } else {
                             pc += op.getSize();
                         }
-                        break;
-
-                    case GOTO:
+                    }
+                    case GOTO -> {
                         int gotoOffset = bytecode.readI32(pc + 1);
                         pc += op.getSize() + gotoOffset;
-                        break;
-
-                    case RETURN:
+                    }
+                    case RETURN -> {
                         JSValue returnValue = valueStack.pop();
                         // Restore stack to saved position before returning
                         valueStack.setStackTop(savedStackTop);
                         currentFrame = previousFrame;
                         return returnValue;
-
-                    case RETURN_UNDEF:
+                    }
+                    case RETURN_UNDEF -> {
                         // Restore stack to saved position before returning
                         valueStack.setStackTop(savedStackTop);
                         currentFrame = previousFrame;
                         return JSUndefined.INSTANCE;
+                    }
 
                     // ==================== Function Calls ====================
-                    case CALL:
+                    case CALL -> {
                         int argCount = bytecode.readU16(pc + 1);
                         handleCall(argCount);
                         pc += op.getSize();
-                        break;
-
-                    case CALL_CONSTRUCTOR:
+                    }
+                    case CALL_CONSTRUCTOR -> {
                         int ctorArgCount = bytecode.readU16(pc + 1);
                         handleCallConstructor(ctorArgCount);
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Object/Array Creation ====================
-                    case OBJECT:
-                    case OBJECT_NEW:
+                    case OBJECT, OBJECT_NEW -> {
                         valueStack.push(new JSObject());
                         pc += op.getSize();
-                        break;
-
-                    case ARRAY_NEW:
+                    }
+                    case ARRAY_NEW -> {
                         valueStack.push(new JSArray());
                         pc += op.getSize();
-                        break;
-
-                    case PUSH_ARRAY:
+                    }
+                    case PUSH_ARRAY -> {
                         JSValue element = valueStack.pop();
                         JSValue array = valueStack.peek(0);
                         if (array instanceof JSArray jsArray) {
                             jsArray.push(element);
                         }
                         pc += op.getSize();
-                        break;
-
-                    case DEFINE_PROP:
+                    }
+                    case DEFINE_PROP -> {
                         JSValue propValue = valueStack.pop();
                         JSValue propKey = valueStack.pop();
                         JSValue propObj = valueStack.peek(0);
@@ -536,38 +480,36 @@ public final class VirtualMachine {
                             jsObj.set(key, propValue);
                         }
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Exception Handling ====================
-                    case THROW:
+                    case THROW -> {
                         JSValue exception = valueStack.pop();
                         pendingException = exception;
                         context.setPendingException(exception);
                         throw new VMException("Exception thrown: " + exception);
-
-                    case CATCH:
+                    }
+                    case CATCH -> {
                         // QuickJS: pushes catch offset marker onto stack
                         // This marker is used during exception unwinding to find the catch handler
                         int catchOffset = bytecode.readI32(pc + 1);
                         int catchHandlerPC = pc + op.getSize() + catchOffset;
                         valueStack.pushStackValue(new CatchOffset(catchHandlerPC));
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Type Operations ====================
-                    case TYPEOF:
+                    case TYPEOF -> {
                         handleTypeof();
                         pc += op.getSize();
-                        break;
-
-                    case DELETE:
+                    }
+                    case DELETE -> {
                         handleDelete();
                         pc += op.getSize();
-                        break;
+                    }
 
                     // ==================== Other Operations ====================
-                    default:
-                        throw new VMException("Unimplemented opcode: " + op + " at PC " + pc);
+                    default -> throw new VMException("Unimplemented opcode: " + op + " at PC " + pc);
                 }
             }
         } catch (VMException e) {

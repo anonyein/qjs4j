@@ -164,86 +164,34 @@ public final class BytecodeCompiler {
         compileExpression(binExpr.right());
 
         // Emit operation
-        Opcode op;
-        switch (binExpr.operator()) {
-            case ADD:
-                op = Opcode.ADD;
-                break;
-            case SUB:
-                op = Opcode.SUB;
-                break;
-            case MUL:
-                op = Opcode.MUL;
-                break;
-            case DIV:
-                op = Opcode.DIV;
-                break;
-            case MOD:
-                op = Opcode.MOD;
-                break;
-            case EXP:
-                op = Opcode.EXP;
-                break;
-            case EQ:
-                op = Opcode.EQ;
-                break;
-            case NE:
-                op = Opcode.NEQ;
-                break;
-            case STRICT_EQ:
-                op = Opcode.STRICT_EQ;
-                break;
-            case STRICT_NE:
-                op = Opcode.STRICT_NEQ;
-                break;
-            case LT:
-                op = Opcode.LT;
-                break;
-            case LE:
-                op = Opcode.LTE;
-                break;
-            case GT:
-                op = Opcode.GT;
-                break;
-            case GE:
-                op = Opcode.GTE;
-                break;
-            case BIT_AND:
-                op = Opcode.AND;
-                break;
-            case BIT_OR:
-                op = Opcode.OR;
-                break;
-            case BIT_XOR:
-                op = Opcode.XOR;
-                break;
-            case LSHIFT:
-                op = Opcode.SHL;
-                break;
-            case RSHIFT:
-                op = Opcode.SAR;
-                break;
-            case URSHIFT:
-                op = Opcode.SHR;
-                break;
-            case LOGICAL_AND:
-                op = Opcode.LOGICAL_AND;
-                break;
-            case LOGICAL_OR:
-                op = Opcode.LOGICAL_OR;
-                break;
-            case NULLISH_COALESCING:
-                op = Opcode.NULLISH_COALESCE;
-                break;
-            case IN:
-                op = Opcode.IN;
-                break;
-            case INSTANCEOF:
-                op = Opcode.INSTANCEOF;
-                break;
-            default:
-                throw new CompilerException("Unknown binary operator: " + binExpr.operator());
-        }
+        Opcode op = switch (binExpr.operator()) {
+            case ADD -> Opcode.ADD;
+            case BIT_AND -> Opcode.AND;
+            case BIT_OR -> Opcode.OR;
+            case BIT_XOR -> Opcode.XOR;
+            case DIV -> Opcode.DIV;
+            case EQ -> Opcode.EQ;
+            case EXP -> Opcode.EXP;
+            case GE -> Opcode.GTE;
+            case GT -> Opcode.GT;
+            case IN -> Opcode.IN;
+            case INSTANCEOF -> Opcode.INSTANCEOF;
+            case LE -> Opcode.LTE;
+            case LOGICAL_AND -> Opcode.LOGICAL_AND;
+            case LOGICAL_OR -> Opcode.LOGICAL_OR;
+            case LSHIFT -> Opcode.SHL;
+            case LT -> Opcode.LT;
+            case MOD -> Opcode.MOD;
+            case MUL -> Opcode.MUL;
+            case NE -> Opcode.NEQ;
+            case NULLISH_COALESCING -> Opcode.NULLISH_COALESCE;
+            case RSHIFT -> Opcode.SAR;
+            case STRICT_EQ -> Opcode.STRICT_EQ;
+            case STRICT_NE -> Opcode.STRICT_NEQ;
+            case SUB -> Opcode.SUB;
+            case URSHIFT -> Opcode.SHR;
+            default -> throw new CompilerException("Unknown binary operator: " + binExpr.operator());
+        };
 
         emitter.emitOpcode(op);
     }
@@ -888,36 +836,20 @@ public final class BytecodeCompiler {
 
         compileExpression(unaryExpr.operand());
 
-        Opcode op;
-        switch (unaryExpr.operator()) {
-            case PLUS:
-                op = Opcode.PLUS;
-                break;
-            case MINUS:
-                op = Opcode.NEG;
-                break;
-            case NOT:
-                op = Opcode.LOGICAL_NOT;
-                break;
-            case BIT_NOT:
-                op = Opcode.NOT;
-                break;
-            case TYPEOF:
-                op = Opcode.TYPEOF;
-                break;
-            case VOID:
+        Opcode op = switch (unaryExpr.operator()) {
+            case BIT_NOT -> Opcode.NOT;
+            case DEC -> Opcode.DEC;
+            case INC -> Opcode.INC;
+            case MINUS -> Opcode.NEG;
+            case NOT -> Opcode.LOGICAL_NOT;
+            case PLUS -> Opcode.PLUS;
+            case TYPEOF -> Opcode.TYPEOF;
+            case VOID -> {
                 emitter.emitOpcode(Opcode.DROP);
-                op = Opcode.UNDEFINED;
-                break;
-            case INC:
-                op = Opcode.INC;
-                break;
-            case DEC:
-                op = Opcode.DEC;
-                break;
-            default:
-                throw new CompilerException("Unknown unary operator: " + unaryExpr.operator());
-        }
+                yield Opcode.UNDEFINED;
+            }
+            default -> throw new CompilerException("Unknown unary operator: " + unaryExpr.operator());
+        };
 
         emitter.emitOpcode(op);
     }

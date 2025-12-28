@@ -173,11 +173,11 @@ public final class Parser {
 
             AssignmentExpression.AssignmentOperator operator = switch (op) {
                 case ASSIGN -> AssignmentExpression.AssignmentOperator.ASSIGN;
-                case PLUS_ASSIGN -> AssignmentExpression.AssignmentOperator.PLUS_ASSIGN;
-                case MINUS_ASSIGN -> AssignmentExpression.AssignmentOperator.MINUS_ASSIGN;
-                case MUL_ASSIGN -> AssignmentExpression.AssignmentOperator.MUL_ASSIGN;
                 case DIV_ASSIGN -> AssignmentExpression.AssignmentOperator.DIV_ASSIGN;
+                case MINUS_ASSIGN -> AssignmentExpression.AssignmentOperator.MINUS_ASSIGN;
                 case MOD_ASSIGN -> AssignmentExpression.AssignmentOperator.MOD_ASSIGN;
+                case MUL_ASSIGN -> AssignmentExpression.AssignmentOperator.MUL_ASSIGN;
+                case PLUS_ASSIGN -> AssignmentExpression.AssignmentOperator.PLUS_ASSIGN;
                 default -> AssignmentExpression.AssignmentOperator.ASSIGN;
             };
 
@@ -529,9 +529,9 @@ public final class Parser {
 
         while (match(TokenType.MUL) || match(TokenType.DIV) || match(TokenType.MOD)) {
             BinaryOperator op = switch (currentToken.type()) {
-                case MUL -> BinaryOperator.MUL;
                 case DIV -> BinaryOperator.DIV;
                 case MOD -> BinaryOperator.MOD;
+                case MUL -> BinaryOperator.MUL;
                 default -> null;
             };
             SourceLocation location = getLocation();
@@ -637,6 +637,18 @@ public final class Parser {
                 String value = currentToken.value();
                 advance();
                 yield new Literal(value, location);
+            }
+            case TRUE -> {
+                advance();
+                yield new Literal(true, location);
+            }
+            case FALSE -> {
+                advance();
+                yield new Literal(false, location);
+            }
+            case NULL -> {
+                advance();
+                yield new Literal(null, location);
             }
             case IDENTIFIER -> parseIdentifier();
             case THIS -> {
