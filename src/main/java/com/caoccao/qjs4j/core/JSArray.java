@@ -110,6 +110,19 @@ public final class JSArray extends JSObject {
     }
 
     /**
+     * Override get by PropertyKey to handle array indices.
+     */
+    @Override
+    public JSValue get(PropertyKey key) {
+        // If it's an index, use dense/sparse array storage
+        if (key.isIndex()) {
+            return get(key.asIndex());
+        }
+        // Otherwise, use the shape-based storage from JSObject
+        return super.get(key);
+    }
+
+    /**
      * Get the array length.
      */
     public long getLength() {
@@ -207,6 +220,20 @@ public final class JSArray extends JSObject {
     @Override
     public void set(int index, JSValue value) {
         set((long) index, value);
+    }
+
+    /**
+     * Override set by PropertyKey to handle array indices.
+     */
+    @Override
+    public void set(PropertyKey key, JSValue value) {
+        // If it's an index, use dense/sparse array storage
+        if (key.isIndex()) {
+            set(key.asIndex(), value);
+        } else {
+            // Otherwise, use the shape-based storage from JSObject
+            super.set(key, value);
+        }
     }
 
     /**

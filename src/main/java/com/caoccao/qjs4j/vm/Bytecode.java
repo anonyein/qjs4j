@@ -25,11 +25,13 @@ public final class Bytecode {
     private final String[] atomPool;
     private final JSValue[] constantPool;
     private final byte[] instructions;
+    private final int localCount;
 
-    public Bytecode(byte[] instructions, JSValue[] constantPool, String[] atomPool) {
+    public Bytecode(byte[] instructions, JSValue[] constantPool, String[] atomPool, int localCount) {
         this.instructions = instructions;
         this.constantPool = constantPool;
         this.atomPool = atomPool;
+        this.localCount = localCount;
     }
 
     public String getAtom(int index) {
@@ -54,6 +56,10 @@ public final class Bytecode {
 
     public int getLength() {
         return instructions.length;
+    }
+
+    public int getLocalCount() {
+        return localCount;
     }
 
     public int readI32(int offset) {

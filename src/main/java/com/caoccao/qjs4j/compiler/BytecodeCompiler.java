@@ -52,7 +52,8 @@ public final class BytecodeCompiler {
         } else {
             throw new IllegalArgumentException("Expected Program node, got: " + ast.getClass().getName());
         }
-        return emitter.build();
+        int localCount = scopes.isEmpty() ? 0 : currentScope().getLocalCount();
+        return emitter.build(localCount);
     }
 
     // ==================== Program Compilation ====================
@@ -102,10 +103,11 @@ public final class BytecodeCompiler {
             functionCompiler.emitter.emitOpcode(Opcode.RETURN);
         }
 
+        int localCount = functionCompiler.currentScope().getLocalCount();
         functionCompiler.exitScope();
 
         // Build the function bytecode
-        Bytecode functionBytecode = functionCompiler.emitter.build();
+        Bytecode functionBytecode = functionCompiler.emitter.build(localCount);
 
         // Arrow functions are always anonymous
         String functionName = "";
@@ -461,10 +463,11 @@ public final class BytecodeCompiler {
             functionCompiler.emitter.emitOpcode(Opcode.RETURN);
         }
 
+        int localCount = functionCompiler.currentScope().getLocalCount();
         functionCompiler.exitScope();
 
         // Build the function bytecode
-        Bytecode functionBytecode = functionCompiler.emitter.build();
+        Bytecode functionBytecode = functionCompiler.emitter.build(localCount);
 
         // Get function name (empty string for anonymous)
         String functionName = funcExpr.id() != null ? funcExpr.id().name() : "";
@@ -1026,6 +1029,10 @@ public final class BytecodeCompiler {
 
         Integer getLocal(String name) {
             return locals.get(name);
+        }
+
+        int getLocalCount() {
+            return nextLocalIndex;
         }
     }
 }

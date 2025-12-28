@@ -16,7 +16,9 @@
 
 package com.caoccao.qjs4j.vm;
 
+import com.caoccao.qjs4j.core.JSBytecodeFunction;
 import com.caoccao.qjs4j.core.JSFunction;
+import com.caoccao.qjs4j.core.JSUndefined;
 import com.caoccao.qjs4j.core.JSValue;
 
 /**
@@ -33,7 +35,28 @@ public final class StackFrame {
     public StackFrame(JSFunction function, JSValue thisArg, JSValue[] args, StackFrame caller) {
         this.function = function;
         this.thisArg = thisArg;
-        this.locals = args;
+
+        // Allocate locals array based on function's local count
+        // For bytecode functions, get local count from bytecode metadata
+        // For native functions, just use args
+        int localCount = 0;
+        if (function instanceof JSBytecodeFunction bytecodeFunc) {
+            localCount = bytecodeFunc.getBytecode().getLocalCount();
+        }
+
+        if (localCount > 0) {
+            this.locals = new JSValue[localCount];
+            // Copy args into the first slots
+            System.arraycopy(args, 0, this.locals, 0, Math.min(args.length, localCount));
+            // Initialize remaining locals to undefined
+            for (int i = args.length; i < localCount; i++) {
+                this.locals[i] = JSUndefined.INSTANCE;
+            }
+        } else {
+            // For native functions or functions with no locals
+            this.locals = args;
+        }
+
         this.closureVars = new JSValue[0];
         this.programCounter = 0;
         this.caller = caller;

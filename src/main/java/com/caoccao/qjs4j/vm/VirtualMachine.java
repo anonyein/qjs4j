@@ -1558,6 +1558,25 @@ public final class VirtualMachine {
             }
         }
 
+        if (value instanceof JSFunction func) {
+            // Get Function.prototype from global object
+            JSObject global = context.getGlobalObject();
+            JSValue functionCtor = global.get("Function");
+            if (functionCtor instanceof JSObject ctorObj) {
+                JSValue prototype = ctorObj.get("prototype");
+                if (prototype instanceof JSObject protoObj) {
+                    JSObject wrapper = new JSObject();
+                    wrapper.setPrototype(protoObj);
+                    // Store the function value so it can be called
+                    wrapper.set("[[FunctionValue]]", func);
+                    // Copy function properties
+                    wrapper.set("name", new JSString(func.getName()));
+                    wrapper.set("length", new JSNumber(func.getLength()));
+                    return wrapper;
+                }
+            }
+        }
+
         return null;
     }
 
