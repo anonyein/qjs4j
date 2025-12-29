@@ -352,7 +352,7 @@ public final class JSTypeConversions {
             return new JSNumber(Double.NaN);
         }
 
-        // Handle wrapper objects (String, Number, Boolean objects)
+        // Handle wrapper objects (String, Number, Boolean, BigInt objects)
         if (value instanceof JSObject obj) {
             JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
             if (primitiveValue instanceof JSNumber num) {
@@ -361,6 +361,13 @@ public final class JSTypeConversions {
                 return stringToNumber(str.value());
             } else if (primitiveValue instanceof JSBoolean bool) {
                 return new JSNumber(bool.value() ? 1.0 : 0.0);
+            } else if (primitiveValue instanceof JSBigInt bigInt) {
+                // BigInt cannot be converted to number without loss of precision
+                try {
+                    return new JSNumber(bigInt.value().doubleValue());
+                } catch (Exception e) {
+                    return new JSNumber(Double.NaN);
+                }
             }
         }
 
@@ -405,6 +412,7 @@ public final class JSTypeConversions {
             return new JSString("null");
         } else if (value.isNullOrUndefined()
                 || value.isBigInt()
+                || value.isBigIntObject()
                 || value.isBoolean()
                 || value.isBooleanObject()
                 || value.isNumber()
@@ -418,7 +426,7 @@ public final class JSTypeConversions {
             return new JSString(s.toString(context));
         }
 
-        // Handle wrapper objects (String, Number, Boolean objects)
+        // Handle wrapper objects (String, Number, Boolean, BigInt objects)
         if (value instanceof JSObject obj) {
             JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
             if (primitiveValue instanceof JSString str) {
@@ -427,6 +435,8 @@ public final class JSTypeConversions {
                 return new JSString(num.toString());
             } else if (primitiveValue instanceof JSBoolean bool) {
                 return new JSString(bool.toString());
+            } else if (primitiveValue instanceof JSBigInt bigInt) {
+                return new JSString(bigInt.toString());
             }
         }
 

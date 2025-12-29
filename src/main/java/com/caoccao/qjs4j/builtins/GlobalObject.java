@@ -242,6 +242,7 @@ public final class GlobalObject {
             return "null";
         } else if (value.isNullOrUndefined()
                 || value.isBigInt()
+                || value.isBigIntObject()
                 || value.isBoolean()
                 || value.isBooleanObject()
                 || value.isNumber()
@@ -488,7 +489,7 @@ public final class GlobalObject {
         bigIntPrototype.set("toLocaleString", new JSNativeFunction("toLocaleString", 0, BigIntPrototype::toLocaleString));
 
         // Create BigInt constructor
-        JSObject bigIntConstructor = new JSObject();
+        JSNativeFunction bigIntConstructor = new JSNativeFunction("BigInt", 1, BigIntConstructor::call);
         bigIntConstructor.set("prototype", bigIntPrototype);
         bigIntConstructor.set("[[BigIntConstructor]]", JSBoolean.TRUE); // Mark as BigInt constructor
 

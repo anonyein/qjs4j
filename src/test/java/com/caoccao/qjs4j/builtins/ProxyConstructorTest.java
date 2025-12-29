@@ -20,6 +20,8 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.JSValue;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigInteger;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -1187,6 +1189,98 @@ public class ProxyConstructorTest extends BaseTest {
                 var proxy = new Proxy(target, handler);
                 Array.prototype.join.call(proxy, ',')""");
         assertEquals("a,b,c", result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyWithBigIntObjectArithmetic() {
+        // Test that proxied BigInt object valueOf works
+        JSValue result = ctx.eval("""
+                var target = new BigInt(10);
+                var handler = {};
+                var proxy = new Proxy(target, handler);
+                proxy.valueOf()""");
+        assertEquals(BigInteger.valueOf(10), result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyWithBigIntObjectAsTarget() {
+        // Test that BigInt object (new BigInt(42)) can be a proxy target
+        // BigInt objects are needed as proxy targets since primitive BigInts cannot be proxied
+        JSValue result = ctx.eval("""
+                var target = new BigInt(42);
+                var handler = {
+                  get: function(target, prop) {
+                    if (prop === 'test') {
+                      return 'intercepted';
+                    }
+                    return target[prop];
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                proxy.test""");
+        assertEquals("intercepted", result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyWithBigIntObjectHasTrap() {
+        // Test has trap on BigInt object proxy
+        JSValue result = ctx.eval("""
+                var target = new BigInt(42);
+                target.customProp = 'exists';
+                var handler = {
+                  has: function(target, prop) {
+                    if (prop === 'fakeProperty') {
+                      return true;
+                    }
+                    return prop in target;
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                'fakeProperty' in proxy""");
+        assertEquals(true, result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyWithBigIntObjectSetTrap() {
+        // Test set trap on BigInt object proxy
+        JSValue result = ctx.eval("""
+                var target = new BigInt(42);
+                var handler = {
+                  set: function(target, prop, value) {
+                    target[prop] = value * 2;
+                    return true;
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                proxy.test = 21;
+                proxy.test""");
+        assertEquals(42.0, (Double) result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyWithBigIntObjectToString() {
+        // Test that proxied BigInt object toString works correctly
+        JSValue result = ctx.eval("""
+                var target = new BigInt(255);
+                var handler = {};
+                var proxy = new Proxy(target, handler);
+                proxy.toString()""");
+        assertEquals("255", result.toJavaObject());
+    }
+
+    @Test
+    public void testProxyWithBigIntObjectValueOf() {
+        // Test that proxied BigInt object valueOf works correctly
+        JSValue result = ctx.eval("""
+                var target = new BigInt(100);
+                var handler = {
+                  get: function(target, prop) {
+                    return target[prop];
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                proxy.valueOf()""");
+        assertEquals(java.math.BigInteger.valueOf(100), result.toJavaObject());
     }
 
     @Test

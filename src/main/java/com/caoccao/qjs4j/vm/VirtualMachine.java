@@ -717,6 +717,57 @@ public final class VirtualMachine {
                 valueStack.push(strObj);
                 return;
             }
+
+            // Check for BigInt constructor (must come before generic JSFunction check)
+            // Note: In standard ES2020, BigInt cannot be called with 'new', but we support
+            // Object(bigint) pattern for creating BigInt objects for use with Proxy
+            JSValue isBigIntCtor = ctorObj.get("[[BigIntConstructor]]");
+            if (isBigIntCtor instanceof JSBoolean && ((JSBoolean) isBigIntCtor).value()) {
+                // BigInt requires at least one argument
+                if (args.length == 0) {
+                    valueStack.push(context.throwTypeError("BigInt() requires an argument"));
+                    return;
+                }
+
+                JSValue value = args[0];
+
+                // If value is already a BigInt primitive, wrap it in an object
+                JSBigInt bigIntValue;
+                if (value instanceof JSBigInt bigInt) {
+                    bigIntValue = bigInt;
+                } else if (value instanceof JSNumber num) {
+                    double d = num.value();
+                    if (Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {
+                        valueStack.push(context.throwRangeError("Cannot convert non-integer to BigInt"));
+                        return;
+                    }
+                    bigIntValue = new JSBigInt(java.math.BigInteger.valueOf((long) d));
+                } else if (value instanceof JSString str) {
+                    try {
+                        bigIntValue = new JSBigInt(new java.math.BigInteger(str.value().trim()));
+                    } catch (NumberFormatException e) {
+                        valueStack.push(context.throwSyntaxError("Cannot convert string to BigInt: " + str.value()));
+                        return;
+                    }
+                } else if (value instanceof JSBoolean bool) {
+                    bigIntValue = new JSBigInt(bool.value() ? java.math.BigInteger.ONE : java.math.BigInteger.ZERO);
+                } else {
+                    valueStack.push(context.throwTypeError("Cannot convert " + value.getClass().getSimpleName() + " to BigInt"));
+                    return;
+                }
+
+                // Create BigInt object wrapper
+                JSBigIntObject bigIntObj = new JSBigIntObject(bigIntValue);
+
+                // Set prototype
+                JSValue prototypeValue = ctorObj.get("prototype");
+                if (prototypeValue instanceof JSObject prototype) {
+                    bigIntObj.setPrototype(prototype);
+                }
+
+                valueStack.push(bigIntObj);
+                return;
+            }
         }
 
         if (constructor instanceof JSFunction func) {

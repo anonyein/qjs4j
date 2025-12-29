@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests for BigInt constructor and static methods.
@@ -148,6 +149,86 @@ public class BigIntConstructorTest extends BaseTest {
         });
         assertRangeError(result);
         assertPendingException(ctx);
+    }
+
+    @Test
+    public void testBigIntObjectArithmetic() {
+        // BigInt objects can be converted via valueOf
+        JSValue result = ctx.eval("""
+                var obj = new BigInt(10);
+                obj.valueOf()""");
+        assertTrue(result.isBigInt());
+        assertEquals(BigInteger.valueOf(10), result.asBigInt().map(JSBigInt::value).orElseThrow());
+    }
+
+    @Test
+    public void testBigIntObjectComparison() {
+        // Test using valueOf for comparison
+        JSValue result = ctx.eval("""
+                var obj = new BigInt(42);
+                var val = obj.valueOf();
+                val""");
+        assertTrue(result.isBigInt());
+        assertEquals(BigInteger.valueOf(42), result.asBigInt().map(JSBigInt::value).orElseThrow());
+    }
+
+    @Test
+    public void testBigIntObjectCreation() {
+        // Test that 'new BigInt(42)' creates a JSBigIntObject
+        JSValue result = ctx.eval("new BigInt(42)");
+        assertTrue(result.isBigIntObject(), "new BigInt(42) should create a JSBigIntObject");
+
+        JSBigIntObject bigIntObj = (JSBigIntObject) result;
+        assertEquals(BigInteger.valueOf(42), bigIntObj.getValue().value());
+    }
+
+    @Test
+    public void testBigIntObjectEquality() {
+        // BigInt object is not the same as primitive when checking with typeof
+        JSValue result = ctx.eval("typeof new BigInt(42)");
+        assertEquals("object", result.toJavaObject());
+
+        JSValue result2 = ctx.eval("typeof BigInt(42)");
+        assertEquals("bigint", result2.toJavaObject());
+    }
+
+    @Test
+    public void testBigIntObjectLargeValue() {
+        JSValue result = ctx.eval("new BigInt('9007199254740991').valueOf()");
+        assertTrue(result.isBigInt());
+        assertEquals(new BigInteger("9007199254740991"), result.asBigInt().map(JSBigInt::value).orElseThrow());
+    }
+
+    @Test
+    public void testBigIntObjectNegative() {
+        JSValue result = ctx.eval("new BigInt(-999).valueOf()");
+        assertTrue(result.isBigInt());
+        assertEquals(BigInteger.valueOf(-999), result.asBigInt().map(JSBigInt::value).orElseThrow());
+    }
+
+    @Test
+    public void testBigIntObjectToString() {
+        JSValue result = ctx.eval("new BigInt(123).toString()");
+        assertEquals("123", result.toJavaObject());
+    }
+
+    @Test
+    public void testBigIntObjectToStringWithRadix() {
+        JSValue result = ctx.eval("new BigInt(255).toString(16)");
+        assertEquals("ff", result.toJavaObject());
+    }
+
+    @Test
+    public void testBigIntObjectTypeof() {
+        JSValue result = ctx.eval("typeof new BigInt(42)");
+        assertEquals("object", result.toJavaObject());
+    }
+
+    @Test
+    public void testBigIntObjectValueOf() {
+        JSValue result = ctx.eval("new BigInt(42).valueOf()");
+        assertTrue(result.isBigInt());
+        assertEquals(BigInteger.valueOf(42), result.asBigInt().map(JSBigInt::value).orElseThrow());
     }
 
     @Test

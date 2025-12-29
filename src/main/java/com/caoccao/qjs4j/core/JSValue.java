@@ -73,6 +73,15 @@ public sealed interface JSValue extends JSStackValue permits
     }
 
     /**
+     * Attempt to cast this value to JSBigIntObject.
+     *
+     * @return Optional containing the JSBigIntObject if this value is a BigInt object, empty otherwise
+     */
+    default Optional<JSBigIntObject> asBigIntObject() {
+        return this instanceof JSBigIntObject v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSBoolean.
      *
      * @return Optional containing the JSBoolean if this value is a boolean, empty otherwise
@@ -448,6 +457,10 @@ public sealed interface JSValue extends JSStackValue permits
      */
     default boolean isBigInt() {
         return this instanceof JSBigInt;
+    }
+
+    default boolean isBigIntObject() {
+        return this instanceof JSBigIntObject;
     }
 
     /**
