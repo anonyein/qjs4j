@@ -827,9 +827,12 @@ public final class GlobalObject {
         numberPrototype.set("toLocaleString", new JSNativeFunction("toLocaleString", 0, NumberPrototype::toLocaleString));
         numberPrototype.set("valueOf", new JSNativeFunction("valueOf", 0, NumberPrototype::valueOf));
 
-        // Number constructor with static methods
-        JSObject numberConstructor = new JSObject();
+        // Create Number constructor
+        JSNativeFunction numberConstructor = new JSNativeFunction("Number", 1, NumberConstructor::call);
         numberConstructor.set("prototype", numberPrototype);
+        numberConstructor.set("[[NumberConstructor]]", JSBoolean.TRUE); // Mark as Number constructor
+        
+        // Number static methods
         numberConstructor.set("isNaN", new JSNativeFunction("isNaN", 1, NumberPrototype::isNaN));
         numberConstructor.set("isFinite", new JSNativeFunction("isFinite", 1, NumberPrototype::isFinite));
         numberConstructor.set("isInteger", new JSNativeFunction("isInteger", 1, NumberPrototype::isInteger));

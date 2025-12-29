@@ -255,7 +255,7 @@ public final class NumberPrototype {
      * ES2020 20.1.3.2
      */
     public static JSValue toExponential(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = JSTypeConversions.toNumber(context, thisArg);
+        JSNumber num = thisValueToNumber(context, thisArg);
         double value = num.value();
         // Get fractionDigits
         if (args.length == 0 || args[0].isUndefined()) {
@@ -275,7 +275,7 @@ public final class NumberPrototype {
      * ES2020 20.1.3.3
      */
     public static JSValue toFixed(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = JSTypeConversions.toNumber(context, thisArg);
+        JSNumber num = thisValueToNumber(context, thisArg);
         double value = num.value();
         int fractionDigits = 0;
         // Get fractionDigits
@@ -294,7 +294,7 @@ public final class NumberPrototype {
      * ES2020 20.1.3.4 (simplified)
      */
     public static JSValue toLocaleString(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = JSTypeConversions.toNumber(context, thisArg);
+        JSNumber num = thisValueToNumber(context, thisArg);
         // Simplified: just use default toString
         return new JSString(DtoaConverter.convert(num.value()));
     }
@@ -304,7 +304,7 @@ public final class NumberPrototype {
      * ES2020 20.1.3.5
      */
     public static JSValue toPrecision(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = JSTypeConversions.toNumber(context, thisArg);
+        JSNumber num = thisValueToNumber(context, thisArg);
         double value = num.value();
 
         // If precision is undefined, use toString
@@ -327,7 +327,7 @@ public final class NumberPrototype {
      * ES2020 20.1.3.6
      */
     public static JSValue toString(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = JSTypeConversions.toNumber(context, thisArg);
+        JSNumber num = thisValueToNumber(context, thisArg);
         double value = num.value();
 
         // Handle special cases
@@ -363,6 +363,37 @@ public final class NumberPrototype {
         if (thisArg instanceof JSNumber num) {
             return num;
         }
+        
+        if (thisArg instanceof JSObject obj) {
+            // Check for [[NumberData]] internal slot
+            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+            if (primitiveValue instanceof JSNumber num) {
+                return num;
+            }
+        }
+        
         return context.throwTypeError("Number.prototype.valueOf called on non-number");
+    }
+
+    /**
+     * Helper method to extract the number value from thisArg.
+     * Handles both primitive numbers and Number objects.
+     * For other values, attempts type coercion via ToNumber.
+     */
+    private static JSNumber thisValueToNumber(JSContext context, JSValue thisArg) {
+        if (thisArg instanceof JSNumber num) {
+            return num;
+        }
+
+        if (thisArg instanceof JSObject obj) {
+            // Check for [[NumberData]] internal slot (Number object)
+            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+            if (primitiveValue instanceof JSNumber num) {
+                return num;
+            }
+        }
+        
+        // For other values, attempt type coercion (maintains backward compatibility)
+        return JSTypeConversions.toNumber(context, thisArg);
     }
 }

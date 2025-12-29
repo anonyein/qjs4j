@@ -478,6 +478,15 @@ public sealed interface JSValue extends JSStackValue permits
     }
 
     /**
+     * Check if this value is a Number object.
+     *
+     * @return true if this value is a Number object, false otherwise
+     */
+    default boolean isNumberObject() {
+        return this instanceof JSNumberObject;
+    }
+
+    /**
      * Check if this value is a bytecode function.
      *
      * @return true if this value is a bytecode function, false otherwise

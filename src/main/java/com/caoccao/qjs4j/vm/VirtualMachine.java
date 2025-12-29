@@ -667,6 +667,31 @@ public final class VirtualMachine {
                 valueStack.push(boolObj);
                 return;
             }
+
+            // Check for Number constructor (must come before generic JSFunction check)
+            JSValue isNumberCtor = ctorObj.get("[[NumberConstructor]]");
+            if (isNumberCtor instanceof JSBoolean && ((JSBoolean) isNumberCtor).value()) {
+                // ES2020: If no argument is passed, use +0
+                JSNumber numValue;
+                if (args.length == 0) {
+                    numValue = new JSNumber(0.0);
+                } else {
+                    // Convert to number using ToNumber
+                    numValue = JSTypeConversions.toNumber(context, args[0]);
+                }
+
+                // Create Number object wrapper
+                JSNumberObject numObj = new JSNumberObject(numValue);
+
+                // Set prototype
+                JSValue prototypeValue = ctorObj.get("prototype");
+                if (prototypeValue instanceof JSObject prototype) {
+                    numObj.setPrototype(prototype);
+                }
+
+                valueStack.push(numObj);
+                return;
+            }
         }
 
         if (constructor instanceof JSFunction func) {
