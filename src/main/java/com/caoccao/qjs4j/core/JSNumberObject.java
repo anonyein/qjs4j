@@ -62,7 +62,7 @@ public final class JSNumberObject extends JSObject {
     public JSNumberObject(JSNumber value) {
         super();
         this.value = value;
-        this.set("[[PrimitiveValue]]", value);
+        this.setPrimitiveValue(value);
     }
 
     /**

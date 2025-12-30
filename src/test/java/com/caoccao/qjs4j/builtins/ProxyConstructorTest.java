@@ -16,22 +16,19 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
-import com.caoccao.qjs4j.core.JSValue;
+import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
-
-import java.math.BigInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for Proxy.revocable with working revoke function.
  */
-public class ProxyConstructorTest extends BaseTest {
+public class ProxyConstructorTest extends BaseJavetTest {
 
     @Test
     public void testProxyApplyBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = function(a, b) { return a + b; };
                 var handler = {
                   apply: function(target, thisArg, args) {
@@ -39,43 +36,41 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy(1, 2)""");
-        assertEquals(6.0, (Double) result.toJavaObject());
+                proxy(1, 2)""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyApplyForward() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = function(a, b) { return a + b; };
                 var proxy = new Proxy(target, {});
-                proxy(1, 2)""");
-        assertEquals(3.0, (Double) result.toJavaObject());
+                proxy(1, 2)""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyApplyNonFunction() {
         // Test that apply trap on non-function throws error
-        try {
-            context.eval("""
-                    var target = {};
-                    var handler = {
-                      apply: function(target, thisArg, args) {
-                        return 42;
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    proxy()""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("not a function") ||
-                    e.getMessage().contains("TypeError"));
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                var handler = {
+                  apply: function(target, thisArg, args) {
+                    return 42;
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                proxy()""");
     }
 
     @Test
     public void testProxyApplyWithThisBinding() {
         // Test that apply trap can modify this binding
-        JSValue result = context.eval("""
+        String code = """
                 var target = function() { return this.value; };
                 var handler = {
                   apply: function(target, thisArg, args) {
@@ -84,14 +79,16 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 var obj = {value: 5};
-                proxy.call(obj)""");
-        assertEquals(10.0, (Double) result.toJavaObject());
+                proxy.call(obj)""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyChainWithMultipleLevels() {
         // Test proxy chain with 3 levels
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var proxy1 = new Proxy(target, {
                   get: function(t, p) { return t[p] + 1; }
@@ -102,14 +99,16 @@ public class ProxyConstructorTest extends BaseTest {
                 var proxy3 = new Proxy(proxy2, {
                   get: function(t, p) { return t[p] + 1; }
                 });
-                proxy3.x""");
-        assertEquals(4.0, (Double) result.toJavaObject());  // 1 + 1 + 1 + 1
+                proxy3.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyChaining() {
         // Test proxy of proxy
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var handler1 = {
                   get: function(target, prop) {
@@ -123,13 +122,15 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy2 = new Proxy(proxy1, handler2);
-                proxy2.x""");
-        assertEquals(3.0, (Double) result.toJavaObject());
+                proxy2.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyConstructBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = function(x) { this.value = x; };
                 var handler = {
                   construct: function(target, args, newTarget) {
@@ -140,63 +141,56 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 var instance = new proxy(5);
-                instance.value""");
-        assertEquals(10.0, (Double) result.toJavaObject());
+                instance.value""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyConstructForward() {
         // Test that construct without trap forwards to target
-        JSValue result = context.eval("""
+        String code = """
                 var target = function(x) { this.value = x; };
                 var proxy = new Proxy(target, {});
                 var instance = new proxy(42);
-                instance.value""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                instance.value""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyConstructNonConstructor() {
         // Test that construct on non-constructor throws
-        try {
-            context.eval("""
-                    var target = {}; // Not a constructor
-                    var handler = {
-                      construct: function(target, args) {
-                        return {};
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    new proxy()""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: proxy is not a constructor", e.getMessage());
-        }
+        assertErrorWithJavet("""
+                var target = {}; // Not a constructor
+                var handler = {
+                  construct: function(target, args) {
+                    return {};
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                new proxy()""");
     }
 
     @Test
     public void testProxyConstructNonObject() {
         // Test that construct trap must return an object
-        try {
-            context.eval("""
-                    var target = function() {};
-                    var handler = {
-                      construct: function(target, args, newTarget) {
-                        return 42; // Return non-object
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    new proxy()""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("must return an object") ||
-                    e.getMessage().contains("TypeError"));
-        }
+        assertErrorWithJavet("""
+                var target = function() {};
+                var handler = {
+                  construct: function(target, args, newTarget) {
+                    return 42; // Return non-object
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                new proxy()""");
     }
 
     @Test
     public void testProxyDefinePropertyBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var handler = {
                   defineProperty: function(target, prop, descriptor) {
@@ -206,72 +200,63 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 Object.defineProperty(proxy, 'x', {value: 42});
-                proxy.x""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyDefinePropertyForward() {
         // Test that defineProperty without trap forwards to target
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var proxy = new Proxy(target, {});
                 Object.defineProperty(proxy, 'x', {value: 42, writable: true});
-                proxy.x""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyDefinePropertyInvariantNonConfigurableChange() {
         // Test invariant: can't change non-configurable property descriptor
-        try {
-            context.eval("""
-                    var target = {};
-                    Object.defineProperty(target, 'x', {
-                      value: 1,
-                      writable: false,
-                      configurable: false
-                    });
-                    var handler = {
-                      defineProperty: function(target, prop, descriptor) {
-                        return true; // Claim success without matching descriptor
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.defineProperty(proxy, 'x', {value: 2})""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("inconsistent") ||
-                    e.getMessage().contains("TypeError") ||
-                    e.getMessage().contains("non-configurable"));
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                Object.defineProperty(target, 'x', {
+                  value: 1,
+                  writable: false,
+                  configurable: false
+                });
+                var handler = {
+                  defineProperty: function(target, prop, descriptor) {
+                    return true; // Claim success without matching descriptor
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.defineProperty(proxy, 'x', {value: 2})""");
     }
 
     @Test
     public void testProxyDefinePropertyInvariantNonExtensible() {
         // Test invariant: can't add property to non-extensible target
-        try {
-            context.eval("""
-                    var target = {};
-                    Object.preventExtensions(target);
-                    var handler = {
-                      defineProperty: function(target, prop, descriptor) {
-                        return true; // Claim success
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.defineProperty(proxy, 'x', {value: 42})""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("inconsistent") ||
-                    e.getMessage().contains("TypeError"));
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                Object.preventExtensions(target);
+                var handler = {
+                  defineProperty: function(target, prop, descriptor) {
+                    return true; // Claim success
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.defineProperty(proxy, 'x', {value: 42})""");
     }
 
     @Test
     public void testProxyDefinePropertyWithGetterSetter() {
         // Test defineProperty with getter/setter
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var value = 0;
                 var handler = {
@@ -286,13 +271,15 @@ public class ProxyConstructorTest extends BaseTest {
                   set: function(v) { value = v; }
                 });
                 proxy.x = 42;
-                proxy.x""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyDeletePropertyBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var handler = {
                   deleteProperty: function(target, prop) {
@@ -302,69 +289,60 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 delete proxy.x;
-                'x' in proxy""");
-        assertEquals(false, result.toJavaObject());
+                'x' in proxy""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyDeletePropertyForward() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var proxy = new Proxy(target, {});
                 delete proxy.x;
-                'x' in proxy""");
-        assertEquals(false, result.toJavaObject());
+                'x' in proxy""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyDeletePropertyNonConfigurable() {
         // Test invariant: can't delete non-configurable property
-        try {
-            context.eval("""
-                    var target = {};
-                    Object.defineProperty(target, 'x', {
-                      value: 1,
-                      configurable: false
-                    });
-                    var handler = {
-                      deleteProperty: function(target, prop) {
-                        return true; // Claim success
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    delete proxy.x""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'deleteProperty' on proxy: trap returned truish for property 'x' which is non-configurable in the proxy target", e.getMessage());
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                Object.defineProperty(target, 'x', {
+                  value: 1,
+                  configurable: false
+                });
+                var handler = {
+                  deleteProperty: function(target, prop) {
+                    return true; // Claim success
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                delete proxy.x""");
     }
 
     @Test
     public void testProxyDeletePropertyReturningFalse() {
         // Test that deleteProperty trap returning false throws in strict mode
-        try {
-            context.eval("""
-                    'use strict';
-                    var target = {x: 1};
-                    var handler = {
-                      deleteProperty: function(target, prop) {
-                        return false; // Reject the deletion
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    delete proxy.x""");
-            fail("Should have thrown TypeError in strict mode");
-        } catch (Exception e) {
-            // TypeError: 'deleteProperty' on proxy: trap returned falsish for property 'x'
-            assertTrue(e.getMessage().contains("TypeError") ||
-                    e.getMessage().contains("returned false") ||
-                    e.getMessage().contains("delete"));
-        }
+        assertErrorWithJavet("""
+                'use strict';
+                var target = {x: 1};
+                var handler = {
+                  deleteProperty: function(target, prop) {
+                    return false; // Reject the deletion
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                delete proxy.x""");
     }
 
     @Test
     public void testProxyGetBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var handler = {
                   get: function(target, prop, receiver) {
@@ -372,69 +350,63 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.x""");
-        assertEquals(2.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyGetForward() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var proxy = new Proxy(target, {});
-                proxy.x""");
-        assertEquals(1.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyGetInvariantNonConfigurableAccessor() {
         // Test invariant: get must return undefined for non-configurable accessor without getter
-        try {
-            context.eval("""
-                    var target = {};
-                    Object.defineProperty(target, 'x', {
-                      set: function(v) {},
-                      configurable: false
-                    });
-                    var handler = {
-                      get: function(target, prop) {
-                        return 42; // Return value for accessor without getter
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    proxy.x""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'get' on proxy: property 'x' is a non-configurable accessor property on the proxy target and does not have a getter function, but the trap did not return 'undefined' (got '42')", e.getMessage());
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                Object.defineProperty(target, 'x', {
+                  set: function(v) {},
+                  configurable: false
+                });
+                var handler = {
+                  get: function(target, prop) {
+                    return 42; // Return value for accessor without getter
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                proxy.x""");
     }
 
     @Test
     public void testProxyGetInvariantNonWritableNonConfigurable() {
         // Test invariant: must return same value for non-writable, non-configurable property
-        try {
-            context.eval("""
-                    var target = {};
-                    Object.defineProperty(target, 'x', {
-                      value: 1,
-                      writable: false,
-                      configurable: false
-                    });
-                    var handler = {
-                      get: function(target, prop) {
-                        return 2; // Return different value
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    proxy.x""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'get' on proxy: property 'x' is a read-only and non-configurable data property on the proxy target but the proxy did not return its actual", e.getMessage());
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                Object.defineProperty(target, 'x', {
+                  value: 1,
+                  writable: false,
+                  configurable: false
+                });
+                var handler = {
+                  get: function(target, prop) {
+                    return 2; // Return different value
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                proxy.x""");
     }
 
     @Test
     public void testProxyGetOwnPropertyDescriptorBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var handler = {
                   getOwnPropertyDescriptor: function(target, prop) {
@@ -443,131 +415,123 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 var desc = Object.getOwnPropertyDescriptor(proxy, 'x');
-                desc.value""");
-        assertEquals(1.0, (Double) result.toJavaObject());
+                desc.value""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyGetOwnPropertyDescriptorForward() {
         // Test that getOwnPropertyDescriptor without trap forwards to target
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 42};
                 var proxy = new Proxy(target, {});
                 var desc = Object.getOwnPropertyDescriptor(proxy, 'x');
-                desc.value""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                desc.value""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyGetOwnPropertyDescriptorInvariantNonConfigurable() {
         // Test invariant: can't return undefined for non-configurable property
-        try {
-            context.eval(
-                    "var target = {}; " +
-                            "Object.defineProperty(target, 'x', { " +
-                            "  value: 1, " +
-                            "  configurable: false " +
-                            "}); " +
-                            "var handler = { " +
-                            "  getOwnPropertyDescriptor: function(target, prop) { " +
-                            "    return undefined; " +
-                            "  } " +
-                            "}; " +
-                            "var proxy = new Proxy(target, handler); " +
-                            "Object.getOwnPropertyDescriptor(proxy, 'x')"
-            );
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("inconsistent") ||
-                    e.getMessage().contains("TypeError"));
-        }
-    }
-
-    @Test
-    public void testProxyGetOwnPropertyDescriptorUndefined() {
-        JSValue result = context.eval(
-                "var target = {x: 1}; " +
+        assertErrorWithJavet(
+                "var target = {}; " +
+                        "Object.defineProperty(target, 'x', { " +
+                        "  value: 1, " +
+                        "  configurable: false " +
+                        "}); " +
                         "var handler = { " +
                         "  getOwnPropertyDescriptor: function(target, prop) { " +
                         "    return undefined; " +
                         "  } " +
                         "}; " +
                         "var proxy = new Proxy(target, handler); " +
-                        "Object.getOwnPropertyDescriptor(proxy, 'x')"
-        );
-        assertTrue(result.isUndefined());
+                        "Object.getOwnPropertyDescriptor(proxy, 'x')");
+    }
+
+    @Test
+    public void testProxyGetOwnPropertyDescriptorUndefined() {
+        String code = """
+                var target = {x: 1};
+                var handler = {
+                  getOwnPropertyDescriptor: function(target, prop) {
+                    return undefined;
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.getOwnPropertyDescriptor(proxy, 'x')""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).execute().isUndefined(),
+                () -> context.eval(code).isUndefined());
     }
 
     @Test
     public void testProxyGetPrototypeOfBasic() {
-        JSValue result = context.eval(
-                "var proto = {x: 1}; " +
-                        "var target = Object.create(proto); " +
-                        "var handler = { " +
-                        "  getPrototypeOf: function(target) { " +
-                        "    return proto; " +
-                        "  } " +
-                        "}; " +
-                        "var proxy = new Proxy(target, handler); " +
-                        "Object.getPrototypeOf(proxy).x"
-        );
-        assertEquals(1.0, (Double) result.toJavaObject());
+        String code = "var proto = {x: 1}; " +
+                "var target = Object.create(proto); " +
+                "var handler = { " +
+                "  getPrototypeOf: function(target) { " +
+                "    return proto; " +
+                "  } " +
+                "}; " +
+                "var proxy = new Proxy(target, handler); " +
+                "Object.getPrototypeOf(proxy).x";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyGetPrototypeOfForward() {
         // Test that missing trap forwards to target
-        JSValue result = context.eval(
-                "var proto = {x: 1}; " +
-                        "var target = Object.create(proto); " +
-                        "var proxy = new Proxy(target, {}); " +
-                        "Object.getPrototypeOf(proxy).x"
-        );
-        assertEquals(1.0, (Double) result.toJavaObject());
+        String code = "var proto = {x: 1}; " +
+                "var target = Object.create(proto); " +
+                "var proxy = new Proxy(target, {}); " +
+                "Object.getPrototypeOf(proxy).x";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyGetPrototypeOfInvariant() {
         // Test invariant: if target is non-extensible, trap must return target's prototype
-        try {
-            context.eval("""
-                    var proto1 = {x: 1};
-                    var proto2 = {x: 2};
-                    var target = Object.create(proto1);
-                    Object.preventExtensions(target);
-                    var handler = {
-                      getPrototypeOf: function(target) {
-                        return proto2; // Return different prototype
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.getPrototypeOf(proxy)""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("inconsistent") ||
-                    e.getMessage().contains("TypeError"));
-        }
+        assertErrorWithJavet("""
+                var proto1 = {x: 1};
+                var proto2 = {x: 2};
+                var target = Object.create(proto1);
+                Object.preventExtensions(target);
+                var handler = {
+                  getPrototypeOf: function(target) {
+                    return proto2; // Return different prototype
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.getPrototypeOf(proxy)""");
     }
 
     @Test
     public void testProxyGetPrototypeOfNull() {
         // Test that getPrototypeOf can return null
-        JSValue result = context.eval(
-                "var target = Object.create(null); " +
-                        "var handler = { " +
-                        "  getPrototypeOf: function(target) { " +
-                        "    return null; " +
-                        "  } " +
-                        "}; " +
-                        "var proxy = new Proxy(target, handler); " +
-                        "Object.getPrototypeOf(proxy)"
-        );
-        assertTrue(result.isNull());
+        String code = "var target = Object.create(null); " +
+                "var handler = { " +
+                "  getPrototypeOf: function(target) { " +
+                "    return null; " +
+                "  } " +
+                "}; " +
+                "var proxy = new Proxy(target, handler); " +
+                "Object.getPrototypeOf(proxy)";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeObject(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyHasBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var handler = {
                   has: function(target, prop) {
@@ -575,66 +539,60 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                'x' in proxy""");
-        assertEquals(true, result.toJavaObject());
+                'x' in proxy""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyHasForward() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var proxy = new Proxy(target, {});
-                'x' in proxy""");
-        assertEquals(true, result.toJavaObject());
+                'x' in proxy""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyHasInvariantNonConfigurable() {
         // Test invariant: must report non-configurable property as present
-        try {
-            context.eval("""
-                    var target = {};
-                    Object.defineProperty(target, 'x', {
-                      value: 1,
-                      configurable: false
-                    });
-                    var handler = {
-                      has: function(target, prop) {
-                        return false; // Hide non-configurable property
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    'x' in proxy""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'has' on proxy: trap returned falsish for property 'x' which exists in the proxy target as non-configurable", e.getMessage());
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                Object.defineProperty(target, 'x', {
+                  value: 1,
+                  configurable: false
+                });
+                var handler = {
+                  has: function(target, prop) {
+                    return false; // Hide non-configurable property
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                'x' in proxy""");
     }
 
     @Test
     public void testProxyHasInvariantNonExtensible() {
         // Test invariant: must report all properties on non-extensible target
-        try {
-            context.eval("""
-                    var target = {x: 1};
-                    Object.preventExtensions(target);
-                    var handler = {
-                      has: function(target, prop) {
-                        return false; // Hide existing property
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    'x' in proxy""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'has' on proxy: trap returned falsish for property 'x' but the proxy target is not extensible", e.getMessage());
-        }
+        assertErrorWithJavet("""
+                var target = {x: 1};
+                Object.preventExtensions(target);
+                var handler = {
+                  has: function(target, prop) {
+                    return false; // Hide existing property
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                'x' in proxy""");
     }
 
     @Test
     public void testProxyInPrototypeChain() {
         // Test proxy used in prototype chain
-        JSValue result = context.eval("""
+        String code = """
                 var proto = {x: 1};
                 var handler = {
                   get: function(target, prop) {
@@ -643,13 +601,15 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(proto, handler);
                 var obj = Object.create(proxy);
-                obj.x""");
-        assertEquals(2.0, (Double) result.toJavaObject());
+                obj.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyIsExtensibleBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var handler = {
                   isExtensible: function(target) {
@@ -657,43 +617,41 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                Object.isExtensible(proxy)""");
-        assertEquals(true, result.toJavaObject());
+                Object.isExtensible(proxy)""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyIsExtensibleForward() {
         // Test that isExtensible without trap forwards to target
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var proxy = new Proxy(target, {});
-                Object.isExtensible(proxy)""");
-        assertEquals(true, result.toJavaObject());
+                Object.isExtensible(proxy)""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyIsExtensibleInvariant() {
         // Test invariant: trap result must match target's extensibility
-        try {
-            context.eval("""
-                    var target = {};
-                    var handler = {
-                      isExtensible: function(target) {
-                        return false; // Lie about extensibility
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.isExtensible(proxy)""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("inconsistent") ||
-                    e.getMessage().contains("TypeError"));
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                var handler = {
+                  isExtensible: function(target) {
+                    return false; // Lie about extensibility
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.isExtensible(proxy)""");
     }
 
     @Test
     public void testProxyMultipleTraps() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var getCalled = false;
                 var setCalled = false;
@@ -711,25 +669,29 @@ public class ProxyConstructorTest extends BaseTest {
                 var proxy = new Proxy(target, handler);
                 var val = proxy.x;
                 proxy.y = 2;
-                getCalled && setCalled""");
-        assertEquals(true, result.toJavaObject());
+                getCalled && setCalled""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyNestedRevocation() {
         // Test that revoking outer proxy doesn't affect inner proxy
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var {proxy: inner, revoke: revokeInner} = Proxy.revocable(target, {});
                 var {proxy: outer, revoke: revokeOuter} = Proxy.revocable(inner, {});
                 revokeOuter();
-                inner.x""");
-        assertEquals(1.0, (Double) result.toJavaObject());
+                inner.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyOwnKeysBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1, y: 2};
                 var handler = {
                   ownKeys: function(target) {
@@ -737,17 +699,21 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                Object.keys(proxy).length""");
-        assertEquals(3.0, (Double) result.toJavaObject());
+                JSON.stringify(Object.keys(proxy))""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyOwnKeysForward() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1, y: 2};
                 var proxy = new Proxy(target, {});
-                Object.keys(proxy).length""");
-        assertEquals(2.0, (Double) result.toJavaObject());
+                Object.keys(proxy).length""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
@@ -797,7 +763,7 @@ public class ProxyConstructorTest extends BaseTest {
     @Test
     public void testProxyOwnKeysWithSymbols() {
         // Test that ownKeys can return symbols
-        JSValue result = context.eval("""
+        String code = """
                 var sym1 = Symbol('a');
                 var sym2 = Symbol('b');
                 var target = {x: 1};
@@ -808,9 +774,10 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                Object.getOwnPropertySymbols(proxy).length""");
-        // Should return 2 symbols (sym1 and sym2)
-        assertEquals(2.0, (Double) result.toJavaObject());
+                Object.getOwnPropertySymbols(proxy).length""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     // ============================================================
@@ -819,7 +786,7 @@ public class ProxyConstructorTest extends BaseTest {
 
     @Test
     public void testProxyPreventExtensionsBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var handler = {
                   preventExtensions: function(target) {
@@ -829,63 +796,59 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 Object.preventExtensions(proxy);
-                Object.isExtensible(proxy)""");
-        assertEquals(false, result.toJavaObject());
+                Object.isExtensible(proxy)""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyPreventExtensionsForward() {
         // Test that preventExtensions without trap forwards to target
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var proxy = new Proxy(target, {});
                 Object.preventExtensions(proxy);
-                Object.isExtensible(proxy)""");
-        assertEquals(false, result.toJavaObject());
+                Object.isExtensible(proxy)""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyPreventExtensionsInvariant() {
         // Test invariant: if trap returns true, target must be non-extensible
-        try {
-            context.eval("""
-                    var target = {};
-                    var handler = {
-                      preventExtensions: function(target) {
-                        return true;
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.preventExtensions(proxy)""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'preventExtensions' on proxy: trap returned truish but the proxy target is extensible", e.getMessage());
-        }
+        String code = """
+                var target = {};
+                var handler = {
+                  preventExtensions: function(target) {
+                    return true;
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.preventExtensions(proxy)""";
+        assertErrorWithJavet(code, "trap returned truish but the proxy target is extensible");
     }
 
     @Test
     public void testProxyPreventExtensionsReturningFalse() {
         // Test that preventExtensions trap can return false
-        try {
-            context.eval("""
-                    var target = {};
-                    var handler = {
-                      preventExtensions: function(target) {
-                        return false;
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.preventExtensions(proxy)""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'preventExtensions' on proxy: trap returned falsish", e.getMessage());
-        }
+        String code = """
+                var target = {};
+                var handler = {
+                  preventExtensions: function(target) {
+                    return false;
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.preventExtensions(proxy)""";
+        assertErrorWithJavet(code, "trap returned falsish");
     }
 
     @Test
     public void testProxyReceiverInGet() {
         // Test that get trap receives correct receiver
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var handler = {
                   get: function(target, prop, receiver) {
@@ -893,14 +856,16 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.x""");
-        assertEquals("correct", result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyReceiverInSet() {
         // Test that set trap receives correct receiver
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var handler = {
                   set: function(target, prop, value, receiver) {
@@ -912,93 +877,97 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 proxy.x = 1;
-                target.result""");
-        assertEquals("correct", result.toJavaObject());
+                target.result""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyRevocableAccessAfterRevoke() {
         // Test that accessing revoked proxy throws TypeError
-        context.eval("""
+        assertErrorWithJavet("""
                 var target = {x: 1};
                 var handler = {};
                 var {proxy, revoke} = Proxy.revocable(target, handler);
                 proxy.x; // Works before revoke
-                revoke();""");
-        // Try to access revoked proxy - should throw TypeError
-        try {
-            context.eval("proxy.x");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("revoked proxy") ||
-                    e.getMessage().contains("TypeError"));
-        }
+                revoke();
+                proxy.x""");
     }
 
     @Test
     public void testProxyRevocableAccessBeforeRevoke() {
         // Test that proxy works normally before revocation
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var handler = {};
                 var {proxy, revoke} = Proxy.revocable(target, handler);
-                proxy.x""");
-        // Proxy access returns the value
-        assertEquals(1.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyRevocableBasic() {
         // Test that Proxy.revocable returns an object with proxy and revoke
-        JSValue result = context.eval("""
+        String code1 = """
                 var target = {x: 1};
                 var handler = {};
                 var revocable = Proxy.revocable(target, handler);
-                typeof revocable""");
-        assertEquals("object", result.toJavaObject());
+                typeof revocable""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code1).executeString(),
+                () -> context.eval(code1).toJavaObject());
 
-        result = context.eval("typeof revocable.proxy");
-        assertEquals("object", result.toJavaObject());
+        String code2 = """
+                var target = {x: 1};
+                var handler = {};
+                var revocable = Proxy.revocable(target, handler);
+                typeof revocable.proxy""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code2).executeString(),
+                () -> context.eval(code2).toJavaObject());
 
-        result = context.eval("typeof revocable.revoke");
-        assertEquals("function", result.toJavaObject());
+        String code3 = """
+                var target = {x: 1};
+                var handler = {};
+                var revocable = Proxy.revocable(target, handler);
+                typeof revocable.revoke""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code3).executeString(),
+                () -> context.eval(code3).toJavaObject());
     }
 
     @Test
     public void testProxyRevocableRevokeMultipleTimes() {
         // Test that calling revoke multiple times doesn't cause issues
-        JSValue result = context.eval("""
+        String code = """
                 var target = {x: 1};
                 var handler = {};
                 var {proxy, revoke} = Proxy.revocable(target, handler);
                 revoke();
                 revoke(); // Call revoke again
-                'ok'""");
-        assertEquals("ok", result.toJavaObject());
+                'ok'""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyRevocableSetAfterRevoke() {
         // Test that setting on revoked proxy throws TypeError
-        context.eval("""
+        assertErrorWithJavet("""
                 var target = {x: 1};
                 var handler = {};
                 var {proxy, revoke} = Proxy.revocable(target, handler);
-                revoke();""");
-
-        // Try to set on revoked proxy - should throw TypeError
-        try {
-            context.eval("proxy.y = 2");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("revoked proxy") ||
-                    e.getMessage().contains("TypeError"));
-        }
+                revoke();
+                proxy.y = 2""");
     }
 
     @Test
     public void testProxySetBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var handler = {
                   set: function(target, prop, value, receiver) {
@@ -1008,24 +977,28 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 proxy.x = 5;
-                proxy.x""");
-        assertEquals(10.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxySetForward() {
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 var proxy = new Proxy(target, {});
                 proxy.x = 42;
-                proxy.x""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxySetInvariantNonWritable() {
         // Test invariant: can't change non-writable property
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 Object.defineProperty(target, 'x', {
                   value: 1,
@@ -1039,13 +1012,15 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 proxy.x = 2;
-                proxy.x""");
-        assertEquals(1.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxySetPrototypeOfBasic() {
-        JSValue result = context.eval("""
+        String code = """
                 var newProto = {x: 2};
                 var target = {y: 1};
                 var handler = {
@@ -1056,43 +1031,41 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 Object.setPrototypeOf(proxy, newProto);
-                Object.getPrototypeOf(proxy).x""");
-        assertEquals(2.0, (Double) result.toJavaObject());
+                Object.getPrototypeOf(proxy).x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxySetPrototypeOfForward() {
         // Test that setPrototypeOf without trap forwards to target
-        JSValue result = context.eval("""
+        String code = """
                 var newProto = {x: 42};
                 var target = {};
                 var proxy = new Proxy(target, {});
                 Object.setPrototypeOf(proxy, newProto);
-                Object.getPrototypeOf(proxy).x""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                Object.getPrototypeOf(proxy).x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxySetPrototypeOfInvariant() {
         // Test invariant: if target is non-extensible, can't change prototype
-        try {
-            context.eval("""
-                    var proto1 = {x: 1};
-                    var proto2 = {x: 2};
-                    var target = Object.create(proto1);
-                    Object.preventExtensions(target);
-                    var handler = {
-                      setPrototypeOf: function(target, proto) {
-                        return true; // Claim success without changing
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.setPrototypeOf(proxy, proto2)""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("inconsistent") ||
-                    e.getMessage().contains("TypeError"));
-        }
+        assertErrorWithJavet("""
+                var proto1 = {x: 1};
+                var proto2 = {x: 2};
+                var target = Object.create(proto1);
+                Object.preventExtensions(target);
+                var handler = {
+                  setPrototypeOf: function(target, proto) {
+                    return true; // Claim success without changing
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.setPrototypeOf(proxy, proto2)""");
     }
 
     @Test
@@ -1179,7 +1152,7 @@ public class ProxyConstructorTest extends BaseTest {
     @Test
     public void testProxyWithArrayLikeObject() {
         // Test proxy with array-like object (has length property)
-        JSValue result = context.eval("""
+        String code = """
                 var target = {0: 'a', 1: 'b', 2: 'c', length: 3};
                 var handler = {
                   get: function(target, prop) {
@@ -1187,26 +1160,27 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                Array.prototype.join.call(proxy, ',')""");
-        assertEquals("a,b,c", result.toJavaObject());
+                Array.prototype.join.call(proxy, ',')""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithBigIntObjectArithmetic() {
         // Test that proxied BigInt object valueOf works
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = Object(BigInt(10));
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.valueOf()""");
-        assertEquals(BigInteger.valueOf(10), result.toJavaObject());
     }
 
     @Test
     public void testProxyWithBigIntObjectAsTarget() {
         // Test that BigInt object (Object(BigInt(42))) can be a proxy target
         // BigInt objects are needed as proxy targets since primitive BigInts cannot be proxied
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object(BigInt(42));
                 var handler = {
                   get: function(target, prop) {
@@ -1217,14 +1191,16 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.test""");
-        assertEquals("intercepted", result.toJavaObject());
+                proxy.test""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithBigIntObjectHasTrap() {
         // Test has trap on BigInt object proxy
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object(BigInt(42));
                 target.customProp = 'exists';
                 var handler = {
@@ -1236,14 +1212,16 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                'fakeProperty' in proxy""");
-        assertEquals(true, result.toJavaObject());
+                'fakeProperty' in proxy""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithBigIntObjectSetTrap() {
         // Test set trap on BigInt object proxy
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object(BigInt(42));
                 var handler = {
                   set: function(target, prop, value) {
@@ -1253,25 +1231,26 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 proxy.test = 21;
-                proxy.test""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                proxy.test""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithBigIntObjectToString() {
         // Test that proxied BigInt object toString works correctly
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = Object(BigInt(255));
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.toString()""");
-        assertEquals("255", result.toJavaObject());
     }
 
     @Test
     public void testProxyWithBigIntObjectValueOf() {
         // Test that proxied BigInt object valueOf works correctly
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = Object(BigInt(100));
                 var handler = {
                   get: function(target, prop) {
@@ -1280,14 +1259,13 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 proxy.valueOf()""");
-        assertEquals(java.math.BigInteger.valueOf(100), result.toJavaObject());
     }
 
     @Test
     public void testProxyWithBooleanObjectAsTarget() {
         // Test that Boolean object (new Boolean(true)) can be a proxy target
         // Boolean objects are needed as proxy targets since primitive booleans cannot be proxied
-        JSValue result = context.eval("""
+        String code = """
                 var target = new Boolean(true);
                 var handler = {
                   get: function(target, prop) {
@@ -1298,25 +1276,26 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.test""");
-        assertEquals("intercepted", result.toJavaObject());
+                proxy.test""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithBooleanObjectToString() {
         // Test that proxied Boolean object still works with toString
-        JSValue result = context.eval("""
-                var target = new Boolean(false);
+        assertErrorWithJavet("""
+                var target = new Boolean(true);
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.toString()""");
-        assertEquals("false", result.toJavaObject());
     }
 
     @Test
     public void testProxyWithBooleanObjectTrapGet() {
         // Test that get trap intercepts valueOf on Boolean object
-        JSValue result = context.eval("""
+        String code = """
                 var target = new Boolean(true);
                 var handler = {
                   get: function(target, prop) {
@@ -1327,25 +1306,26 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.valueOf()""");
-        assertFalse((Boolean) result.toJavaObject());
+                proxy.valueOf()""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithBooleanObjectValueOf() {
         // Test that proxied Boolean object still works with valueOf
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = new Boolean(true);
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.valueOf()""");
-        assertTrue((Boolean) result.toJavaObject());
     }
 
     @Test
     public void testProxyWithNullPrototype() {
         // Test proxy with null prototype target
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object.create(null);
                 target.x = 42;
                 var handler = {
@@ -1354,15 +1334,17 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.x""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                proxy.x""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithNumberObjectAsTarget() {
         // Test that Number object (new Number(42)) can be a proxy target
         // Number objects are needed as proxy targets since primitive numbers cannot be proxied
-        JSValue result = context.eval("""
+        String code = """
                 var target = new Number(42);
                 var handler = {
                   get: function(target, prop) {
@@ -1373,44 +1355,26 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.test""");
-        assertEquals("intercepted", result.toJavaObject());
-    }
-
-    @Test
-    public void testProxyWithNumberObjectSpecialValues() {
-        // Test that Number object with NaN can be proxied
-        JSValue resultNaN = context.eval("""
-                var target = new Number(NaN);
-                var handler = {};
-                var proxy = new Proxy(target, handler);
-                proxy.valueOf()""");
-        assertTrue(Double.isNaN((Double) resultNaN.toJavaObject()));
-
-        // Test that Number object with Infinity can be proxied
-        JSValue resultInf = context.eval("""
-                var target = new Number(Infinity);
-                var handler = {};
-                var proxy = new Proxy(target, handler);
-                proxy.valueOf()""");
-        assertEquals(Double.POSITIVE_INFINITY, (Double) resultInf.toJavaObject());
+                proxy.test""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithNumberObjectToString() {
         // Test that proxied Number object still works with toString
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = new Number(42);
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.toString()""");
-        assertEquals("42", result.toJavaObject());
     }
 
     @Test
     public void testProxyWithNumberObjectTrapGet() {
         // Test that get trap intercepts valueOf on Number object
-        JSValue result = context.eval("""
+        String code = """
                 var target = new Number(100);
                 var handler = {
                   get: function(target, prop) {
@@ -1421,25 +1385,26 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.valueOf()""");
-        assertEquals(999.0, (Double) result.toJavaObject());
+                proxy.valueOf()""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithNumberObjectValueOf() {
         // Test that proxied Number object still works with valueOf
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = new Number(3.14);
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.valueOf()""");
-        assertEquals(3.14, (Double) result.toJavaObject(), 0.001);
     }
 
     @Test
     public void testProxyWithNumericProperties() {
         // Test that proxy works with object having numeric property names
-        JSValue result = context.eval("""
+        String code = """
                 var target = {};
                 target['0'] = 1;
                 target['1'] = 2;
@@ -1450,15 +1415,17 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy['0']""");
-        assertEquals(2.0, (Double) result.toJavaObject());  // 1 * 2
+                proxy['0']""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithStringObjectAsTarget() {
         // Test that String object (new String("hello")) can be a proxy target
         // String objects are needed as proxy targets since primitive strings cannot be proxied
-        JSValue result = context.eval("""
+        String code = """
                 var target = new String('hello');
                 var handler = {
                   get: function(target, prop) {
@@ -1469,14 +1436,16 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.test""");
-        assertEquals("intercepted", result.toJavaObject());
+                proxy.test""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithStringObjectCharAccess() {
         // Test that proxied String object supports character access
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = new String('hello');
                 var handler = {
                   get: function(target, prop) {
@@ -1488,35 +1457,35 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 proxy[1]""");
-        assertEquals("X", result.toJavaObject());
     }
 
     @Test
     public void testProxyWithStringObjectLength() {
         // Test that proxied String object has length property
-        JSValue result = context.eval("""
+        String code = """
                 var target = new String('hello');
                 var handler = {};
                 var proxy = new Proxy(target, handler);
-                proxy.length""");
-        assertEquals(5.0, (Double) result.toJavaObject());
+                proxy.length""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithStringObjectToString() {
         // Test that proxied String object still works with toString
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = new String('hello');
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.toString()""");
-        assertEquals("hello", result.toJavaObject());
     }
 
     @Test
     public void testProxyWithStringObjectTrapGet() {
         // Test that get trap intercepts methods on String object
-        JSValue result = context.eval("""
+        String code = """
                 var target = new String('hello');
                 var handler = {
                   get: function(target, prop) {
@@ -1527,25 +1496,26 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.toUpperCase()""");
-        assertEquals("INTERCEPTED", result.toJavaObject());
+                proxy.toUpperCase()""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithStringObjectValueOf() {
         // Test that proxied String object still works with valueOf
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = new String('world');
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.valueOf()""");
-        assertEquals("world", result.toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolObjectAsPropertyKey() {
         // Test that symbol object is created and can be used with proxy
-        JSValue result = context.eval("""
+        String code = """
                 var symObj = Object(Symbol('key'));
                 var sym = symObj.valueOf();
                 var target = {};
@@ -1560,15 +1530,17 @@ public class ProxyConstructorTest extends BaseTest {
                 };
                 var proxy = new Proxy(target, handler);
                 proxy[sym] = 'value';
-                proxy[sym]""");
-        assertEquals("value", result.toJavaObject());
+                proxy[sym]""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolObjectAsTarget() {
         // Test that Symbol object (Object(Symbol('foo'))) can be a proxy target
         // Symbol objects are needed as proxy targets since primitive symbols cannot be proxied
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object(Symbol('foo'));
                 var handler = {
                   get: function(target, prop) {
@@ -1579,14 +1551,16 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.test""");
-        assertEquals("intercepted", result.toJavaObject());
+                proxy.test""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolObjectDescription() {
         // Test accessing description through proxy
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object(Symbol('myDescription'));
                 var handler = {
                   get: function(target, prop) {
@@ -1597,37 +1571,40 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.description""");
-        assertEquals("modified", result.toJavaObject());
+                proxy.description""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolObjectGetPrimitiveValue() {
         // Test accessing [[PrimitiveValue]] through proxy
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object(Symbol('test'));
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 var primitiveValue = proxy['[[PrimitiveValue]]'];
-                typeof primitiveValue""");
-        assertEquals("symbol", result.toJavaObject());
+                typeof primitiveValue""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolObjectToString() {
         // Test that proxied Symbol object still works with toString
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = Object(Symbol('test'));
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 proxy.toString()""");
-        assertEquals("Symbol(test)", result.toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolObjectTrapGet() {
         // Test that get trap intercepts methods on Symbol object
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object(Symbol('test'));
                 var handler = {
                   get: function(target, prop) {
@@ -1638,26 +1615,27 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.toString()""");
-        assertEquals("INTERCEPTED", result.toJavaObject());
+                proxy.toString()""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolObjectValueOf() {
         // Test that proxied Symbol object still works with valueOf
-        JSValue result = context.eval("""
+        assertErrorWithJavet("""
                 var target = Object(Symbol('mySymbol'));
                 var handler = {};
                 var proxy = new Proxy(target, handler);
                 var primitiveValue = proxy.valueOf();
                 typeof primitiveValue""");
-        assertEquals("symbol", result.toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolObjectWellKnown() {
         // Test proxying an object wrapping a well-known symbol
-        JSValue result = context.eval("""
+        String code = """
                 var target = Object(Symbol.iterator);
                 var handler = {
                   get: function(target, prop) {
@@ -1668,14 +1646,16 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy.test""");
-        assertEquals("well-known", result.toJavaObject());
+                proxy.test""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testProxyWithSymbolProperty() {
         // Test that proxy works with symbol properties
-        JSValue result = context.eval("""
+        String code = """
                 var sym = Symbol('test');
                 var target = {};
                 target[sym] = 42;
@@ -1685,8 +1665,10 @@ public class ProxyConstructorTest extends BaseTest {
                   }
                 };
                 var proxy = new Proxy(target, handler);
-                proxy[sym]""");
-        assertEquals(42.0, (Double) result.toJavaObject());
+                proxy[sym]""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 }
 

@@ -62,7 +62,7 @@ public final class JSStringObject extends JSObject {
     public JSStringObject(JSString value) {
         super();
         this.value = value;
-        this.set("[[PrimitiveValue]]", value);
+        this.setPrimitiveValue(value);
         // String objects have a length property
         this.set("length", new JSNumber(value.value().length()));
     }
@@ -101,6 +101,52 @@ public final class JSStringObject extends JSObject {
             return new JSString(String.valueOf(value.value().charAt(index)));
         }
         return super.get(index);
+    }
+
+    /**
+     * Override getOwnPropertyDescriptor to support special String object semantics.
+     * Per ES spec, String exotic objects have indexed properties for each character
+     * with {writable: false, enumerable: true, configurable: false}.
+     *
+     * @param key the property key
+     * @return the property descriptor
+     */
+    @Override
+    public PropertyDescriptor getOwnPropertyDescriptor(PropertyKey key) {
+        // Check if this is an indexed property within the string bounds
+        if (key.isIndex()) {
+            int index = (int) key.getValue();
+            if (index >= 0 && index < value.value().length()) {
+                // Return descriptor for character at index
+                JSValue charValue = new JSString(String.valueOf(value.value().charAt(index)));
+                return PropertyDescriptor.dataDescriptor(
+                        charValue,  // value
+                        false,      // writable
+                        true,       // enumerable
+                        false       // configurable
+                );
+            }
+        } else if (key.isString()) {
+            // Check if string key is a valid numeric index
+            try {
+                int index = Integer.parseInt(key.asString());
+                if (index >= 0 && index < value.value().length()) {
+                    // Return descriptor for character at index
+                    JSValue charValue = new JSString(String.valueOf(value.value().charAt(index)));
+                    return PropertyDescriptor.dataDescriptor(
+                            charValue,  // value
+                            false,      // writable
+                            true,       // enumerable
+                            false       // configurable
+                    );
+                }
+            } catch (NumberFormatException e) {
+                // Not a numeric index, fall through
+            }
+        }
+
+        // For non-indexed properties, use default behavior
+        return super.getOwnPropertyDescriptor(key);
     }
 
     /**

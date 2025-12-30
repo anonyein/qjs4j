@@ -42,20 +42,8 @@ public class SymbolPrototypeTest extends BaseTest {
         result = SymbolPrototype.getDescription(ctx, symbolNoDesc, new JSValue[]{});
         assertTrue(result.isUndefined());
 
-        // Normal case: symbol object wrapper
-        JSObject symbolObj = new JSObject();
-        symbolObj.set("[[PrimitiveValue]]", symbolWithDesc);
-        result = SymbolPrototype.getDescription(ctx, symbolObj, new JSValue[]{});
-        assertEquals("testDescription", result.asString().map(JSString::value).orElseThrow());
-
         // Edge case: called on non-symbol
         result = SymbolPrototype.getDescription(ctx, new JSString("not a symbol"), new JSValue[]{});
-        assertTrue(result.isUndefined());
-
-        // Edge case: symbol object with wrong primitive value
-        JSObject badSymbolObj = new JSObject();
-        badSymbolObj.set("[[PrimitiveValue]]", new JSString("not a symbol"));
-        result = SymbolPrototype.getDescription(ctx, badSymbolObj, new JSValue[]{});
         assertTrue(result.isUndefined());
     }
 
@@ -66,12 +54,6 @@ public class SymbolPrototypeTest extends BaseTest {
         // Normal case: symbol
         JSSymbol symbol = new JSSymbol("test");
         JSValue result = SymbolPrototype.toPrimitive(ctx, symbol, new JSValue[]{});
-        assertEquals(symbol, result);
-
-        // Normal case: symbol object wrapper
-        JSObject symbolObj = new JSObject();
-        symbolObj.set("[[PrimitiveValue]]", symbol);
-        result = SymbolPrototype.toPrimitive(ctx, symbolObj, new JSValue[]{});
         assertEquals(symbol, result);
 
         // Edge case: called on non-symbol (should behave same as valueOf)
@@ -94,25 +76,12 @@ public class SymbolPrototypeTest extends BaseTest {
         result = SymbolPrototype.toString(ctx, symbolNoDesc, new JSValue[]{});
         assertEquals("Symbol()", result.asString().map(JSString::value).orElseThrow());
 
-        // Normal case: symbol object wrapper
-        JSObject symbolObj = new JSObject();
-        symbolObj.set("[[PrimitiveValue]]", symbolWithDesc);
-        result = SymbolPrototype.toString(ctx, symbolObj, new JSValue[]{});
-        assertEquals("Symbol(testDescription)", result.asString().map(JSString::value).orElseThrow());
-
         // Normal case: via eval for well-known symbol
         result = ctx.eval("Symbol.prototype.toString.call(Symbol.iterator)");
         assertEquals("Symbol(Symbol.iterator)", result.asString().map(JSString::value).orElseThrow());
 
         // Edge case: called on non-symbol
         result = SymbolPrototype.toString(ctx, new JSString("not a symbol"), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
-
-        // Edge case: symbol object with wrong primitive value
-        JSObject badSymbolObj = new JSObject();
-        badSymbolObj.set("[[PrimitiveValue]]", new JSString("not a symbol"));
-        result = SymbolPrototype.toString(ctx, badSymbolObj, new JSValue[]{});
         assertTypeError(result);
         assertPendingException(ctx);
 
@@ -147,21 +116,8 @@ public class SymbolPrototypeTest extends BaseTest {
         JSValue result = SymbolPrototype.valueOf(ctx, symbol, new JSValue[]{});
         assertEquals(symbol, result);
 
-        // Normal case: symbol object wrapper
-        JSObject symbolObj = new JSObject();
-        symbolObj.set("[[PrimitiveValue]]", symbol);
-        result = SymbolPrototype.valueOf(ctx, symbolObj, new JSValue[]{});
-        assertEquals(symbol, result);
-
         // Edge case: called on non-symbol
         result = SymbolPrototype.valueOf(ctx, new JSString("not a symbol"), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
-
-        // Edge case: symbol object with wrong primitive value
-        JSObject badSymbolObj = new JSObject();
-        badSymbolObj.set("[[PrimitiveValue]]", new JSString("not a symbol"));
-        result = SymbolPrototype.valueOf(ctx, badSymbolObj, new JSValue[]{});
         assertTypeError(result);
         assertPendingException(ctx);
     }

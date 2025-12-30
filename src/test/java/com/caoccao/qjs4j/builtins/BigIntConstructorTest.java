@@ -319,7 +319,7 @@ public class BigIntConstructorTest extends BaseJavetTest {
     @Test
     public void testNewBigIntThrowsTypeError() {
         // BigInt cannot be called with 'new' operator per ES2020 spec
-        assertErrorWithJavet("new BigInt(123)", "TypeError: BigInt is not a constructor");
+        assertErrorWithJavet("new BigInt(123)");
         // The correct way to create a BigInt object is Object(BigInt())
         assertThat(context.eval("Object(BigInt(123))"))
                 .isInstanceOfSatisfying(JSBigIntObject.class, bigIntObj ->

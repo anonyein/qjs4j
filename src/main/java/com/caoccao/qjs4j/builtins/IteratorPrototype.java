@@ -174,7 +174,7 @@ public final class IteratorPrototype {
         if (!(thisArg instanceof JSString str)) {
             // Try to get primitive value for boxed strings
             if (thisArg instanceof JSObject obj) {
-                JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+                JSValue primitiveValue = obj.getPrimitiveValue();
                 if (primitiveValue instanceof JSString boxedStr) {
                     return JSIterator.stringIterator(boxedStr);
                 }

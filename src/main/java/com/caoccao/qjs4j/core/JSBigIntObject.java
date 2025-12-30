@@ -67,7 +67,7 @@ public final class JSBigIntObject extends JSObject {
     public JSBigIntObject(JSBigInt value) {
         super();
         this.value = value;
-        this.set("[[PrimitiveValue]]", value);
+        this.setPrimitiveValue(value);
     }
 
     /**

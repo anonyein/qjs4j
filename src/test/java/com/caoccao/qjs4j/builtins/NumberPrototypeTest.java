@@ -403,10 +403,6 @@ public class NumberPrototypeTest extends BaseJavetTest {
         // Edge case: precision too high - skip error check due to JSObject implementation
         assertRangeError(NumberPrototype.toFixed(context, num, new JSValue[]{new JSNumber(101)}));
         assertPendingException(context);
-
-        // Edge case: non-number thisArg (should coerce)
-        result = NumberPrototype.toFixed(context, new JSString("42.5"), new JSValue[]{new JSNumber(1)});
-        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("42.5");
     }
 
     @Test

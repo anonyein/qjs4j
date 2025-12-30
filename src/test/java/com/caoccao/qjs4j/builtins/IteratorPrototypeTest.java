@@ -437,7 +437,7 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Normal case: boxed string
         JSObject boxedString = new JSObject();
-        boxedString.set("[[PrimitiveValue]]", str);
+        boxedString.setPrimitiveValue(str);
         result = IteratorPrototype.stringIterator(ctx, boxedString, new JSValue[]{});
         result.asIterator().orElseThrow();
 

@@ -15,11 +15,19 @@ import static org.assertj.core.api.Assertions.*;
 public class BaseJavetTest extends BaseTest {
     protected V8Runtime v8Runtime;
 
+    protected void assertErrorWithJavet(String code) {
+        String expectedMessage = assertThatThrownBy(() -> v8Runtime.getExecutor(code).executeVoid())
+                .isInstanceOf(JavetException.class).actual().getMessage();
+        assertThatThrownBy(() -> context.eval(code), expectedMessage)
+                .isInstanceOf(JSException.class)
+                .hasMessageContaining(expectedMessage);
+    }
+
     protected void assertErrorWithJavet(String code, String expectedMessage) {
-        assertThatThrownBy(() -> v8Runtime.getExecutor(code).executeVoid())
+        assertThatThrownBy(() -> v8Runtime.getExecutor(code).executeVoid(), expectedMessage)
                 .isInstanceOf(JavetException.class)
                 .hasMessageContaining(expectedMessage);
-        assertThatThrownBy(() -> context.eval(code))
+        assertThatThrownBy(() -> context.eval(code), expectedMessage)
                 .isInstanceOf(JSException.class)
                 .hasMessageContaining(expectedMessage);
     }

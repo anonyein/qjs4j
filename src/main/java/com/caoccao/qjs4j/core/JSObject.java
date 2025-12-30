@@ -36,6 +36,7 @@ public non-sealed class JSObject implements JSValue {
     protected boolean extensible = true;
     protected boolean frozen = false;
     protected JSValue[] propertyValues;
+    protected JSValue primitiveValue; // Internal slot for [[PrimitiveValue]] (not accessible from JS)
     protected JSObject prototype;
     protected boolean sealed = false;
     protected JSShape shape;
@@ -362,6 +363,22 @@ public non-sealed class JSObject implements JSValue {
             return sparseProperties.containsKey(key.asIndex());
         }
         return false;
+    }
+
+    /**
+     * Get the [[PrimitiveValue]] internal slot.
+     * This is for internal use only - not accessible from JavaScript.
+     */
+    public JSValue getPrimitiveValue() {
+        return primitiveValue;
+    }
+
+    /**
+     * Set the [[PrimitiveValue]] internal slot.
+     * This is for internal use only - not accessible from JavaScript.
+     */
+    public void setPrimitiveValue(JSValue value) {
+        this.primitiveValue = value;
     }
 
     /**

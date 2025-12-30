@@ -155,6 +155,11 @@ public class BigIntPrototypeTest extends BaseJavetTest {
         result = BigIntPrototype.toString(context, new JSString("not a bigint"), new JSValue[]{});
         assertTypeError(result);
         assertPendingException(context);
+
+        String code = "Object(BigInt(123n)).toString()";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
@@ -168,5 +173,10 @@ public class BigIntPrototypeTest extends BaseJavetTest {
         result = BigIntPrototype.valueOf(context, new JSString("not a bigint"), new JSValue[]{});
         assertTypeError(result);
         assertPendingException(context);
+
+        String code = "Object(BigInt(123n)).valueOf()";
+        assertWithJavet(
+                () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
+                () -> context.eval(code).toJavaObject());
     }
 }

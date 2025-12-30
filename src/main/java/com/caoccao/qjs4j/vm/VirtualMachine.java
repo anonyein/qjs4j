@@ -40,6 +40,16 @@ public final class VirtualMachine {
     }
 
     /**
+     * Clear the pending exception in the VM.
+     * This is needed when an async function catches an exception.
+     */
+    public void clearPendingException() {
+        this.pendingException = null;
+    }
+
+    // ==================== Arithmetic Operation Handlers ====================
+
+    /**
      * Execute a bytecode function.
      */
     public JSValue execute(JSBytecodeFunction function, JSValue thisArg, JSValue[] args) {
@@ -564,8 +574,6 @@ public final class VirtualMachine {
             throw new VMException("VM error: " + e.getMessage(), e);
         }
     }
-
-    // ==================== Arithmetic Operation Handlers ====================
 
     private void handleAdd() {
         JSValue right = valueStack.pop();
@@ -1400,14 +1408,14 @@ public final class VirtualMachine {
         valueStack.push(JSBoolean.valueOf(result));
     }
 
+    // ==================== Bitwise Operation Handlers ====================
+
     private void handleExp() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         double result = Math.pow(JSTypeConversions.toNumber(context, left).value(), JSTypeConversions.toNumber(context, right).value());
         valueStack.push(new JSNumber(result));
     }
-
-    // ==================== Bitwise Operation Handlers ====================
 
     private void handleGt() {
         JSValue right = valueStack.pop();
@@ -1461,13 +1469,13 @@ public final class VirtualMachine {
         }
     }
 
+    // ==================== Comparison Operation Handlers ====================
+
     private void handleLogicalNot() {
         JSValue operand = valueStack.pop();
         boolean result = JSTypeConversions.toBoolean(operand) == JSBoolean.FALSE;
         valueStack.push(JSBoolean.valueOf(result));
     }
-
-    // ==================== Comparison Operation Handlers ====================
 
     private void handleLogicalOr() {
         JSValue right = valueStack.pop();
@@ -1539,14 +1547,14 @@ public final class VirtualMachine {
         }
     }
 
+    // ==================== Logical Operation Handlers ====================
+
     private void handleOr() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         int result = JSTypeConversions.toInt32(context, left) | JSTypeConversions.toInt32(context, right);
         valueStack.push(new JSNumber(result));
     }
-
-    // ==================== Logical Operation Handlers ====================
 
     private void handlePlus() {
         JSValue operand = valueStack.pop();
@@ -1570,6 +1578,8 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber(leftInt << (rightInt & 0x1F)));
     }
 
+    // ==================== Type Operation Handlers ====================
+
     private void handleShr() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
@@ -1578,14 +1588,14 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber((leftInt >>> (rightInt & 0x1F)) & 0xFFFFFFFFL));
     }
 
-    // ==================== Type Operation Handlers ====================
-
     private void handleStrictEq() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         boolean result = JSTypeConversions.strictEquals(left, right);
         valueStack.push(JSBoolean.valueOf(result));
     }
+
+    // ==================== Async Operation Handlers ====================
 
     private void handleStrictNeq() {
         JSValue right = valueStack.pop();
@@ -1594,7 +1604,7 @@ public final class VirtualMachine {
         valueStack.push(JSBoolean.valueOf(result));
     }
 
-    // ==================== Async Operation Handlers ====================
+    // ==================== Function Call Handlers ====================
 
     private void handleSub() {
         JSValue right = valueStack.pop();
@@ -1602,8 +1612,6 @@ public final class VirtualMachine {
         double result = JSTypeConversions.toNumber(context, left).value() - JSTypeConversions.toNumber(context, right).value();
         valueStack.push(new JSNumber(result));
     }
-
-    // ==================== Function Call Handlers ====================
 
     private void handleTypeof() {
         JSValue operand = valueStack.pop();
@@ -1632,7 +1640,7 @@ public final class VirtualMachine {
         // Check if target is callable BEFORE checking for apply trap
         JSValue target = proxy.getTarget();
         if (!(target instanceof JSFunction)) {
-            throw new JSException(context.throwTypeError("not a function"));
+            throw new JSException(context.throwTypeError("proxy is not a function"));
         }
 
         // Get the apply trap from the handler
@@ -1756,7 +1764,10 @@ public final class VirtualMachine {
 
         // Validate that construct trap returned an object
         if (!(result instanceof JSObject)) {
-            throw new JSException(context.throwTypeError("construct trap must return an object"));
+            throw new JSException(context.throwTypeError(
+                    "'construct' on proxy: trap returned non-object ('" +
+                            JSTypeConversions.toString(context, result) +
+                            "')"));
         }
 
         return result;
@@ -1789,7 +1800,7 @@ public final class VirtualMachine {
                     JSObject wrapper = new JSObject();
                     wrapper.setPrototype(protoObj);
                     // Store the primitive value
-                    wrapper.set("[[PrimitiveValue]]", str);
+                    wrapper.setPrimitiveValue(str);
                     return wrapper;
                 }
             }
@@ -1804,7 +1815,7 @@ public final class VirtualMachine {
                 if (prototype instanceof JSObject protoObj) {
                     JSObject wrapper = new JSObject();
                     wrapper.setPrototype(protoObj);
-                    wrapper.set("[[PrimitiveValue]]", num);
+                    wrapper.setPrimitiveValue(num);
                     return wrapper;
                 }
             }
@@ -1819,21 +1830,13 @@ public final class VirtualMachine {
                 if (prototype instanceof JSObject protoObj) {
                     JSObject wrapper = new JSObject();
                     wrapper.setPrototype(protoObj);
-                    wrapper.set("[[PrimitiveValue]]", bool);
+                    wrapper.setPrimitiveValue(bool);
                     return wrapper;
                 }
             }
         }
 
         return null;
-    }
-    
-    /**
-     * Clear the pending exception in the VM.
-     * This is needed when an async function catches an exception.
-     */
-    public void clearPendingException() {
-        this.pendingException = null;
     }
 
     /**

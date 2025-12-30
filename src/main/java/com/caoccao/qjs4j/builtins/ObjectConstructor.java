@@ -875,7 +875,11 @@ public final class ObjectConstructor {
 
         for (PropertyKey key : propertyKeys) {
             if (key.isString()) {
-                result.push(new JSString(key.asString()));
+                // Check if property is enumerable
+                PropertyDescriptor desc = obj.getOwnPropertyDescriptor(key);
+                if (desc != null && desc.isEnumerable()) {
+                    result.push(new JSString(key.asString()));
+                }
             }
         }
 

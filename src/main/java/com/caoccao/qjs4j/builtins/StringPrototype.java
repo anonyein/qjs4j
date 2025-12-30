@@ -665,19 +665,9 @@ public final class StringPrototype {
      * ES2020 21.1.3.23
      */
     public static JSValue toString_(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (thisArg instanceof JSString str) {
-            return str;
-        }
-
-        if (thisArg instanceof JSObject obj) {
-            // Check for [[StringData]] internal slot
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSString str) {
-                return str;
-            }
-        }
-
-        return context.throwTypeError("String.prototype.toString requires that 'this' be a String");
+        return thisArg.asStringWithDownCast()
+                .map(jsString -> (JSValue) jsString)
+                .orElseGet(() -> context.throwTypeError("String.prototype.toString requires that 'this' be a String"));
     }
 
     /**
@@ -721,18 +711,8 @@ public final class StringPrototype {
      * ES2020 21.1.3.29
      */
     public static JSValue valueOf(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (thisArg instanceof JSString str) {
-            return str;
-        }
-
-        if (thisArg instanceof JSObject obj) {
-            // Check for [[StringData]] internal slot
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSString str) {
-                return str;
-            }
-        }
-
-        return context.throwTypeError("String.prototype.valueOf called on non-string");
+        return thisArg.asStringWithDownCast()
+                .map(jsString -> (JSValue) jsString)
+                .orElseGet(() -> context.throwTypeError("String.prototype.valueOf requires that 'this' be a String"));
     }
 }

@@ -368,7 +368,7 @@ public final class JSTypeConversions {
 
         // Handle wrapper objects (String, Number, Boolean, BigInt objects)
         if (value instanceof JSObject obj) {
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+            JSValue primitiveValue = obj.getPrimitiveValue();
             if (primitiveValue instanceof JSNumber num) {
                 return num;
             } else if (primitiveValue instanceof JSString str) {
@@ -406,7 +406,7 @@ public final class JSTypeConversions {
         // For objects, call ToPrimitive with hint
         if (input instanceof JSObject obj) {
             // Check for [[PrimitiveValue]] internal slot (wrapper objects)
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+            JSValue primitiveValue = obj.getPrimitiveValue();
             if (primitiveValue != null && !(primitiveValue instanceof JSUndefined)) {
                 return primitiveValue;
             }
@@ -469,7 +469,7 @@ public final class JSTypeConversions {
 
         // Handle wrapper objects (String, Number, Boolean, BigInt objects)
         if (value instanceof JSObject obj) {
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
+            JSValue primitiveValue = obj.getPrimitiveValue();
             if (primitiveValue instanceof JSString str) {
                 return str;
             } else if (primitiveValue instanceof JSNumber num) {

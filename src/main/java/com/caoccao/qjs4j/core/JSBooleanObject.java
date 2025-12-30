@@ -62,7 +62,7 @@ public final class JSBooleanObject extends JSObject {
     public JSBooleanObject(JSBoolean value) {
         super();
         this.value = value;
-        this.set("[[PrimitiveValue]]", value);
+        this.setPrimitiveValue(value);
     }
 
     /**

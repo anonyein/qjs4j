@@ -18,35 +18,23 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.*;
 
+import java.util.Optional;
+
 /**
  * Implementation of Symbol.prototype methods.
  * Based on ES2020 Symbol specification.
  */
 public final class SymbolPrototype {
-
     /**
      * Symbol.prototype.description
      * ES2020 19.4.3.1
      * Getter for the Symbol's description.
      */
     public static JSValue getDescription(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSSymbol symbol;
-
-        if (thisArg instanceof JSSymbol sym) {
-            symbol = sym;
-        } else if (thisArg instanceof JSObject obj) {
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSSymbol sym) {
-                symbol = sym;
-            } else {
-                return JSUndefined.INSTANCE;
-            }
-        } else {
-            return JSUndefined.INSTANCE;
-        }
-
-        String description = symbol.getDescription();
-        return description != null ? new JSString(description) : JSUndefined.INSTANCE;
+        return thisArg.asSymbolWithDownCast()
+                .map(JSSymbol::getDescription)
+                .map(description -> (JSValue) new JSString(description))
+                .orElse(JSUndefined.INSTANCE);
     }
 
     /**
@@ -64,27 +52,12 @@ public final class SymbolPrototype {
      * Returns a string representation of the Symbol.
      */
     public static JSValue toString(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSSymbol symbol;
-
-        if (thisArg instanceof JSSymbol sym) {
-            symbol = sym;
-        } else if (thisArg instanceof JSObject obj) {
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSSymbol sym) {
-                symbol = sym;
-            } else {
-                return context.throwTypeError("Symbol.prototype.toString requires that 'this' be a Symbol");
-            }
-        } else {
-            return context.throwTypeError("Symbol.prototype.toString requires that 'this' be a Symbol");
-        }
-
-        String description = symbol.getDescription();
-        if (description != null) {
-            return new JSString("Symbol(" + description + ")");
-        } else {
-            return new JSString("Symbol()");
-        }
+        return thisArg.asSymbolWithDownCast()
+                .map(jsSymbol -> Optional.ofNullable(jsSymbol.getDescription()))
+                .map(optionalDescription -> (JSValue) new JSString(optionalDescription
+                        .map(description -> "Symbol(" + description + ")")
+                        .orElse("Symbol()")))
+                .orElseGet(() -> context.throwTypeError("Symbol.prototype.toString requires that 'this' be a Symbol"));
     }
 
     /**
@@ -102,15 +75,8 @@ public final class SymbolPrototype {
      * Returns the primitive value of the Symbol.
      */
     public static JSValue valueOf(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (thisArg instanceof JSSymbol symbol) {
-            return symbol;
-        } else if (thisArg instanceof JSObject obj) {
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSSymbol symbol) {
-                return symbol;
-            }
-        }
-
-        return context.throwTypeError("Symbol.prototype.valueOf called on non-Symbol");
+        return thisArg.asSymbolWithDownCast()
+                .map(jsSymbol -> (JSValue) jsSymbol)
+                .orElseGet(() -> context.throwTypeError("Symbol.prototype.valueOf requires that 'this' be a Symbol"));
     }
 }

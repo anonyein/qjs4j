@@ -16,7 +16,7 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for ObjectPrototype methods.
  */
-public class ObjectPrototypeTest extends BaseTest {
+public class ObjectPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testAssign() {
@@ -221,11 +221,13 @@ public class ObjectPrototypeTest extends BaseTest {
 
     @Test
     public void testSet() {
-        JSValue result = context.eval("""
+        String code = """
                 const obj = {};
                 obj.a = 1;
-                JSON.stringify(obj);""");
-        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("{\"a\":1}"));
+                JSON.stringify(obj);""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test

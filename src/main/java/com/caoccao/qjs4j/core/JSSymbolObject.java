@@ -70,7 +70,7 @@ public final class JSSymbolObject extends JSObject {
     public JSSymbolObject(JSSymbol value) {
         super();
         this.value = value;
-        this.set("[[PrimitiveValue]]", value);
+        this.setPrimitiveValue(value);
     }
 
     /**

@@ -72,17 +72,6 @@ public class BooleanPrototypeTest extends BaseJavetTest {
         result = BooleanPrototype.toString(context, JSBoolean.FALSE, new JSValue[]{});
         assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("false"));
 
-        // Normal case: Boolean object wrapper
-        JSObject boolObj = new JSObject();
-        boolObj.set("[[PrimitiveValue]]", JSBoolean.TRUE);
-        result = BooleanPrototype.toString(context, boolObj, new JSValue[]{});
-        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("true"));
-
-        JSObject boolObj2 = new JSObject();
-        boolObj2.set("[[PrimitiveValue]]", JSBoolean.FALSE);
-        result = BooleanPrototype.toString(context, boolObj2, new JSValue[]{});
-        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("false"));
-
         // Edge case: called on non-boolean
         assertTypeError(BooleanPrototype.toString(context, new JSString("not boolean"), new JSValue[]{}));
         assertPendingException(context);
@@ -109,17 +98,6 @@ public class BooleanPrototypeTest extends BaseJavetTest {
 
         // Normal case: false
         result = BooleanPrototype.valueOf(context, JSBoolean.FALSE, new JSValue[]{});
-        assertThat(result).isEqualTo(JSBoolean.FALSE);
-
-        // Normal case: Boolean object wrapper
-        JSObject boolObj = new JSObject();
-        boolObj.set("[[PrimitiveValue]]", JSBoolean.TRUE);
-        result = BooleanPrototype.valueOf(context, boolObj, new JSValue[]{});
-        assertThat(result).isEqualTo(JSBoolean.TRUE);
-
-        JSObject boolObj2 = new JSObject();
-        boolObj2.set("[[PrimitiveValue]]", JSBoolean.FALSE);
-        result = BooleanPrototype.valueOf(context, boolObj2, new JSValue[]{});
         assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Edge case: called on non-boolean

@@ -122,13 +122,13 @@ public class SymbolObjectTest extends BaseTest {
     @Test
     public void testSymbolObjectGetPrimitiveValue() {
         // Test accessing [[PrimitiveValue]] internal slot
+        // [[PrimitiveValue]] is an internal slot and should not be accessible via property access
         JSValue result = context.eval("""
                 var symObj = Object(Symbol('test'));
                 symObj['[[PrimitiveValue]]'];
                 """);
-        // This should return the primitive symbol value
-        assertInstanceOf(JSSymbol.class, result);
-        assertEquals("test", ((JSSymbol) result).getDescription());
+        // This should return undefined since [[PrimitiveValue]] is internal
+        assertTrue(result.isUndefined());
     }
 
     @Test

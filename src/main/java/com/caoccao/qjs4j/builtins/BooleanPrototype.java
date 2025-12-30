@@ -16,36 +16,23 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSString;
+import com.caoccao.qjs4j.core.JSValue;
 
 /**
  * Implementation of JavaScript Boolean.prototype methods.
  * Based on ES2020 Boolean specification.
  */
 public final class BooleanPrototype {
-
     /**
      * Boolean.prototype.toString()
      * ES2020 19.3.3.2
      */
     public static JSValue toString(JSContext context, JSValue thisArg, JSValue[] args) {
-        boolean value;
-
-        if (thisArg instanceof JSBoolean bool) {
-            value = bool.value();
-        } else if (thisArg instanceof JSObject obj) {
-            // Check for [[BooleanData]] internal slot
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSBoolean bool) {
-                value = bool.value();
-            } else {
-                return context.throwTypeError("Boolean.prototype.toString called on non-boolean");
-            }
-        } else {
-            return context.throwTypeError("Boolean.prototype.toString called on non-boolean");
-        }
-
-        return new JSString(value ? "true" : "false");
+        return thisArg.asBooleanWithDownCast()
+                .map(jsBoolean -> (JSValue) new JSString(jsBoolean.toString()))
+                .orElseGet(() -> context.throwTypeError("Boolean.prototype.toString requires that 'this' be a Boolean"));
     }
 
     /**
@@ -53,18 +40,8 @@ public final class BooleanPrototype {
      * ES2020 19.3.3.3
      */
     public static JSValue valueOf(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (thisArg instanceof JSBoolean bool) {
-            return bool;
-        }
-
-        if (thisArg instanceof JSObject obj) {
-            // Check for [[BooleanData]] internal slot
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSBoolean bool) {
-                return bool;
-            }
-        }
-
-        return context.throwTypeError("Boolean.prototype.valueOf called on non-boolean");
+        return thisArg.asBooleanWithDownCast()
+                .map(jsBoolean -> (JSValue) jsBoolean)
+                .orElseGet(() -> context.throwTypeError("Boolean.prototype.valueOf requires that 'this' be a Boolean"));
     }
 }

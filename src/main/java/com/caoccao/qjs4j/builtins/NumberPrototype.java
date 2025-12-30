@@ -251,45 +251,26 @@ public final class NumberPrototype {
     }
 
     /**
-     * Helper method to extract the number value from thisArg.
-     * Handles both primitive numbers and Number objects.
-     * For other values, attempts type coercion via ToNumber.
-     */
-    private static JSNumber thisValueToNumber(JSContext context, JSValue thisArg) {
-        if (thisArg instanceof JSNumber num) {
-            return num;
-        }
-
-        if (thisArg instanceof JSObject obj) {
-            // Check for [[NumberData]] internal slot (Number object)
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSNumber num) {
-                return num;
-            }
-        }
-
-        // For other values, attempt type coercion (maintains backward compatibility)
-        return JSTypeConversions.toNumber(context, thisArg);
-    }
-
-    /**
      * Number.prototype.toExponential(fractionDigits)
      * ES2020 20.1.3.2
      */
     public static JSValue toExponential(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = thisValueToNumber(context, thisArg);
-        double value = num.value();
-        // Get fractionDigits
-        if (args.length == 0 || args[0].isUndefined()) {
-            // No argument: use automatic precision (minimal digits to uniquely represent the value)
-            return new JSString(DtoaConverter.convertExponentialWithoutFractionDigits(value));
-        }
-        int fractionDigits = (int) JSTypeConversions.toInteger(context, args[0]);
-        // RangeError if out of bounds [0, 100]
-        if (fractionDigits < 0 || fractionDigits > DtoaConverter.MAX_DIGITS) {
-            return context.throwRangeError("toExponential() fractionDigits must be between 0 and 100");
-        }
-        return new JSString(DtoaConverter.convertExponentialWithFractionDigits(value, fractionDigits));
+        return thisArg.asNumberWithDownCast()
+                .map(jsNumber -> {
+                    double value = jsNumber.value();
+                    // Get fractionDigits
+                    if (args.length == 0 || args[0].isUndefined()) {
+                        // No argument: use automatic precision (minimal digits to uniquely represent the value)
+                        return new JSString(DtoaConverter.convertExponentialWithoutFractionDigits(value));
+                    }
+                    int fractionDigits = (int) JSTypeConversions.toInteger(context, args[0]);
+                    // RangeError if out of bounds [0, 100]
+                    if (fractionDigits < 0 || fractionDigits > DtoaConverter.MAX_DIGITS) {
+                        return context.throwRangeError("toExponential() argument must be between 0 and 100");
+                    }
+                    return new JSString(DtoaConverter.convertExponentialWithFractionDigits(value, fractionDigits));
+                })
+                .orElseGet(() -> context.throwTypeError("Number.prototype.toExponential requires that 'this' be a Number"));
     }
 
     /**
@@ -297,18 +278,21 @@ public final class NumberPrototype {
      * ES2020 20.1.3.3
      */
     public static JSValue toFixed(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = thisValueToNumber(context, thisArg);
-        double value = num.value();
-        int fractionDigits = 0;
-        // Get fractionDigits
-        if (args.length > 0 && !args[0].isUndefined()) {
-            fractionDigits = (int) JSTypeConversions.toInteger(context, args[0]);
-        }
-        // RangeError if out of bounds [0, 100]
-        if (fractionDigits < 0 || fractionDigits > DtoaConverter.MAX_DIGITS) {
-            return context.throwRangeError("toFixed() fractionDigits must be between 0 and 100");
-        }
-        return new JSString(DtoaConverter.convertFixed(value, fractionDigits));
+        return thisArg.asNumberWithDownCast()
+                .map(jsNumber -> {
+                    double value = jsNumber.value();
+                    int fractionDigits = 0;
+                    // Get fractionDigits
+                    if (args.length > 0 && !args[0].isUndefined()) {
+                        fractionDigits = (int) JSTypeConversions.toInteger(context, args[0]);
+                    }
+                    // RangeError if out of bounds [0, 100]
+                    if (fractionDigits < 0 || fractionDigits > DtoaConverter.MAX_DIGITS) {
+                        return context.throwRangeError("toFixed() digits argument must be between 0 and 100");
+                    }
+                    return new JSString(DtoaConverter.convertFixed(value, fractionDigits));
+                })
+                .orElseGet(() -> context.throwTypeError("Number.prototype.toPrecision requires that 'this' be a Number"));
     }
 
     /**
@@ -316,9 +300,12 @@ public final class NumberPrototype {
      * ES2020 20.1.3.4 (simplified)
      */
     public static JSValue toLocaleString(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = thisValueToNumber(context, thisArg);
-        // Simplified: just use default toString
-        return new JSString(DtoaConverter.convert(num.value()));
+        return thisArg.asNumberWithDownCast()
+                .map(jsNumber -> {
+                    // Simplified: just use default toString
+                    return (JSValue) new JSString(DtoaConverter.convert(jsNumber.value()));
+                })
+                .orElseGet(() -> context.throwTypeError("Number.prototype.toLocaleString requires that 'this' be a Number"));
     }
 
     /**
@@ -326,22 +313,21 @@ public final class NumberPrototype {
      * ES2020 20.1.3.5
      */
     public static JSValue toPrecision(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = thisValueToNumber(context, thisArg);
-        double value = num.value();
-
-        // If precision is undefined, use toString
-        if (args.length == 0 || args[0] instanceof JSUndefined) {
-            return new JSString(DtoaConverter.convert(value));
-        }
-
-        int precision = (int) JSTypeConversions.toInteger(context, args[0]);
-
-        // RangeError if out of bounds [1, 100]
-        if (precision < 1 || precision > DtoaConverter.MAX_PRECISION) {
-            return context.throwRangeError("toPrecision() precision must be between 1 and 100");
-        }
-
-        return new JSString(DtoaConverter.convertWithPrecision(value, precision));
+        return thisArg.asNumberWithDownCast()
+                .map(jsNumber -> {
+                    double value = jsNumber.value();
+                    // If precision is undefined, use toString
+                    if (args.length == 0 || args[0] instanceof JSUndefined) {
+                        return new JSString(DtoaConverter.convert(value));
+                    }
+                    int precision = (int) JSTypeConversions.toInteger(context, args[0]);
+                    // RangeError if out of bounds [1, 100]
+                    if (precision < 1 || precision > DtoaConverter.MAX_PRECISION) {
+                        return context.throwRangeError("toPrecision() precision must be between 1 and 100");
+                    }
+                    return new JSString(DtoaConverter.convertWithPrecision(value, precision));
+                })
+                .orElseGet(() -> context.throwTypeError("Number.prototype.toPrecision requires that 'this' be a Number"));
     }
 
     /**
@@ -349,32 +335,30 @@ public final class NumberPrototype {
      * ES2020 20.1.3.6
      */
     public static JSValue toString(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSNumber num = thisValueToNumber(context, thisArg);
-        double value = num.value();
-
-        // Handle special cases
-        if (Double.isNaN(value)) {
-            return new JSString("NaN");
-        }
-        if (Double.isInfinite(value)) {
-            return new JSString(value > 0 ? "Infinity" : "-Infinity");
-        }
-
-        // Get radix (default 10)
-        int radix = args.length > 0 ? (int) JSTypeConversions.toInteger(context, args[0]) : 10;
-
-        // RangeError if radix out of bounds [2, 36]
-        if (radix < 2 || radix > 36) {
-            return context.throwRangeError("toString() radix must be between 2 and 36");
-        }
-
-        // For radix 10, use default conversion
-        if (radix == 10) {
-            return new JSString(DtoaConverter.convert(value));
-        }
-
-        // For other radixes, convert using the radix conversion method
-        return new JSString(DtoaConverter.convertToRadix(value, radix));
+        return thisArg.asNumberWithDownCast()
+                .map(jsNumber -> {
+                    double value = jsNumber.value();
+                    // Handle special cases
+                    if (Double.isNaN(value)) {
+                        return new JSString("NaN");
+                    }
+                    if (Double.isInfinite(value)) {
+                        return new JSString(value > 0 ? "Infinity" : "-Infinity");
+                    }
+                    // Get radix (default 10)
+                    int radix = args.length > 0 ? (int) JSTypeConversions.toInteger(context, args[0]) : 10;
+                    // RangeError if radix out of bounds [2, 36]
+                    if (radix < 2 || radix > 36) {
+                        return context.throwRangeError("toString() radix must be between 2 and 36");
+                    }
+                    // For radix 10, use default conversion
+                    if (radix == 10) {
+                        return new JSString(DtoaConverter.convert(value));
+                    }
+                    // For other radixes, convert using the radix conversion method
+                    return new JSString(DtoaConverter.convertToRadix(value, radix));
+                })
+                .orElseGet(() -> context.throwTypeError("Number.prototype.toString requires that 'this' be a Number"));
     }
 
     /**
@@ -382,18 +366,8 @@ public final class NumberPrototype {
      * ES2020 20.1.3.7
      */
     public static JSValue valueOf(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (thisArg instanceof JSNumber num) {
-            return num;
-        }
-
-        if (thisArg instanceof JSObject obj) {
-            // Check for [[NumberData]] internal slot
-            JSValue primitiveValue = obj.get("[[PrimitiveValue]]");
-            if (primitiveValue instanceof JSNumber num) {
-                return num;
-            }
-        }
-
-        return context.throwTypeError("Number.prototype.valueOf called on non-number");
+        return thisArg.asNumberWithDownCast()
+                .map(jsNumber -> (JSValue) jsNumber)
+                .orElseGet(() -> context.throwTypeError("Number.prototype.valueOf requires that 'this' be a Number"));
     }
 }

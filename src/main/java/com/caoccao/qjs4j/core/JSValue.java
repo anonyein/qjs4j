@@ -82,6 +82,20 @@ public sealed interface JSValue extends JSStackValue permits
     }
 
     /**
+     * Attempt to extract JSBigInt from this value, whether it's a JSBigInt or JSBigIntObject.
+     *
+     * @return Optional containing the JSBigInt if this value is a BigInt or BigInt object, empty otherwise
+     */
+    default Optional<JSBigInt> asBigIntWithDownCast() {
+        if (this instanceof JSBigInt jsBigInt) {
+            return Optional.of(jsBigInt);
+        } else if (this instanceof JSBigIntObject jsBigIntObject) {
+            return Optional.of(jsBigIntObject.getValue());
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSBoolean.
      *
      * @return Optional containing the JSBoolean if this value is a boolean, empty otherwise
@@ -97,6 +111,20 @@ public sealed interface JSValue extends JSStackValue permits
      */
     default Optional<JSBooleanObject> asBooleanObject() {
         return this instanceof JSBooleanObject v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to extract JSBoolean from this value, whether it's a JSBoolean or JSBooleanObject.
+     *
+     * @return Optional containing the JSBoolean if this value is a boolean or Boolean object, empty otherwise
+     */
+    default Optional<JSBoolean> asBooleanWithDownCast() {
+        if (this instanceof JSBoolean jsBoolean) {
+            return Optional.of(jsBoolean);
+        } else if (this instanceof JSBooleanObject jsBooleanObject) {
+            return Optional.of(jsBooleanObject.getValue());
+        }
+        return Optional.empty();
     }
 
     /**
@@ -253,6 +281,20 @@ public sealed interface JSValue extends JSStackValue permits
     }
 
     /**
+     * Attempt to extract JSNumber from this value, whether it's a JSNumber or JSNumberObject.
+     *
+     * @return Optional containing the JSNumber if this value is a number or Number object, empty otherwise
+     */
+    default Optional<JSNumber> asNumberWithDownCast() {
+        if (this instanceof JSNumber jsNumber) {
+            return Optional.of(jsNumber);
+        } else if (this instanceof JSNumberObject jsNumberObject) {
+            return Optional.of(jsNumberObject.getValue());
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSObject.
      *
      * @return Optional containing the JSObject if this value is an object, empty otherwise
@@ -325,6 +367,20 @@ public sealed interface JSValue extends JSStackValue permits
     }
 
     /**
+     * Attempt to extract JSString from this value, whether it's a JSString or JSStringObject.
+     *
+     * @return Optional containing the JSString if this value is a string or String object, empty otherwise
+     */
+    default Optional<JSString> asStringWithDownCast() {
+        if (this instanceof JSString jsString) {
+            return Optional.of(jsString);
+        } else if (this instanceof JSStringObject jsStringObject) {
+            return Optional.of(jsStringObject.getValue());
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Attempt to cast this value to JSSymbol.
      *
      * @return Optional containing the JSSymbol if this value is a symbol, empty otherwise
@@ -340,6 +396,20 @@ public sealed interface JSValue extends JSStackValue permits
      */
     default Optional<JSSymbolObject> asSymbolObject() {
         return this instanceof JSSymbolObject v ? Optional.of(v) : Optional.empty();
+    }
+
+    /**
+     * Attempt to extract JSSymbol from this value, whether it's a JSSymbol or JSSymbolObject.
+     *
+     * @return Optional containing the JSSymbol if this value is a symbol or Symbol object, empty otherwise
+     */
+    default Optional<JSSymbol> asSymbolWithDownCast() {
+        if (this instanceof JSSymbol jsSymbol) {
+            return Optional.of(jsSymbol);
+        } else if (this instanceof JSSymbolObject jsSymbolObject) {
+            return Optional.of(jsSymbolObject.getValue());
+        }
+        return Optional.empty();
     }
 
     /**
