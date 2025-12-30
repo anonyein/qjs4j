@@ -216,14 +216,7 @@ public final class JSContext implements AutoCloseable {
             return throwError("RangeError", "Maximum call stack size exceeded");
         }
 
-        // Check for 'use strict' directive
-        boolean isStrict = code.trim().startsWith("'use strict'") || code.trim().startsWith("\"use strict\"");
-
         try {
-            if (isStrict) {
-                enterStrictMode();
-            }
-
             // Phase 1-3: Lexer → Parser → Compiler (compile to bytecode)
             JSBytecodeFunction func = com.caoccao.qjs4j.compiler.Compiler.compile(code, filename);
 
@@ -260,9 +253,6 @@ public final class JSContext implements AutoCloseable {
         } catch (Exception e) {
             return throwError("Error", "Execution error: " + e.getMessage());
         } finally {
-            if (isStrict) {
-                exitStrictMode();
-            }
             popStackFrame();
         }
     }

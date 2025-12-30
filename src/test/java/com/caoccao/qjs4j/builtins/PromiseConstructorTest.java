@@ -20,7 +20,7 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.JSValue;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for Promise constructor static methods with iterable support.
@@ -36,7 +36,7 @@ public class PromiseConstructorTest extends BaseTest {
                         "var p3 = Promise.resolve(3); " +
                         "Promise.all([p1, p2, p3]).then(arr => JSON.stringify(arr))"
         );
-        assertNotNull(result);
+        assertThat(result).isNotNull();
     }
 
     // Note: Tests for JavaScript native iterables (Set, Map, custom iterables) are not included

@@ -7,8 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class BigIntParserTest {
     @Test
@@ -17,15 +16,13 @@ public class BigIntParserTest {
         Parser parser = new Parser(lexer);
         Program program = parser.parse();
 
-        assertEquals(1, program.body().size());
-        assertInstanceOf(ExpressionStatement.class, program.body().get(0));
-
-        var exprStmt = (com.caoccao.qjs4j.compiler.ast.ExpressionStatement) program.body().get(0);
-        assertInstanceOf(Literal.class, exprStmt.expression());
-
-        Literal literal = (Literal) exprStmt.expression();
-        assertInstanceOf(BigInteger.class, literal.value());
-        assertEquals(BigInteger.valueOf(123), literal.value());
+        assertThat(program.body()).hasSize(1);
+        assertThat(program.body().get(0)).isInstanceOfSatisfying(ExpressionStatement.class, exprStmt -> {
+            assertThat(exprStmt.expression()).isInstanceOfSatisfying(Literal.class, literal -> {
+                assertThat(literal.value()).isInstanceOf(BigInteger.class);
+                assertThat(literal.value()).isEqualTo(BigInteger.valueOf(123));
+            });
+        });
     }
 
     @Test
@@ -34,9 +31,11 @@ public class BigIntParserTest {
         Parser parser = new Parser(lexer);
         Program program = parser.parse();
 
-        assertEquals(1, program.body().size());
-        var exprStmt = (com.caoccao.qjs4j.compiler.ast.ExpressionStatement) program.body().get(0);
-        Literal literal = (Literal) exprStmt.expression();
-        assertEquals(BigInteger.valueOf(255), literal.value());
+        assertThat(program.body()).hasSize(1);
+        assertThat(program.body().get(0)).isInstanceOfSatisfying(ExpressionStatement.class, exprStmt -> {
+            assertThat(exprStmt.expression()).isInstanceOfSatisfying(Literal.class, literal -> {
+                assertThat(literal.value()).isEqualTo(BigInteger.valueOf(255));
+            });
+        });
     }
 }

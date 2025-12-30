@@ -20,7 +20,7 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for Map constructor static methods.
@@ -48,22 +48,22 @@ public class MapConstructorTest extends BaseTest {
         // Check even group
         JSValue evenGroup = map.mapGet(new JSString("even"));
         JSArray evenArray = evenGroup.asArray().orElseThrow();
-        assertEquals(2, evenArray.getLength());
-        assertEquals(2.0, evenArray.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, evenArray.get(1).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(evenArray.getLength()).isEqualTo(2);
+        assertThat(evenArray.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(evenArray.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Check odd group
         JSValue oddGroup = map.mapGet(new JSString("odd"));
         JSArray oddArray = oddGroup.asArray().orElseThrow();
-        assertEquals(2, oddArray.getLength());
-        assertEquals(1.0, oddArray.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, oddArray.get(1).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(oddArray.getLength()).isEqualTo(2);
+        assertThat(oddArray.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(oddArray.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: empty array
         JSArray emptyItems = new JSArray();
         result = MapConstructor.groupBy(context, JSUndefined.INSTANCE, new JSValue[]{emptyItems, callback});
         map = result.asMap().orElseThrow();
-        assertEquals(0, map.size());
+        assertThat(map.size()).isEqualTo(0);
 
         // Edge case: insufficient arguments
         assertTypeError(MapConstructor.groupBy(context, JSUndefined.INSTANCE, new JSValue[]{items}));

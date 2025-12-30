@@ -41,6 +41,7 @@ public final class JSBytecodeFunction extends JSFunction {
     private final boolean isAsync;
     private final boolean isConstructor;
     private final boolean isGenerator;
+    private final boolean strict;
     private final int length;
     private final String name;
     private final JSObject prototype;
@@ -53,7 +54,19 @@ public final class JSBytecodeFunction extends JSFunction {
      * @param length   Number of formal parameters
      */
     public JSBytecodeFunction(Bytecode bytecode, String name, int length) {
-        this(bytecode, name, length, new JSValue[0], null, true, false, false);
+        this(bytecode, name, length, new JSValue[0], null, true, false, false, false);
+    }
+
+    /**
+     * Create a bytecode function with strict mode.
+     *
+     * @param bytecode The compiled bytecode
+     * @param name     Function name (empty string for anonymous)
+     * @param length   Number of formal parameters
+     * @param strict   Whether the function is in strict mode
+     */
+    public JSBytecodeFunction(Bytecode bytecode, String name, int length, boolean strict) {
+        this(bytecode, name, length, new JSValue[0], null, true, false, false, strict);
     }
 
     /**
@@ -61,7 +74,7 @@ public final class JSBytecodeFunction extends JSFunction {
      */
     public JSBytecodeFunction(Bytecode bytecode, String name, int length,
                               JSValue[] closureVars, JSObject prototype,
-                              boolean isConstructor, boolean isAsync, boolean isGenerator) {
+                              boolean isConstructor, boolean isAsync, boolean isGenerator, boolean strict) {
         super(); // Initialize as JSObject
         this.bytecode = bytecode;
         this.name = name != null ? name : "";
@@ -71,6 +84,7 @@ public final class JSBytecodeFunction extends JSFunction {
         this.isConstructor = isConstructor;
         this.isAsync = isAsync;
         this.isGenerator = isGenerator;
+        this.strict = strict;
 
         // Set up function properties on the object
         // Functions are objects in JavaScript and have these standard properties
@@ -182,6 +196,14 @@ public final class JSBytecodeFunction extends JSFunction {
      */
     public boolean isGenerator() {
         return isGenerator;
+    }
+
+    /**
+     * Check if this function is in strict mode.
+     * Following QuickJS js_mode & JS_MODE_STRICT.
+     */
+    public boolean isStrict() {
+        return strict;
     }
 
     @Override

@@ -19,7 +19,7 @@ package com.caoccao.qjs4j.regexp;
 import com.caoccao.qjs4j.BaseTest;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class RegExpEngineTest extends BaseTest {
     @Test
@@ -28,14 +28,14 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("abc", "i");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("ABC", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("ABC", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("ABC");
 
         result = engine.exec("aBc", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("aBc", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("aBc");
     }
 
     @Test
@@ -44,9 +44,9 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("a.b", "s");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("a\nb", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("a\nb", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("a\nb");
     }
 
     @Test
@@ -55,7 +55,7 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("a.b", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("a\nb", 0);
-        assertNull(result); // Should not match because . doesn't match \n
+        assertThat(result).isNull(); // Should not match because . doesn't match \n
     }
 
     @Test
@@ -65,15 +65,15 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("");
 
         // Start index out of bounds
         result = engine.exec("abc", -1);
-        assertNull(result);
+        assertThat(result).isNull();
         result = engine.exec("abc", 4);
-        assertNull(result);
+        assertThat(result).isNull();
     }
 
     @Test
@@ -82,16 +82,16 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("a\\nb", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("a\nb", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("a\nb", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("a\nb");
 
         bytecode = compiler.compile("a\\tb", "");
         engine = new RegExpEngine(bytecode);
         result = engine.exec("a\tb", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("a\tb", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("a\tb");
     }
 
     @Test
@@ -100,7 +100,7 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("abc", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("defgh", 0);
-        assertNull(result);
+        assertThat(result).isNull();
     }
 
     @Test
@@ -109,11 +109,11 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("abc", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("xxabcxx", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("abc", result.getMatch());
-        assertEquals(2, result.startIndex());
-        assertEquals(5, result.endIndex());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("abc");
+        assertThat(result.startIndex()).isEqualTo(2);
+        assertThat(result.endIndex()).isEqualTo(5);
     }
 
     @Test
@@ -122,10 +122,10 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("a(bc)d", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("xabcd", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("abcd", result.getMatch());
-        assertEquals("bc", result.getCapture(1));
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("abcd");
+        assertThat(result.getCapture(1)).isEqualTo("bc");
     }
 
     @Test
@@ -134,9 +134,9 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("a.b", "is");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("A\nB", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("A\nB", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("A\nB");
     }
 
     @Test
@@ -145,20 +145,20 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("^abc", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("abc", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
 
         result = engine.exec("xabc", 0);
-        assertNull(result); // Should not match at position 0
+        assertThat(result).isNull(); // Should not match at position 0
 
         bytecode = compiler.compile("abc$", "");
         engine = new RegExpEngine(bytecode);
         result = engine.exec("abc", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
 
         result = engine.exec("abcx", 0);
-        assertNull(result); // Should not match at end
+        assertThat(result).isNull(); // Should not match at end
     }
 
     @Test
@@ -167,20 +167,20 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("^abc$", "m");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("abc\ndef", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("abc", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("abc");
 
         result = engine.exec("abc\ndef", 4);
-        assertNull(result); // Should not match "def" with "^abc$"
+        assertThat(result).isNull(); // Should not match "def" with "^abc$"
 
         // Test ^ matching at line start
         bytecode = compiler.compile("^def", "m");
         engine = new RegExpEngine(bytecode);
         result = engine.exec("abc\ndef", 4);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("def", result.getMatch());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("def");
     }
 
     @Test
@@ -189,12 +189,12 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("(a)(b)(c)", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("abc", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("abc", result.getMatch());
-        assertEquals("a", result.getCapture(1));
-        assertEquals("b", result.getCapture(2));
-        assertEquals("c", result.getCapture(3));
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("abc");
+        assertThat(result.getCapture(1)).isEqualTo("a");
+        assertThat(result.getCapture(2)).isEqualTo("b");
+        assertThat(result.getCapture(3)).isEqualTo("c");
     }
 
     @Test
@@ -203,11 +203,11 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("((a)b)", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("ab", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("ab", result.getMatch());
-        assertEquals("ab", result.getCapture(1));
-        assertEquals("a", result.getCapture(2));
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("ab");
+        assertThat(result.getCapture(1)).isEqualTo("ab");
+        assertThat(result.getCapture(2)).isEqualTo("a");
     }
 
     @Test
@@ -216,11 +216,11 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("abc", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("xxxabc", 3);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("abc", result.getMatch());
-        assertEquals(3, result.startIndex());
-        assertEquals(6, result.endIndex());
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("abc");
+        assertThat(result.startIndex()).isEqualTo(3);
+        assertThat(result.endIndex()).isEqualTo(6);
     }
 
     @Test
@@ -229,9 +229,9 @@ public class RegExpEngineTest extends BaseTest {
         RegExpBytecode bytecode = compiler.compile("😀🌟🚀", "");
         RegExpEngine engine = new RegExpEngine(bytecode);
         RegExpEngine.MatchResult result = engine.exec("😀🌟🚀", 0);
-        assertNotNull(result);
-        assertTrue(result.matched());
-        assertEquals("😀🌟🚀", result.getMatch());
-        assertTrue(engine.test("😀🌟🚀"));
+        assertThat(result).isNotNull();
+        assertThat(result.matched()).isTrue();
+        assertThat(result.getMatch()).isEqualTo("😀🌟🚀");
+        assertThat(engine.test("😀🌟🚀")).isTrue();
     }
 }

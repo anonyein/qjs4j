@@ -38,14 +38,21 @@ import java.util.List;
 public final class Parser {
     private final Lexer lexer;
     private Token currentToken;
+    private Token nextToken; // Lookahead token
 
     public Parser(Lexer lexer) {
         this.lexer = lexer;
         this.currentToken = lexer.nextToken();
+        this.nextToken = lexer.nextToken();
     }
 
     private void advance() {
-        currentToken = lexer.nextToken();
+        currentToken = nextToken;
+        nextToken = lexer.nextToken();
+    }
+
+    private Token peek() {
+        return nextToken;
     }
 
     // Statement parsing
@@ -88,6 +95,9 @@ public final class Parser {
         List<Statement> body = new ArrayList<>();
         SourceLocation location = getLocation();
 
+        // Parse directives (like "use strict") at the beginning
+        boolean strict = parseDirectives();
+
         while (!match(TokenType.EOF)) {
             Statement stmt = parseStatement();
             if (stmt != null) {
@@ -95,7 +105,82 @@ public final class Parser {
             }
         }
 
-        return new Program(body, false, location);
+        return new Program(body, false, strict, location);
+    }
+
+    /**
+     * Parse directives at the beginning of a program or function.
+     * Following QuickJS implementation in js_parse_directives().
+     * Returns true if "use strict" directive was found.
+     */
+    private boolean parseDirectives() {
+        boolean hasUseStrict = false;
+
+        // Directives are string literal expression statements at the beginning
+        while (match(TokenType.STRING)) {
+            String stringValue = (String) currentToken.value();
+            int stringLine = currentToken.line();
+
+            // Peek at the next token to see if this is a valid directive
+            Token next = peek();
+            boolean hasSemi = false;
+
+            if (next.type() == TokenType.SEMICOLON) {
+                hasSemi = true;
+            } else if (next.type() == TokenType.RBRACE || next.type() == TokenType.EOF) {
+                // ASI before } or EOF
+                hasSemi = true;
+            } else {
+                // Check if next token allows ASI on a new line
+                TokenType nextType = next.type();
+                boolean isASI = switch (nextType) {
+                    case NUMBER, STRING, IDENTIFIER,
+                         INC, DEC, NULL, FALSE, TRUE,
+                         IF, RETURN, VAR, THIS, DELETE, TYPEOF,
+                         NEW, DO, WHILE, FOR, SWITCH, THROW,
+                         TRY, FUNCTION, CLASS,
+                         CONST, LET -> true;
+                    default -> false;
+                };
+                if (isASI && next.line() > stringLine) {
+                    hasSemi = true;
+                }
+            }
+
+            if (!hasSemi) {
+                // Not a directive - leave it for normal statement parsing
+                break;
+            }
+
+            // Valid directive - consume it
+            advance(); // Consume the string token
+            if (match(TokenType.SEMICOLON)) {
+                advance(); // Consume the semicolon if present
+            }
+
+            // Check if this is "use strict"
+            if ("use strict".equals(stringValue)) {
+                hasUseStrict = true;
+            }
+        }
+
+        return hasUseStrict;
+    }
+
+    /**
+     * Check if current token can trigger automatic semicolon insertion.
+     * Following QuickJS list of tokens that allow ASI.
+     */
+    private boolean isASIToken() {
+        return switch (currentToken.type()) {
+            case NUMBER, STRING, IDENTIFIER,
+                 INC, DEC, NULL, FALSE, TRUE,
+                 IF, RETURN, VAR, THIS, DELETE, TYPEOF,
+                 NEW, DO, WHILE, FOR, SWITCH, THROW,
+                 TRY, FUNCTION, CLASS,
+                 CONST, LET -> true;
+            default -> false;
+        };
     }
 
     private Expression parseAdditiveExpression() {

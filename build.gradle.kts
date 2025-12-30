@@ -49,6 +49,12 @@ object Config {
     }
 
     object Projects {
+        // https://mvnrepository.com/artifact/org.assertj/assertj-core
+        const val ASSERTJ_CORE = "org.assertj:assertj-core:${Versions.ASSERTJ_CORE}"
+
+        // https://mvnrepository.com/artifact/net.javacrumbs.json-unit/json-unit-assertj
+        const val JSON_UNIT_ASSERTJ = "net.javacrumbs.json-unit:json-unit-assertj:${Versions.JSON_UNIT_ASSERTJ}"
+
         const val JUNIT_BOM = "org.junit:junit-bom:${Versions.JUNIT}"
         // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
         const val JUNIT_JUPITER = "org.junit.jupiter:junit-jupiter"
@@ -58,8 +64,10 @@ object Config {
     }
 
     object Versions {
+        const val ASSERTJ_CORE = "3.27.6"
         const val JAVA_VERSION = "17"
         const val JAVET = "5.0.2"
+        const val JSON_UNIT_ASSERTJ = "5.1.0"
         const val JUNIT = "6.0.1"
         const val QJS4J = "0.1.0"
     }
@@ -95,6 +103,10 @@ val osType = if (os.isWindows) "windows" else
 val archType = if (arch == "aarch64" || arch == "arm64") "arm64" else "x86_64"
 
 dependencies {
+    // https://mvnrepository.com/artifact/org.assertj/assertj-core
+    testImplementation(Config.Projects.ASSERTJ_CORE)
+    testImplementation(Config.Projects.JSON_UNIT_ASSERTJ)
+
     // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
     testImplementation(platform(Config.Projects.JUNIT_BOM))
     testImplementation(Config.Projects.JUNIT_JUPITER)

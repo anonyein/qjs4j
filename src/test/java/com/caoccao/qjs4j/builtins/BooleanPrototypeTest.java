@@ -16,65 +16,72 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 
 /**
  * Unit tests for Boolean.prototype methods.
  */
-public class BooleanPrototypeTest extends BaseTest {
+public class BooleanPrototypeTest extends BaseJavetTest {
     @Test
     public void testEquals() {
-        // Verify that loose equality passes between primitive and primitive
-        assertTrue(context.eval("true == true").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertFalse(context.eval("true == false").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertTrue(context.eval("true == Boolean(true)").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertFalse(context.eval("true == Boolean(false)").asBoolean().map(JSBoolean::value).orElseThrow());
-        // Verify that strict equality passes between primitive and primitive
-        assertTrue(context.eval("true === true").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertFalse(context.eval("true === false").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertTrue(context.eval("true === Boolean(true)").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertFalse(context.eval("true === Boolean(false)").asBoolean().map(JSBoolean::value).orElseThrow());
-        // Verify that loose equality passes between primitive and primitive
-        assertTrue(context.eval("Boolean(true) == Boolean(true)").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertFalse(context.eval("Boolean(true) == Boolean(false)").asBoolean().map(JSBoolean::value).orElseThrow());
-        // Verify that loose equality passes between primitive and object
-        assertTrue(context.eval("true == new Boolean(true)").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertFalse(context.eval("true == new Boolean(false)").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertTrue(context.eval("Boolean(true) == new Boolean(true)").asBoolean().map(JSBoolean::value).orElseThrow());
-        assertFalse(context.eval("Boolean(true) == new Boolean(false)").asBoolean().map(JSBoolean::value).orElseThrow());
-        // Verify that loose equality fails between object and object
-        assertFalse(context.eval("new Boolean(true) == new Boolean(true)").asBoolean().map(JSBoolean::value).orElseThrow());
-        // Verify that strict equality fails between primitive and object
-        assertFalse(context.eval("true === new Boolean(true)").asBoolean().map(JSBoolean::value).orElseThrow());
-        // Verify that strict equality fails between object and object
-        assertFalse(context.eval("new Boolean(true) === new Boolean(true)").asBoolean().map(JSBoolean::value).orElseThrow());
+        Stream.of(
+                // Verify that loose equality passes between primitive and primitive
+                "true == true",
+                "true == false",
+                "true == Boolean(true)",
+                "true == Boolean(false)",
+                // Verify that strict equality passes between primitive and primitive
+                "true === true",
+                "true === false",
+                "true === Boolean(true)",
+                "true === Boolean(false)",
+                // Verify that loose equality passes between primitive and primitive
+                "Boolean(true) == Boolean(true)",
+                "Boolean(true) == Boolean(false)",
+                // Verify that loose equality passes between primitive and object
+                "true == new Boolean(true)",
+                "true == new Boolean(false)",
+                "Boolean(true) == new Boolean(true)",
+                "Boolean(true) == new Boolean(false)",
+                // Verify that loose equality fails between object and object
+                "new Boolean(true) == new Boolean(true)",
+                // Verify that strict equality fails between primitive and object
+                "true === new Boolean(true)",
+                // Verify that strict equality fails between object and object
+                "new Boolean(true) === new Boolean(true)").forEach(code -> {
+            assertWithJavet(
+                    () -> v8Runtime.getExecutor(code).executeBoolean(),
+                    () -> context.eval(code).toJavaObject());
+        });
     }
 
     @Test
     public void testToString() {
         // Normal case: true
         JSValue result = BooleanPrototype.toString(context, JSBoolean.TRUE, new JSValue[]{});
-        assertEquals("true", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("true"));
 
         // Normal case: false
         result = BooleanPrototype.toString(context, JSBoolean.FALSE, new JSValue[]{});
-        assertEquals("false", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("false"));
 
         // Normal case: Boolean object wrapper
         JSObject boolObj = new JSObject();
         boolObj.set("[[PrimitiveValue]]", JSBoolean.TRUE);
         result = BooleanPrototype.toString(context, boolObj, new JSValue[]{});
-        assertEquals("true", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("true"));
 
         JSObject boolObj2 = new JSObject();
         boolObj2.set("[[PrimitiveValue]]", JSBoolean.FALSE);
         result = BooleanPrototype.toString(context, boolObj2, new JSValue[]{});
-        assertEquals("false", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("false"));
 
         // Edge case: called on non-boolean
         assertTypeError(BooleanPrototype.toString(context, new JSString("not boolean"), new JSValue[]{}));
@@ -88,36 +95,32 @@ public class BooleanPrototypeTest extends BaseTest {
 
     @Test
     public void testTypeof() {
-        JSValue trueType = context.eval("typeof true;");
-        assertEquals("boolean", trueType.asString().map(JSString::value).orElseThrow());
-
-        JSValue falseType = context.eval("typeof false;");
-        assertEquals("boolean", falseType.asString().map(JSString::value).orElseThrow());
-
-        JSValue boolObjType = context.eval("typeof new Boolean(true);");
-        assertEquals("object", boolObjType.asString().map(JSString::value).orElseThrow());
+        Stream.of("typeof true", "typeof false", "typeof new Boolean(true)")
+                .forEach(code -> assertWithJavet(
+                        () -> v8Runtime.getExecutor(code).executeString(),
+                        () -> context.eval(code).toJavaObject()));
     }
 
     @Test
     public void testValueOf() {
         // Normal case: true
         JSValue result = BooleanPrototype.valueOf(context, JSBoolean.TRUE, new JSValue[]{});
-        assertTrue(result.isBooleanTrue());
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: false
         result = BooleanPrototype.valueOf(context, JSBoolean.FALSE, new JSValue[]{});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Normal case: Boolean object wrapper
         JSObject boolObj = new JSObject();
         boolObj.set("[[PrimitiveValue]]", JSBoolean.TRUE);
         result = BooleanPrototype.valueOf(context, boolObj, new JSValue[]{});
-        assertTrue(result.isBooleanTrue());
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
 
         JSObject boolObj2 = new JSObject();
         boolObj2.set("[[PrimitiveValue]]", JSBoolean.FALSE);
         result = BooleanPrototype.valueOf(context, boolObj2, new JSValue[]{});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Edge case: called on non-boolean
         assertTypeError(BooleanPrototype.valueOf(context, new JSNumber(123), new JSValue[]{}));

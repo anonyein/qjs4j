@@ -20,8 +20,7 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for IteratorPrototype methods.
@@ -44,26 +43,29 @@ public class IteratorPrototypeTest extends BaseTest {
         // Test iteration - first entry [0, "a"]
         JSObject iteratorResult = iterator.next();
         JSArray pair = iteratorResult.get("value").asArray().orElseThrow();
-        assertEquals(0.0, pair.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals("a", pair.get(1).asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(pair.get(0)).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(0.0));
+        assertThat(pair.get(1)).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("a"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         // Second entry [1, "b"]
         iteratorResult = iterator.next();
         pair = iteratorResult.get("value").asArray().orElseThrow();
-        assertEquals(1.0, pair.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals("b", pair.get(1).asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(pair.get(0)).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(1.0));
+        assertThat(pair.get(1)).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("b"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         // End
         iteratorResult = iterator.next();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: called on non-array
         result = IteratorPrototype.arrayEntries(ctx, JSNull.INSTANCE, new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -81,21 +83,24 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Test iteration
         JSObject iteratorResult = iterator.next();
-        assertEquals(0.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(0.0));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         iteratorResult = iterator.next();
-        assertEquals(1.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(1.0));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         iteratorResult = iterator.next();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: called on non-array
         result = IteratorPrototype.arrayKeys(ctx, new JSObject(), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -114,25 +119,28 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Test iteration
         JSObject iteratorResult = iterator.next();
-        assertEquals(1.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(1.0));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         iteratorResult = iterator.next();
-        assertEquals("hello", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("hello"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         iteratorResult = iterator.next();
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSBoolean.TRUE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         iteratorResult = iterator.next();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: called on non-array
         result = IteratorPrototype.arrayValues(ctx, new JSString("not an array"), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -152,29 +160,32 @@ public class IteratorPrototypeTest extends BaseTest {
         boolean foundKey1 = false, foundKey2 = false;
         for (int i = 0; i < 2; i++) {
             JSObject iteratorResult = iterator.next();
-            assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+            assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
             JSArray pair = iteratorResult.get("value").asArray().orElseThrow();
 
             String key = pair.get(0).asString().map(JSString::value).orElseThrow();
             if ("key1".equals(key)) {
-                assertEquals("value1", pair.get(1).asString().map(JSString::value).orElseThrow());
+                assertThat(pair.get(1)).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("value1"));
                 foundKey1 = true;
             } else if ("key2".equals(key)) {
-                assertEquals(42.0, pair.get(1).asNumber().map(JSNumber::value).orElseThrow());
+                assertThat(pair.get(1)).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(42.0));
                 foundKey2 = true;
             }
         }
-        assertTrue(foundKey1 && foundKey2);
+        assertThat(foundKey1 && foundKey2).isTrue();
 
         // End of iteration
         JSObject iteratorResult = iterator.next();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: called on non-map
         result = IteratorPrototype.mapEntriesIterator(ctx, new JSArray(), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -194,17 +205,20 @@ public class IteratorPrototypeTest extends BaseTest {
         boolean foundA = false, foundB = false;
         for (int i = 0; i < 2; i++) {
             JSObject iteratorResult = iterator.next();
-            assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+            assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
             String key = iteratorResult.get("value").asString().map(JSString::value).orElseThrow();
             if ("a".equals(key)) foundA = true;
             else if ("b".equals(key)) foundB = true;
         }
-        assertTrue(foundA && foundB);
+        assertThat(foundA && foundB).isTrue();
 
         // Edge case: called on non-map
         result = IteratorPrototype.mapKeysIterator(ctx, JSUndefined.INSTANCE, new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -224,17 +238,20 @@ public class IteratorPrototypeTest extends BaseTest {
         boolean foundOne = false, foundTwo = false;
         for (int i = 0; i < 2; i++) {
             JSObject iteratorResult = iterator.next();
-            assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+            assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
             String value = iteratorResult.get("value").asString().map(JSString::value).orElseThrow();
             if ("one".equals(value)) foundOne = true;
             else if ("two".equals(value)) foundTwo = true;
         }
-        assertTrue(foundOne && foundTwo);
+        assertThat(foundOne && foundTwo).isTrue();
 
         // Edge case: called on non-map
         result = IteratorPrototype.mapValuesIterator(ctx, new JSString("not a map"), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -250,25 +267,28 @@ public class IteratorPrototypeTest extends BaseTest {
         // Normal case: next() on iterator
         JSValue result = IteratorPrototype.next(ctx, iterator, new JSValue[]{});
         JSObject iteratorResult = result.asObject().orElseThrow();
-        assertEquals(1.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(1.0));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         // Continue iteration
         result = IteratorPrototype.next(ctx, iterator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(2.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(2.0));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         // End of iteration
         result = IteratorPrototype.next(ctx, iterator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: called on non-iterator
         result = IteratorPrototype.next(ctx, new JSString("not an iterator"), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -288,11 +308,11 @@ public class IteratorPrototypeTest extends BaseTest {
         boolean foundHello = false, found42 = false;
         for (int i = 0; i < 2; i++) {
             JSObject iteratorResult = iterator.next();
-            assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+            assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
             JSArray pair = iteratorResult.get("value").asArray().orElseThrow();
 
             // In Set entries, both elements should be the same
-            assertEquals(pair.get(0), pair.get(1));
+            assertThat(pair.get(0)).isEqualTo(pair.get(1));
 
             JSValue value = pair.get(0);
             if (value instanceof JSString str && "hello".equals(str.value())) {
@@ -301,12 +321,15 @@ public class IteratorPrototypeTest extends BaseTest {
                 found42 = true;
             }
         }
-        assertTrue(foundHello && found42);
+        assertThat(foundHello && found42).isTrue();
 
         // Edge case: called on non-set
         result = IteratorPrototype.setEntriesIterator(ctx, JSBoolean.FALSE, new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -328,8 +351,11 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Edge case: called on non-set (should delegate to setValuesIterator)
         result = IteratorPrototype.setKeysIterator(ctx, new JSArray(), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -350,7 +376,7 @@ public class IteratorPrototypeTest extends BaseTest {
         boolean foundA = false, foundB = false, found3 = false;
         for (int i = 0; i < 3; i++) {
             JSObject iteratorResult = iterator.next();
-            assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+            assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
             JSValue value = iteratorResult.get("value");
             if (value instanceof JSString str) {
                 if ("a".equals(str.value())) foundA = true;
@@ -359,17 +385,20 @@ public class IteratorPrototypeTest extends BaseTest {
                 found3 = true;
             }
         }
-        assertTrue(foundA && foundB && found3);
+        assertThat(foundA && foundB && found3).isTrue();
 
         // End of iteration
         JSObject iteratorResult = iterator.next();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: called on non-set
         result = IteratorPrototype.setValuesIterator(ctx, new JSObject(), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -383,28 +412,28 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Test iteration
         JSObject iteratorResult = iterator.next();
-        assertEquals("a", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, s -> assertThat(s.value()).isEqualTo("a"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         iteratorResult = iterator.next();
-        assertEquals("b", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, s -> assertThat(s.value()).isEqualTo("b"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         iteratorResult = iterator.next();
-        assertEquals("c", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, s -> assertThat(s.value()).isEqualTo("c"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         iteratorResult = iterator.next();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: empty string
         JSString emptyStr = new JSString("");
         result = IteratorPrototype.stringIterator(ctx, emptyStr, new JSValue[]{});
         iterator = result.asIterator().orElseThrow();
         iteratorResult = iterator.next();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: boxed string
         JSObject boxedString = new JSObject();
@@ -414,14 +443,20 @@ public class IteratorPrototypeTest extends BaseTest {
 
         // Edge case: called on non-string
         result = IteratorPrototype.stringIterator(ctx, new JSNumber(123), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
 
         // Edge case: boxed non-string
         JSObject badBox = new JSObject();
         badBox.set("[[PrimitiveValue]]", new JSNumber(456));
         result = IteratorPrototype.stringIterator(ctx, badBox, new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 }

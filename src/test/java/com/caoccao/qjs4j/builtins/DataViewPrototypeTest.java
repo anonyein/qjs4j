@@ -20,8 +20,8 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import org.assertj.core.data.Offset;
 
 /**
  * Unit tests for DataView prototype methods.
@@ -34,7 +34,7 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.getBuffer(context, dataView, new JSValue[]{});
-        assertEquals(buffer, result);
+        assertThat(result).isEqualTo(buffer);
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getBuffer(context, new JSString("not a dataview"), new JSValue[]{});
@@ -48,12 +48,12 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.getByteLength(context, dataView, new JSValue[]{});
-        assertEquals(16.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(16.0));
 
         // With offset and length
         JSDataView dataView2 = new JSDataView(buffer, 4, 8);
         result = DataViewPrototype.getByteLength(context, dataView2, new JSValue[]{});
-        assertEquals(8.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(8.0));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getByteLength(context, new JSNumber(123), new JSValue[]{});
@@ -67,12 +67,12 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.getByteOffset(context, dataView, new JSValue[]{});
-        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(0.0));
 
         // With offset
         JSDataView dataView2 = new JSDataView(buffer, 4, 8);
         result = DataViewPrototype.getByteOffset(context, dataView2, new JSValue[]{});
-        assertEquals(4.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(4.0));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getByteOffset(context, new JSObject(), new JSValue[]{});
@@ -89,12 +89,12 @@ public class DataViewPrototypeTest extends BaseTest {
         DataViewPrototype.setFloat32(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(3.14159f)});
 
         JSValue result = DataViewPrototype.getFloat32(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(3.14159f, result.asNumber().map(JSNumber::value).orElseThrow(), 0.00001);
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isCloseTo(3.14159, Offset.offset(0.00001)));
 
         // With little-endian flag
         DataViewPrototype.setFloat32(context, dataView, new JSValue[]{new JSNumber(4), new JSNumber(2.718f), JSBoolean.TRUE});
         result = DataViewPrototype.getFloat32(context, dataView, new JSValue[]{new JSNumber(4), JSBoolean.TRUE});
-        assertEquals(2.718f, result.asNumber().map(JSNumber::value).orElseThrow(), 0.00001);
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isCloseTo(2.718, Offset.offset(0.00001)));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getFloat32(context, new JSString("not a dataview"), new JSValue[]{new JSNumber(0)});
@@ -116,12 +116,12 @@ public class DataViewPrototypeTest extends BaseTest {
         DataViewPrototype.setFloat64(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(2.71828)});
 
         JSValue result = DataViewPrototype.getFloat64(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(2.71828, result.asNumber().map(JSNumber::value).orElseThrow(), 0.00001);
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isCloseTo(2.71828, Offset.offset(0.00001)));
 
         // With little-endian flag
         DataViewPrototype.setFloat64(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(3.14159), JSBoolean.TRUE});
         result = DataViewPrototype.getFloat64(context, dataView, new JSValue[]{new JSNumber(0), JSBoolean.TRUE});
-        assertEquals(3.14159, result.asNumber().map(JSNumber::value).orElseThrow(), 0.00001);
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isCloseTo(3.14159, Offset.offset(0.00001)));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getFloat64(context, new JSNumber(123), new JSValue[]{new JSNumber(0)});
@@ -138,12 +138,12 @@ public class DataViewPrototypeTest extends BaseTest {
         DataViewPrototype.setInt16(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(12345)});
 
         JSValue result = DataViewPrototype.getInt16(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(12345.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(12345.0));
 
         // With little-endian flag
         DataViewPrototype.setInt16(context, dataView, new JSValue[]{new JSNumber(2), new JSNumber(-12345), JSBoolean.TRUE});
         result = DataViewPrototype.getInt16(context, dataView, new JSValue[]{new JSNumber(2), JSBoolean.TRUE});
-        assertEquals(-12345.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(-12345.0));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getInt16(context, new JSObject(), new JSValue[]{new JSNumber(0)});
@@ -160,12 +160,12 @@ public class DataViewPrototypeTest extends BaseTest {
         DataViewPrototype.setInt32(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(123456789)});
 
         JSValue result = DataViewPrototype.getInt32(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(123456789.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(123456789.0));
 
         // With little-endian flag
         DataViewPrototype.setInt32(context, dataView, new JSValue[]{new JSNumber(4), new JSNumber(-987654321), JSBoolean.TRUE});
         result = DataViewPrototype.getInt32(context, dataView, new JSValue[]{new JSNumber(4), JSBoolean.TRUE});
-        assertEquals(-987654321.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(-987654321.0));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getInt32(context, new JSString("not a dataview"), new JSValue[]{new JSNumber(0)});
@@ -182,7 +182,7 @@ public class DataViewPrototypeTest extends BaseTest {
         buffer.getBuffer().put(0, (byte) -123);
 
         JSValue result = DataViewPrototype.getInt8(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(-123.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(-123.0));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getInt8(context, new JSNumber(456), new JSValue[]{new JSNumber(0)});
@@ -199,7 +199,7 @@ public class DataViewPrototypeTest extends BaseTest {
         buffer.getBuffer().put(0, (byte) 200);
 
         JSValue result = DataViewPrototype.getUint8(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(200.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(200.0));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.getUint8(context, new JSObject(), new JSValue[]{new JSNumber(0)});
@@ -213,17 +213,17 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.setFloat32(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(3.14159f)});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Check the value was set by reading it back
         JSValue readResult = DataViewPrototype.getFloat32(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(3.14159f, readResult.asNumber().map(JSNumber::value).orElseThrow(), 0.00001);
+        assertThat(readResult).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isCloseTo(3.14159, Offset.offset(0.00001)));
 
         // With little-endian flag
         result = DataViewPrototype.setFloat32(context, dataView, new JSValue[]{new JSNumber(4), new JSNumber(2.718f), JSBoolean.TRUE});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
         readResult = DataViewPrototype.getFloat32(context, dataView, new JSValue[]{new JSNumber(4), JSBoolean.TRUE});
-        assertEquals(2.718f, readResult.asNumber().map(JSNumber::value).orElseThrow(), 0.00001);
+        assertThat(readResult).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isCloseTo(2.718, Offset.offset(0.00001)));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.setFloat32(context, new JSString("not a dataview"), new JSValue[]{new JSNumber(0), new JSNumber(1.0f)});
@@ -242,17 +242,17 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.setFloat64(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(2.71828)});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Check the value was set by reading it back
         JSValue readResult = DataViewPrototype.getFloat64(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(2.71828, readResult.asNumber().map(JSNumber::value).orElseThrow(), 0.00001);
+        assertThat(readResult).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isCloseTo(2.71828, Offset.offset(0.00001)));
 
         // With little-endian flag
         result = DataViewPrototype.setFloat64(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(3.14159), JSBoolean.TRUE});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
         readResult = DataViewPrototype.getFloat64(context, dataView, new JSValue[]{new JSNumber(0), JSBoolean.TRUE});
-        assertEquals(3.14159, readResult.asNumber().map(JSNumber::value).orElseThrow(), 0.00001);
+        assertThat(readResult).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isCloseTo(3.14159, Offset.offset(0.00001)));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.setFloat64(context, new JSNumber(123), new JSValue[]{new JSNumber(0), new JSNumber(1.0)});
@@ -266,17 +266,17 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.setInt16(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(12345)});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Check the value was set by reading it back
         JSValue readResult = DataViewPrototype.getInt16(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(12345.0, readResult.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(readResult).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(12345.0));
 
         // With little-endian flag
         result = DataViewPrototype.setInt16(context, dataView, new JSValue[]{new JSNumber(2), new JSNumber(-12345), JSBoolean.TRUE});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
         readResult = DataViewPrototype.getInt16(context, dataView, new JSValue[]{new JSNumber(2), JSBoolean.TRUE});
-        assertEquals(-12345.0, readResult.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(readResult).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(-12345.0));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.setInt16(context, new JSObject(), new JSValue[]{new JSNumber(0), new JSNumber(123)});
@@ -290,17 +290,17 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.setInt32(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(123456789)});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Check the value was set by reading it back
         JSValue readResult = DataViewPrototype.getInt32(context, dataView, new JSValue[]{new JSNumber(0)});
-        assertEquals(123456789.0, readResult.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(readResult).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(123456789.0));
 
         // With little-endian flag
         result = DataViewPrototype.setInt32(context, dataView, new JSValue[]{new JSNumber(4), new JSNumber(-987654321), JSBoolean.TRUE});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
         readResult = DataViewPrototype.getInt32(context, dataView, new JSValue[]{new JSNumber(4), JSBoolean.TRUE});
-        assertEquals(-987654321.0, readResult.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(readResult).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(-987654321.0));
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.setInt32(context, new JSString("not a dataview"), new JSValue[]{new JSNumber(0), new JSNumber(123)});
@@ -314,11 +314,11 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.setInt8(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(-123)});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Check the value was set
         byte value = buffer.getBuffer().get(0);
-        assertEquals((byte) -123, value);
+        assertThat(value).isEqualTo((byte) -123);
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.setInt8(context, new JSNumber(456), new JSValue[]{new JSNumber(0), new JSNumber(123)});
@@ -332,11 +332,11 @@ public class DataViewPrototypeTest extends BaseTest {
         JSDataView dataView = new JSDataView(buffer);
 
         JSValue result = DataViewPrototype.setUint8(context, dataView, new JSValue[]{new JSNumber(0), new JSNumber(200)});
-        assertTrue(result.isUndefined());
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Check the value was set
         byte value = buffer.getBuffer().get(0);
-        assertEquals((byte) 200, value);
+        assertThat(value).isEqualTo((byte) 200);
 
         // Edge case: called on non-DataView
         result = DataViewPrototype.setUint8(context, new JSObject(), new JSValue[]{new JSNumber(0), new JSNumber(123)});

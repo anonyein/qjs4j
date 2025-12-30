@@ -24,6 +24,7 @@ import java.util.List;
 public record Program(
         List<Statement> body,
         boolean isModule,
+        boolean strict,
         SourceLocation location
 ) implements ASTNode {
     @Override

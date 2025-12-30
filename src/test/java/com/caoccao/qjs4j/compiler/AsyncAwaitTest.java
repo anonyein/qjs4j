@@ -16,24 +16,16 @@
 
 package com.caoccao.qjs4j.compiler;
 
+import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for async/await functionality.
  */
-public class AsyncAwaitTest {
-    private JSContext context;
-
-    @BeforeEach
-    void setUp() {
-        JSRuntime runtime = new JSRuntime();
-        context = runtime.createContext();
-    }
-
+public class AsyncAwaitTest extends BaseTest {
     @Test
     void testAsyncArrowFunction() {
         String code = """
@@ -42,13 +34,10 @@ public class AsyncAwaitTest {
                 };
                 test();
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.FULFILLED, promise.getState());
-        assertEquals("hello", ((JSString) promise.getResult()).value());
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            assertThat(promise.getState()).isEqualTo(JSPromise.PromiseState.FULFILLED);
+            assertThat(promise.getResult()).isInstanceOfSatisfying(JSString.class, jsString -> assertThat(jsString.value()).isEqualTo("hello"));
+        });
     }
 
     @Test
@@ -60,12 +49,9 @@ public class AsyncAwaitTest {
                 }
                 test;
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSBytecodeFunction.class, result);
-
-        JSBytecodeFunction func = (JSBytecodeFunction) result;
-        assertTrue(func.isAsync(), "Function should be marked as async");
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSBytecodeFunction.class, func -> {
+            assertThat(func.isAsync()).as("Function should be marked as async").isTrue();
+        });
     }
 
     @Test
@@ -76,15 +62,14 @@ public class AsyncAwaitTest {
                 }
                 test();
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result, "Async function should return a promise");
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.FULFILLED, promise.getState(),
-                "Promise should be fulfilled");
-        assertEquals(42.0, ((JSNumber) promise.getResult()).value(),
-                "Promise should resolve to 42");
+        assertThat(context.eval(code)).as("Async function should return a promise")
+                .isInstanceOfSatisfying(JSPromise.class, promise -> {
+                    assertThat(promise.getState()).as("Promise should be fulfilled")
+                            .isEqualTo(JSPromise.PromiseState.FULFILLED);
+                    assertThat(promise.getResult()).as("Promise should resolve to 42")
+                            .isInstanceOfSatisfying(JSNumber.class, jsNumber ->
+                                    assertThat(jsNumber.value()).isEqualTo(42.0));
+                });
     }
 
     @Test
@@ -95,13 +80,11 @@ public class AsyncAwaitTest {
                 }
                 String(myAsyncFunction);
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSString.class, result);
-
-        String str = ((JSString) result).value();
-        assertTrue(str.contains("async"), "toString should show 'async'");
-        assertTrue(str.contains("myAsyncFunction"), "toString should show function name");
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSString.class, jsString -> {
+            String str = jsString.value();
+            assertThat(str).contains("async");
+            assertThat(str).contains("myAsyncFunction");
+        });
     }
 
     @Test
@@ -114,12 +97,9 @@ public class AsyncAwaitTest {
                 }
                 test();
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.FULFILLED, promise.getState());
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            assertThat(promise.getState()).isEqualTo(JSPromise.PromiseState.FULFILLED);
+        });
     }
 
     @Test
@@ -130,13 +110,10 @@ public class AsyncAwaitTest {
                 }
                 test();
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.FULFILLED, promise.getState());
-        assertInstanceOf(JSUndefined.class, promise.getResult());
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            assertThat(promise.getState()).isEqualTo(JSPromise.PromiseState.FULFILLED);
+            assertThat(promise.getResult()).isInstanceOf(JSUndefined.class);
+        });
     }
 
     @Test
@@ -147,12 +124,9 @@ public class AsyncAwaitTest {
                 }
                 test();
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.FULFILLED, promise.getState());
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            assertThat(promise.getState()).isEqualTo(JSPromise.PromiseState.FULFILLED);
+        });
     }
 
     @Test
@@ -165,14 +139,11 @@ public class AsyncAwaitTest {
                 }
                 test();
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        // Note: The current simple implementation may not fully resolve chained promises
-        // This test validates the basic structure is working
-        assertNotNull(promise);
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            // Note: The current simple implementation may not fully resolve chained promises
+            // This test validates the basic structure is working
+            assertThat(promise).isNotNull();
+        });
     }
 
     @Test
@@ -184,12 +155,9 @@ public class AsyncAwaitTest {
                 }
                 test();
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.FULFILLED, promise.getState());
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            assertThat(promise.getState()).isEqualTo(JSPromise.PromiseState.FULFILLED);
+        });
     }
 
     @Test
@@ -200,11 +168,8 @@ public class AsyncAwaitTest {
                 }
                 test;
                 """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSBytecodeFunction.class, result);
-
-        JSBytecodeFunction func = (JSBytecodeFunction) result;
-        assertFalse(func.isAsync(), "Regular function should not be marked as async");
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSBytecodeFunction.class, func -> {
+            assertThat(func.isAsync()).isFalse();
+        });
     }
 }

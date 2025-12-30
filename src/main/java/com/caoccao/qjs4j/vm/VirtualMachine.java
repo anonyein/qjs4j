@@ -47,6 +47,15 @@ public final class VirtualMachine {
         // This ensures that nested function calls don't corrupt the caller's stack
         int savedStackTop = valueStack.getStackTop();
 
+        // Save and set strict mode based on function
+        // Following QuickJS: each function has its own strict mode flag
+        boolean savedStrictMode = context.isStrictMode();
+        if (function.isStrict()) {
+            context.enterStrictMode();
+        } else {
+            context.exitStrictMode();
+        }
+
         // Create new stack frame
         StackFrame frame = new StackFrame(function, thisArg, args, currentFrame);
         StackFrame previousFrame = currentFrame;
@@ -435,15 +444,25 @@ public final class VirtualMachine {
                     }
                     case RETURN -> {
                         JSValue returnValue = valueStack.pop();
-                        // Restore stack to saved position before returning
+                        // Restore stack and strict mode before returning
                         valueStack.setStackTop(savedStackTop);
                         currentFrame = previousFrame;
+                        if (savedStrictMode) {
+                            context.enterStrictMode();
+                        } else {
+                            context.exitStrictMode();
+                        }
                         return returnValue;
                     }
                     case RETURN_UNDEF -> {
-                        // Restore stack to saved position before returning
+                        // Restore stack and strict mode before returning
                         valueStack.setStackTop(savedStackTop);
                         currentFrame = previousFrame;
+                        if (savedStrictMode) {
+                            context.enterStrictMode();
+                        } else {
+                            context.exitStrictMode();
+                        }
                         return JSUndefined.INSTANCE;
                     }
 
@@ -524,14 +543,24 @@ public final class VirtualMachine {
                 }
             }
         } catch (VMException e) {
-            // Restore stack on exception
+            // Restore stack and strict mode on exception
             valueStack.setStackTop(savedStackTop);
             currentFrame = previousFrame;
+            if (savedStrictMode) {
+                context.enterStrictMode();
+            } else {
+                context.exitStrictMode();
+            }
             throw e;
         } catch (Exception e) {
-            // Restore stack on exception
+            // Restore stack and strict mode on exception
             valueStack.setStackTop(savedStackTop);
             currentFrame = previousFrame;
+            if (savedStrictMode) {
+                context.enterStrictMode();
+            } else {
+                context.exitStrictMode();
+            }
             throw new VMException("VM error: " + e.getMessage(), e);
         }
     }

@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.function.Function;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for ArrayPrototype methods.
@@ -42,33 +42,33 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case: positive index
         JSValue result = ArrayPrototype.at(context, arr, new JSValue[]{new JSNumber(0)});
-        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         result = ArrayPrototype.at(context, arr, new JSValue[]{new JSNumber(2)});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Negative index
         result = ArrayPrototype.at(context, arr, new JSValue[]{new JSNumber(-1)});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         result = ArrayPrototype.at(context, arr, new JSValue[]{new JSNumber(-2)});
-        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
 
         // Out of bounds
         result = ArrayPrototype.at(context, arr, new JSValue[]{new JSNumber(3)});
-        assertEquals(JSUndefined.INSTANCE, result);
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         result = ArrayPrototype.at(context, arr, new JSValue[]{new JSNumber(-4)});
-        assertEquals(JSUndefined.INSTANCE, result);
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // No arguments
         result = ArrayPrototype.at(context, arr, new JSValue[]{});
-        assertEquals(JSUndefined.INSTANCE, result);
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.at(context, emptyArr, new JSValue[]{new JSNumber(0)});
-        assertEquals(JSUndefined.INSTANCE, result);
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Edge case: at on non-array
         JSValue nonArray = new JSString("not an array");
@@ -89,23 +89,23 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case: concat arrays
         JSValue result = ArrayPrototype.concat(context, arr, new JSValue[]{arr2});
         JSArray concatenated = result.asArray().orElseThrow();
-        assertEquals(4, concatenated.getLength());
-        assertEquals(1.0, concatenated.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, concatenated.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, concatenated.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, concatenated.get(3).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(concatenated.getLength()).isEqualTo(4);
+        assertThat(concatenated.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(concatenated.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(concatenated.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(concatenated.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Concat with values
         result = ArrayPrototype.concat(context, arr, new JSValue[]{new JSNumber(5), arr2});
         concatenated = result.asArray().orElseThrow();
-        assertEquals(5, concatenated.getLength());
-        assertEquals(5.0, concatenated.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(concatenated.getLength()).isEqualTo(5);
+        assertThat(concatenated.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(5.0);
 
         // Edge case: concat with empty arrays
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.concat(context, emptyArr, new JSValue[]{arr});
         concatenated = result.asArray().orElseThrow();
-        assertEquals(2, concatenated.getLength());
+        assertThat(concatenated.getLength()).isEqualTo(2);
 
         // Edge case: concat on non-array
         JSValue nonArray = new JSString("not an array");
@@ -124,13 +124,13 @@ public class ArrayPrototypeTest extends BaseTest {
         arr.push(new JSNumber(5));
 
         JSValue result = ArrayPrototype.copyWithin(context, arr, new JSValue[]{new JSNumber(0), new JSNumber(3), new JSNumber(5)});
-        assertSame(arr, result);
-        assertEquals(5, arr.getLength());
-        assertEquals(4.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(5.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, arr.get(3).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(5.0, arr.get(4).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr);
+        assertThat(arr.getLength()).isEqualTo(5);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(5.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
+        assertThat(arr.get(4).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(5.0);
 
         // With negative indices
         JSArray arr2 = new JSArray();
@@ -141,24 +141,24 @@ public class ArrayPrototypeTest extends BaseTest {
         arr2.push(new JSNumber(5));
 
         result = ArrayPrototype.copyWithin(context, arr2, new JSValue[]{new JSNumber(-2), new JSNumber(0), new JSNumber(2)});
-        assertSame(arr2, result);
-        assertEquals(5, arr2.getLength());
-        assertEquals(1.0, arr2.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr2.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr2.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1.0, arr2.get(3).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr2.get(4).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr2);
+        assertThat(arr2.getLength()).isEqualTo(5);
+        assertThat(arr2.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr2.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr2.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr2.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr2.get(4).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.copyWithin(context, emptyArr, new JSValue[]{new JSNumber(0), new JSNumber(1)});
-        assertSame(emptyArr, result);
+        assertThat(result).isSameAs(emptyArr);
 
         // Edge case: no arguments
         JSArray arr3 = new JSArray();
         arr3.push(new JSNumber(1));
         result = ArrayPrototype.copyWithin(context, arr3, new JSValue[]{});
-        assertSame(arr3, result);
+        assertThat(result).isSameAs(arr3);
 
         // Edge case: copyWithin on non-array
         JSValue nonArray = new JSString("not an array");
@@ -180,7 +180,7 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         JSValue result = ArrayPrototype.every(context, arr, new JSValue[]{isEvenFn});
-        assertTrue(result.isBooleanTrue());
+        assertThat(result.isBooleanTrue()).isTrue();
 
         // Not all pass
         JSArray arr2 = new JSArray();
@@ -189,12 +189,12 @@ public class ArrayPrototypeTest extends BaseTest {
         arr2.push(new JSNumber(4));
 
         result = ArrayPrototype.every(context, arr2, new JSValue[]{isEvenFn});
-        assertEquals(JSBoolean.FALSE, result);
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Edge case: empty array (vacuously true)
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.every(context, emptyArr, new JSValue[]{isEvenFn});
-        assertEquals(JSBoolean.TRUE, result);
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.every(context, arr, new JSValue[]{}));
@@ -216,12 +216,12 @@ public class ArrayPrototypeTest extends BaseTest {
         arr.push(new JSNumber(4));
 
         JSValue result = ArrayPrototype.fill(context, arr, new JSValue[]{new JSNumber(0)});
-        assertSame(arr, result);
-        assertEquals(4, arr.getLength());
-        assertEquals(0.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr.get(3).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr);
+        assertThat(arr.getLength()).isEqualTo(4);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
 
         // Fill with start index
         JSArray arr2 = new JSArray();
@@ -231,12 +231,12 @@ public class ArrayPrototypeTest extends BaseTest {
         arr2.push(new JSNumber(4));
 
         result = ArrayPrototype.fill(context, arr2, new JSValue[]{new JSNumber(0), new JSNumber(2)});
-        assertSame(arr2, result);
-        assertEquals(4, arr2.getLength());
-        assertEquals(1.0, arr2.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr2.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr2.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr2.get(3).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr2);
+        assertThat(arr2.getLength()).isEqualTo(4);
+        assertThat(arr2.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr2.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr2.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr2.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
 
         // Fill with start and end
         JSArray arr3 = new JSArray();
@@ -246,12 +246,12 @@ public class ArrayPrototypeTest extends BaseTest {
         arr3.push(new JSNumber(4));
 
         result = ArrayPrototype.fill(context, arr3, new JSValue[]{new JSNumber(0), new JSNumber(1), new JSNumber(3)});
-        assertSame(arr3, result);
-        assertEquals(4, arr3.getLength());
-        assertEquals(1.0, arr3.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr3.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr3.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, arr3.get(3).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr3);
+        assertThat(arr3.getLength()).isEqualTo(4);
+        assertThat(arr3.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr3.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr3.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr3.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // With negative indices
         JSArray arr4 = new JSArray();
@@ -261,17 +261,17 @@ public class ArrayPrototypeTest extends BaseTest {
         arr4.push(new JSNumber(4));
 
         result = ArrayPrototype.fill(context, arr4, new JSValue[]{new JSNumber(0), new JSNumber(-3), new JSNumber(-1)});
-        assertSame(arr4, result);
-        assertEquals(4, arr4.getLength());
-        assertEquals(1.0, arr4.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr4.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0.0, arr4.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, arr4.get(3).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr4);
+        assertThat(arr4.getLength()).isEqualTo(4);
+        assertThat(arr4.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr4.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr4.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr4.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.fill(context, emptyArr, new JSValue[]{new JSNumber(1)});
-        assertSame(emptyArr, result);
+        assertThat(result).isSameAs(emptyArr);
 
         // Edge case: fill on non-array
         JSValue nonArray = new JSString("not an array");
@@ -295,27 +295,27 @@ public class ArrayPrototypeTest extends BaseTest {
 
         JSValue result = ArrayPrototype.filter(context, arr, new JSValue[]{evenFn});
         JSArray filtered = result.asArray().orElseThrow();
-        assertEquals(2, filtered.getLength());
-        assertEquals(2.0, filtered.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, filtered.get(1).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(filtered.getLength()).isEqualTo(2);
+        assertThat(filtered.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(filtered.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Edge case: no elements pass filter
         JSFunction noneFn = createTestFunction(args -> JSBoolean.FALSE);
         result = ArrayPrototype.filter(context, arr, new JSValue[]{noneFn});
         JSArray arr1 = result.asArray().orElseThrow();
-        assertEquals(0, arr1.getLength());
+        assertThat(arr1.getLength()).isEqualTo(0);
 
         // Edge case: all elements pass filter
         JSFunction allFn = createTestFunction(args -> JSBoolean.TRUE);
         result = ArrayPrototype.filter(context, arr, new JSValue[]{allFn});
         arr1 = result.asArray().orElseThrow();
-        assertEquals(4, arr1.getLength());
+        assertThat(arr1.getLength()).isEqualTo(4);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.filter(context, emptyArr, new JSValue[]{evenFn});
         arr1 = result.asArray().orElseThrow();
-        assertEquals(0, arr1.getLength());
+        assertThat(arr1.getLength()).isEqualTo(0);
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.filter(context, arr, new JSValue[]{}));
@@ -341,7 +341,7 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         JSValue result = ArrayPrototype.find(context, arr, new JSValue[]{findEvenFn});
-        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
 
         // No match
         JSFunction findNegativeFn = createTestFunction(args -> {
@@ -350,12 +350,12 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         result = ArrayPrototype.find(context, arr, new JSValue[]{findNegativeFn});
-        assertTrue(result.isUndefined());
+        assertThat(result.isUndefined()).isTrue();
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.find(context, emptyArr, new JSValue[]{findEvenFn});
-        assertTrue(result.isUndefined());
+        assertThat(result.isUndefined()).isTrue();
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.find(context, arr, new JSValue[]{}));
@@ -381,7 +381,7 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         JSValue result = ArrayPrototype.findIndex(context, arr, new JSValue[]{findEvenFn});
-        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         // No match
         JSFunction findNegativeFn = createTestFunction(args -> {
@@ -390,12 +390,12 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         result = ArrayPrototype.findIndex(context, arr, new JSValue[]{findNegativeFn});
-        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(-1.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.findIndex(context, emptyArr, new JSValue[]{findEvenFn});
-        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(-1.0);
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.findIndex(context, arr, new JSValue[]{}));
@@ -422,7 +422,7 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         JSValue result = ArrayPrototype.findLast(context, arr, new JSValue[]{findEvenFn});
-        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
 
         // No match
         JSFunction findNegativeFn = createTestFunction(args -> {
@@ -431,12 +431,12 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         result = ArrayPrototype.findLast(context, arr, new JSValue[]{findNegativeFn});
-        assertEquals(JSUndefined.INSTANCE, result);
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.findLast(context, emptyArr, new JSValue[]{findEvenFn});
-        assertEquals(JSUndefined.INSTANCE, result);
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.findLast(context, arr, new JSValue[]{}));
@@ -463,7 +463,7 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         JSValue result = ArrayPrototype.findLastIndex(context, arr, new JSValue[]{findEvenFn});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // No match
         JSFunction findNegativeFn = createTestFunction(args -> {
@@ -472,12 +472,12 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         result = ArrayPrototype.findLastIndex(context, arr, new JSValue[]{findNegativeFn});
-        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(-1.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.findLastIndex(context, emptyArr, new JSValue[]{findEvenFn});
-        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(-1.0);
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.findLastIndex(context, arr, new JSValue[]{}));
@@ -509,25 +509,25 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case: flat()
         JSValue result = ArrayPrototype.flat(context, arr, new JSValue[]{});
         JSArray flattened = result.asArray().orElseThrow();
-        assertEquals(5, flattened.getLength());
-        assertEquals(0.0, flattened.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, flattened.get(1).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(flattened.getLength()).isEqualTo(5);
+        assertThat(flattened.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(flattened.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
         JSArray childArray = flattened.get(2).asArray().orElseThrow();
-        assertEquals(1.0, childArray.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, childArray.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, flattened.get(3).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(5.0, flattened.get(4).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(childArray.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(childArray.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(flattened.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
+        assertThat(flattened.get(4).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(5.0);
 
         // With depth
         result = ArrayPrototype.flat(context, arr, new JSValue[]{new JSNumber(0)});
         flattened = result.asArray().orElseThrow();
-        assertEquals(3, flattened.getLength()); // No flattening
+        assertThat(flattened.getLength()).isEqualTo(3); // No flattening
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.flat(context, emptyArr, new JSValue[]{});
         JSArray arr1 = result.asArray().orElseThrow();
-        assertEquals(0, arr1.getLength());
+        assertThat(arr1.getLength()).isEqualTo(0);
 
         // Edge case: flat on non-array
         JSValue nonArray = new JSString("not an array");
@@ -553,28 +553,28 @@ public class ArrayPrototypeTest extends BaseTest {
 
         JSValue result = ArrayPrototype.flatMap(context, arr, new JSValue[]{doubleAndWrapFn});
         JSArray flattened = result.asArray().orElseThrow();
-        assertEquals(6, flattened.getLength());
-        assertEquals(1.0, flattened.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, flattened.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, flattened.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, flattened.get(3).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, flattened.get(4).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(6.0, flattened.get(5).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(flattened.getLength()).isEqualTo(6);
+        assertThat(flattened.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(flattened.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(flattened.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(flattened.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
+        assertThat(flattened.get(4).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(flattened.get(5).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(6.0);
 
         // Case where callback returns non-array
         JSFunction identityFn = createTestFunction(args -> args[0]);
         result = ArrayPrototype.flatMap(context, arr, new JSValue[]{identityFn});
         flattened = result.asArray().orElseThrow();
-        assertEquals(3, flattened.getLength());
-        assertEquals(1.0, flattened.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, flattened.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, flattened.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(flattened.getLength()).isEqualTo(3);
+        assertThat(flattened.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(flattened.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(flattened.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.flatMap(context, emptyArr, new JSValue[]{doubleAndWrapFn});
         JSArray arr1 = result.asArray().orElseThrow();
-        assertEquals(0, arr1.getLength());
+        assertThat(arr1.getLength()).isEqualTo(0);
 
         // Edge case: flatMap on non-array
         JSValue nonArray = new JSString("not an array");
@@ -603,19 +603,19 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         JSValue result = ArrayPrototype.forEach(context, arr, new JSValue[]{collectFn});
-        assertTrue(result.isUndefined());
-        assertEquals(3, count[0]);
-        assertEquals(6.0, sum[0]);
+        assertThat(result.isUndefined()).isTrue();
+        assertThat(count[0]).isEqualTo(3);
+        assertThat(sum[0]).isEqualTo(6.0);
 
         // With thisArg
         JSValue thisArg = new JSObject();
         result = ArrayPrototype.forEach(context, arr, new JSValue[]{collectFn, thisArg});
-        assertTrue(result.isUndefined());
+        assertThat(result.isUndefined()).isTrue();
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.forEach(context, emptyArr, new JSValue[]{collectFn});
-        assertTrue(result.isUndefined());
+        assertThat(result.isUndefined()).isTrue();
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.forEach(context, arr, new JSValue[]{}));
@@ -636,26 +636,26 @@ public class ArrayPrototypeTest extends BaseTest {
         arr.push(new JSNumber(3));
 
         JSValue result = ArrayPrototype.getLength(context, arr, new JSValue[]{});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.getLength(context, emptyArr, new JSValue[]{});
-        assertEquals(0.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
 
         // Array with specific length
         JSArray arrWithLength = new JSArray(10);
         result = ArrayPrototype.getLength(context, arrWithLength, new JSValue[]{});
-        assertEquals(10.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(10.0);
 
         // After modifying array
         arr.push(new JSNumber(4));
         result = ArrayPrototype.getLength(context, arr, new JSValue[]{});
-        assertEquals(4.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         arr.pop();
         result = ArrayPrototype.getLength(context, arr, new JSValue[]{});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: getLength on non-array
         JSValue nonArray = new JSString("not an array");
@@ -669,42 +669,42 @@ public class ArrayPrototypeTest extends BaseTest {
         JSArray arr = new JSArray();
         JSValue result = ArrayPrototype.getSymbolUnscopables(context, arr, new JSValue[]{});
 
-        assertTrue(result.isObject());
+        assertThat(result.isObject()).isTrue();
         JSObject unscopables = result.asObject().orElseThrow();
 
         // Verify ES2015 methods are marked as unscopable
-        assertEquals(JSBoolean.TRUE, unscopables.get("copyWithin"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("entries"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("fill"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("find"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("findIndex"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("flat"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("flatMap"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("includes"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("keys"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("values"));
+        assertThat(unscopables.get("copyWithin")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("entries")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("fill")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("find")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("findIndex")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("flat")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("flatMap")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("includes")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("keys")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("values")).isEqualTo(JSBoolean.TRUE);
 
         // Verify ES2022+ methods are marked as unscopable
-        assertEquals(JSBoolean.TRUE, unscopables.get("at"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("findLast"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("findLastIndex"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("toReversed"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("toSorted"));
-        assertEquals(JSBoolean.TRUE, unscopables.get("toSpliced"));
+        assertThat(unscopables.get("at")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("findLast")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("findLastIndex")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("toReversed")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("toSorted")).isEqualTo(JSBoolean.TRUE);
+        assertThat(unscopables.get("toSpliced")).isEqualTo(JSBoolean.TRUE);
 
         // Verify old methods are NOT in unscopables (they should return undefined)
-        assertTrue(unscopables.get("push").isUndefined());
-        assertTrue(unscopables.get("pop").isUndefined());
-        assertTrue(unscopables.get("shift").isUndefined());
-        assertTrue(unscopables.get("unshift").isUndefined());
-        assertTrue(unscopables.get("slice").isUndefined());
-        assertTrue(unscopables.get("splice").isUndefined());
-        assertTrue(unscopables.get("concat").isUndefined());
-        assertTrue(unscopables.get("join").isUndefined());
-        assertTrue(unscopables.get("reverse").isUndefined());
-        assertTrue(unscopables.get("sort").isUndefined());
-        assertTrue(unscopables.get("indexOf").isUndefined());
-        assertTrue(unscopables.get("lastIndexOf").isUndefined());
+        assertThat(unscopables.get("push").isUndefined()).isTrue();
+        assertThat(unscopables.get("pop").isUndefined()).isTrue();
+        assertThat(unscopables.get("shift").isUndefined()).isTrue();
+        assertThat(unscopables.get("unshift").isUndefined()).isTrue();
+        assertThat(unscopables.get("slice").isUndefined()).isTrue();
+        assertThat(unscopables.get("splice").isUndefined()).isTrue();
+        assertThat(unscopables.get("concat").isUndefined()).isTrue();
+        assertThat(unscopables.get("join").isUndefined()).isTrue();
+        assertThat(unscopables.get("reverse").isUndefined()).isTrue();
+        assertThat(unscopables.get("sort").isUndefined()).isTrue();
+        assertThat(unscopables.get("indexOf").isUndefined()).isTrue();
+        assertThat(unscopables.get("lastIndexOf").isUndefined()).isTrue();
     }
 
     @Test
@@ -717,38 +717,38 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.includes(context, arr, new JSValue[]{new JSNumber(2)});
-        assertEquals(JSBoolean.TRUE, result);
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
 
         // Not found
         result = ArrayPrototype.includes(context, arr, new JSValue[]{new JSNumber(3)});
-        assertEquals(JSBoolean.FALSE, result);
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // With fromIndex
         result = ArrayPrototype.includes(context, arr, new JSValue[]{new JSNumber(2), new JSNumber(2)});
-        assertEquals(JSBoolean.FALSE, result);
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Negative fromIndex
         result = ArrayPrototype.includes(context, arr, new JSValue[]{new JSNumber(2), new JSNumber(-3)});
-        assertEquals(JSBoolean.TRUE, result);
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: includes undefined
         result = ArrayPrototype.includes(context, arr, new JSValue[]{JSUndefined.INSTANCE});
-        assertEquals(JSBoolean.TRUE, result);
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: includes NaN (special case)
         JSArray nanArr = new JSArray();
         nanArr.push(new JSNumber(Double.NaN));
         result = ArrayPrototype.includes(context, nanArr, new JSValue[]{new JSNumber(Double.NaN)});
-        assertEquals(JSBoolean.TRUE, result);
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.includes(context, emptyArr, new JSValue[]{new JSNumber(1)});
-        assertEquals(JSBoolean.FALSE, result);
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Edge case: no search element
         result = ArrayPrototype.includes(context, arr, new JSValue[]{});
-        assertEquals(JSBoolean.FALSE, result);
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Edge case: includes on non-array
         JSValue nonArray = new JSString("not an array");
@@ -766,28 +766,28 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.indexOf(context, arr, new JSValue[]{new JSNumber(2)});
-        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         // With fromIndex
         result = ArrayPrototype.indexOf(context, arr, new JSValue[]{new JSNumber(2), new JSNumber(2)});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Not found
         result = ArrayPrototype.indexOf(context, arr, new JSValue[]{new JSNumber(4)});
-        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(-1.0);
 
         // Negative fromIndex
         result = ArrayPrototype.indexOf(context, arr, new JSValue[]{new JSNumber(2), new JSNumber(-2)});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.indexOf(context, emptyArr, new JSValue[]{new JSNumber(1)});
-        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(-1.0);
 
         // Edge case: no search element
         result = ArrayPrototype.indexOf(context, arr, new JSValue[]{});
-        assertEquals(-1.0, ((JSNumber) result).value());
+        assertThat(((JSNumber) result).value()).isEqualTo(-1.0);
 
         // Edge case: indexOf on non-array
         JSValue nonArray = new JSString("not an array");
@@ -804,20 +804,20 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.join(context, arr, new JSValue[]{new JSString("-")});
-        assertEquals("a-b-c", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("a-b-c");
 
         // Default separator
         result = ArrayPrototype.join(context, arr, new JSValue[]{});
-        assertEquals("a,b,c", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("a,b,c");
 
         // Empty separator
         result = ArrayPrototype.join(context, arr, new JSValue[]{new JSString("")});
-        assertEquals("abc", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("abc");
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.join(context, emptyArr, new JSValue[]{});
-        assertEquals("", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("");
 
         // Edge case: array with null/undefined
         JSArray mixedArr = new JSArray();
@@ -826,22 +826,19 @@ public class ArrayPrototypeTest extends BaseTest {
         mixedArr.push(JSUndefined.INSTANCE);
         mixedArr.push(new JSString("b"));
         result = ArrayPrototype.join(context, mixedArr, new JSValue[]{});
-        assertEquals("a,,,b", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("a,,,b");
 
         // Edge case: join on non-array
         JSValue nonArray = new JSString("not an array");
-        assertEquals("", ArrayPrototype.join(context, nonArray, new JSValue[]{}).asString().map(JSString::value).orElseThrow());
+        assertThat(ArrayPrototype.join(context, nonArray, new JSValue[]{}).asString().map(JSString::value).orElseThrow()).isEqualTo("");
 
         // Edge case: join called on array-like object
-        assertEquals(
-                "a,,,d,e",
-                context.eval("Array.prototype.join.call({ 0: 'a', 1: null, 2: undefined, 3: 'd', 4: 'e', length: 5 }, ',')").asString().map(JSString::value).orElseThrow());
-        assertEquals(
-                "a,,,d,e",
-                context.eval("Array.prototype.join.call({ 0: 'a', 1: null, 2: undefined, 3: 'd', 4: 'e', length: 5 })").asString().map(JSString::value).orElseThrow());
-        assertEquals(
-                "a----",
-                context.eval("Array.prototype.join.call({ 0: 'a', 0.1: 'b', length: 5 }, '-')").asString().map(JSString::value).orElseThrow());
+        assertThat(
+                context.eval("Array.prototype.join.call({ 0: 'a', 1: null, 2: undefined, 3: 'd', 4: 'e', length: 5 }, ',')").asString().map(JSString::value).orElseThrow()).isEqualTo("a,,,d,e");
+        assertThat(
+                context.eval("Array.prototype.join.call({ 0: 'a', 1: null, 2: undefined, 3: 'd', 4: 'e', length: 5 })").asString().map(JSString::value).orElseThrow()).isEqualTo("a,,,d,e");
+        assertThat(
+                context.eval("Array.prototype.join.call({ 0: 'a', 0.1: 'b', length: 5 }, '-')").asString().map(JSString::value).orElseThrow()).isEqualTo("a----");
     }
 
     @Test
@@ -854,28 +851,28 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.lastIndexOf(context, arr, new JSValue[]{new JSNumber(2)});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // With fromIndex
         result = ArrayPrototype.lastIndexOf(context, arr, new JSValue[]{new JSNumber(2), new JSNumber(2)});
-        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         // Not found
         result = ArrayPrototype.lastIndexOf(context, arr, new JSValue[]{new JSNumber(4)});
-        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(-1.0);
 
         // Negative fromIndex
         result = ArrayPrototype.lastIndexOf(context, arr, new JSValue[]{new JSNumber(2), new JSNumber(-1)});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.lastIndexOf(context, emptyArr, new JSValue[]{new JSNumber(1)});
-        assertEquals(-1.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(-1.0);
 
         // Edge case: no search element
         result = ArrayPrototype.lastIndexOf(context, arr, new JSValue[]{});
-        assertEquals(-1.0, ((JSNumber) result).value());
+        assertThat(((JSNumber) result).value()).isEqualTo(-1.0);
 
         // Edge case: lastIndexOf on non-array
         JSValue nonArray = new JSString("not an array");
@@ -898,21 +895,21 @@ public class ArrayPrototypeTest extends BaseTest {
 
         JSValue result = ArrayPrototype.map(context, arr, new JSValue[]{doubleFn});
         JSArray mapped = result.asArray().orElseThrow();
-        assertEquals(3, mapped.getLength());
-        assertEquals(2.0, mapped.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, mapped.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(6.0, mapped.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(mapped.getLength()).isEqualTo(3);
+        assertThat(mapped.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(mapped.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
+        assertThat(mapped.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(6.0);
 
         // With thisArg
         JSValue thisArg = new JSObject();
         result = ArrayPrototype.map(context, arr, new JSValue[]{doubleFn, thisArg});
-        assertTrue(result.isArray());
+        assertThat(result.isArray()).isTrue();
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.map(context, emptyArr, new JSValue[]{doubleFn});
         JSArray mappedEmpty = result.asArray().orElseThrow();
-        assertEquals(0, mappedEmpty.getLength());
+        assertThat(mappedEmpty.getLength()).isEqualTo(0);
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.map(context, arr, new JSValue[]{}));
@@ -937,20 +934,20 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.pop(context, arr, new JSValue[]{});
-        assertEquals(3.0, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2, arr.getLength());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr.getLength()).isEqualTo(2);
 
         result = ArrayPrototype.pop(context, arr, new JSValue[]{});
-        assertEquals(2.0, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1, arr.getLength());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr.getLength()).isEqualTo(1);
 
         // Pop from empty array
         result = ArrayPrototype.pop(context, arr, new JSValue[]{});
-        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(0, arr.getLength());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.getLength()).isEqualTo(0);
 
         result = ArrayPrototype.pop(context, arr, new JSValue[]{});
-        assertTrue(result.isUndefined());
+        assertThat(result.isUndefined()).isTrue();
 
         // Edge case: pop from non-array
         JSValue nonArray = new JSString("not an array");
@@ -963,15 +960,15 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case
         JSArray arr = new JSArray();
         JSValue result = ArrayPrototype.push(context, arr, new JSValue[]{new JSNumber(1), new JSNumber(2)});
-        assertEquals(2, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2, arr.getLength());
-        assertEquals(1.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2);
+        assertThat(arr.getLength()).isEqualTo(2);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
 
         // Push more
         result = ArrayPrototype.push(context, arr, new JSValue[]{new JSNumber(3)});
-        assertEquals(3, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3, arr.getLength());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3);
+        assertThat(arr.getLength()).isEqualTo(3);
 
         // Edge case: push to non-array
         JSValue nonArray = new JSString("not an array");
@@ -994,11 +991,11 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         JSValue result = ArrayPrototype.reduce(context, arr, new JSValue[]{sumFn});
-        assertEquals(6.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(6.0);
 
         // With initial value
         result = ArrayPrototype.reduce(context, arr, new JSValue[]{sumFn, new JSNumber(10)});
-        assertEquals(16.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(16.0);
 
         // Edge case: empty array without initial value
         JSArray emptyArr = new JSArray();
@@ -1007,13 +1004,13 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Edge case: empty array with initial value
         result = ArrayPrototype.reduce(context, emptyArr, new JSValue[]{sumFn, new JSNumber(42)});
-        assertEquals(42.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(42.0);
 
         // Edge case: single element without initial value
         JSArray singleArr = new JSArray();
         singleArr.push(new JSNumber(5));
         result = ArrayPrototype.reduce(context, singleArr, new JSValue[]{sumFn});
-        assertEquals(5.0, result.asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(5.0);
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.reduce(context, arr, new JSValue[]{}));
@@ -1045,11 +1042,11 @@ public class ArrayPrototypeTest extends BaseTest {
         strArr.push(new JSString("c"));
 
         JSValue result = ArrayPrototype.reduceRight(context, strArr, new JSValue[]{concatFn});
-        assertEquals("cba", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("cba");
 
         // With initial value
         result = ArrayPrototype.reduceRight(context, strArr, new JSValue[]{concatFn, new JSString("d")});
-        assertEquals("dcba", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("dcba");
 
         // Edge case: empty array without initial value
         JSArray emptyArr = new JSArray();
@@ -1058,13 +1055,13 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Edge case: empty array with initial value
         result = ArrayPrototype.reduceRight(context, emptyArr, new JSValue[]{concatFn, new JSString("x")});
-        assertEquals("x", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("x");
 
         // Edge case: single element without initial value
         JSArray singleArr = new JSArray();
         singleArr.push(new JSString("z"));
         result = ArrayPrototype.reduceRight(context, singleArr, new JSValue[]{concatFn});
-        assertEquals("z", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("z");
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.reduceRight(context, strArr, new JSValue[]{}));
@@ -1086,24 +1083,24 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.reverse(context, arr, new JSValue[]{});
-        assertSame(arr, result);
-        assertEquals(4, arr.getLength());
-        assertEquals(4.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1.0, arr.get(3).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr);
+        assertThat(arr.getLength()).isEqualTo(4);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.reverse(context, emptyArr, new JSValue[]{});
-        assertSame(emptyArr, result);
+        assertThat(result).isSameAs(emptyArr);
 
         // Edge case: single element
         JSArray singleArr = new JSArray();
         singleArr.push(new JSNumber(42));
         result = ArrayPrototype.reverse(context, singleArr, new JSValue[]{});
-        assertSame(singleArr, result);
-        assertEquals(42.0, singleArr.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(singleArr);
+        assertThat(singleArr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(42.0);
 
         // Edge case: reverse on non-array
         JSValue nonArray = new JSString("not an array");
@@ -1120,15 +1117,15 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.shift(context, arr, new JSValue[]{});
-        assertEquals(1.0, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2, arr.getLength());
-        assertEquals(2.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.getLength()).isEqualTo(2);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: shift from empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.shift(context, emptyArr, new JSValue[]{});
-        assertTrue(result.isUndefined());
+        assertThat(result.isUndefined()).isTrue();
 
         // Edge case: shift from non-array
         JSValue nonArray = new JSString("not an array");
@@ -1148,27 +1145,27 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case: slice(1, 4)
         JSValue result = ArrayPrototype.slice(context, arr, new JSValue[]{new JSNumber(1), new JSNumber(4)});
         JSArray sliced = result.asArray().orElseThrow();
-        assertEquals(3, sliced.getLength());
-        assertEquals(1.0, sliced.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, sliced.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, sliced.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(sliced.getLength()).isEqualTo(3);
+        assertThat(sliced.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(sliced.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(sliced.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Slice from start
         result = ArrayPrototype.slice(context, arr, new JSValue[]{new JSNumber(2)});
         sliced = result.asArray().orElseThrow();
-        assertEquals(3, sliced.getLength());
-        assertEquals(2.0, sliced.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(sliced.getLength()).isEqualTo(3);
+        assertThat(sliced.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
 
         // Slice with negative indices
         result = ArrayPrototype.slice(context, arr, new JSValue[]{new JSNumber(-2)});
         sliced = result.asArray().orElseThrow();
-        assertEquals(2, sliced.getLength());
-        assertEquals(3.0, sliced.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(sliced.getLength()).isEqualTo(2);
+        assertThat(sliced.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: empty slice
         result = ArrayPrototype.slice(context, arr, new JSValue[]{new JSNumber(2), new JSNumber(2)});
         sliced = result.asArray().orElseThrow();
-        assertEquals(0, sliced.getLength());
+        assertThat(sliced.getLength()).isEqualTo(0);
 
         // Edge case: slice on non-array
         JSValue nonArray = new JSString("not an array");
@@ -1190,7 +1187,7 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         JSValue result = ArrayPrototype.some(context, arr, new JSValue[]{isOddFn});
-        assertEquals(JSBoolean.TRUE, result);
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
 
         // None pass
         JSArray arr2 = new JSArray();
@@ -1199,12 +1196,12 @@ public class ArrayPrototypeTest extends BaseTest {
         arr2.push(new JSNumber(6));
 
         result = ArrayPrototype.some(context, arr2, new JSValue[]{isOddFn});
-        assertEquals(JSBoolean.FALSE, result);
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Edge case: empty array (vacuously false)
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.some(context, emptyArr, new JSValue[]{isOddFn});
-        assertEquals(JSBoolean.FALSE, result);
+        assertThat(result).isEqualTo(JSBoolean.FALSE);
 
         // Edge case: no callback
         assertTypeError(ArrayPrototype.some(context, arr, new JSValue[]{}));
@@ -1227,13 +1224,13 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case: default sort (string comparison)
         JSValue result = ArrayPrototype.sort(context, arr, new JSValue[]{});
-        assertSame(arr, result);
-        assertEquals(5, arr.getLength());
-        assertEquals(1.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, arr.get(3).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(5.0, arr.get(4).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr);
+        assertThat(arr.getLength()).isEqualTo(5);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
+        assertThat(arr.get(4).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(5.0);
 
         // With compare function
         JSArray arr2 = new JSArray();
@@ -1248,23 +1245,23 @@ public class ArrayPrototypeTest extends BaseTest {
         });
 
         result = ArrayPrototype.sort(context, arr2, new JSValue[]{descCompare});
-        assertSame(arr2, result);
-        assertEquals(3, arr2.getLength());
-        assertEquals(4.0, arr2.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr2.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1.0, arr2.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(arr2);
+        assertThat(arr2.getLength()).isEqualTo(3);
+        assertThat(arr2.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
+        assertThat(arr2.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr2.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.sort(context, emptyArr, new JSValue[]{});
-        assertSame(emptyArr, result);
+        assertThat(result).isSameAs(emptyArr);
 
         // Edge case: single element
         JSArray singleArr = new JSArray();
         singleArr.push(new JSNumber(42));
         result = ArrayPrototype.sort(context, singleArr, new JSValue[]{});
-        assertSame(singleArr, result);
-        assertEquals(42.0, singleArr.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result).isSameAs(singleArr);
+        assertThat(singleArr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(42.0);
 
         // Edge case: sort on non-array
         JSValue nonArray = new JSString("not an array");
@@ -1284,17 +1281,17 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case: splice(2, 2, 10, 11)
         JSValue result = ArrayPrototype.splice(context, arr, new JSValue[]{new JSNumber(2), new JSNumber(2), new JSNumber(10), new JSNumber(11)});
         JSArray deleted = result.asArray().orElseThrow();
-        assertEquals(2, deleted.getLength());
-        assertEquals(2.0, deleted.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, deleted.get(1).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(deleted.getLength()).isEqualTo(2);
+        assertThat(deleted.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(deleted.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Check modified array
-        assertEquals(5, arr.getLength());
-        assertEquals(0.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(10.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(11.0, arr.get(3).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, arr.get(4).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(arr.getLength()).isEqualTo(5);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(10.0);
+        assertThat(arr.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(11.0);
+        assertThat(arr.get(4).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Edge case: splice with no deletions
         JSArray arr2 = new JSArray();
@@ -1302,8 +1299,8 @@ public class ArrayPrototypeTest extends BaseTest {
         arr2.push(new JSNumber(2));
         result = ArrayPrototype.splice(context, arr2, new JSValue[]{new JSNumber(1), new JSNumber(0), new JSNumber(1.5)});
         deleted = result.asArray().orElseThrow();
-        assertEquals(0, deleted.getLength());
-        assertEquals(3, arr2.getLength());
+        assertThat(deleted.getLength()).isEqualTo(0);
+        assertThat(arr2.getLength()).isEqualTo(3);
 
         // Edge case: splice on non-array
         JSValue nonArray = new JSString("not an array");
@@ -1326,38 +1323,38 @@ public class ArrayPrototypeTest extends BaseTest {
         // Get Symbol.iterator
         PropertyKey iteratorKey = PropertyKey.fromSymbol(JSSymbol.ITERATOR);
         JSValue iteratorFn = arr.get(iteratorKey);
-        assertNotNull(iteratorFn);
-        assertTrue(iteratorFn.isFunction());
+        assertThat(iteratorFn).isNotNull();
+        assertThat(iteratorFn.isFunction()).isTrue();
 
         // Get values function
         JSValue valuesFn = arr.get("values");
-        assertNotNull(valuesFn);
-        assertTrue(valuesFn.isFunction());
+        assertThat(valuesFn).isNotNull();
+        assertThat(valuesFn.isFunction()).isTrue();
 
         // Symbol.iterator should be the same as values
-        assertSame(valuesFn, iteratorFn);
+        assertThat(valuesFn).isSameAs(iteratorFn);
 
         // Test that calling Symbol.iterator works
         JSValue iteratorResult = ((JSFunction) iteratorFn).call(context, arr, new JSValue[0]);
-        assertTrue(iteratorResult.isIterator());
+        assertThat(iteratorResult.isIterator()).isTrue();
 
         // Test iteration
         JSIterator iterator = (JSIterator) iteratorResult;
         JSObject result1 = iterator.next();
-        assertTrue(result1.get("done").isBooleanFalse());
-        assertEquals(1.0, result1.get("value").asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result1.get("done").isBooleanFalse()).isTrue();
+        assertThat(result1.get("value").asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         JSObject result2 = iterator.next();
-        assertTrue(result2.get("done").isBooleanFalse());
-        assertEquals(2.0, result2.get("value").asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result2.get("done").isBooleanFalse()).isTrue();
+        assertThat(result2.get("value").asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
 
         JSObject result3 = iterator.next();
-        assertTrue(result3.get("done").isBooleanFalse());
-        assertEquals(3.0, result3.get("value").asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result3.get("done").isBooleanFalse()).isTrue();
+        assertThat(result3.get("value").asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         JSObject result4 = iterator.next();
-        assertTrue(result4.get("done").isBooleanTrue());
-        assertTrue(result4.get("value").isUndefined());
+        assertThat(result4.get("done").isBooleanTrue()).isTrue();
+        assertThat(result4.get("value").isUndefined()).isTrue();
     }
 
     @Test
@@ -1369,7 +1366,7 @@ public class ArrayPrototypeTest extends BaseTest {
         arr.push(new JSString("c"));
 
         JSValue result = ArrayPrototype.toLocaleString(context, arr, new JSValue[]{});
-        assertEquals("a,b,c", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("a,b,c");
 
         // With numbers
         JSArray arr2 = new JSArray();
@@ -1378,7 +1375,7 @@ public class ArrayPrototypeTest extends BaseTest {
         arr2.push(new JSNumber(3));
 
         result = ArrayPrototype.toLocaleString(context, arr2, new JSValue[]{});
-        assertEquals("1,2,3", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("1,2,3");
 
         // With null and undefined
         JSArray arr3 = new JSArray();
@@ -1388,12 +1385,12 @@ public class ArrayPrototypeTest extends BaseTest {
         arr3.push(new JSString("b"));
 
         result = ArrayPrototype.toLocaleString(context, arr3, new JSValue[]{});
-        assertEquals("a,,,b", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("a,,,b");
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.toLocaleString(context, emptyArr, new JSValue[]{});
-        assertEquals("", result.asString().map(JSString::value).orElse("FAIL"));
+        assertThat(result.asString().map(JSString::value).orElse("FAIL")).isEqualTo("");
 
         // Edge case: toLocaleString on non-array
         JSValue nonArray = new JSString("not an array");
@@ -1411,29 +1408,29 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case
         JSValue result = ArrayPrototype.toReversed(context, arr, new JSValue[]{});
         JSArray reversed = result.asArray().orElseThrow();
-        assertEquals(3, reversed.getLength());
-        assertEquals(3.0, reversed.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, reversed.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1.0, reversed.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(reversed.getLength()).isEqualTo(3);
+        assertThat(reversed.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(reversed.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(reversed.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         // Original array should be unchanged
-        assertEquals(1.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.toReversed(context, emptyArr, new JSValue[]{});
         JSArray emptyReversed = result.asArray().orElseThrow();
-        assertEquals(0, emptyReversed.getLength());
+        assertThat(emptyReversed.getLength()).isEqualTo(0);
 
         // Edge case: single element
         JSArray singleArr = new JSArray();
         singleArr.push(new JSNumber(42));
         result = ArrayPrototype.toReversed(context, singleArr, new JSValue[]{});
         JSArray singleReversed = result.asArray().orElseThrow();
-        assertEquals(1, singleReversed.getLength());
-        assertEquals(42.0, singleReversed.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(singleReversed.getLength()).isEqualTo(1);
+        assertThat(singleReversed.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(42.0);
 
         // Edge case: toReversed on non-array
         JSValue nonArray = new JSString("not an array");
@@ -1451,15 +1448,15 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case: default sort (string comparison)
         JSValue result = ArrayPrototype.toSorted(context, arr, new JSValue[]{});
         JSArray sorted = result.asArray().orElseThrow();
-        assertEquals(3, sorted.getLength());
-        assertEquals(1.0, sorted.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, sorted.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, sorted.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(sorted.getLength()).isEqualTo(3);
+        assertThat(sorted.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(sorted.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(sorted.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Original array should be unchanged
-        assertEquals(3.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
 
         // With custom compare function
         JSFunction compareFn = createTestFunction(args -> {
@@ -1470,24 +1467,24 @@ public class ArrayPrototypeTest extends BaseTest {
 
         result = ArrayPrototype.toSorted(context, arr, new JSValue[]{compareFn});
         JSArray sortedDesc = result.asArray().orElseThrow();
-        assertEquals(3, sortedDesc.getLength());
-        assertEquals(3.0, sortedDesc.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, sortedDesc.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1.0, sortedDesc.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(sortedDesc.getLength()).isEqualTo(3);
+        assertThat(sortedDesc.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(sortedDesc.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(sortedDesc.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.toSorted(context, emptyArr, new JSValue[]{});
         JSArray emptySorted = result.asArray().orElseThrow();
-        assertEquals(0, emptySorted.getLength());
+        assertThat(emptySorted.getLength()).isEqualTo(0);
 
         // Edge case: single element
         JSArray singleArr = new JSArray();
         singleArr.push(new JSNumber(42));
         result = ArrayPrototype.toSorted(context, singleArr, new JSValue[]{});
         JSArray singleSorted = result.asArray().orElseThrow();
-        assertEquals(1, singleSorted.getLength());
-        assertEquals(42.0, singleSorted.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(singleSorted.getLength()).isEqualTo(1);
+        assertThat(singleSorted.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(42.0);
 
         // Edge case: toSorted on non-array
         JSValue nonArray = new JSString("not an array");
@@ -1506,51 +1503,51 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case: remove 2 elements starting at index 1
         JSValue result = ArrayPrototype.toSpliced(context, arr, new JSValue[]{new JSNumber(1), new JSNumber(2)});
         JSArray spliced = result.asArray().orElseThrow();
-        assertEquals(2, spliced.getLength());
-        assertEquals(1.0, spliced.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, spliced.get(1).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(spliced.getLength()).isEqualTo(2);
+        assertThat(spliced.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(spliced.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Original array should be unchanged
-        assertEquals(4, arr.getLength());
-        assertEquals(1.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, arr.get(3).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(arr.getLength()).isEqualTo(4);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Insert elements
         result = ArrayPrototype.toSpliced(context, arr, new JSValue[]{new JSNumber(1), new JSNumber(0), new JSNumber(5), new JSNumber(6)});
         JSArray inserted = result.asArray().orElseThrow();
-        assertEquals(6, inserted.getLength());
-        assertEquals(1.0, inserted.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(5.0, inserted.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(6.0, inserted.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, inserted.get(3).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, inserted.get(4).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, inserted.get(5).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(inserted.getLength()).isEqualTo(6);
+        assertThat(inserted.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(inserted.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(5.0);
+        assertThat(inserted.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(6.0);
+        assertThat(inserted.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(inserted.get(4).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(inserted.get(5).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Replace elements
         result = ArrayPrototype.toSpliced(context, arr, new JSValue[]{new JSNumber(1), new JSNumber(2), new JSNumber(7), new JSNumber(8)});
         JSArray replaced = result.asArray().orElseThrow();
-        assertEquals(4, replaced.getLength());
-        assertEquals(1.0, replaced.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(7.0, replaced.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(8.0, replaced.get(2).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, replaced.get(3).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(replaced.getLength()).isEqualTo(4);
+        assertThat(replaced.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(replaced.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(7.0);
+        assertThat(replaced.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(8.0);
+        assertThat(replaced.get(3).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Negative start index
         result = ArrayPrototype.toSpliced(context, arr, new JSValue[]{new JSNumber(-2), new JSNumber(1)});
         JSArray negStart = result.asArray().orElseThrow();
-        assertEquals(3, negStart.getLength());
-        assertEquals(1.0, negStart.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, negStart.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(4.0, negStart.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(negStart.getLength()).isEqualTo(3);
+        assertThat(negStart.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(negStart.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(negStart.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(4.0);
 
         // Edge case: empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.toSpliced(context, emptyArr, new JSValue[]{new JSNumber(0), new JSNumber(0), new JSNumber(1)});
         JSArray emptySpliced = result.asArray().orElseThrow();
-        assertEquals(1, emptySpliced.getLength());
-        assertEquals(1.0, emptySpliced.get(0).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(emptySpliced.getLength()).isEqualTo(1);
+        assertThat(emptySpliced.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
 
         // Edge case: toSpliced on non-array
         JSValue nonArray = new JSString("not an array");
@@ -1567,17 +1564,15 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.toString(context, jsArray, new JSValue[]{});
-        assertEquals("a,1,c", result.asString().map(JSString::value).orElseThrow());
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("a,1,c");
 
         // Edge case: toString on string
-        assertEquals(
-                "[object String]",
-                ArrayPrototype.toString(context, new JSString("a"), new JSValue[]{}).asString().map(JSString::value).orElseThrow());
+        assertThat(
+                ArrayPrototype.toString(context, new JSString("a"), new JSValue[]{}).asString().map(JSString::value).orElseThrow()).isEqualTo("[object String]");
 
         // Edge case: toString on object
-        assertEquals(
-                "[object Object]",
-                ArrayPrototype.toString(context, new JSObject(), new JSValue[]{}).asString().map(JSString::value).orElseThrow());
+        assertThat(
+                ArrayPrototype.toString(context, new JSObject(), new JSValue[]{}).asString().map(JSString::value).orElseThrow()).isEqualTo("[object Object]");
 
         // Edge case: toString on null
         assertTypeError(ArrayPrototype.toString(context, new JSNull(), new JSValue[]{}), "Cannot convert undefined or null to object");
@@ -1596,22 +1591,22 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Normal case
         JSValue result = ArrayPrototype.unshift(context, arr, new JSValue[]{new JSNumber(1)});
-        assertEquals(3, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3, arr.getLength());
-        assertEquals(1.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
+        assertThat(arr.getLength()).isEqualTo(3);
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Unshift multiple
         result = ArrayPrototype.unshift(context, arr, new JSValue[]{new JSNumber(-1), new JSNumber(0)});
-        assertEquals(5, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(5, arr.getLength());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(5.0);
+        assertThat(arr.getLength()).isEqualTo(5);
 
         // Edge case: unshift to empty array
         JSArray emptyArr = new JSArray();
         result = ArrayPrototype.unshift(context, emptyArr, new JSValue[]{new JSNumber(1)});
-        assertEquals(1, result.asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(1, emptyArr.getLength());
+        assertThat(result.asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(emptyArr.getLength()).isEqualTo(1);
 
         // Edge case: unshift to non-array
         JSValue nonArray = new JSString("not an array");
@@ -1629,31 +1624,31 @@ public class ArrayPrototypeTest extends BaseTest {
         // Normal case: replace element at index 1
         JSValue result = ArrayPrototype.with(context, arr, new JSValue[]{new JSNumber(1), new JSNumber(42)});
         JSArray withResult = result.asArray().orElseThrow();
-        assertEquals(3, withResult.getLength());
-        assertEquals(1.0, withResult.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(42.0, withResult.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, withResult.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(withResult.getLength()).isEqualTo(3);
+        assertThat(withResult.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(withResult.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(42.0);
+        assertThat(withResult.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Original array should be unchanged
-        assertEquals(1.0, arr.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, arr.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, arr.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(arr.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(arr.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(arr.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Negative index
         result = ArrayPrototype.with(context, arr, new JSValue[]{new JSNumber(-1), new JSNumber(99)});
         JSArray negIndex = result.asArray().orElseThrow();
-        assertEquals(3, negIndex.getLength());
-        assertEquals(1.0, negIndex.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, negIndex.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(99.0, negIndex.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(negIndex.getLength()).isEqualTo(3);
+        assertThat(negIndex.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(1.0);
+        assertThat(negIndex.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(negIndex.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(99.0);
 
         // Edge case: index 0
         result = ArrayPrototype.with(context, arr, new JSValue[]{new JSNumber(0), new JSNumber(100)});
         JSArray zeroIndex = result.asArray().orElseThrow();
-        assertEquals(3, zeroIndex.getLength());
-        assertEquals(100.0, zeroIndex.get(0).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(2.0, zeroIndex.get(1).asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(3.0, zeroIndex.get(2).asNumber().map(JSNumber::value).orElseThrow());
+        assertThat(zeroIndex.getLength()).isEqualTo(3);
+        assertThat(zeroIndex.get(0).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(100.0);
+        assertThat(zeroIndex.get(1).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(2.0);
+        assertThat(zeroIndex.get(2).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(3.0);
 
         // Edge case: out of bounds positive index
         JSValue outOfBoundsResult = ArrayPrototype.with(context, arr, new JSValue[]{new JSNumber(3), new JSNumber(1)});

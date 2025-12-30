@@ -20,7 +20,7 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for ArrayBuffer constructor static methods.
@@ -36,13 +36,13 @@ public class ArrayBufferConstructorTest extends BaseTest {
         JSValue result = ArrayBufferConstructor.getSpecies(context, arrayBufferConstructor, new JSValue[]{});
 
         // Should return the same ArrayBuffer constructor
-        assertSame(arrayBufferConstructor, result);
+        assertThat(result).isSameAs(arrayBufferConstructor);
 
         // Verify it also works via Symbol.species property
         PropertyKey speciesKey = PropertyKey.fromSymbol(JSSymbol.SPECIES);
         JSValue speciesGetter = arrayBufferConstructor.get(speciesKey);
-        assertNotNull(speciesGetter);
-        assertTrue(speciesGetter.isFunction());
+        assertThat(speciesGetter).isNotNull();
+        assertThat(speciesGetter.isFunction()).isTrue();
     }
 
     @Test
@@ -51,45 +51,45 @@ public class ArrayBufferConstructorTest extends BaseTest {
         JSArrayBuffer buffer = new JSArrayBuffer(16);
         JSUint8Array uint8Array = new JSUint8Array(buffer, 0, 8);
         JSValue result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{uint8Array});
-        assertTrue(result.isBooleanTrue());
+        assertThat(result.isBooleanTrue()).isTrue();
 
         JSInt32Array int32Array = new JSInt32Array(buffer, 0, 4);
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{int32Array});
-        assertTrue(result.isBooleanTrue());
+        assertThat(result.isBooleanTrue()).isTrue();
 
         JSFloat32Array float32Array = new JSFloat32Array(buffer, 0, 4);
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{float32Array});
-        assertTrue(result.isBooleanTrue());
+        assertThat(result.isBooleanTrue()).isTrue();
 
         // Normal case: DataView should return true
         JSDataView dataView = new JSDataView(buffer);
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{dataView});
-        assertTrue(result.isBooleanTrue());
+        assertThat(result.isBooleanTrue()).isTrue();
 
         // Normal case: non-view objects should return false
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{new JSArray()});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result.isBooleanFalse()).isTrue();
 
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{new JSObject()});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result.isBooleanFalse()).isTrue();
 
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{new JSString("test")});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result.isBooleanFalse()).isTrue();
 
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(123)});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result.isBooleanFalse()).isTrue();
 
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{JSBoolean.TRUE});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result.isBooleanFalse()).isTrue();
 
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{JSNull.INSTANCE});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result.isBooleanFalse()).isTrue();
 
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{JSUndefined.INSTANCE});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result.isBooleanFalse()).isTrue();
 
         // Edge case: no arguments
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{});
-        assertTrue(result.isBooleanFalse());
+        assertThat(result.isBooleanFalse()).isTrue();
     }
 }

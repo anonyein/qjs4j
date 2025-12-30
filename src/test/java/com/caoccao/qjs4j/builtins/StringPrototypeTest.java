@@ -30,7 +30,7 @@ public class StringPrototypeTest extends BaseTest {
     protected JSString str;
 
     @BeforeEach
-    public void setUp() {
+    public void setUp() throws Exception {
         super.setUp();
         str = new JSString("hello world");
     }

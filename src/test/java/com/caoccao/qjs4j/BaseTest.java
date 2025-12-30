@@ -4,7 +4,7 @@ import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public abstract class BaseTest {
     protected JSContext context;
@@ -14,24 +14,22 @@ public abstract class BaseTest {
     }
 
     protected void assertError(JSValue value, String expectedType, String expectedMessage) {
-        if (value instanceof JSObject jsObject) {
-            if (jsObject.get("name") instanceof JSString name && jsObject.get("message") instanceof JSString message) {
-                assertEquals(expectedType, name.value());
+        assertThat(value).as("Value must be an error object").isInstanceOfSatisfying(JSObject.class, jsObject -> {
+            assertThat(jsObject.get("name")).as("An error object must have a name").isInstanceOfSatisfying(JSString.class, name -> {
+                assertThat(name.value()).isEqualTo(expectedType);
+            });
+            assertThat(jsObject.get("message")).as("An error object must have a message").isInstanceOfSatisfying(JSString.class, message -> {
                 if (expectedMessage == null) {
-                    assertNotNull(message.value());
+                    assertThat(message.value()).isNotNull();
                 } else {
-                    assertEquals(expectedMessage, message.value());
+                    assertThat(message.value()).isEqualTo(expectedMessage);
                 }
-            } else {
-                fail("Error object does not have name or message property");
-            }
-        } else {
-            fail("Value is not an error object");
-        }
+            });
+        });
     }
 
     protected void assertPendingException(JSContext ctx) {
-        assertTrue(ctx.hasPendingException());
+        assertThat(ctx.hasPendingException()).isTrue();
         ctx.clearPendingException();
     }
 
@@ -59,12 +57,12 @@ public abstract class BaseTest {
     }
 
     @BeforeEach
-    public void setUp() {
+    public void setUp() throws Exception {
         context = new JSContext(new JSRuntime());
     }
 
     @AfterEach
-    public void tearDown() {
+    public void tearDown() throws Exception {
         context.getRuntime().gc();
         context.close();
     }

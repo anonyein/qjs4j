@@ -120,7 +120,8 @@ public final class BytecodeCompiler {
                 null,            // prototype - arrow functions don't have prototype
                 false,           // isConstructor - arrow functions cannot be constructors
                 arrowExpr.isAsync(),
-                false            // Arrow functions cannot be generators
+                false,           // Arrow functions cannot be generators
+                false            // strict - TODO: inherit from enclosing scope
         );
 
         // Prototype chain will be initialized when the function is loaded
@@ -441,7 +442,8 @@ public final class BytecodeCompiler {
                 null,            // prototype - will be set by VM
                 true,            // isConstructor - regular functions can be constructors
                 funcDecl.isAsync(),
-                funcDecl.isGenerator()
+                funcDecl.isGenerator(),
+                false            // strict - TODO: parse directives in function body
         );
 
         // Emit FCLOSURE opcode with function in constant pool
@@ -506,7 +508,8 @@ public final class BytecodeCompiler {
                 null,            // prototype - will be set by VM
                 true,            // isConstructor - regular functions can be constructors
                 funcExpr.isAsync(),
-                funcExpr.isGenerator()
+                funcExpr.isGenerator(),
+                false            // strict - TODO: parse directives in function body
         );
 
         // Prototype chain will be initialized when the function is loaded

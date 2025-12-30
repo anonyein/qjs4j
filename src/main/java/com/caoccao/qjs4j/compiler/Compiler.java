@@ -52,7 +52,7 @@ public final class Compiler {
 
             // Create and return bytecode function
             String name = filename != null ? filename : "<script>";
-            return new JSBytecodeFunction(bytecode, name, 0);
+            return new JSBytecodeFunction(bytecode, name, 0, ast.strict());
 
         } catch (BytecodeCompiler.CompilerException e) {
             throw new CompilerException("Bytecode compiler error: " + e.getMessage(), e);
@@ -103,7 +103,7 @@ public final class Compiler {
             // Create and return bytecode function
             // Note: Module code is always strict mode
             String name = filename != null ? filename : "<module>";
-            return new JSBytecodeFunction(bytecode, name, 0);
+            return new JSBytecodeFunction(bytecode, name, 0, true);
 
         } catch (BytecodeCompiler.CompilerException e) {
             throw new CompilerException("Module compiler error: " + e.getMessage(), e);

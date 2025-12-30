@@ -16,23 +16,51 @@
 
 package com.caoccao.qjs4j.compiler;
 
-import com.caoccao.qjs4j.core.*;
-import org.junit.jupiter.api.BeforeEach;
+import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.core.JSArray;
+import com.caoccao.qjs4j.core.JSBoolean;
+import com.caoccao.qjs4j.core.JSPromise;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Advanced tests for async/await functionality, focusing on proper asynchronous behavior,
  * promise chaining, and execution suspension/resumption.
  */
-public class AsyncAwaitAdvancedTest {
-    private JSContext context;
+public class AsyncAwaitAdvancedTest extends BaseTest {
 
-    @BeforeEach
-    void setUp() {
-        JSRuntime runtime = new JSRuntime();
-        context = runtime.createContext();
+    @Test
+    void testAsyncAwaitWithPromiseAll() {
+        // Test using Promise.all with async/await
+        String code = """
+                async function test() {
+                    const results = await Promise.all([
+                        Promise.resolve(1),
+                        Promise.resolve(2),
+                        Promise.resolve(3)
+                    ]);
+                    return results;
+                }
+                test();
+                """;
+
+        assertThat(context.eval(code)).isInstanceOf(JSPromise.class);
+    }
+
+    @Test
+    void testAsyncFunctionErrorHandling() {
+        // Test that errors in async functions are caught and wrapped in rejected promises
+        String code = """
+                async function test() {
+                    throw 'test error';
+                }
+                test();
+                """;
+
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            assertThat(promise.getState()).as("Promise should be rejected when async function throws").isEqualTo(JSPromise.PromiseState.REJECTED);
+        });
     }
 
     @Test
@@ -52,18 +80,34 @@ public class AsyncAwaitAdvancedTest {
                 [resolved, result];
                 """;
 
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSArray.class, result);
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSArray.class, array -> {
+            // Check that the promise executor ran (resolved should be true)
+            assertThat(array.get(0)).isInstanceOfSatisfying(JSBoolean.class, resolvedFlag -> assertThat(resolvedFlag.value()).as("Promise executor should have run").isTrue());
+            // Check that test() returned a promise
+            assertThat(array.get(1)).isInstanceOf(JSPromise.class);
+        });
+    }
 
-        JSArray array = (JSArray) result;
-        // Check that the promise executor ran (resolved should be true)
-        JSValue resolvedFlag = array.get(0);
-        assertInstanceOf(JSBoolean.class, resolvedFlag);
-        assertTrue(((JSBoolean) resolvedFlag).value(), "Promise executor should have run");
+    @Test
+    void testAsyncGeneratorBasic() {
+        // Test basic async generator syntax (if implemented)
+        String code = """
+                async function* generator() {
+                    yield 1;
+                    yield 2;
+                    yield 3;
+                }
+                const gen = generator();
+                gen;
+                """;
 
-        // Check that test() returned a promise
-        JSValue testResult = array.get(1);
-        assertInstanceOf(JSPromise.class, testResult);
+        try {
+            // If async generators are implemented, this should return an async generator object
+            assertThat(context.eval(code)).isNotNull();
+        } catch (Exception e) {
+            // If not implemented, expect a parse error
+            assertThat(e.getMessage()).containsAnyOf("parse", "syntax");
+        }
     }
 
     @Test
@@ -77,70 +121,9 @@ public class AsyncAwaitAdvancedTest {
                 test();
                 """;
 
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.FULFILLED, promise.getState());
-    }
-
-    @Test
-    void testMultipleSequentialAwaits() {
-        // Test that multiple awaits execute in sequence
-        String code = """
-                let order = [];
-                async function test() {
-                    order.push(1);
-                    await 'first';
-                    order.push(2);
-                    await 'second';
-                    order.push(3);
-                    return order;
-                }
-                test();
-                """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-    }
-
-    @Test
-    void testAsyncFunctionErrorHandling() {
-        // Test that errors in async functions are caught and wrapped in rejected promises
-        String code = """
-                async function test() {
-                    throw 'test error';
-                }
-                test();
-                """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.REJECTED, promise.getState(),
-                "Promise should be rejected when async function throws");
-    }
-
-    @Test
-    void testNestedAsyncFunctions() {
-        // Test calling async function from within another async function
-        String code = """
-                async function inner() {
-                    return 42;
-                }
-                async function outer() {
-                    const value = await inner();
-                    return value * 2;
-                }
-                outer();
-                """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-
-        JSPromise promise = (JSPromise) result;
-        assertEquals(JSPromise.PromiseState.FULFILLED, promise.getState());
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            assertThat(promise.getState()).isEqualTo(JSPromise.PromiseState.FULFILLED);
+        });
     }
 
     @Test
@@ -158,8 +141,7 @@ public class AsyncAwaitAdvancedTest {
                 test();
                 """;
 
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
+        assertThat(context.eval(code)).isInstanceOf(JSPromise.class);
     }
 
     @Test
@@ -182,56 +164,11 @@ public class AsyncAwaitAdvancedTest {
                 [p1, p2, results];
                 """;
 
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSArray.class, result);
-
-        JSArray array = (JSArray) result;
-        // Both should return promises
-        assertInstanceOf(JSPromise.class, array.get(0));
-        assertInstanceOf(JSPromise.class, array.get(1));
-    }
-
-    @Test
-    void testAsyncAwaitWithPromiseAll() {
-        // Test using Promise.all with async/await
-        String code = """
-                async function test() {
-                    const results = await Promise.all([
-                        Promise.resolve(1),
-                        Promise.resolve(2),
-                        Promise.resolve(3)
-                    ]);
-                    return results;
-                }
-                test();
-                """;
-
-        JSValue result = context.eval(code);
-        assertInstanceOf(JSPromise.class, result);
-    }
-
-    @Test
-    void testAsyncGeneratorBasic() {
-        // Test basic async generator syntax (if implemented)
-        String code = """
-                async function* generator() {
-                    yield 1;
-                    yield 2;
-                    yield 3;
-                }
-                const gen = generator();
-                gen;
-                """;
-
-        try {
-            JSValue result = context.eval(code);
-            // If async generators are implemented, this should return an async generator object
-            assertNotNull(result);
-        } catch (Exception e) {
-            // If not implemented, expect a parse error
-            assertTrue(e.getMessage().contains("parse") || e.getMessage().contains("syntax"),
-                    "Should fail with parse/syntax error if async generators not implemented");
-        }
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSArray.class, array -> {
+            // Both should return promises
+            assertThat(array.get(0)).isInstanceOf(JSPromise.class);
+            assertThat(array.get(1)).isInstanceOf(JSPromise.class);
+        });
     }
 
     @Test
@@ -254,15 +191,52 @@ public class AsyncAwaitAdvancedTest {
         // The parser doesn't properly handle `for await` syntax yet
         // TODO: Implement for-await-of loops with FOR_AWAIT_OF_START and FOR_AWAIT_OF_NEXT opcodes
         try {
-            JSValue result = context.eval(code);
             // for-await-of not yet implemented, so this won't be a promise
             // The test passes regardless since the feature isn't ready
-            // assertInstanceOf(JSPromise.class, result);
+            // assertThat(context.eval(code)).isInstanceOf(JSPromise.class);
         } catch (Exception e) {
             // Expected: parser/compiler error due to unimplemented for-await-of
             // OR: the function compiles but returns incorrect type due to parser bug
             // Both are acceptable until for-await-of is implemented
-            assertTrue(true, "for-await-of not yet implemented: " + e.getMessage());
+            assertThat(true).as("for-await-of not yet implemented: " + e.getMessage()).isTrue();
         }
+    }
+
+    @Test
+    void testMultipleSequentialAwaits() {
+        // Test that multiple awaits execute in sequence
+        String code = """
+                let order = [];
+                async function test() {
+                    order.push(1);
+                    await 'first';
+                    order.push(2);
+                    await 'second';
+                    order.push(3);
+                    return order;
+                }
+                test();
+                """;
+
+        assertThat(context.eval(code)).isInstanceOf(JSPromise.class);
+    }
+
+    @Test
+    void testNestedAsyncFunctions() {
+        // Test calling async function from within another async function
+        String code = """
+                async function inner() {
+                    return 42;
+                }
+                async function outer() {
+                    const value = await inner();
+                    return value * 2;
+                }
+                outer();
+                """;
+
+        assertThat(context.eval(code)).isInstanceOfSatisfying(JSPromise.class, promise -> {
+            assertThat(promise.getState()).isEqualTo(JSPromise.PromiseState.FULFILLED);
+        });
     }
 }

@@ -20,7 +20,7 @@ import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for GeneratorPrototype methods.
@@ -47,18 +47,18 @@ public class GeneratorPrototypeTest extends BaseTest {
         // Test the custom generator
         JSValue result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         JSObject iteratorResult = result.asObject().orElseThrow();
-        assertEquals("first", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("first"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals("second", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("second"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
     }
 
     @Test
@@ -72,15 +72,15 @@ public class GeneratorPrototypeTest extends BaseTest {
         // Normal case: next() on empty generator
         JSValue result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         JSObject iteratorResult = result.asObject().orElseThrow();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: return on empty generator
         JSGenerator generator2 = JSGenerator.fromArray(emptyArray);
         result = GeneratorPrototype.returnMethod(ctx, generator2, new JSValue[]{new JSString("done")});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals("done", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("done"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
     }
 
     @Test
@@ -97,48 +97,54 @@ public class GeneratorPrototypeTest extends BaseTest {
         // Normal case: first next() call
         JSValue result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         JSObject iteratorResult = result.asObject().orElseThrow();
-        assertEquals(1.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(1.0));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         // Normal case: second next() call
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(2.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(2.0));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         // Normal case: third next() call
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(3.0, iteratorResult.get("value").asNumber().map(JSNumber::value).orElseThrow());
-        assertEquals(JSBoolean.FALSE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(3.0));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.FALSE);
 
         // Normal case: fourth next() call (done)
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: subsequent calls after done
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: next() with value argument (ignored in this simple implementation)
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{new JSString("ignored")});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: called on non-generator
         result = GeneratorPrototype.next(ctx, new JSString("not a generator"), new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
 
         // Edge case: called on null
         result = GeneratorPrototype.next(ctx, JSNull.INSTANCE, new JSValue[]{});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -155,31 +161,37 @@ public class GeneratorPrototypeTest extends BaseTest {
         // Normal case: return with value
         JSValue result = GeneratorPrototype.returnMethod(ctx, generator, new JSValue[]{new JSString("returned")});
         JSObject iteratorResult = result.asObject().orElseThrow();
-        assertEquals("returned", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("returned"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: subsequent next() calls after return
         result = GeneratorPrototype.next(ctx, generator, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals("returned", iteratorResult.get("value").asString().map(JSString::value).orElseThrow());
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("returned"));
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: return without value (undefined)
         JSGenerator generator2 = JSGenerator.fromArray(array);
         result = GeneratorPrototype.returnMethod(ctx, generator2, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
-        assertEquals(JSUndefined.INSTANCE, iteratorResult.get("value"));
-        assertEquals(JSBoolean.TRUE, iteratorResult.get("done"));
+        assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
+        assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Edge case: called on non-generator
         result = GeneratorPrototype.returnMethod(ctx, new JSObject(), new JSValue[]{new JSNumber(42)});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
 
         // Edge case: called on undefined
         result = GeneratorPrototype.returnMethod(ctx, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(42)});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 
     @Test
@@ -195,23 +207,35 @@ public class GeneratorPrototypeTest extends BaseTest {
         // Normal case: throw with exception
         JSValue result = GeneratorPrototype.throwMethod(ctx, generator, new JSValue[]{new JSString("test exception")});
         // In this simplified implementation, throw completes the generator and returns an error
-        assertError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isNotNull();
+            assertThat(error.get("message")).isNotNull();
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
 
         // Normal case: throw without exception (undefined)
         JSGenerator generator2 = JSGenerator.fromArray(array);
         result = GeneratorPrototype.throwMethod(ctx, generator2, new JSValue[]{});
-        assertError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isNotNull();
+            assertThat(error.get("message")).isNotNull();
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
 
         // Edge case: called on non-generator
         result = GeneratorPrototype.throwMethod(ctx, new JSNumber(123), new JSValue[]{new JSString("error")});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
 
         // Edge case: called on null
         result = GeneratorPrototype.throwMethod(ctx, JSNull.INSTANCE, new JSValue[]{new JSString("error")});
-        assertTypeError(result);
-        assertPendingException(ctx);
+        assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
+                assertThat(name.value()).isEqualTo("TypeError"));
+        });
+        assertThat(ctx.getPendingException()).isNotNull();
     }
 }

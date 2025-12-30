@@ -16,118 +16,89 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.JSValue;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for Reflect object methods, particularly extensibility.
  */
-public class ReflectObjectTest extends BaseTest {
+public class ReflectObjectTest extends BaseJavetTest {
 
     @Test
     public void testReflectDeleteProperty() {
-        JSValue result = context.eval(
-                "var obj = {x: 1, y: 2}; " +
-                        "Reflect.deleteProperty(obj, 'x'); " +
-                        "JSON.stringify(obj)"
-        );
-        assertEquals("{\"y\":2}", result.toJavaObject());
+        String code = "var obj = {x: 1, y: 2}; Reflect.deleteProperty(obj, 'x'); JSON.stringify(obj)";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testReflectGet() {
-        JSValue result = context.eval(
-                "var obj = {x: 1}; " +
-                        "Reflect.get(obj, 'x')"
-        );
-        assertEquals(1.0, (Double) result.toJavaObject());
+        String code = "var obj = {x: 1}; Reflect.get(obj, 'x')";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testReflectHas() {
-        JSValue result = context.eval(
-                "var obj = {x: 1}; " +
-                        "Reflect.has(obj, 'x')"
-        );
-        assertTrue((Boolean) result.toJavaObject());
-
-        result = context.eval("Reflect.has(obj, 'y')");
-        assertFalse((Boolean) result.toJavaObject());
+        String code = "var obj = {x: 1}; JSON.stringify([Reflect.has(obj, 'x'), Reflect.has(obj, 'y')])";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeString(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testReflectIsExtensible() {
-        // Test normal extensible object
-        JSValue result = context.eval("var obj = {}; Reflect.isExtensible(obj)");
-        assertTrue((Boolean) result.toJavaObject());
-
-        // Test after preventExtensions
-        result = context.eval(
-                "var obj2 = {}; " +
-                        "Reflect.preventExtensions(obj2); " +
-                        "Reflect.isExtensible(obj2)"
-        );
-        assertFalse((Boolean) result.toJavaObject());
-
-        // Test frozen object is not extensible
-        result = context.eval(
-                "var obj3 = {}; " +
-                        "Object.freeze(obj3); " +
-                        "Reflect.isExtensible(obj3)"
-        );
-        assertFalse((Boolean) result.toJavaObject());
-
-        // Test sealed object is not extensible
-        result = context.eval(
-                "var obj4 = {}; " +
-                        "Object.seal(obj4); " +
-                        "Reflect.isExtensible(obj4)"
-        );
-        assertFalse((Boolean) result.toJavaObject());
+        Stream.of(
+                "var obj = {}; Reflect.isExtensible(obj)",
+                "var obj2 = {}; Reflect.preventExtensions(obj2); Reflect.isExtensible(obj2)",
+                "var obj3 = {}; Object.freeze(obj3); Reflect.isExtensible(obj3)",
+                "var obj4 = {}; Object.seal(obj4); Reflect.isExtensible(obj4)").forEach(code -> assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject()));
     }
 
     @Test
     public void testReflectPreventExtensions() {
         // Test that Reflect.preventExtensions prevents adding properties
-        JSValue result = context.eval(
-                "var obj = {a: 1}; " +
-                        "Reflect.preventExtensions(obj); " +
-                        "obj.b = 2; " +  // Should not add
-                        "JSON.stringify(obj)"
+        JSValue result = context.eval("""
+                var obj = {a: 1};
+                Reflect.preventExtensions(obj);
+                obj.b = 2;
+                JSON.stringify(obj)"""
         );
-        assertEquals("{\"a\":1}", result.toJavaObject());
+        assertThat(result.toJavaObject()).isEqualTo("{\"a\":1}");
 
         // Test that it returns true
-        result = context.eval(
-                "var obj2 = {}; " +
-                        "Reflect.preventExtensions(obj2)"
-        );
-        assertTrue((Boolean) result.toJavaObject());
+        result = context.eval("var obj2 = {}; Reflect.preventExtensions(obj2)");
+        assertThat((Boolean) result.toJavaObject()).isTrue();
     }
 
     @Test
     public void testReflectPreventExtensionsWithObjectPreventExtensions() {
         // Test that Reflect.preventExtensions and Object.preventExtensions are consistent
-        JSValue result = context.eval(
-                "var obj1 = {}; " +
-                        "var obj2 = {}; " +
-                        "Reflect.preventExtensions(obj1); " +
-                        "Object.preventExtensions(obj2); " +
-                        "Reflect.isExtensible(obj1) === Object.isExtensible(obj2)"
-        );
-        assertTrue((Boolean) result.toJavaObject());
+        String code = """
+                var obj1 = {};
+                var obj2 = {};
+                Reflect.preventExtensions(obj1);
+                Object.preventExtensions(obj2);
+                Reflect.isExtensible(obj1) === Object.isExtensible(obj2)""";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeBoolean(),
+                () -> context.eval(code).toJavaObject());
     }
 
     @Test
     public void testReflectSet() {
-        JSValue result = context.eval(
-                "var obj = {}; " +
-                        "Reflect.set(obj, 'x', 42); " +
-                        "obj.x"
-        );
-        assertEquals(42.0, (Double) result.toJavaObject());
+        String code = "var obj = {}; Reflect.set(obj, 'x', 42); obj.x";
+        assertWithJavet(
+                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
+                () -> context.eval(code).toJavaObject());
     }
 }

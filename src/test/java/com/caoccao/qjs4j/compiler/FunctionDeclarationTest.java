@@ -16,23 +16,18 @@
 
 package com.caoccao.qjs4j.compiler;
 
-import com.caoccao.qjs4j.core.*;
-import org.junit.jupiter.api.BeforeEach;
+import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.core.JSBytecodeFunction;
+import com.caoccao.qjs4j.core.JSNumber;
+import com.caoccao.qjs4j.core.JSPromise;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for function declarations to debug async/await issues.
  */
-public class FunctionDeclarationTest {
-    private JSContext context;
-
-    @BeforeEach
-    void setUp() {
-        JSRuntime runtime = new JSRuntime();
-        context = runtime.createContext();
-    }
+public class FunctionDeclarationTest extends BaseTest {
 
     @Test
     void testAsyncFunctionDeclarationCall() {
@@ -43,17 +38,7 @@ public class FunctionDeclarationTest {
                 test();
                 """;
 
-        JSValue result = context.eval(code);
-        System.out.println("Result type: " + result.getClass().getSimpleName());
-        System.out.println("Result: " + result);
-        System.out.println("Result toString: " + result);
-
-        if (result instanceof JSBytecodeFunction func) {
-            System.out.println("Function name: " + func.getName());
-            System.out.println("Function isAsync: " + func.isAsync());
-        }
-
-        assertInstanceOf(JSPromise.class, result, "Async function should return a promise");
+        assertThat(context.eval(code)).as("Async function should return a promise").isInstanceOf(JSPromise.class);
     }
 
     @Test
@@ -65,14 +50,10 @@ public class FunctionDeclarationTest {
                 test;
                 """;
 
-        JSValue result = context.eval(code);
-        System.out.println("Result type: " + result.getClass().getSimpleName());
-        System.out.println("Result: " + result);
-
-        assertInstanceOf(JSBytecodeFunction.class, result, "Should return the function");
-        JSBytecodeFunction func = (JSBytecodeFunction) result;
-        assertEquals("test", func.getName());
-        assertTrue(func.isAsync(), "Function should be marked as async");
+        assertThat(context.eval(code)).as("Should return the function").isInstanceOfSatisfying(JSBytecodeFunction.class, func -> {
+            assertThat(func.getName()).isEqualTo("test");
+            assertThat(func.isAsync()).as("Function should be marked as async").isTrue();
+        });
     }
 
     @Test
@@ -84,12 +65,7 @@ public class FunctionDeclarationTest {
                 test();
                 """;
 
-        JSValue result = context.eval(code);
-        System.out.println("Result type: " + result.getClass().getSimpleName());
-        System.out.println("Result: " + result);
-
-        assertInstanceOf(JSNumber.class, result, "Should return 42");
-        assertEquals(42.0, ((JSNumber) result).value());
+        assertThat(context.eval(code)).as("Should return 42").isInstanceOfSatisfying(JSNumber.class, jsNumber -> assertThat(jsNumber.value()).isEqualTo(42.0));
     }
 
     @Test
@@ -101,17 +77,8 @@ public class FunctionDeclarationTest {
                 test;
                 """;
 
-        try {
-            JSValue result = context.eval(code);
-            System.out.println("Result type: " + result.getClass().getSimpleName());
-            System.out.println("Result: " + result);
-
-            assertInstanceOf(JSBytecodeFunction.class, result, "Should return the function");
-            JSBytecodeFunction func = (JSBytecodeFunction) result;
-            assertEquals("test", func.getName());
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail("Exception thrown: " + e.getMessage());
-        }
+        assertThat(context.eval(code)).as("Should return the function").isInstanceOfSatisfying(JSBytecodeFunction.class, func -> {
+            assertThat(func.getName()).isEqualTo("test");
+        });
     }
 }
