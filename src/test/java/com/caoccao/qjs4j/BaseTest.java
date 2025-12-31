@@ -28,9 +28,9 @@ public abstract class BaseTest {
         });
     }
 
-    protected void assertPendingException(JSContext ctx) {
-        assertThat(ctx.hasPendingException()).isTrue();
-        ctx.clearPendingException();
+    protected void assertPendingException(JSContext context) {
+        assertThat(context.hasPendingException()).isTrue();
+        context.clearPendingException();
     }
 
     protected void assertRangeError(JSValue value) {

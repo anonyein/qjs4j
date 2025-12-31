@@ -111,11 +111,11 @@ public final class JSModule {
      * Evaluate this module.
      * ES2020 15.2.1.17 Evaluate() method.
      *
-     * @param ctx The execution context
+     * @param context The execution context
      * @return The module evaluation result
      * @throws ModuleEvaluationException if evaluation fails
      */
-    public JSValue evaluate(JSContext ctx) throws ModuleEvaluationException {
+    public JSValue evaluate(JSContext context) throws ModuleEvaluationException {
         if (status == ModuleStatus.EVALUATING) {
             // Circular evaluation - this is ok, just return undefined
             return JSUndefined.INSTANCE;
@@ -132,23 +132,23 @@ public final class JSModule {
         try {
             // First, evaluate all dependencies
             for (JSModule dependency : requestedModules) {
-                dependency.evaluate(ctx);
+                dependency.evaluate(context);
             }
 
             // Execute the module code
-            com.caoccao.qjs4j.vm.VirtualMachine vm = new com.caoccao.qjs4j.vm.VirtualMachine(ctx);
+            com.caoccao.qjs4j.vm.VirtualMachine vm = new com.caoccao.qjs4j.vm.VirtualMachine(context);
             JSValue result = vm.execute(moduleFunction, namespace, new JSValue[0]);
 
             // Check for exceptions
-            if (ctx.hasPendingException()) {
-                JSValue exception = ctx.getPendingException();
-                ctx.clearPendingException();
+            if (context.hasPendingException()) {
+                JSValue exception = context.getPendingException();
+                context.clearPendingException();
                 status = ModuleStatus.LINKED; // Reset to linked state
                 throw new ModuleEvaluationException("Module evaluation failed: " + url, exception);
             }
 
             // Populate namespace object with exports
-            populateNamespace(ctx);
+            populateNamespace(context);
 
             status = ModuleStatus.EVALUATED;
             return result != null ? result : JSUndefined.INSTANCE;
@@ -213,10 +213,10 @@ public final class JSModule {
      * ES2020 15.2.1.16 Link() method.
      *
      * @param resolver Module resolver for resolving import specifiers
-     * @param ctx      The execution context
+     * @param context  The execution context
      * @throws ModuleLinkingException if linking fails
      */
-    public void link(ModuleResolver resolver, JSContext ctx) throws ModuleLinkingException {
+    public void link(ModuleResolver resolver, JSContext context) throws ModuleLinkingException {
         if (status == ModuleStatus.LINKING || status == ModuleStatus.EVALUATING) {
             throw new ModuleLinkingException("Circular module dependency detected: " + url);
         }
@@ -236,7 +236,7 @@ public final class JSModule {
                 addDependency(importedModule);
 
                 // Recursively link dependencies
-                importedModule.link(resolver, ctx);
+                importedModule.link(resolver, context);
             }
 
             status = ModuleStatus.LINKED;
@@ -249,7 +249,7 @@ public final class JSModule {
     /**
      * Populate the namespace object with exported values.
      */
-    private void populateNamespace(JSContext ctx) {
+    private void populateNamespace(JSContext context) {
         // Add all named exports to the namespace
         for (Map.Entry<String, ExportEntry> entry : namedExports.entrySet()) {
             String exportName = entry.getKey();

@@ -19,8 +19,6 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
  * Unit tests for Proxy.revocable with working revoke function.
  */
@@ -719,45 +717,33 @@ public class ProxyConstructorTest extends BaseJavetTest {
     @Test
     public void testProxyOwnKeysInvariantDuplicates() {
         // Test invariant: ownKeys result can't have duplicates
-        try {
-            context.eval("""
-                    var target = {x: 1};
-                    var handler = {
-                      ownKeys: function(target) {
-                        return ['x', 'x']; // Duplicate property
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.keys(proxy)""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            // TypeError: 'ownKeys' on proxy: trap returned duplicate entries
-            assertTrue(e.getMessage().contains("duplicate") ||
-                    e.getMessage().contains("TypeError"));
-        }
+        assertErrorWithJavet("""
+                var target = {x: 1};
+                var handler = {
+                  ownKeys: function(target) {
+                    return ['x', 'x']; // Duplicate property
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.keys(proxy)""");
     }
 
     @Test
     public void testProxyOwnKeysInvariantNonExtensible() {
         // Test invariant: ownKeys must include all non-configurable properties
-        try {
-            context.eval("""
-                    var target = {};
-                    Object.defineProperty(target, 'x', {
-                      value: 1,
-                      configurable: false
-                    });
-                    var handler = {
-                      ownKeys: function(target) {
-                        return []; // Omit non-configurable property
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.keys(proxy)""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'ownKeys' on proxy: trap result did not include 'x'", e.getMessage());
-        }
+        assertErrorWithJavet("""
+                var target = {};
+                Object.defineProperty(target, 'x', {
+                  value: 1,
+                  configurable: false
+                });
+                var handler = {
+                  ownKeys: function(target) {
+                    return []; // Omit non-configurable property
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.keys(proxy)""");
     }
 
     @Test
@@ -1071,82 +1057,57 @@ public class ProxyConstructorTest extends BaseJavetTest {
     @Test
     public void testProxySetPrototypeOfReturningFalse() {
         // Test that setPrototypeOf trap can return false
-        try {
-            context.eval("""
-                    'use strict';
-                    var target = {};
-                    var handler = {
-                      setPrototypeOf: function(target, proto) {
-                        return false; // Refuse to set prototype
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    Object.setPrototypeOf(proxy, {})""");
-            fail("Should have thrown TypeError in strict mode");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("TypeError") ||
-                    e.getMessage().contains("returned false"));
-        }
+        assertErrorWithJavet("""
+                'use strict';
+                var target = {};
+                var handler = {
+                  setPrototypeOf: function(target, proto) {
+                    return false; // Refuse to set prototype
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                Object.setPrototypeOf(proxy, {})""");
     }
 
     @Test
     public void testProxySetReturningFalse() {
         // Test that set trap returning false throws in strict mode
-        try {
-            // Reject the assignment
-            context.eval("""
-                    'use strict';
-                    var target = {};
-                    var handler = {
-                      set: function(target, prop, value) {
-                        return false;
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    proxy.x = 1""");
-            fail("Should have thrown TypeError in strict mode");
-        } catch (Exception e) {
-            assertEquals("TypeError: 'set' on proxy: trap returned falsish for property 'x'", e.getMessage());
-        }
+        assertErrorWithJavet("""
+                'use strict';
+                var target = {};
+                var handler = {
+                  set: function(target, prop, value) {
+                    return false;
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                proxy.x = 1""");
     }
 
     @Test
     public void testProxyThrowingTrap() {
         // Test that trap can throw custom error
-        try {
-            context.eval("""
-                    var target = {x: 1};
-                    var handler = {
-                      get: function(target, prop) {
-                        throw new Error('custom error');
-                      }
-                    };
-                    var proxy = new Proxy(target, handler);
-                    proxy.x""");
-            fail("Should have thrown custom error");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("custom error"));
-        }
+        assertErrorWithJavet("""
+                var target = {x: 1};
+                var handler = {
+                  get: function(target, prop) {
+                    throw new Error('custom error');
+                  }
+                };
+                var proxy = new Proxy(target, handler);
+                proxy.x""");
     }
 
     @Test
     public void testProxyTrapWithNonCallableHandler() {
         // Test that non-callable trap throws TypeError
-        try {
-            // Not a function
-            context.eval("""
-                    var target = {x: 1};
-                    var handler = {
-                      get: 42
-                    };
-                    var proxy = new Proxy(target, handler);
-                    proxy.x""");
-            fail("Should have thrown TypeError");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("not a function") ||
-                    e.getMessage().contains("TypeError") ||
-                    e.getMessage().contains("callable"));
-        }
+        assertErrorWithJavet("""
+                var target = {x: 1};
+                var handler = {
+                  get: 42
+                };
+                var proxy = new Proxy(target, handler);
+                proxy.x""");
     }
 
     @Test

@@ -42,7 +42,7 @@ public final class RegExpEngine {
             return null;
         }
 
-        ExecutionContext ctx = new ExecutionContext(
+        ExecutionContext executionContext = new ExecutionContext(
                 input,
                 bytecode.instructions(),
                 bytecode.captureCount(),
@@ -55,9 +55,9 @@ public final class RegExpEngine {
         // Try matching at each position
         int end = bytecode.isSticky() ? startIndex + 1 : input.length() + 1;
         for (int pos = startIndex; pos < end; pos++) {
-            ctx.reset(pos);
-            if (execute(ctx)) {
-                return ctx.createResult(true);
+            executionContext.reset(pos);
+            if (execute(executionContext)) {
+                return executionContext.createResult(true);
             }
         }
 
@@ -67,8 +67,8 @@ public final class RegExpEngine {
     /**
      * Execute the bytecode starting from the given instruction pointer.
      */
-    private boolean execute(ExecutionContext ctx) {
-        byte[] bc = ctx.bytecode;
+    private boolean execute(ExecutionContext executionContext) {
+        byte[] bc = executionContext.bytecode;
         int pc = 0;
 
         while (pc < bc.length) {
@@ -78,7 +78,7 @@ public final class RegExpEngine {
             switch (op) {
                 case CHAR -> {
                     int ch = readU16(bc, pc + 1);
-                    if (!ctx.matchChar(ch)) {
+                    if (!executionContext.matchChar(ch)) {
                         return false;
                     }
                     pc += 3;
@@ -86,7 +86,7 @@ public final class RegExpEngine {
 
                 case CHAR_I -> {
                     int ch = readU16(bc, pc + 1);
-                    if (!ctx.matchCharIgnoreCase(ch)) {
+                    if (!executionContext.matchCharIgnoreCase(ch)) {
                         return false;
                     }
                     pc += 3;
@@ -94,7 +94,7 @@ public final class RegExpEngine {
 
                 case CHAR32 -> {
                     int ch = readU32(bc, pc + 1);
-                    if (!ctx.matchChar(ch)) {
+                    if (!executionContext.matchChar(ch)) {
                         return false;
                     }
                     pc += 5;
@@ -102,35 +102,35 @@ public final class RegExpEngine {
 
                 case CHAR32_I -> {
                     int ch = readU32(bc, pc + 1);
-                    if (!ctx.matchCharIgnoreCase(ch)) {
+                    if (!executionContext.matchCharIgnoreCase(ch)) {
                         return false;
                     }
                     pc += 5;
                 }
 
                 case DOT -> {
-                    if (!ctx.matchDot()) {
+                    if (!executionContext.matchDot()) {
                         return false;
                     }
                     pc += 1;
                 }
 
                 case ANY -> {
-                    if (!ctx.matchAny()) {
+                    if (!executionContext.matchAny()) {
                         return false;
                     }
                     pc += 1;
                 }
 
                 case LINE_START, LINE_START_M -> {
-                    if (!ctx.matchLineStart(op == RegExpOpcode.LINE_START_M)) {
+                    if (!executionContext.matchLineStart(op == RegExpOpcode.LINE_START_M)) {
                         return false;
                     }
                     pc += 1;
                 }
 
                 case LINE_END, LINE_END_M -> {
-                    if (!ctx.matchLineEnd(op == RegExpOpcode.LINE_END_M)) {
+                    if (!executionContext.matchLineEnd(op == RegExpOpcode.LINE_END_M)) {
                         return false;
                     }
                     pc += 1;
@@ -143,13 +143,13 @@ public final class RegExpEngine {
 
                 case SAVE_START -> {
                     int captureIndex = bc[pc + 1] & 0xFF;
-                    ctx.saveStart(captureIndex);
+                    executionContext.saveStart(captureIndex);
                     pc += 2;
                 }
 
                 case SAVE_END -> {
                     int captureIndex = bc[pc + 1] & 0xFF;
-                    ctx.saveEnd(captureIndex);
+                    executionContext.saveEnd(captureIndex);
                     pc += 2;
                 }
 

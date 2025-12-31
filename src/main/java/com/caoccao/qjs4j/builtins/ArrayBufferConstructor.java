@@ -29,7 +29,7 @@ public final class ArrayBufferConstructor {
      * ES2020 24.1.3.3
      * Returns the ArrayBuffer constructor.
      */
-    public static JSValue getSpecies(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getSpecies(JSContext context, JSValue thisArg, JSValue[] args) {
         return thisArg;
     }
 
@@ -38,7 +38,7 @@ public final class ArrayBufferConstructor {
      * ES2020 24.1.3.1
      * Returns true if value is a TypedArray or DataView.
      */
-    public static JSValue isView(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue isView(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
             return JSBoolean.FALSE;
         }

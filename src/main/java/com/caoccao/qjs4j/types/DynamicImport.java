@@ -54,16 +54,16 @@ public final class DynamicImport {
      * Implement dynamic import as a function.
      * Returns a promise that resolves to the module namespace.
      *
-     * @param ctx       The execution context
+     * @param context   The execution context
      * @param specifier Module specifier to import
      * @param loader    Module loader to use
      * @return A promise that resolves to the module namespace object
      */
-    public static JSPromise import_(JSContext ctx, String specifier, ModuleLoader loader) {
+    public static JSPromise import_(JSContext context, String specifier, ModuleLoader loader) {
         JSPromise promise = new JSPromise();
 
         // Queue module loading as a microtask
-        ctx.enqueueMicrotask(() -> {
+        context.enqueueMicrotask(() -> {
             try {
                 // Load and evaluate the module
                 JSObject namespace = loader.import_(specifier);

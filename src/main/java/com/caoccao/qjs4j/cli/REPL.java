@@ -27,12 +27,12 @@ import java.io.InputStreamReader;
  * Read-Eval-Print Loop for interactive JavaScript execution.
  */
 public final class REPL {
-    private final JSContext ctx;
+    private final JSContext context;
     private final BufferedReader reader;
 
     public REPL() {
         JSRuntime runtime = new JSRuntime();
-        this.ctx = runtime.createContext();
+        this.context = runtime.createContext();
         this.reader = new BufferedReader(new InputStreamReader(System.in));
     }
 
@@ -46,7 +46,7 @@ public final class REPL {
                     break;
                 }
 
-                JSValue result = ctx.eval(line);
+                JSValue result = context.eval(line);
                 if (result != null) {
                     System.out.println(stringify(result));
                 }

@@ -41,10 +41,10 @@ public final class JSBytecodeFunction extends JSFunction {
     private final boolean isAsync;
     private final boolean isConstructor;
     private final boolean isGenerator;
-    private final boolean strict;
     private final int length;
     private final String name;
     private final JSObject prototype;
+    private final boolean strict;
 
     /**
      * Create a bytecode function.
@@ -102,13 +102,13 @@ public final class JSBytecodeFunction extends JSFunction {
     }
 
     @Override
-    public JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
         // If this is an async function, wrap execution in a promise
         if (isAsync) {
             JSPromise promise = new JSPromise();
             try {
                 // Execute bytecode in the VM
-                JSValue result = ctx.getVirtualMachine().execute(this, thisArg, args);
+                JSValue result = context.getVirtualMachine().execute(this, thisArg, args);
 
                 // If result is already a promise, use it directly
                 if (result instanceof JSPromise) {
@@ -120,9 +120,9 @@ public final class JSBytecodeFunction extends JSFunction {
             } catch (VirtualMachine.VMException e) {
                 // VM exception during async function execution
                 // Check if there's a pending exception in the context
-                if (ctx.hasPendingException()) {
-                    JSValue exception = ctx.getPendingException();
-                    ctx.clearAllPendingExceptions(); // Clear BOTH context and VM pending exceptions
+                if (context.hasPendingException()) {
+                    JSValue exception = context.getPendingException();
+                    context.clearAllPendingExceptions(); // Clear BOTH context and VM pending exceptions
                     promise.reject(exception);
                 } else {
                     // Create error object from exception message
@@ -143,7 +143,7 @@ public final class JSBytecodeFunction extends JSFunction {
         }
 
         // For non-async functions, execute normally and let exceptions propagate
-        return ctx.getVirtualMachine().execute(this, thisArg, args);
+        return context.getVirtualMachine().execute(this, thisArg, args);
     }
 
     /**

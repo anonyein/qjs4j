@@ -251,7 +251,7 @@ public class ObjectPrototypeTest extends BaseJavetTest {
         assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("[object Array]"));
 
         // Normal case: function
-        JSFunction func = new JSNativeFunction("test", 0, (ctx, thisArg, args) -> JSUndefined.INSTANCE);
+        JSFunction func = new JSNativeFunction("test", 0, (childContext, thisArg, args) -> JSUndefined.INSTANCE);
         result = ObjectPrototype.toString(context, func, new JSValue[]{});
         assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("[object Function]"));
 

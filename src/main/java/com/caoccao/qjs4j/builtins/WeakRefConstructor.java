@@ -16,7 +16,10 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSObject;
+import com.caoccao.qjs4j.core.JSValue;
+import com.caoccao.qjs4j.core.JSWeakRef;
 
 /**
  * WeakRef constructor implementation.

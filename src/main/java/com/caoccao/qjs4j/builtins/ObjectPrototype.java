@@ -252,7 +252,7 @@ public final class ObjectPrototype {
      * ES2020 19.1.2.6
      * Freezes an object, preventing new properties and making existing properties non-configurable.
      */
-    public static JSValue freeze(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue freeze(JSContext context, JSValue thisArg, JSValue[] args) {
         JSValue arg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
 
         if (!(arg instanceof JSObject obj)) {
@@ -308,7 +308,7 @@ public final class ObjectPrototype {
      * ES2020 19.1.3.6
      * Returns a string representing the object with Symbol.toStringTag support.
      */
-    public static JSValue toString(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue toString(JSContext context, JSValue thisArg, JSValue[] args) {
         // Handle primitives
         if (thisArg instanceof JSUndefined) {
             return new JSString("[object Undefined]");
@@ -422,7 +422,7 @@ public final class ObjectPrototype {
     /**
      * Object.prototype.valueOf()
      */
-    public static JSValue valueOf(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue valueOf(JSContext context, JSValue thisArg, JSValue[] args) {
         return thisArg;
     }
 

@@ -67,7 +67,7 @@ public final class SymbolPrototype {
      * ES2020 19.4.3.5
      * Returns "Symbol".
      */
-    public static JSValue toStringTag(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue toStringTag(JSContext context, JSValue thisArg, JSValue[] args) {
         return new JSString("Symbol");
     }
 

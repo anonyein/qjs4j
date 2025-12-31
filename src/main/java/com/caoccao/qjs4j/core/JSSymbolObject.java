@@ -39,7 +39,7 @@ package com.caoccao.qjs4j.core;
  * // Create a symbol object for use with Proxy
  * JSSymbol sym = new JSSymbol("foo");
  * JSSymbolObject symObj = new JSSymbolObject(sym);
- * JSProxy proxy = new JSProxy(symObj, handler, ctx);
+ * JSProxy proxy = new JSProxy(symObj, handler, context);
  *
  * // In JavaScript code:
  * // var symObj = Object(Symbol('foo'));

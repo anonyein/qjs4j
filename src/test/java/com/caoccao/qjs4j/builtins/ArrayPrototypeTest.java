@@ -30,7 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class ArrayPrototypeTest extends BaseTest {
     // Helper method to create a simple test function
     private JSFunction createTestFunction(Function<JSValue[], JSValue> impl) {
-        return new JSNativeFunction("test", 1, (ctx, thisArg, args) -> impl.apply(args));
+        return new JSNativeFunction(
+                "test",
+                1,
+                (context, thisArg, args) -> impl.apply(args));
     }
 
     @Test

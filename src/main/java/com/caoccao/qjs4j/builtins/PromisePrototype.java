@@ -29,10 +29,10 @@ public final class PromisePrototype {
      * ES2020 25.6.5.1
      * Returns a new Promise, and attaches a callback for rejection only.
      */
-    public static JSValue catchMethod(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue catchMethod(JSContext context, JSValue thisArg, JSValue[] args) {
         // catch is just then(undefined, onRejected)
         JSValue[] thenArgs = new JSValue[]{JSUndefined.INSTANCE, args.length > 0 ? args[0] : JSUndefined.INSTANCE};
-        return then(ctx, thisArg, thenArgs);
+        return then(context, thisArg, thenArgs);
     }
 
     /**

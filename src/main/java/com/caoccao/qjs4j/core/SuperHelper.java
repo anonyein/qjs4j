@@ -55,23 +55,24 @@ public final class SuperHelper {
      *
      * @param derivedClass The derived class
      * @param instance     The current instance
-     * @param ctx          The execution context
+     * @param context      The execution context
      * @return A super reference object
      */
-    public static JSObject createSuperReference(JSClass derivedClass, JSObject instance, JSContext ctx) {
+    public static JSObject createSuperReference(JSClass derivedClass, JSObject instance, JSContext context) {
         JSObject superRef = new JSObject();
 
         // Add __call__ for super() constructor calls
-        superRef.set("__call__", new JSNativeFunction("super", 0, (context, thisArg, args) -> {
-            return callSuperConstructor(context, derivedClass, instance, args);
-        }));
+        superRef.set("__call__", new JSNativeFunction(
+                "super",
+                0,
+                (childContext, thisArg, args) -> callSuperConstructor(childContext, derivedClass, instance, args)));
 
         // Add __get__ for super.method() calls
-        superRef.set("__get__", new JSNativeFunction("getSuperMethod", 1, (context, thisArg, args) -> {
+        superRef.set("__get__", new JSNativeFunction("getSuperMethod", 1, (childContext, thisArg, args) -> {
             if (args.length == 0) {
                 return JSUndefined.INSTANCE;
             }
-            String methodName = JSTypeConversions.toString(context, args[0]).value();
+            String methodName = JSTypeConversions.toString(childContext, args[0]).value();
             JSValue method = getSuperMethod(derivedClass, methodName);
 
             // If method is a function, bind it to the current instance

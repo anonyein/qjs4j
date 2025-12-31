@@ -18,10 +18,10 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.*;
+import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import org.assertj.core.data.Offset;
 
 /**
  * Unit tests for DataView prototype methods.

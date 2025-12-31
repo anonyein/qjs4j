@@ -23,14 +23,14 @@ package com.caoccao.qjs4j.core;
  * Example:
  * <pre>
  * JSClass myClass = new ClassBuilder("MyClass")
- *     .constructor((ctx, thisArg, args) -> {
+ *     .constructor((context, thisArg, args) -> {
  *         thisArg.set("x", args[0]);
  *         return JSUndefined.INSTANCE;
  *     })
- *     .instanceMethod("getValue", (ctx, thisArg, args) -> {
+ *     .instanceMethod("getValue", (context, thisArg, args) -> {
  *         return thisArg.get("x");
  *     })
- *     .staticMethod("create", (ctx, thisArg, args) -> {
+ *     .staticMethod("create", (context, thisArg, args) -> {
  *         // Create and return new instance
  *     })
  *     .build();
@@ -49,7 +49,7 @@ public final class JSClassBuilder {
      */
     public JSClassBuilder(String name) {
         this.name = name;
-        this.constructor = new JSNativeFunction("constructor", 0, (ctx, thisArg, args) -> JSUndefined.INSTANCE);
+        this.constructor = new JSNativeFunction("constructor", 0, (context, thisArg, args) -> JSUndefined.INSTANCE);
         this.superClass = null;
         this.classObject = null; // Will be created in build()
     }

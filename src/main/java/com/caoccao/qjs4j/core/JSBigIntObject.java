@@ -40,7 +40,7 @@ import java.math.BigInteger;
  * <pre>{@code
  * // Create a BigInt object for use with Proxy
  * JSBigIntObject bigIntObj = new JSBigIntObject(BigInteger.valueOf(42));
- * JSProxy proxy = new JSProxy(bigIntObj, handler, ctx);
+ * JSProxy proxy = new JSProxy(bigIntObj, handler, context);
  * }</pre>
  *
  * @see <a href="https://tc39.es/ecma262/#sec-bigint-objects">ECMAScript BigInt Objects</a>

@@ -35,7 +35,7 @@ package com.caoccao.qjs4j.core;
  * <pre>{@code
  * // Create a number object for use with Proxy
  * JSNumberObject numObj = new JSNumberObject(42);
- * JSProxy proxy = new JSProxy(numObj, handler, ctx);
+ * JSProxy proxy = new JSProxy(numObj, handler, context);
  * }</pre>
  *
  * @see <a href="https://tc39.es/ecma262/#sec-number-objects">ECMAScript Number Objects</a>

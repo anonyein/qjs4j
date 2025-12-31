@@ -48,12 +48,12 @@ public final class JSFinalizationRegistry extends JSObject {
      * Create a new FinalizationRegistry.
      *
      * @param cleanupCallback Callback function called with held values
-     * @param ctx             The execution context
+     * @param context         The execution context
      */
-    public JSFinalizationRegistry(JSFunction cleanupCallback, JSContext ctx) {
+    public JSFinalizationRegistry(JSFunction cleanupCallback, JSContext context) {
         super();
         this.cleanupCallback = cleanupCallback;
-        this.context = ctx;
+        this.context = context;
         this.referenceQueue = new ReferenceQueue<>();
         this.registrations = new ConcurrentHashMap<>();
         this.unregisterTokenMap = new ConcurrentHashMap<>();
@@ -65,9 +65,9 @@ public final class JSFinalizationRegistry extends JSObject {
         this.cleanupThread.start();
 
         // Add register() method
-        this.set("register", new JSNativeFunction("register", 2, (context, thisArg, args) -> {
+        this.set("register", new JSNativeFunction("register", 2, (childContext, thisArg, args) -> {
             if (args.length < 2) {
-                return context.throwTypeError("FinalizationRegistry.register requires target and heldValue");
+                return childContext.throwTypeError("FinalizationRegistry.register requires target and heldValue");
             }
 
             JSValue target = args[0];
@@ -75,12 +75,12 @@ public final class JSFinalizationRegistry extends JSObject {
             JSValue unregisterToken = args.length > 2 ? args[2] : null;
 
             if (!(target instanceof JSObject targetObj)) {
-                return context.throwTypeError("FinalizationRegistry target must be an object");
+                return childContext.throwTypeError("FinalizationRegistry target must be an object");
             }
 
             // Cannot register the same object as target and unregister token
             if (unregisterToken != null && target == unregisterToken) {
-                return context.throwTypeError("Target and unregister token cannot be the same object");
+                return childContext.throwTypeError("Target and unregister token cannot be the same object");
             }
 
             register(targetObj, heldValue, unregisterToken);
@@ -88,9 +88,9 @@ public final class JSFinalizationRegistry extends JSObject {
         }));
 
         // Add unregister() method
-        this.set("unregister", new JSNativeFunction("unregister", 1, (context, thisArg, args) -> {
+        this.set("unregister", new JSNativeFunction("unregister", 1, (childContext, thisArg, args) -> {
             if (args.length == 0) {
-                return context.throwTypeError("FinalizationRegistry.unregister requires unregisterToken");
+                return childContext.throwTypeError("FinalizationRegistry.unregister requires unregisterToken");
             }
 
             JSValue unregisterToken = args[0];

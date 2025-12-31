@@ -25,33 +25,6 @@ import com.caoccao.qjs4j.core.*;
 public final class PromiseConstructor {
 
     /**
-     * Helper method to get the Promise prototype from the global object.
-     * This is needed to set the [[Prototype]] on newly created promises.
-     */
-    private static JSObject getPromisePrototype(JSContext context) {
-        JSValue promiseConstructor = context.getGlobalObject().get("Promise");
-        if (promiseConstructor instanceof JSObject) {
-            JSValue prototype = ((JSObject) promiseConstructor).get("prototype");
-            if (prototype instanceof JSObject) {
-                return (JSObject) prototype;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Helper method to create a new Promise with the correct prototype.
-     */
-    private static JSPromise createPromise(JSContext context) {
-        JSPromise promise = new JSPromise();
-        JSObject prototype = getPromisePrototype(context);
-        if (prototype != null) {
-            promise.setPrototype(prototype);
-        }
-        return promise;
-    }
-
-    /**
      * Promise.all(iterable)
      * ES2020 25.6.4.1
      * Returns a Promise that fulfills when all promises fulfill, or rejects when any promise rejects.
@@ -284,6 +257,33 @@ public final class PromiseConstructor {
     }
 
     /**
+     * Helper method to create a new Promise with the correct prototype.
+     */
+    private static JSPromise createPromise(JSContext context) {
+        JSPromise promise = new JSPromise();
+        JSObject prototype = getPromisePrototype(context);
+        if (prototype != null) {
+            promise.setPrototype(prototype);
+        }
+        return promise;
+    }
+
+    /**
+     * Helper method to get the Promise prototype from the global object.
+     * This is needed to set the [[Prototype]] on newly created promises.
+     */
+    private static JSObject getPromisePrototype(JSContext context) {
+        JSValue promiseConstructor = context.getGlobalObject().get("Promise");
+        if (promiseConstructor instanceof JSObject) {
+            JSValue prototype = ((JSObject) promiseConstructor).get("prototype");
+            if (prototype instanceof JSObject) {
+                return (JSObject) prototype;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Promise.race(iterable)
      * ES2020 25.6.4.5
      * Returns a Promise that settles as soon as any promise in the iterable settles.
@@ -344,11 +344,11 @@ public final class PromiseConstructor {
      * ES2020 25.6.4.4
      * Returns a Promise that is rejected with the given reason.
      */
-    public static JSValue reject(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue reject(JSContext context, JSValue thisArg, JSValue[] args) {
         JSValue reason = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
 
         // Create a new promise and reject it
-        JSPromise promise = createPromise(ctx);
+        JSPromise promise = createPromise(context);
         promise.reject(reason);
         return promise;
     }
@@ -358,7 +358,7 @@ public final class PromiseConstructor {
      * ES2020 25.6.4.6
      * Returns a Promise that is resolved with the given value.
      */
-    public static JSValue resolve(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue resolve(JSContext context, JSValue thisArg, JSValue[] args) {
         JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
 
         // If value is already a promise, return it
@@ -367,7 +367,7 @@ public final class PromiseConstructor {
         }
 
         // Create a new promise and fulfill it
-        JSPromise promise = createPromise(ctx);
+        JSPromise promise = createPromise(context);
         promise.fulfill(value);
         return promise;
     }
@@ -377,18 +377,18 @@ public final class PromiseConstructor {
      * ES2024 27.2.4.9
      * Returns an object with a new promise and its resolve/reject functions.
      */
-    public static JSValue withResolvers(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        JSPromise promise = createPromise(ctx);
+    public static JSValue withResolvers(JSContext context, JSValue thisArg, JSValue[] args) {
+        JSPromise promise = createPromise(context);
 
         // Create resolve function
-        JSNativeFunction resolveFn = new JSNativeFunction("resolve", 1, (context, thisValue, funcArgs) -> {
+        JSNativeFunction resolveFn = new JSNativeFunction("resolve", 1, (childContext, thisValue, funcArgs) -> {
             JSValue value = funcArgs.length > 0 ? funcArgs[0] : JSUndefined.INSTANCE;
             promise.fulfill(value);
             return JSUndefined.INSTANCE;
         });
 
         // Create reject function
-        JSNativeFunction rejectFn = new JSNativeFunction("reject", 1, (context, thisValue, funcArgs) -> {
+        JSNativeFunction rejectFn = new JSNativeFunction("reject", 1, (childContext, thisValue, funcArgs) -> {
             JSValue reason = funcArgs.length > 0 ? funcArgs[0] : JSUndefined.INSTANCE;
             promise.reject(reason);
             return JSUndefined.INSTANCE;

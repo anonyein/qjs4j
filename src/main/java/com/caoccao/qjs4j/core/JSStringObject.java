@@ -35,7 +35,7 @@ package com.caoccao.qjs4j.core;
  * <pre>{@code
  * // Create a string object for use with Proxy
  * JSStringObject strObj = new JSStringObject("hello");
- * JSProxy proxy = new JSProxy(strObj, handler, ctx);
+ * JSProxy proxy = new JSProxy(strObj, handler, context);
  * }</pre>
  *
  * @see <a href="https://tc39.es/ecma262/#sec-string-objects">ECMAScript String Objects</a>

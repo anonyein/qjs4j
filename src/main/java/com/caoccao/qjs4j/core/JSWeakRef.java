@@ -47,9 +47,7 @@ public final class JSWeakRef extends JSObject {
         this.targetRef = new WeakReference<>(target);
 
         // Add deref() method
-        this.set("deref", new JSNativeFunction("deref", 0, (ctx, thisArg, args) -> {
-            return deref();
-        }));
+        this.set("deref", new JSNativeFunction("deref", 0, (childContext, thisArg, args) -> deref()));
     }
 
     /**

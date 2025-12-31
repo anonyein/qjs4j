@@ -37,12 +37,12 @@ public final class JSBoundFunction extends JSFunction {
     }
 
     @Override
-    public JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
         // Merge bound args with call args
         JSValue[] mergedArgs = new JSValue[boundArgs.length + args.length];
         System.arraycopy(boundArgs, 0, mergedArgs, 0, boundArgs.length);
         System.arraycopy(args, 0, mergedArgs, boundArgs.length, args.length);
-        return target.call(ctx, boundThis, mergedArgs);
+        return target.call(context, boundThis, mergedArgs);
     }
 
     @Override

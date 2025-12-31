@@ -42,8 +42,8 @@ public final class JSNativeFunction extends JSFunction {
     }
 
     @Override
-    public JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args) {
-        return callback.call(ctx, thisArg, args);
+    public JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
+        return callback.call(context, thisArg, args);
     }
 
     @Override
@@ -69,6 +69,6 @@ public final class JSNativeFunction extends JSFunction {
 
     @FunctionalInterface
     public interface NativeCallback {
-        JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args);
+        JSValue call(JSContext context, JSValue thisArg, JSValue[] args);
     }
 }

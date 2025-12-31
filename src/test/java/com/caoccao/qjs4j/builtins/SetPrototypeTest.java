@@ -108,7 +108,7 @@ public class SetPrototypeTest extends BaseJavetTest {
 
         // Normal case: forEach with callback
         final StringBuilder result = new StringBuilder();
-        JSFunction callback = new JSNativeFunction("testCallback", 3, (ctx, thisArg, args) -> {
+        JSFunction callback = new JSNativeFunction("testCallback", 3, (childContext, thisArg, args) -> {
             String value = args[0].asString().map(JSString::value).orElseThrow();
             result.append(value).append(",");
             return JSUndefined.INSTANCE;

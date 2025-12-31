@@ -35,7 +35,7 @@ package com.caoccao.qjs4j.core;
  * <pre>{@code
  * // Create a boolean object for use with Proxy
  * JSBooleanObject boolObj = new JSBooleanObject(true);
- * JSProxy proxy = new JSProxy(boolObj, handler, ctx);
+ * JSProxy proxy = new JSProxy(boolObj, handler, context);
  * }</pre>
  *
  * @see <a href="https://tc39.es/ecma262/#sec-boolean-objects">ECMAScript Boolean Objects</a>

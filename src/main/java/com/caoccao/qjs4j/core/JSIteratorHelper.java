@@ -67,10 +67,10 @@ public final class JSIteratorHelper {
      * Calls the object's [Symbol.iterator] method to get an iterator.
      *
      * @param iterable The iterable object
-     * @param ctx      The execution context
+     * @param context  The execution context
      * @return An iterator, or null if the object is not iterable
      */
-    public static JSValue getIterator(JSValue iterable, JSContext ctx) {
+    public static JSValue getIterator(JSValue iterable, JSContext context) {
         if (!(iterable instanceof JSObject iterableObj)) {
             return null;
         }
@@ -83,7 +83,7 @@ public final class JSIteratorHelper {
         }
 
         // Call the iterator method to get the iterator
-        JSValue iterator = iteratorFunc.call(ctx, iterable, new JSValue[0]);
+        JSValue iterator = iteratorFunc.call(context, iterable, new JSValue[0]);
 
         // Verify it's an object with a next method
         if (iterator instanceof JSObject iteratorObj) {
@@ -115,10 +115,10 @@ public final class JSIteratorHelper {
      * Call next() on an iterator and return the result.
      *
      * @param iterator The iterator object
-     * @param ctx      The execution context
+     * @param context  The execution context
      * @return The iterator result object with {value, done}
      */
-    public static JSObject iteratorNext(JSValue iterator, JSContext ctx) {
+    public static JSObject iteratorNext(JSValue iterator, JSContext context) {
         if (!(iterator instanceof JSObject iteratorObj)) {
             return null;
         }
@@ -139,7 +139,7 @@ public final class JSIteratorHelper {
             return null;
         }
 
-        JSValue result = nextFunc.call(ctx, iterator, new JSValue[0]);
+        JSValue result = nextFunc.call(context, iterator, new JSValue[0]);
 
         // Result should be an object with value and done properties
         if (result instanceof JSObject resultObj) {
@@ -153,16 +153,16 @@ public final class JSIteratorHelper {
      * Convert an iterable to an array.
      *
      * @param iterable The iterable to convert
-     * @param ctx      The execution context
+     * @param context  The execution context
      * @return A JSArray containing all values from the iterable
      */
-    public static JSArray toArray(JSValue iterable, JSContext ctx) {
+    public static JSArray toArray(JSValue iterable, JSContext context) {
         JSArray result = new JSArray();
 
         forOf(iterable, (value) -> {
             result.push(value);
             return true;
-        }, ctx);
+        }, context);
 
         return result;
     }

@@ -51,10 +51,10 @@ public final class RegExpCompiler {
         groupNames = new ArrayList<>();
 
         DynamicBuffer buffer = new DynamicBuffer(256);
-        CompileContext ctx = new CompileContext(pattern, flagBits, buffer);
+        CompileContext context = new CompileContext(pattern, flagBits, buffer);
 
         try {
-            compilePattern(ctx);
+            compilePattern(context);
             // End with MATCH opcode
             buffer.appendU8(RegExpOpcode.MATCH.getCode());
 
@@ -69,44 +69,44 @@ public final class RegExpCompiler {
         }
     }
 
-    private void compileAlternative(CompileContext ctx) {
+    private void compileAlternative(CompileContext context) {
         // An alternative is a sequence of terms
-        while (ctx.pos < ctx.codePoints.length) {
-            int ch = ctx.codePoints[ctx.pos];
+        while (context.pos < context.codePoints.length) {
+            int ch = context.codePoints[context.pos];
 
             switch (ch) {
                 case '^' -> {
-                    ctx.buffer.appendU8(ctx.isMultiline() ?
+                    context.buffer.appendU8(context.isMultiline() ?
                             RegExpOpcode.LINE_START_M.getCode() :
                             RegExpOpcode.LINE_START.getCode());
-                    ctx.pos++;
+                    context.pos++;
                 }
 
                 case '$' -> {
-                    ctx.buffer.appendU8(ctx.isMultiline() ?
+                    context.buffer.appendU8(context.isMultiline() ?
                             RegExpOpcode.LINE_END_M.getCode() :
                             RegExpOpcode.LINE_END.getCode());
-                    ctx.pos++;
+                    context.pos++;
                 }
 
                 case '.' -> {
-                    ctx.buffer.appendU8(ctx.isDotAll() ?
+                    context.buffer.appendU8(context.isDotAll() ?
                             RegExpOpcode.ANY.getCode() :
                             RegExpOpcode.DOT.getCode());
-                    ctx.pos++;
+                    context.pos++;
                 }
 
                 case '\\' -> {
-                    ctx.pos++;
-                    compileEscape(ctx);
+                    context.pos++;
+                    compileEscape(context);
                 }
 
                 case '[' -> {
-                    compileCharacterClass(ctx);
+                    compileCharacterClass(context);
                 }
 
                 case '(' -> {
-                    compileGroup(ctx);
+                    compileGroup(context);
                 }
 
                 case ')' -> {
@@ -126,37 +126,37 @@ public final class RegExpCompiler {
 
                 default -> {
                     // Literal character
-                    compileLiteralChar(ctx, ch);
-                    ctx.pos++;
+                    compileLiteralChar(context, ch);
+                    context.pos++;
                 }
             }
         }
     }
 
-    private void compileCharacterClass(CompileContext ctx) {
+    private void compileCharacterClass(CompileContext context) {
         // Character classes [abc], [^abc], [a-z]
         // Not fully implemented yet
         throw new RegExpSyntaxException("Character classes not yet fully implemented");
     }
 
-    private void compileDisjunction(CompileContext ctx) {
+    private void compileDisjunction(CompileContext context) {
         // A disjunction is a sequence of alternatives separated by |
         // For now, we just compile a sequence (no | support yet)
-        compileAlternative(ctx);
+        compileAlternative(context);
     }
 
-    private void compileEscape(CompileContext ctx) {
-        if (ctx.pos >= ctx.codePoints.length) {
+    private void compileEscape(CompileContext context) {
+        if (context.pos >= context.codePoints.length) {
             throw new RegExpSyntaxException("Incomplete escape sequence");
         }
 
-        int ch = ctx.codePoints[ctx.pos++];
+        int ch = context.codePoints[context.pos++];
         switch (ch) {
-            case 'n' -> compileLiteralChar(ctx, '\n');
-            case 'r' -> compileLiteralChar(ctx, '\r');
-            case 't' -> compileLiteralChar(ctx, '\t');
-            case 'f' -> compileLiteralChar(ctx, '\f');
-            case 'v' -> compileLiteralChar(ctx, '\u000B');
+            case 'n' -> compileLiteralChar(context, '\n');
+            case 'r' -> compileLiteralChar(context, '\r');
+            case 't' -> compileLiteralChar(context, '\t');
+            case 'f' -> compileLiteralChar(context, '\f');
+            case 'v' -> compileLiteralChar(context, '\u000B');
             case 'd', 'D', 'w', 'W', 's', 'S' -> {
                 // Character class escapes - not fully implemented
                 throw new RegExpSyntaxException("Character class escapes not yet implemented");
@@ -167,58 +167,58 @@ public final class RegExpCompiler {
             }
             default -> {
                 // Literal escaped character
-                compileLiteralChar(ctx, ch);
+                compileLiteralChar(context, ch);
             }
         }
     }
 
-    private void compileGroup(CompileContext ctx) {
+    private void compileGroup(CompileContext context) {
         // Capture groups (...)
-        ctx.pos++; // Skip '('
+        context.pos++; // Skip '('
 
         int groupIndex = captureCount++;
 
         // Save start
-        ctx.buffer.appendU8(RegExpOpcode.SAVE_START.getCode());
-        ctx.buffer.appendU8(groupIndex);
+        context.buffer.appendU8(RegExpOpcode.SAVE_START.getCode());
+        context.buffer.appendU8(groupIndex);
 
         // Compile group contents
-        compileDisjunction(ctx);
+        compileDisjunction(context);
 
         // Save end
-        ctx.buffer.appendU8(RegExpOpcode.SAVE_END.getCode());
-        ctx.buffer.appendU8(groupIndex);
+        context.buffer.appendU8(RegExpOpcode.SAVE_END.getCode());
+        context.buffer.appendU8(groupIndex);
 
-        if (ctx.pos >= ctx.codePoints.length || ctx.codePoints[ctx.pos] != ')') {
+        if (context.pos >= context.codePoints.length || context.codePoints[context.pos] != ')') {
             throw new RegExpSyntaxException("Unclosed group");
         }
-        ctx.pos++; // Skip ')'
+        context.pos++; // Skip ')'
     }
 
-    private void compileLiteralChar(CompileContext ctx, int ch) {
+    private void compileLiteralChar(CompileContext context, int ch) {
         if (ch <= 0xFFFF) {
-            ctx.buffer.appendU8(ctx.isIgnoreCase() ?
+            context.buffer.appendU8(context.isIgnoreCase() ?
                     RegExpOpcode.CHAR_I.getCode() :
                     RegExpOpcode.CHAR.getCode());
-            ctx.buffer.appendU16(ch);
+            context.buffer.appendU16(ch);
         } else {
-            ctx.buffer.appendU8(ctx.isIgnoreCase() ?
+            context.buffer.appendU8(context.isIgnoreCase() ?
                     RegExpOpcode.CHAR32_I.getCode() :
                     RegExpOpcode.CHAR32.getCode());
-            ctx.buffer.appendU32(ch);
+            context.buffer.appendU32(ch);
         }
     }
 
-    private void compilePattern(CompileContext ctx) {
+    private void compilePattern(CompileContext context) {
         // Save start of capture group 0
-        ctx.buffer.appendU8(RegExpOpcode.SAVE_START.getCode());
-        ctx.buffer.appendU8(0); // Capture group 0
+        context.buffer.appendU8(RegExpOpcode.SAVE_START.getCode());
+        context.buffer.appendU8(0); // Capture group 0
 
-        compileDisjunction(ctx);
+        compileDisjunction(context);
 
         // Save end of capture group 0
-        ctx.buffer.appendU8(RegExpOpcode.SAVE_END.getCode());
-        ctx.buffer.appendU8(0); // Capture group 0
+        context.buffer.appendU8(RegExpOpcode.SAVE_END.getCode());
+        context.buffer.appendU8(0); // Capture group 0
     }
 
     private static class CompileContext {

@@ -26,7 +26,7 @@ public abstract sealed class JSFunction extends JSObject
     /**
      * Call this function with the given context, this value, and arguments.
      */
-    public abstract JSValue call(JSContext ctx, JSValue thisArg, JSValue[] args);
+    public abstract JSValue call(JSContext context, JSValue thisArg, JSValue[] args);
 
     /**
      * Get the number of formal parameters.
@@ -42,9 +42,9 @@ public abstract sealed class JSFunction extends JSObject
      * Initialize the function's prototype chain to inherit from Function.prototype.
      * This should be called after creation when the context is available.
      */
-    public void initializePrototypeChain(JSContext ctx) {
+    public void initializePrototypeChain(JSContext context) {
         // Set __proto__ to Function.prototype so functions inherit apply, call, bind, etc.
-        JSObject global = ctx.getGlobalObject();
+        JSObject global = context.getGlobalObject();
         JSValue functionCtor = global.get("Function");
         if (functionCtor instanceof JSObject ctorObj) {
             JSValue funcProto = ctorObj.get("prototype");

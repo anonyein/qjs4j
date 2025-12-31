@@ -18,7 +18,6 @@ package com.caoccao.qjs4j.cli;
 
 import com.caoccao.qjs4j.core.JSContext;
 import com.caoccao.qjs4j.core.JSRuntime;
-import com.caoccao.qjs4j.core.JSValue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,12 +41,10 @@ public final class QuickJSInterpreter {
     }
 
     private static void runScript(String filename) throws Exception {
-        JSRuntime runtime = new JSRuntime();
-        JSContext ctx = runtime.createContext();
-
+        JSRuntime jsRuntime = new JSRuntime();
+        JSContext context = jsRuntime.createContext();
         String code = Files.readString(Path.of(filename));
-        JSValue result = ctx.eval(code);
-
-        runtime.runJobs();
+        context.eval(code);
+        jsRuntime.runJobs();
     }
 }

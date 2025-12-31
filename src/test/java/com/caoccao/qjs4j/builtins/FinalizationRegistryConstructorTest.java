@@ -33,8 +33,8 @@ public class FinalizationRegistryConstructorTest extends BaseTest {
         // (FinalizationRegistry must be called with 'new')
         JSValue result = FinalizationRegistryConstructor.construct(context, JSUndefined.INSTANCE, new JSValue[0]);
         assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
-            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
-                assertThat(name.value()).isEqualTo("TypeError"));
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name ->
+                    assertThat(name.value()).isEqualTo("TypeError"));
         });
         assertThat(context.getPendingException()).isNotNull();
     }
@@ -52,8 +52,8 @@ public class FinalizationRegistryConstructorTest extends BaseTest {
         assertThat(result).isNotNull();
         assertThat(result.isFinalizationRegistry()).isTrue();
 
-        assertThat(result).isInstanceOfSatisfying(JSFinalizationRegistry.class, registry -> 
-            assertThat(registry.toString()).isEqualTo("[object FinalizationRegistry]"));
+        assertThat(result).isInstanceOfSatisfying(JSFinalizationRegistry.class, registry ->
+                assertThat(registry.toString()).isEqualTo("[object FinalizationRegistry]"));
     }
 
     @Test
@@ -61,8 +61,8 @@ public class FinalizationRegistryConstructorTest extends BaseTest {
         // Test with non-function cleanup callback - should throw TypeError
         JSValue result = FinalizationRegistryConstructor.createFinalizationRegistry(context, new JSString("not a function"));
         assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
-            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
-                assertThat(name.value()).isEqualTo("TypeError"));
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name ->
+                    assertThat(name.value()).isEqualTo("TypeError"));
         });
         assertThat(context.getPendingException()).isNotNull();
     }
@@ -72,8 +72,8 @@ public class FinalizationRegistryConstructorTest extends BaseTest {
         // Test with null cleanup callback - should throw TypeError
         JSValue result = FinalizationRegistryConstructor.createFinalizationRegistry(context, JSNull.INSTANCE);
         assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
-            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
-                assertThat(name.value()).isEqualTo("TypeError"));
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name ->
+                    assertThat(name.value()).isEqualTo("TypeError"));
         });
         assertThat(context.getPendingException()).isNotNull();
     }
@@ -83,8 +83,8 @@ public class FinalizationRegistryConstructorTest extends BaseTest {
         // Test with undefined cleanup callback - should throw TypeError
         JSValue result = FinalizationRegistryConstructor.createFinalizationRegistry(context, JSUndefined.INSTANCE);
         assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
-            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name -> 
-                assertThat(name.value()).isEqualTo("TypeError"));
+            assertThat(error.get("name")).isInstanceOfSatisfying(JSString.class, name ->
+                    assertThat(name.value()).isEqualTo("TypeError"));
         });
         assertThat(context.getPendingException()).isNotNull();
     }

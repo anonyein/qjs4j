@@ -76,23 +76,23 @@ public class WeakSetPrototypeTest extends BaseJavetTest {
         Stream.of(
                 // Normal case: delete existing value
                 """
-                var weakSet = new WeakSet();
-                var value1 = {};
-                weakSet.add(value1);
-                weakSet.delete(value1);""",
+                        var weakSet = new WeakSet();
+                        var value1 = {};
+                        weakSet.add(value1);
+                        weakSet.delete(value1);""",
                 // Normal case: delete non-existing value
                 """
-                var weakSet = new WeakSet();
-                var value = {};
-                weakSet.delete(value);""",
+                        var weakSet = new WeakSet();
+                        var value = {};
+                        weakSet.delete(value);""",
                 // Normal case: no arguments
                 """
-                var weakSet = new WeakSet();
-                weakSet.delete();""",
+                        var weakSet = new WeakSet();
+                        weakSet.delete();""",
                 // Edge case: non-object value
                 """
-                var weakSet = new WeakSet();
-                weakSet.delete('string');"""
+                        var weakSet = new WeakSet();
+                        weakSet.delete('string');"""
         ).forEach(code ->
                 assertWithJavet(
                         () -> v8Runtime.getExecutor(code).executeBoolean(),
@@ -107,23 +107,23 @@ public class WeakSetPrototypeTest extends BaseJavetTest {
         Stream.of(
                 // Normal case: has existing value
                 """
-                var weakSet = new WeakSet();
-                var value1 = {};
-                weakSet.add(value1);
-                weakSet.has(value1);""",
+                        var weakSet = new WeakSet();
+                        var value1 = {};
+                        weakSet.add(value1);
+                        weakSet.has(value1);""",
                 // Normal case: has non-existing value
                 """
-                var weakSet = new WeakSet();
-                var value = {};
-                weakSet.has(value);""",
+                        var weakSet = new WeakSet();
+                        var value = {};
+                        weakSet.has(value);""",
                 // Normal case: no arguments
                 """
-                var weakSet = new WeakSet();
-                weakSet.has();""",
+                        var weakSet = new WeakSet();
+                        weakSet.has();""",
                 // Edge case: non-object value
                 """
-                var weakSet = new WeakSet();
-                weakSet.has('string');"""
+                        var weakSet = new WeakSet();
+                        weakSet.has('string');"""
         ).forEach(code ->
                 assertWithJavet(
                         () -> v8Runtime.getExecutor(code).executeBoolean(),

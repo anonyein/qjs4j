@@ -372,7 +372,7 @@ public class ObjectConstructorTest extends BaseJavetTest {
         items.push(new JSNumber(4));
 
         // Callback function: group by even/odd
-        JSFunction callback = new JSNativeFunction("testCallback", 3, (ctx, thisArg, args) -> {
+        JSFunction callback = new JSNativeFunction("testCallback", 3, (childContext, thisArg, args) -> {
             double num = args[0].asNumber().map(JSNumber::value).orElseThrow();
             return (num % 2 == 0) ? new JSString("even") : new JSString("odd");
         });

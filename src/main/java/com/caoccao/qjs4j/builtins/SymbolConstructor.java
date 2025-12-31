@@ -46,7 +46,7 @@ public final class SymbolConstructor {
      * Symbol.hasInstance
      * ES2020 19.4.2.3
      */
-    public static JSValue getHasInstance(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getHasInstance(JSContext context, JSValue thisArg, JSValue[] args) {
         return JSSymbol.HAS_INSTANCE;
     }
 
@@ -54,7 +54,7 @@ public final class SymbolConstructor {
      * Symbol.isConcatSpreadable
      * ES2020 19.4.2.5
      */
-    public static JSValue getIsConcatSpreadable(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getIsConcatSpreadable(JSContext context, JSValue thisArg, JSValue[] args) {
         return JSSymbol.IS_CONCAT_SPREADABLE;
     }
 
@@ -62,7 +62,7 @@ public final class SymbolConstructor {
      * Symbol.iterator
      * ES2020 19.4.2.4
      */
-    public static JSValue getIterator(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getIterator(JSContext context, JSValue thisArg, JSValue[] args) {
         return JSSymbol.ITERATOR;
     }
 
@@ -70,7 +70,7 @@ public final class SymbolConstructor {
      * Symbol.toPrimitive
      * ES2020 19.4.2.13
      */
-    public static JSValue getToPrimitive(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getToPrimitive(JSContext context, JSValue thisArg, JSValue[] args) {
         return JSSymbol.TO_PRIMITIVE;
     }
 
@@ -78,7 +78,7 @@ public final class SymbolConstructor {
      * Symbol.toStringTag
      * ES2020 19.4.2.14
      */
-    public static JSValue getToStringTag(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getToStringTag(JSContext context, JSValue thisArg, JSValue[] args) {
         return JSSymbol.TO_STRING_TAG;
     }
 

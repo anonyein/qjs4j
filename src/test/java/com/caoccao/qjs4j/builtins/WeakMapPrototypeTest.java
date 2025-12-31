@@ -21,8 +21,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 /**
  * Unit tests for WeakMap.prototype methods.
  */
@@ -117,23 +115,23 @@ public class WeakMapPrototypeTest extends BaseJavetTest {
         Stream.of(
                 // Normal case: has existing key
                 """
-                var weakMap = new WeakMap();
-                var key1 = {};
-                weakMap.set(key1, 'value1');
-                weakMap.has(key1);""",
+                        var weakMap = new WeakMap();
+                        var key1 = {};
+                        weakMap.set(key1, 'value1');
+                        weakMap.has(key1);""",
                 // Normal case: has non-existing key
                 """
-                var weakMap = new WeakMap();
-                var key = {};
-                weakMap.has(key);""",
+                        var weakMap = new WeakMap();
+                        var key = {};
+                        weakMap.has(key);""",
                 // Normal case: no arguments
                 """
-                var weakMap = new WeakMap();
-                weakMap.has();""",
+                        var weakMap = new WeakMap();
+                        weakMap.has();""",
                 // Edge case: non-object key
                 """
-                var weakMap = new WeakMap();
-                weakMap.has('string');"""
+                        var weakMap = new WeakMap();
+                        weakMap.has('string');"""
         ).forEach(code ->
                 assertWithJavet(
                         () -> v8Runtime.getExecutor(code).executeBoolean(),

@@ -1297,14 +1297,14 @@ public final class VirtualMachine {
 
                 // Create resolve and reject functions
                 JSNativeFunction resolveFunc = new JSNativeFunction("resolve", 1,
-                        (ctx, thisArg, funcArgs) -> {
+                        (childContext, thisArg, funcArgs) -> {
                             JSValue value = funcArgs.length > 0 ? funcArgs[0] : JSUndefined.INSTANCE;
                             promiseObj.fulfill(value);
                             return JSUndefined.INSTANCE;
                         });
 
                 JSNativeFunction rejectFunc = new JSNativeFunction("reject", 1,
-                        (ctx, thisArg, funcArgs) -> {
+                        (childContext, thisArg, funcArgs) -> {
                             JSValue reason = funcArgs.length > 0 ? funcArgs[0] : JSUndefined.INSTANCE;
                             promiseObj.reject(reason);
                             return JSUndefined.INSTANCE;

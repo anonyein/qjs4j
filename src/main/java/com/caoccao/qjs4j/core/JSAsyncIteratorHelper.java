@@ -33,14 +33,14 @@ public final class JSAsyncIteratorHelper {
      *
      * @param iterable The iterable to loop over
      * @param callback The callback to execute for each value
-     * @param ctx      The execution context
+     * @param context  The execution context
      * @return A promise that resolves when iteration is complete
      */
-    public static JSPromise forAwaitOf(JSValue iterable, AsyncIterationCallback callback, JSContext ctx) {
+    public static JSPromise forAwaitOf(JSValue iterable, AsyncIterationCallback callback, JSContext context) {
         JSPromise completionPromise = new JSPromise();
 
         // Get async iterator
-        JSAsyncIterator iterator = getAsyncIterator(iterable, ctx);
+        JSAsyncIterator iterator = getAsyncIterator(iterable, context);
         if (iterator == null) {
             JSObject error = new JSObject();
             error.set("name", new JSString("TypeError"));
@@ -50,7 +50,7 @@ public final class JSAsyncIteratorHelper {
         }
 
         // Start iteration
-        iterateNext(iterator, callback, ctx, completionPromise);
+        iterateNext(iterator, callback, context, completionPromise);
 
         return completionPromise;
     }
@@ -60,10 +60,10 @@ public final class JSAsyncIteratorHelper {
      * Checks for Symbol.asyncIterator, falls back to Symbol.iterator.
      *
      * @param iterable The value to get an iterator from
-     * @param ctx      The execution context
+     * @param context  The execution context
      * @return An async iterator, or null if not iterable
      */
-    public static JSAsyncIterator getAsyncIterator(JSValue iterable, JSContext ctx) {
+    public static JSAsyncIterator getAsyncIterator(JSValue iterable, JSContext context) {
         if (!(iterable instanceof JSObject obj)) {
             return null;
         }
@@ -74,7 +74,7 @@ public final class JSAsyncIteratorHelper {
 
         if (asyncIteratorMethod instanceof JSFunction asyncIterFunc) {
             // Call the async iterator method
-            JSValue result = asyncIterFunc.call(ctx, iterable, new JSValue[0]);
+            JSValue result = asyncIterFunc.call(context, iterable, new JSValue[0]);
             if (result instanceof JSAsyncIterator asyncIter) {
                 return asyncIter;
             }
@@ -86,10 +86,10 @@ public final class JSAsyncIteratorHelper {
 
         if (iteratorMethod instanceof JSFunction iterFunc) {
             // Call the iterator method
-            JSValue result = iterFunc.call(ctx, iterable, new JSValue[0]);
+            JSValue result = iterFunc.call(context, iterable, new JSValue[0]);
             if (result instanceof JSIterator syncIter) {
                 // Convert sync iterator to async
-                return JSAsyncIterator.fromIterator(syncIter, ctx);
+                return JSAsyncIterator.fromIterator(syncIter, context);
             }
         }
 
@@ -124,15 +124,18 @@ public final class JSAsyncIteratorHelper {
      * Internal helper to iterate to the next value.
      * Uses continuation-passing style to avoid deep recursion.
      */
-    private static void iterateNext(JSAsyncIterator iterator, AsyncIterationCallback callback,
-                                    JSContext ctx, JSPromise completionPromise) {
+    private static void iterateNext(
+            JSAsyncIterator iterator,
+            AsyncIterationCallback callback,
+            JSContext context,
+            JSPromise completionPromise) {
         // Get next promise
         JSPromise nextPromise = iterator.next();
 
         // When next promise resolves, process the result
         nextPromise.addReactions(
                 new JSPromise.ReactionRecord(
-                        new JSNativeFunction("onNextFulfilled", 1, (context, thisArg, args) -> {
+                        new JSNativeFunction("onNextFulfilled", 1, (childContext, thisArg, args) -> {
                             JSValue result = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
 
                             if (!(result instanceof JSObject resultObj)) {
@@ -157,40 +160,40 @@ public final class JSAsyncIteratorHelper {
                             // When processing completes, continue to next iteration
                             processingPromise.addReactions(
                                     new JSPromise.ReactionRecord(
-                                            new JSNativeFunction("onProcessed", 1, (ctx2, thisArg2, args2) -> {
+                                            new JSNativeFunction("onProcessed", 1, (innerContext, thisArg2, args2) -> {
                                                 // Continue iteration
-                                                iterateNext(iterator, callback, context, completionPromise);
+                                                iterateNext(iterator, callback, childContext, completionPromise);
                                                 return JSUndefined.INSTANCE;
                                             }),
                                             null,
-                                            context
+                                            childContext
                                     ),
                                     new JSPromise.ReactionRecord(
-                                            new JSNativeFunction("onProcessError", 1, (ctx2, thisArg2, args2) -> {
+                                            new JSNativeFunction("onProcessError", 1, (innerContext, thisArg2, args2) -> {
                                                 // If processing fails, reject completion promise
                                                 JSValue error = args2.length > 0 ? args2[0] : JSUndefined.INSTANCE;
                                                 completionPromise.reject(error);
                                                 return JSUndefined.INSTANCE;
                                             }),
                                             null,
-                                            context
+                                            childContext
                                     )
                             );
 
                             return JSUndefined.INSTANCE;
                         }),
                         null,
-                        ctx
+                        context
                 ),
                 new JSPromise.ReactionRecord(
-                        new JSNativeFunction("onNextRejected", 1, (context, thisArg, args) -> {
+                        new JSNativeFunction("onNextRejected", 1, (childContext, thisArg, args) -> {
                             // If next() fails, reject completion promise
                             JSValue error = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
                             completionPromise.reject(error);
                             return JSUndefined.INSTANCE;
                         }),
                         null,
-                        ctx
+                        context
                 )
         );
     }
@@ -200,10 +203,10 @@ public final class JSAsyncIteratorHelper {
      * Waits for all values to be produced asynchronously.
      *
      * @param iterable The async iterable
-     * @param ctx      The execution context
+     * @param context  The execution context
      * @return A promise that resolves to an array of all values
      */
-    public static JSPromise toArray(JSValue iterable, JSContext ctx) {
+    public static JSPromise toArray(JSValue iterable, JSContext context) {
         JSPromise resultPromise = new JSPromise();
         JSArray array = new JSArray();
 
@@ -214,23 +217,23 @@ public final class JSAsyncIteratorHelper {
             JSPromise resolved = new JSPromise();
             resolved.fulfill(JSUndefined.INSTANCE);
             return resolved;
-        }, ctx).addReactions(
+        }, context).addReactions(
                 new JSPromise.ReactionRecord(
-                        new JSNativeFunction("onComplete", 1, (context, thisArg, args) -> {
+                        new JSNativeFunction("onComplete", 1, (childContext, thisArg, args) -> {
                             resultPromise.fulfill(array);
                             return JSUndefined.INSTANCE;
                         }),
                         resultPromise,
-                        ctx
+                        context
                 ),
                 new JSPromise.ReactionRecord(
-                        new JSNativeFunction("onError", 1, (context, thisArg, args) -> {
+                        new JSNativeFunction("onError", 1, (childContext, thisArg, args) -> {
                             JSValue error = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
                             resultPromise.reject(error);
                             return JSUndefined.INSTANCE;
                         }),
                         resultPromise,
-                        ctx
+                        context
                 )
         );
 

@@ -38,47 +38,47 @@ public final class JSAsyncGenerator extends JSObject {
      * Create a new async generator.
      *
      * @param generatorFunction The generator implementation
-     * @param ctx               The execution context
+     * @param context           The execution context
      */
-    public JSAsyncGenerator(AsyncGeneratorFunction generatorFunction, JSContext ctx) {
+    public JSAsyncGenerator(AsyncGeneratorFunction generatorFunction, JSContext context) {
         super();
         this.state = AsyncGeneratorState.SUSPENDED_START;
-        this.context = ctx;
+        this.context = context;
         this.generatorFunction = generatorFunction;
         this.returnValue = JSUndefined.INSTANCE;
         this.thrownValue = null;
 
         // Add next() method
-        this.set("next", new JSNativeFunction("next", 1, (context, thisArg, args) -> {
+        this.set("next", new JSNativeFunction("next", 1, (childContext, thisArg, args) -> {
             JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
             return next(value);
         }));
 
         // Add return() method
-        this.set("return", new JSNativeFunction("return", 1, (context, thisArg, args) -> {
+        this.set("return", new JSNativeFunction("return", 1, (childContext, thisArg, args) -> {
             JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
             return return_(value);
         }));
 
         // Add throw() method
-        this.set("throw", new JSNativeFunction("throw", 1, (context, thisArg, args) -> {
+        this.set("throw", new JSNativeFunction("throw", 1, (childContext, thisArg, args) -> {
             JSValue exception = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
             return throw_(exception);
         }));
 
         // Make this an async iterable via Symbol.asyncIterator
         this.set(PropertyKey.fromSymbol(JSSymbol.ASYNC_ITERATOR),
-                new JSNativeFunction("[Symbol.asyncIterator]", 0, (context, thisArg, args) -> thisArg));
+                new JSNativeFunction("[Symbol.asyncIterator]", 0, (childContext, thisArg, args) -> thisArg));
     }
 
     /**
      * Create a simple async generator from a function that yields promises.
      *
      * @param yielder Function that returns promise values in sequence
-     * @param ctx     The execution context
+     * @param context The execution context
      * @return An async generator
      */
-    public static JSAsyncGenerator create(AsyncYieldFunction yielder, JSContext ctx) {
+    public static JSAsyncGenerator create(AsyncYieldFunction yielder, JSContext context) {
         return new JSAsyncGenerator((inputValue, isThrow) -> {
             if (isThrow) {
                 // If throwing, reject the promise
@@ -87,7 +87,7 @@ public final class JSAsyncGenerator extends JSObject {
                 return promise;
             }
             return yielder.yieldNext(inputValue);
-        }, ctx);
+        }, context);
     }
 
     /**
@@ -149,7 +149,7 @@ public final class JSAsyncGenerator extends JSObject {
             // When the generator execution completes
             resultPromise.addReactions(
                     new JSPromise.ReactionRecord(
-                            new JSNativeFunction("onFulfilled", 1, (ctx, thisArg, args) -> {
+                            new JSNativeFunction("onFulfilled", 1, (childContext, thisArg, args) -> {
                                 JSValue result = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
 
                                 if (result instanceof JSObject resultObj) {
@@ -171,7 +171,7 @@ public final class JSAsyncGenerator extends JSObject {
                             context
                     ),
                     new JSPromise.ReactionRecord(
-                            new JSNativeFunction("onRejected", 1, (ctx, thisArg, args) -> {
+                            new JSNativeFunction("onRejected", 1, (childContext, thisArg, args) -> {
                                 state = AsyncGeneratorState.COMPLETED;
                                 JSValue error = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
                                 finalPromise.reject(error);
@@ -238,7 +238,7 @@ public final class JSAsyncGenerator extends JSObject {
 
             resultPromise.addReactions(
                     new JSPromise.ReactionRecord(
-                            new JSNativeFunction("onFulfilled", 1, (ctx, thisArg, args) -> {
+                            new JSNativeFunction("onFulfilled", 1, (childContext, thisArg, args) -> {
                                 JSValue result = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
 
                                 if (result instanceof JSObject resultObj) {
@@ -259,7 +259,7 @@ public final class JSAsyncGenerator extends JSObject {
                             context
                     ),
                     new JSPromise.ReactionRecord(
-                            new JSNativeFunction("onRejected", 1, (ctx, thisArg, args) -> {
+                            new JSNativeFunction("onRejected", 1, (childContext, thisArg, args) -> {
                                 state = AsyncGeneratorState.COMPLETED;
                                 JSValue error = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
                                 finalPromise.reject(error);

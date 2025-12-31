@@ -273,7 +273,7 @@ public final class ArrayConstructor {
      * ES2015 22.1.2.4
      * Returns the Array constructor.
      */
-    public static JSValue getSpecies(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue getSpecies(JSContext context, JSValue thisArg, JSValue[] args) {
         return thisArg;
     }
 
@@ -282,7 +282,7 @@ public final class ArrayConstructor {
      * ES2020 22.1.2.2
      * Determines whether the passed value is an Array.
      */
-    public static JSValue isArray(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue isArray(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
             return JSBoolean.FALSE;
         }
@@ -295,7 +295,7 @@ public final class ArrayConstructor {
      * ES2020 22.1.2.3
      * Creates a new Array instance with a variable number of arguments.
      */
-    public static JSValue of(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue of(JSContext context, JSValue thisArg, JSValue[] args) {
         JSArray array = new JSArray();
 
         for (JSValue item : args) {

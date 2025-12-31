@@ -303,7 +303,7 @@ public final class JSONObject {
      * ES2020 24.5.2
      * Simplified implementation - basic JSON stringification
      */
-    public static JSValue stringify(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue stringify(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
             return JSUndefined.INSTANCE;
         }

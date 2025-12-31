@@ -32,16 +32,15 @@ import java.util.*;
 public non-sealed class JSObject implements JSValue {
     // ThreadLocal to track visited objects during prototype chain traversal
     private static final ThreadLocal<Set<JSObject>> visitedObjects = ThreadLocal.withInitial(HashSet::new);
-
+    protected ConstructorType constructorType; // Internal slot for [[Constructor]] type (not accessible from JS)
     protected boolean extensible = true;
     protected boolean frozen = false;
-    protected JSValue[] propertyValues;
     protected JSValue primitiveValue; // Internal slot for [[PrimitiveValue]] (not accessible from JS)
+    protected JSValue[] propertyValues;
     protected JSObject prototype;
     protected boolean sealed = false;
     protected JSShape shape;
     protected Map<Integer, JSValue> sparseProperties; // For array indices
-    protected ConstructorType constructorType; // Internal slot for [[Constructor]] type (not accessible from JS)
 
     /**
      * Create an empty object with no prototype.
@@ -246,15 +245,15 @@ public non-sealed class JSObject implements JSValue {
     /**
      * Get a property value by property key with context for getter functions.
      */
-    public JSValue get(PropertyKey key, JSContext ctx) {
-        return get(key, ctx, this);  // Pass original receiver
+    public JSValue get(PropertyKey key, JSContext context) {
+        return get(key, context, this);  // Pass original receiver
     }
 
     /**
      * Internal get method with receiver tracking for prototype chain getter invocation.
      * Protected to allow JSProxy to override with proper trap handling.
      */
-    protected JSValue get(PropertyKey key, JSContext ctx, JSObject receiver) {
+    protected JSValue get(PropertyKey key, JSContext context, JSObject receiver) {
         // Look in own properties
         int offset = shape.getPropertyOffset(key);
         if (offset >= 0) {
@@ -262,9 +261,9 @@ public non-sealed class JSObject implements JSValue {
             PropertyDescriptor desc = shape.getDescriptor(key);
             if (desc != null && desc.hasGetter()) {
                 JSFunction getter = desc.getGetter();
-                if (getter != null && ctx != null) {
+                if (getter != null && context != null) {
                     // Call the getter with the ORIGINAL receiver as 'this', not the prototype
-                    return getter.call(ctx, receiver, new JSValue[0]);
+                    return getter.call(context, receiver, new JSValue[0]);
                 }
                 // Getter is explicitly undefined or no context available
                 return JSUndefined.INSTANCE;
@@ -288,7 +287,7 @@ public non-sealed class JSObject implements JSValue {
                 visited.add(prototype);
 
                 // Recurse into prototype chain, passing along the original receiver
-                return prototype.get(key, ctx, receiver);
+                return prototype.get(key, context, receiver);
             } finally {
                 // Clean up: remove from visited set
                 visited.remove(prototype);
@@ -301,6 +300,14 @@ public non-sealed class JSObject implements JSValue {
         }
 
         return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Get the constructor type internal slot.
+     * This is for internal use only - not accessible from JavaScript.
+     */
+    public ConstructorType getConstructorType() {
+        return constructorType;
     }
 
     /**
@@ -328,6 +335,14 @@ public non-sealed class JSObject implements JSValue {
         }
 
         return keys;
+    }
+
+    /**
+     * Get the [[PrimitiveValue]] internal slot.
+     * This is for internal use only - not accessible from JavaScript.
+     */
+    public JSValue getPrimitiveValue() {
+        return primitiveValue;
     }
 
     public JSObject getPrototype() {
@@ -375,38 +390,6 @@ public non-sealed class JSObject implements JSValue {
     }
 
     /**
-     * Get the [[PrimitiveValue]] internal slot.
-     * This is for internal use only - not accessible from JavaScript.
-     */
-    public JSValue getPrimitiveValue() {
-        return primitiveValue;
-    }
-
-    /**
-     * Set the [[PrimitiveValue]] internal slot.
-     * This is for internal use only - not accessible from JavaScript.
-     */
-    public void setPrimitiveValue(JSValue value) {
-        this.primitiveValue = value;
-    }
-
-    /**
-     * Get the constructor type internal slot.
-     * This is for internal use only - not accessible from JavaScript.
-     */
-    public ConstructorType getConstructorType() {
-        return constructorType;
-    }
-
-    /**
-     * Set the constructor type internal slot.
-     * This is for internal use only - not accessible from JavaScript.
-     */
-    public void setConstructorType(ConstructorType type) {
-        this.constructorType = type;
-    }
-
-    /**
      * Check if this object is extensible.
      * ES5.1 15.2.3.13
      */
@@ -448,8 +431,6 @@ public non-sealed class JSObject implements JSValue {
         return keys.toArray(new PropertyKey[0]);
     }
 
-    // Prototype chain
-
     /**
      * Prevent new properties from being added to this object.
      * ES5.1 15.2.3.10
@@ -468,7 +449,7 @@ public non-sealed class JSObject implements JSValue {
         this.extensible = false; // Sealed objects are not extensible
     }
 
-    // Object integrity levels (ES5)
+    // Prototype chain
 
     /**
      * Set a property value by string name.
@@ -493,6 +474,8 @@ public non-sealed class JSObject implements JSValue {
         set(PropertyKey.fromIndex(index), value);
     }
 
+    // Object integrity levels (ES5)
+
     /**
      * Set a property value by property key.
      */
@@ -503,7 +486,7 @@ public non-sealed class JSObject implements JSValue {
     /**
      * Set a property value by property key with context for setter functions.
      */
-    public void set(PropertyKey key, JSValue value, JSContext ctx) {
+    public void set(PropertyKey key, JSValue value, JSContext context) {
         // Check if property already exists
         int offset = shape.getPropertyOffset(key);
         if (offset >= 0) {
@@ -513,9 +496,9 @@ public non-sealed class JSObject implements JSValue {
             // If property has a setter, call it
             if (desc.hasSetter()) {
                 JSFunction setter = desc.getSetter();
-                if (setter != null && ctx != null) {
+                if (setter != null && context != null) {
                     // Call the setter with 'this' as the object and value as argument
-                    setter.call(ctx, this, new JSValue[]{value});
+                    setter.call(context, this, new JSValue[]{value});
                 }
                 // If setter is null/undefined or no context, the assignment does nothing (silently fails)
                 return;
@@ -534,6 +517,22 @@ public non-sealed class JSObject implements JSValue {
         if (extensible) {
             defineProperty(key, PropertyDescriptor.defaultData(value));
         }
+    }
+
+    /**
+     * Set the constructor type internal slot.
+     * This is for internal use only - not accessible from JavaScript.
+     */
+    public void setConstructorType(ConstructorType type) {
+        this.constructorType = type;
+    }
+
+    /**
+     * Set the [[PrimitiveValue]] internal slot.
+     * This is for internal use only - not accessible from JavaScript.
+     */
+    public void setPrimitiveValue(JSValue value) {
+        this.primitiveValue = value;
     }
 
     public void setPrototype(JSObject prototype) {

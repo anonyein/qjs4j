@@ -54,25 +54,25 @@ public final class JSProxy extends JSObject {
      * Apply trap for function proxies.
      * ES2020 9.5.13 [[Call]]
      */
-    public JSValue apply(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public JSValue apply(JSContext context, JSValue thisArg, JSValue[] args) {
         if (revoked) {
-            throw new JSException(context.throwTypeError("Cannot perform 'apply' on a proxy that has been revoked"));
+            throw new JSException(this.context.throwTypeError("Cannot perform 'apply' on a proxy that has been revoked"));
         }
 
         if (!isFunc) {
-            throw new JSException(context.throwTypeError("not a function"));
+            throw new JSException(this.context.throwTypeError("not a function"));
         }
 
         JSValue trap = getTrapMethod("apply");
         if (trap instanceof JSUndefined) {
             if (target instanceof JSFunction targetFunc) {
-                return targetFunc.call(ctx, thisArg, args);
+                return targetFunc.call(context, thisArg, args);
             }
-            throw new JSException(context.throwTypeError("target is not callable"));
+            throw new JSException(this.context.throwTypeError("target is not callable"));
         }
 
         if (!(trap instanceof JSFunction trapFunc)) {
-            throw new JSException(context.throwTypeError("apply trap must be a function"));
+            throw new JSException(this.context.throwTypeError("apply trap must be a function"));
         }
 
         // Create arguments array
@@ -80,20 +80,20 @@ public final class JSProxy extends JSObject {
 
         // Call trap: handler.apply(target, thisArg, argumentsList)
         JSValue[] trapArgs = new JSValue[]{target, thisArg, argArray};
-        return trapFunc.call(ctx, handler, trapArgs);
+        return trapFunc.call(context, handler, trapArgs);
     }
 
     /**
      * Construct trap for constructor proxies.
      * ES2020 9.5.14 [[Construct]]
      */
-    public JSValue construct(JSContext ctx, JSValue[] args, JSValue newTarget) {
+    public JSValue construct(JSContext context, JSValue[] args, JSValue newTarget) {
         if (revoked) {
-            throw new JSException(context.throwTypeError("Cannot perform 'construct' on a proxy that has been revoked"));
+            throw new JSException(this.context.throwTypeError("Cannot perform 'construct' on a proxy that has been revoked"));
         }
 
         if (!JSTypeChecking.isConstructor(target)) {
-            throw new JSException(context.throwTypeError("target is not a constructor"));
+            throw new JSException(this.context.throwTypeError("target is not a constructor"));
         }
 
         JSValue trap = getTrapMethod("construct");
@@ -101,14 +101,14 @@ public final class JSProxy extends JSObject {
             // Forward to target constructor
             if (target instanceof JSFunction targetFunc) {
                 // Would need constructor invocation support
-                throw new JSException(context.throwTypeError(
+                throw new JSException(this.context.throwTypeError(
                         "construct forwarding not yet implemented"));
             }
-            throw new JSException(context.throwTypeError("target is not a constructor"));
+            throw new JSException(this.context.throwTypeError("target is not a constructor"));
         }
 
         if (!(trap instanceof JSFunction trapFunc)) {
-            throw new JSException(context.throwTypeError("construct trap must be a function"));
+            throw new JSException(this.context.throwTypeError("construct trap must be a function"));
         }
 
         // Create arguments array
@@ -116,11 +116,11 @@ public final class JSProxy extends JSObject {
 
         // Call trap: handler.construct(target, argumentsList, newTarget)
         JSValue[] trapArgs = new JSValue[]{target, argArray, newTarget};
-        JSValue result = trapFunc.call(ctx, handler, trapArgs);
+        JSValue result = trapFunc.call(context, handler, trapArgs);
 
         // Result must be an object
         if (!(result instanceof JSObject)) {
-            throw new JSException(context.throwTypeError(
+            throw new JSException(this.context.throwTypeError(
                     "construct trap must return an object"));
         }
 
@@ -307,25 +307,29 @@ public final class JSProxy extends JSObject {
      * Override get with context to intercept property access.
      */
     @Override
-    public JSValue get(PropertyKey key, JSContext ctx) {
+    public JSValue get(PropertyKey key, JSContext context) {
         // Use this proxy as the receiver
-        return get(key, ctx, this);
+        return get(key, context, this);
     }
 
     /**
      * Override get method with receiver tracking for prototype chain support.
      */
     @Override
-    protected JSValue get(PropertyKey key, JSContext ctx, JSObject receiver) {
-        return getInternal(key, ctx, receiver);
+    protected JSValue get(PropertyKey key, JSContext context, JSObject receiver) {
+        return getInternal(key, context, receiver);
+    }
+
+    public JSObject getHandler() {
+        return handler;
     }
 
     /**
      * Internal get implementation that accepts a receiver parameter for prototype chain support.
      */
-    private JSValue getInternal(PropertyKey key, JSContext ctx, JSObject receiver) {
+    private JSValue getInternal(PropertyKey key, JSContext context, JSObject receiver) {
         if (revoked) {
-            throw new JSException(context.throwTypeError("Cannot perform 'get' on a proxy that has been revoked"));
+            throw new JSException(this.context.throwTypeError("Cannot perform 'get' on a proxy that has been revoked"));
         }
 
         // Check if handler has 'get' trap
@@ -350,7 +354,7 @@ public final class JSProxy extends JSObject {
                         keyValue,
                         receiver  // Use the receiver parameter instead of 'this'
                 };
-                JSValue trapResult = getTrapFunc.call(context, handler, args);
+                JSValue trapResult = getTrapFunc.call(this.context, handler, args);
 
                 // Check invariant: non-configurable accessor without getter must return undefined
                 // Since JSFunction extends JSObject, target is always a JSObject
@@ -361,11 +365,11 @@ public final class JSProxy extends JSObject {
                         // Non-configurable accessor without getter
                         if (!(trapResult instanceof JSUndefined)) {
                             String keyStr = key.isString() ? key.asString() : String.valueOf(key.getValue());
-                            throw new JSException(context.throwTypeError(
+                            throw new JSException(this.context.throwTypeError(
                                     "'get' on proxy: property '" +
                                             keyStr +
                                             "' is a non-configurable accessor property on the proxy target and does not have a getter function, but the trap did not return 'undefined' (got '" +
-                                            JSTypeConversions.toString(context, trapResult).value() +
+                                            JSTypeConversions.toString(this.context, trapResult).value() +
                                             "')"));
                         }
                     }
@@ -376,35 +380,29 @@ public final class JSProxy extends JSObject {
                         // Non-writable, non-configurable data property
                         if (!JSTypeConversions.strictEquals(trapResult, targetDesc.getValue())) {
                             String keyStr = key.isString() ? key.asString() : String.valueOf(key.getValue());
-                            throw new JSException(context.throwTypeError(
+                            throw new JSException(this.context.throwTypeError(
                                     "'get' on proxy: property '" +
                                             keyStr +
                                             "' is a read-only and non-configurable data property on the proxy target but the proxy did not return its actual value (expected '" +
-                                            JSTypeConversions.toString(context, targetDesc.getValue()).value() +
+                                            JSTypeConversions.toString(this.context, targetDesc.getValue()).value() +
                                             "' but got '" +
-                                            JSTypeConversions.toString(context, trapResult).value() +
+                                            JSTypeConversions.toString(this.context, trapResult).value() +
                                             "')"));
                         }
                     }
                 }
-
                 return trapResult;
             } else {
-                throw new JSException(context.throwTypeError("proxy trap 'get' must be a function"));
+                throw new JSException(this.context.throwTypeError("'" + JSTypeConversions.toString(context, getTrap) + "' returned for property 'get' of object '#<Object>' is not a function"));
             }
         }
-
         // No trap, forward to target
         // Following QuickJS js_proxy_get: forward to target
         // Since JSFunction now extends JSObject, all targets are JSObjects
         if (target instanceof JSObject targetObj) {
-            return targetObj.get(key, ctx != null ? ctx : context);
+            return targetObj.get(key, context != null ? context : this.context);
         }
         return JSUndefined.INSTANCE;
-    }
-
-    public JSObject getHandler() {
-        return handler;
     }
 
     /**
@@ -904,9 +902,9 @@ public final class JSProxy extends JSObject {
      * Override set with context to intercept property assignment.
      */
     @Override
-    public void set(PropertyKey key, JSValue value, JSContext ctx) {
+    public void set(PropertyKey key, JSValue value, JSContext context) {
         if (revoked) {
-            throw new JSException(context.throwTypeError("Cannot perform 'set' on a proxy that has been revoked"));
+            throw new JSException(this.context.throwTypeError("Cannot perform 'set' on a proxy that has been revoked"));
         }
 
         // Check if handler has 'set' trap
@@ -919,18 +917,18 @@ public final class JSProxy extends JSObject {
                     value,
                     this
             };
-            JSValue result = setTrapFunc.call(context, handler, args);
+            JSValue result = setTrapFunc.call(this.context, handler, args);
 
             // Check if trap returned falsy in strict mode
-            if (context.isStrictMode() && JSTypeConversions.toBoolean(result) != JSBoolean.TRUE) {
-                throw new JSException(context.throwTypeError(
+            if (this.context.isStrictMode() && JSTypeConversions.toBoolean(result) != JSBoolean.TRUE) {
+                throw new JSException(this.context.throwTypeError(
                         "'set' on proxy: trap returned falsish for property '" + key.asString() + "'"));
             }
             return;
         }
 
         // No trap, forward to target
-        ((JSObject) target).set(key, value, ctx != null ? ctx : context);
+        ((JSObject) target).set(key, value, context != null ? context : this.context);
     }
 
     /**
@@ -960,7 +958,7 @@ public final class JSProxy extends JSObject {
         JSValue result = trapFunc.call(context, handler, args);
 
         // Convert to boolean
-        boolean boolResult = JSTypeConversions.toBoolean(result) == JSBoolean.TRUE;
+        boolean boolResult = JSTypeConversions.toBoolean(result).isBooleanTrue();
         if (boolResult) {
             // Check invariants if target is not extensible
             if (!targetObj.isExtensible()) {
@@ -971,7 +969,7 @@ public final class JSProxy extends JSObject {
                 }
             }
         } else {
-            throw new JSException(context.throwTypeError("setPrototypeOf returned false"));
+            throw new JSException(context.throwTypeError("'setPrototypeOf' on proxy: trap returned falsish for property 'undefined'"));
         }
     }
 

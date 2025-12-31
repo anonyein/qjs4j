@@ -18,8 +18,6 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.*;
 
-import java.util.Optional;
-
 /**
  * Implementation of BigInt.prototype methods.
  * Based on ES2020 BigInt specification.
@@ -31,9 +29,9 @@ public final class BigIntPrototype {
      * Returns a localized string representation.
      * Simplified implementation - just calls toString.
      */
-    public static JSValue toLocaleString(JSContext ctx, JSValue thisArg, JSValue[] args) {
+    public static JSValue toLocaleString(JSContext context, JSValue thisArg, JSValue[] args) {
         // For now, just delegate to toString with radix 10
-        return toString(ctx, thisArg, new JSValue[]{new JSNumber(10)});
+        return toString(context, thisArg, new JSValue[]{new JSNumber(10)});
     }
 
     /**
