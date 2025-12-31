@@ -1359,26 +1359,39 @@ public final class VirtualMachine {
             }
 
             // Handle Error constructors
-            JSValue errorNameValue = ctorObj.get("[[ErrorName]]");
-            if (errorNameValue instanceof JSString errorName) {
-                // Create Error object
-                JSObject errorObj = new JSObject();
+            ConstructorType ctorType = ctorObj.getConstructorType();
+            if (ctorType == ConstructorType.ERROR || 
+                ctorType == ConstructorType.TYPE_ERROR ||
+                ctorType == ConstructorType.RANGE_ERROR ||
+                ctorType == ConstructorType.REFERENCE_ERROR ||
+                ctorType == ConstructorType.SYNTAX_ERROR ||
+                ctorType == ConstructorType.URI_ERROR ||
+                ctorType == ConstructorType.EVAL_ERROR ||
+                ctorType == ConstructorType.AGGREGATE_ERROR) {
+                
+                // Get message from first argument
+                String message = "";
+                if (args.length > 0 && !(args[0] instanceof JSUndefined)) {
+                    JSString messageStr = JSTypeConversions.toString(context, args[0]);
+                    message = messageStr.value();
+                }
 
-                // Get prototype
+                // Create Error object of the proper type
+                JSError errorObj = switch (ctorType) {
+                    case TYPE_ERROR -> new JSTypeError(context, message);
+                    case RANGE_ERROR -> new JSRangeError(context, message);
+                    case REFERENCE_ERROR -> new JSReferenceError(context, message);
+                    case SYNTAX_ERROR -> new JSSyntaxError(context, message);
+                    case URI_ERROR -> new JSURIError(context, message);
+                    case EVAL_ERROR -> new JSEvalError(context, message);
+                    case AGGREGATE_ERROR -> new JSAggregateError(context, message);
+                    default -> new JSError(context, message);
+                };
+
+                // Set prototype from constructor
                 JSValue prototypeValue = ctorObj.get("prototype");
                 if (prototypeValue instanceof JSObject prototype) {
                     errorObj.setPrototype(prototype);
-                }
-
-                // Set name
-                errorObj.set("name", errorName);
-
-                // Set message from first argument
-                if (args.length > 0 && !(args[0] instanceof JSUndefined)) {
-                    JSString message = JSTypeConversions.toString(context, args[0]);
-                    errorObj.set("message", message);
-                } else {
-                    errorObj.set("message", new JSString(""));
                 }
 
                 valueStack.push(errorObj);
@@ -1465,10 +1478,42 @@ public final class VirtualMachine {
     private void handleInstanceof() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
-        // Simplified instanceof check
-        boolean result = right instanceof JSFunction && left instanceof JSObject;
-        // Simplified
-        valueStack.push(JSBoolean.valueOf(result));
+        
+        // Per ECMAScript spec, right must be an object
+        if (!(right instanceof JSObject)) {
+            throw new VMException("Right-hand side of instanceof is not an object");
+        }
+        
+        // Get the prototype property from the constructor (right operand)
+        JSObject constructor = (JSObject) right;
+        JSValue prototypeValue = constructor.get("prototype");
+        
+        // If the constructor doesn't have a valid prototype property, return false
+        // (This can happen with some built-in functions that aren't constructors)
+        if (!(prototypeValue instanceof JSObject constructorPrototype)) {
+            valueStack.push(JSBoolean.FALSE);
+            return;
+        }
+        
+        // If left is not an object, instanceof is false
+        if (!(left instanceof JSObject)) {
+            valueStack.push(JSBoolean.FALSE);
+            return;
+        }
+        
+        // Walk the prototype chain of left to see if it matches constructor.prototype
+        JSObject obj = (JSObject) left;
+        JSObject currentPrototype = obj.getPrototype();
+        
+        while (currentPrototype != null) {
+            if (currentPrototype == constructorPrototype) {
+                valueStack.push(JSBoolean.TRUE);
+                return;
+            }
+            currentPrototype = currentPrototype.getPrototype();
+        }
+        
+        valueStack.push(JSBoolean.FALSE);
     }
 
     private void handleLogicalAnd() {

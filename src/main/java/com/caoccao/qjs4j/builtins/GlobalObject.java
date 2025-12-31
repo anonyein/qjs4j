@@ -81,15 +81,37 @@ public final class GlobalObject {
      * Create an Error constructor.
      */
     private static JSObject createErrorConstructor(JSContext context, String errorName) {
-        // Error.prototype
-        JSObject errorPrototype = new JSObject();
-        errorPrototype.set("name", new JSString(errorName));
-        errorPrototype.set("message", new JSString(""));
+        // Create Error prototype using the proper error class
+        JSError errorPrototype = switch (errorName) {
+            case JSTypeError.NAME -> new JSTypeError(context);
+            case JSRangeError.NAME -> new JSRangeError(context);
+            case JSReferenceError.NAME -> new JSReferenceError(context);
+            case JSSyntaxError.NAME -> new JSSyntaxError(context);
+            case JSURIError.NAME -> new JSURIError(context);
+            case JSEvalError.NAME -> new JSEvalError(context);
+            case JSAggregateError.NAME -> new JSAggregateError(context);
+            default -> new JSError(context);
+        };
+        
         errorPrototype.set("toString", new JSNativeFunction("toString", 0, GlobalObject::errorToString));
 
         // For now, Error constructor is a placeholder (like Array, String, etc.)
         JSObject errorConstructor = new JSObject();
         errorConstructor.set("prototype", errorPrototype);
+        
+        // Set constructor type based on error name
+        ConstructorType constructorType = switch (errorName) {
+            case JSTypeError.NAME -> ConstructorType.TYPE_ERROR;
+            case JSRangeError.NAME -> ConstructorType.RANGE_ERROR;
+            case JSReferenceError.NAME -> ConstructorType.REFERENCE_ERROR;
+            case JSSyntaxError.NAME -> ConstructorType.SYNTAX_ERROR;
+            case JSURIError.NAME -> ConstructorType.URI_ERROR;
+            case JSEvalError.NAME -> ConstructorType.EVAL_ERROR;
+            case JSAggregateError.NAME -> ConstructorType.AGGREGATE_ERROR;
+            default -> ConstructorType.ERROR;
+        };
+        errorConstructor.setConstructorType(constructorType);
+        
         // Store error name for constructor use
         errorConstructor.set("[[ErrorName]]", new JSString(errorName));
 
@@ -641,6 +663,7 @@ public final class GlobalObject {
         global.set("SyntaxError", createErrorConstructor(context, "SyntaxError"));
         global.set("URIError", createErrorConstructor(context, "URIError"));
         global.set("EvalError", createErrorConstructor(context, "EvalError"));
+        global.set("AggregateError", createErrorConstructor(context, "AggregateError"));
     }
 
     /**
@@ -1088,8 +1111,18 @@ public final class GlobalObject {
      * Initialize Symbol constructor and static methods.
      */
     private static void initializeSymbolConstructor(JSContext context, JSObject global) {
+        // Get Object.prototype to set as Symbol.prototype's prototype
+        JSValue objectCtor = global.get("Object");
+        JSObject objectPrototype = null;
+        if (objectCtor instanceof JSObject) {
+            JSValue objProto = ((JSObject) objectCtor).get("prototype");
+            if (objProto instanceof JSObject) {
+                objectPrototype = (JSObject) objProto;
+            }
+        }
+        
         // Create Symbol.prototype
-        JSObject symbolPrototype = new JSObject();
+        JSObject symbolPrototype = new JSObject(objectPrototype);
         JSNativeFunction symbolToString = new JSNativeFunction("toString", 0, SymbolPrototype::toString);
         symbolToString.initializePrototypeChain(context);
         symbolPrototype.set("toString", symbolToString);

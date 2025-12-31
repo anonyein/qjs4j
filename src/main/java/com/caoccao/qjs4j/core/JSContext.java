@@ -468,6 +468,16 @@ public final class JSContext implements AutoCloseable {
     }
 
     /**
+     * Throw a AggregateError.
+     *
+     * @param message Error message
+     * @return The error value
+     */
+    public JSValue throwAggregateError(String message) {
+        return throwError(JSAggregateError.NAME, message);
+    }
+
+    /**
      * Throw a JavaScript error.
      * Creates an Error object and sets it as the pending exception.
      *
@@ -475,7 +485,7 @@ public final class JSContext implements AutoCloseable {
      * @return The error value (for convenience in return statements)
      */
     public JSValue throwError(String message) {
-        return throwError("Error", message);
+        return throwError(JSError.NAME, message);
     }
 
     /**
@@ -486,10 +496,26 @@ public final class JSContext implements AutoCloseable {
      * @return The error value
      */
     public JSValue throwError(String errorType, String message) {
-        // Create error object
-        JSObject error = new JSObject();
-        error.set("name", new JSString(errorType));
-        error.set("message", new JSString(message));
+        // Create error object using the proper error class
+        JSError error = switch (errorType) {
+            case JSAggregateError.NAME -> new JSAggregateError(this, message);
+            case JSEvalError.NAME -> new JSEvalError(this, message);
+            case JSRangeError.NAME -> new JSRangeError(this, message);
+            case JSReferenceError.NAME -> new JSReferenceError(this, message);
+            case JSSyntaxError.NAME -> new JSSyntaxError(this, message);
+            case JSTypeError.NAME -> new JSTypeError(this, message);
+            case JSURIError.NAME -> new JSURIError(this, message);
+            default -> new JSError(this, message);
+        };
+
+        // Set prototype from the global error constructor
+        JSValue errorCtor = globalObject.get(errorType);
+        if (errorCtor instanceof JSObject ctorObj) {
+            JSValue prototypeValue = ctorObj.get("prototype");
+            if (prototypeValue instanceof JSObject prototype) {
+                error.setPrototype(prototype);
+            }
+        }
 
         // Capture stack trace
         captureStackTrace(error);
@@ -501,13 +527,23 @@ public final class JSContext implements AutoCloseable {
     }
 
     /**
+     * Throw a EvalError.
+     *
+     * @param message Error message
+     * @return The error value
+     */
+    public JSValue throwEvalError(String message) {
+        return throwError(JSEvalError.NAME, message);
+    }
+
+    /**
      * Throw a RangeError.
      *
      * @param message Error message
      * @return The error value
      */
     public JSValue throwRangeError(String message) {
-        return throwError("RangeError", message);
+        return throwError(JSRangeError.NAME, message);
     }
 
     /**
@@ -517,7 +553,7 @@ public final class JSContext implements AutoCloseable {
      * @return The error value
      */
     public JSValue throwReferenceError(String message) {
-        return throwError("ReferenceError", message);
+        return throwError(JSReferenceError.NAME, message);
     }
 
     /**
@@ -527,7 +563,7 @@ public final class JSContext implements AutoCloseable {
      * @return The error value
      */
     public JSValue throwSyntaxError(String message) {
-        return throwError("SyntaxError", message);
+        return throwError(JSSyntaxError.NAME, message);
     }
 
     /**
@@ -537,7 +573,7 @@ public final class JSContext implements AutoCloseable {
      * @return The error value
      */
     public JSValue throwTypeError(String message) {
-        return throwError("TypeError", message);
+        return throwError(JSTypeError.NAME, message);
     }
 
     /**
@@ -547,7 +583,7 @@ public final class JSContext implements AutoCloseable {
      * @return The error value
      */
     public JSValue throwURIError(String message) {
-        return throwError("URIError", message);
+        return throwError(JSURIError.NAME, message);
     }
 
     /**
