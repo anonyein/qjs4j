@@ -913,6 +913,10 @@ public final class BytecodeCompiler {
             // Bind exception to parameter if present
             if (handler.param() != null) {
                 enterScope();
+                // Catch block creates a local scope - variables should use GET_LOCAL
+                boolean savedGlobalScope = inGlobalScope;
+                inGlobalScope = false;
+                
                 String paramName = handler.param().name();
                 int localIndex = currentScope().declareLocal(paramName);
                 emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
@@ -942,6 +946,7 @@ public final class BytecodeCompiler {
                     emitter.emitOpcode(Opcode.UNDEFINED);
                 }
                 
+                inGlobalScope = savedGlobalScope;
                 exitScope();
             } else {
                 // No parameter, compile catch body without binding
