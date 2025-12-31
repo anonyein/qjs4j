@@ -33,12 +33,14 @@ public final class BytecodeCompiler {
     private final Deque<LoopContext> loopStack;
     private final Deque<Scope> scopes;
     private boolean inGlobalScope;
+    private int maxLocalCount;
 
     public BytecodeCompiler() {
         this.emitter = new BytecodeEmitter();
         this.scopes = new ArrayDeque<>();
         this.loopStack = new ArrayDeque<>();
         this.inGlobalScope = false;
+        this.maxLocalCount = 0;
     }
 
     /**
@@ -50,8 +52,7 @@ public final class BytecodeCompiler {
         } else {
             throw new IllegalArgumentException("Expected Program node, got: " + ast.getClass().getName());
         }
-        int localCount = scopes.isEmpty() ? 0 : currentScope().getLocalCount();
-        return emitter.build(localCount);
+        return emitter.build(maxLocalCount);
     }
 
     // ==================== Program Compilation ====================
@@ -533,7 +534,8 @@ public final class BytecodeCompiler {
             emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
         } else {
             // In function scope, check locals first
-            // Search through all scopes in the stack, from innermost to outermost
+            // Search from innermost scope (most recently pushed) to outermost
+            // ArrayDeque.push() adds to front, iterator() iterates from front to back
             Integer localIndex = null;
             for (Scope scope : scopes) {
                 localIndex = scope.getLocal(name);
@@ -1093,11 +1095,26 @@ public final class BytecodeCompiler {
     }
 
     private void enterScope() {
-        scopes.push(new Scope());
+        int baseIndex = scopes.isEmpty() ? 0 : currentScope().getLocalCount();
+        scopes.push(new Scope(baseIndex));
     }
 
     private void exitScope() {
-        scopes.pop();
+        Scope exitingScope = scopes.pop();
+        
+        // Track the maximum local count reached
+        int localCount = exitingScope.getLocalCount();
+        if (localCount > maxLocalCount) {
+            maxLocalCount = localCount;
+        }
+        
+        // Update parent scope's nextLocalIndex to reflect locals allocated in child scope
+        if (!scopes.isEmpty()) {
+            Scope parentScope = currentScope();
+            if (localCount > parentScope.getLocalCount()) {
+                parentScope.setLocalCount(localCount);
+            }
+        }
     }
 
     /**
@@ -1127,7 +1144,15 @@ public final class BytecodeCompiler {
      */
     private static class Scope {
         private final Map<String, Integer> locals = new HashMap<>();
-        private int nextLocalIndex = 0;
+        private int nextLocalIndex;
+
+        Scope() {
+            this.nextLocalIndex = 0;
+        }
+
+        Scope(int baseIndex) {
+            this.nextLocalIndex = baseIndex;
+        }
 
         int declareLocal(String name) {
             if (locals.containsKey(name)) {
@@ -1144,6 +1169,10 @@ public final class BytecodeCompiler {
 
         int getLocalCount() {
             return nextLocalIndex;
+        }
+
+        void setLocalCount(int count) {
+            this.nextLocalIndex = count;
         }
     }
 }

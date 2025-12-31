@@ -83,8 +83,9 @@ public final class VirtualMachine {
                     pendingException = null;
 
                     // Unwind the stack looking for a CatchOffset marker
+                    // Only unwind within the current function's stack frame (QuickJS: while (sp > stack_buf))
                     boolean foundHandler = false;
-                    while (valueStack.getStackTop() > 0) {
+                    while (valueStack.getStackTop() > savedStackTop) {
                         JSStackValue val = valueStack.popStackValue();
                         if (val instanceof JSCatchOffset catchOffset) {
                             // Found catch handler - push exception and jump to it
@@ -366,7 +367,8 @@ public final class VirtualMachine {
                     }
                     case PUT_LOCAL -> {
                         int putLocalIndex = bytecode.readU16(pc + 1);
-                        currentFrame.getLocals()[putLocalIndex] = valueStack.pop();
+                        JSValue value = valueStack.pop();
+                        currentFrame.getLocals()[putLocalIndex] = value;
                         pc += op.getSize();
                     }
                     case SET_LOCAL -> {
@@ -532,7 +534,9 @@ public final class VirtualMachine {
                         JSValue exception = valueStack.pop();
                         pendingException = exception;
                         context.setPendingException(exception);
-                        throw new VMException("Exception thrown: " + exception);
+                        // Don't throw immediately - let the exception handling loop unwind the stack
+                        // This matches QuickJS behavior: goto exception;
+                        // Don't advance PC - let the exception handler deal with it
                     }
                     case CATCH -> {
                         // QuickJS: pushes catch offset marker onto stack

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 public class JSErrorTest extends BaseJavetTest {
     @Test
     public void testInstanceof() {
@@ -21,5 +23,13 @@ public class JSErrorTest extends BaseJavetTest {
                 "new AggregateError('AggregateError') instanceof AggregateError").forEach(code -> assertWithJavet(
                 () -> v8Runtime.getExecutor(code).executeBoolean(),
                 () -> context.eval(code).toJavaObject()));
+    }
+
+    @Test
+    public void testTryCatchTypeError() {
+        JSValue result = context.eval("try { throw new TypeError('I am a TypeError'); } catch (e) { e.name + ': ' + e.message; }");
+        assertThat(result).isInstanceOfSatisfying(JSString.class, jsString -> {
+            assertThat(jsString.value()).isEqualTo("TypeError: I am a TypeError");
+        });
     }
 }
