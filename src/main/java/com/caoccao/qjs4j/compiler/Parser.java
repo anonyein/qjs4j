@@ -596,6 +596,13 @@ public final class Parser {
         SourceLocation location = getLocation();
         expect(TokenType.FUNCTION);
 
+        // Check for generator function: function* or async function*
+        // Following QuickJS implementation: check for '*' after 'function' keyword
+        if (match(TokenType.MUL)) {
+            advance();
+            isGenerator = true;
+        }
+
         Identifier id = parseIdentifier();
 
         expect(TokenType.LPAREN);
@@ -620,6 +627,14 @@ public final class Parser {
         SourceLocation location = getLocation();
         expect(TokenType.FUNCTION);
 
+        // Check for generator function expression: function* () {}
+        // Following QuickJS implementation: check for '*' after 'function' keyword
+        boolean isGenerator = false;
+        if (match(TokenType.MUL)) {
+            advance();
+            isGenerator = true;
+        }
+
         Identifier id = null;
         if (match(TokenType.IDENTIFIER)) {
             id = parseIdentifier();
@@ -640,7 +655,7 @@ public final class Parser {
         expect(TokenType.RPAREN);
         BlockStatement body = parseBlockStatement();
 
-        return new FunctionExpression(id, params, body, false, false, location);
+        return new FunctionExpression(id, params, body, false, isGenerator, location);
     }
 
     private Identifier parseIdentifier() {

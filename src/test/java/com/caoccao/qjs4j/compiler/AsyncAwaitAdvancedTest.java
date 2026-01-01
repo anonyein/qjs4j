@@ -89,7 +89,6 @@ public class AsyncAwaitAdvancedTest extends BaseJavetTest {
         });
     }
 
-    @Disabled("Async generators not yet implemented")
     @Test
     void testAsyncGeneratorBasic() {
         // Test basic async generator syntax (if implemented)
