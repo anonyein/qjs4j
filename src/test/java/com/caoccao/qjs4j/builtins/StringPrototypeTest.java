@@ -173,7 +173,7 @@ public class StringPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testEquals() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Verify that loose equality passes between primitive and primitive
                 "'hello' == 'hello'",
                 "'hello' == 'world'",
@@ -199,11 +199,7 @@ public class StringPrototypeTest extends BaseJavetTest {
                 // Verify that strict equality fails between primitive and object
                 "'hello' === new String('hello')",
                 // Verify that strict equality fails between object and object
-                "new String('hello') === new String('hello')").forEach(code -> {
-            assertWithJavet(
-                    () -> v8Runtime.getExecutor(code).executeBoolean(),
-                    () -> context.eval(code).toJavaObject());
-        });
+                "new String('hello') === new String('hello')");
     }
 
     @Test
@@ -226,6 +222,23 @@ public class StringPrototypeTest extends BaseJavetTest {
         // Empty string
         JSString empty = new JSString("");
         assertThat(empty.value().length()).isEqualTo(0);
+
+        JSValue nonString = new JSNumber(123);
+        assertThat(StringPrototype.getLength(context, nonString, new JSValue[]{}).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+
+        assertIntegerWithJavet("'hello world'.length",
+                "'你好世界'.length",
+                "'😀🌟🚀'.length",
+                "'Hello 你好 😀'.length",
+                "''.length");
+
+        assertErrorWithJavet("String.prototype.length.call({})",
+                "String.prototype.length.call(123)",
+                "String.prototype.length.call(true)",
+                "String.prototype.length.call('abc')",
+                "String['prototype'].length.call('abc')",
+                "String.prototype.length.call(null)",
+                "String.prototype.length.call(undefined)");
     }
 
     @Test
@@ -310,7 +323,7 @@ public class StringPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testMatch() {
-        Stream.of(
+        assertStringWithJavet(
                 // Match with string
                 "JSON.stringify('hello world'.match('world'))",
                 "JSON.stringify('hello world'.match('test'))",
@@ -328,14 +341,12 @@ public class StringPrototypeTest extends BaseJavetTest {
                 "JSON.stringify('hello world'.match(/xyz/))",
                 // Edge cases
                 "JSON.stringify(''.match('test'))",
-                "JSON.stringify('hello world'.match(''))").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
+                "JSON.stringify('hello world'.match(''))");
     }
 
     @Test
     public void testMatchAll() {
-        Stream.of(
+        assertStringWithJavet(
                 // MatchAll with global regex - convert to array for comparison
                 "JSON.stringify(Array.from('hello world'.matchAll(/o/g)).map(m => m[0]))",
                 "JSON.stringify(Array.from('hello world'.matchAll(/l/g)).map(m => m[0]))",
@@ -344,17 +355,11 @@ public class StringPrototypeTest extends BaseJavetTest {
                 "JSON.stringify(Array.from('hello world'.matchAll('o')).map(m => m[0]))",
                 "JSON.stringify(Array.from('hello world'.matchAll('l')).map(m => m[0]))",
                 // No matches
-                "JSON.stringify(Array.from('hello world'.matchAll(/xyz/g)).map(m => m[0]))").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
+                "JSON.stringify(Array.from('hello world'.matchAll(/xyz/g)).map(m => m[0]))");
 
         // Test non-global regex throws error
-        Stream.of(
-                "try { 'hello world'.matchAll(/o/); 'no error'; } catch(e) { e.message; }").forEach(code -> {
-            assertWithJavet(
-                    () -> v8Runtime.getExecutor(code).executeString(),
-                    () -> context.eval(code).toJavaObject());
-        });
+        assertStringWithJavet(
+                "try { 'hello world'.matchAll(/o/); 'no error'; } catch(e) { e.message; }");
     }
 
     @Test
@@ -475,7 +480,7 @@ public class StringPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testReplaceAllWithRegExp() {
-        Stream.of(
+        assertStringWithJavet(
                 // ReplaceAll with string
                 "'hello world'.replaceAll('o', 'x')",
                 "'hello world'.replaceAll('l', 'L')",
@@ -490,22 +495,16 @@ public class StringPrototypeTest extends BaseJavetTest {
                 // Edge cases
                 "''.replaceAll('test', 'xyz')",
                 "''.replaceAll('', 'xyz')",
-                "'hello world'.replaceAll('', 'X')").forEach(code -> {
-            assertWithJavet(
-                    () -> v8Runtime.getExecutor(code).executeString(),
-                    () -> context.eval(code).toJavaObject());
-        });
+                "'hello world'.replaceAll('', 'X')");
 
         // Test non-global regex throws error
-        Stream.of(
-                "try { 'hello world'.replaceAll(/o/, 'x'); 'no error'; } catch(e) { e.message; }").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
+        assertStringWithJavet(
+                "try { 'hello world'.replaceAll(/o/, 'x'); 'no error'; } catch(e) { e.message; }");
     }
 
     @Test
     public void testReplaceWithRegExp() {
-        Stream.of(
+        assertStringWithJavet(
                 // Replace with string
                 "'hello world'.replace('world', 'universe')",
                 "'hello world'.replace('o', 'x')",
@@ -522,16 +521,12 @@ public class StringPrototypeTest extends BaseJavetTest {
                 "'hello world'.replace(/world/, '[$&]')",
                 // Edge cases
                 "''.replace('test', 'xyz')",
-                "'hello world'.replace('', 'X')").forEach(code -> {
-            assertWithJavet(
-                    () -> v8Runtime.getExecutor(code).executeString(),
-                    () -> context.eval(code).toJavaObject());
-        });
+                "'hello world'.replace('', 'X')");
     }
 
     @Test
     public void testSearch() {
-        Stream.of(
+        assertIntegerWithJavet(
                 // Search with string
                 "'hello world'.search('world')",
                 "'hello world'.search('o')",
@@ -547,9 +542,7 @@ public class StringPrototypeTest extends BaseJavetTest {
                 "'hello world'.search(/W/i)",
                 // Edge cases
                 "''.search('test')",
-                "'hello world'.search('')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject()));
+                "'hello world'.search('')");
     }
 
     @Test
@@ -614,7 +607,7 @@ public class StringPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testSplitWithRegExp() {
-        Stream.of(
+        assertStringWithJavet(
                 // Split with string
                 "JSON.stringify('hello world'.split(' '))",
                 "JSON.stringify('a,b,c'.split(','))",
@@ -632,9 +625,7 @@ public class StringPrototypeTest extends BaseJavetTest {
                 // Edge cases
                 "JSON.stringify('hello world'.split(''))",
                 "JSON.stringify(''.split(' '))",
-                "JSON.stringify('hello world'.split())").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
+                "JSON.stringify('hello world'.split())");
     }
 
     @Test

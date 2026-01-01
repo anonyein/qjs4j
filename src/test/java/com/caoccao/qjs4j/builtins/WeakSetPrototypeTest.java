@@ -29,33 +29,20 @@ public class WeakSetPrototypeTest extends BaseJavetTest {
     @Test
     public void testAdd() {
         // Normal case: add new value
-        String code1 = """
+        assertBooleanWithJavet("""
                 var weakSet = new WeakSet();
                 var value1 = {};
-                weakSet.add(value1).constructor === WeakSet""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code1).executeBoolean(),
-                () -> context.eval(code1).toJavaObject());
-
-        // Verify add returns the WeakSet
-        String code2 = """
+                weakSet.add(value1).constructor === WeakSet""",
+                """
                 var weakSet = new WeakSet();
                 var value = {};
-                weakSet.add(value) === weakSet;""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code2).executeBoolean(),
-                () -> context.eval(code2).toJavaObject());
-
-        // Normal case: add duplicate value
-        String code3 = """
+                weakSet.add(value) === weakSet;""",
+                """
                 var weakSet = new WeakSet();
                 var value = {};
                 weakSet.add(value);
                 weakSet.add(value);
-                weakSet.has(value);""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code3).executeBoolean(),
-                () -> context.eval(code3).toJavaObject());
+                weakSet.has(value);""");
 
         // Edge case: no arguments
         assertErrorWithJavet("""
@@ -73,7 +60,7 @@ public class WeakSetPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testDelete() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Normal case: delete existing value
                 """
                         var weakSet = new WeakSet();
@@ -92,11 +79,7 @@ public class WeakSetPrototypeTest extends BaseJavetTest {
                 // Edge case: non-object value
                 """
                         var weakSet = new WeakSet();
-                        weakSet.delete('string');"""
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
+                        weakSet.delete('string');""");
 
         // Edge case: called on non-WeakSet
         assertErrorWithJavet("WeakSet.prototype.delete.call('not weakset', {});");
@@ -104,7 +87,7 @@ public class WeakSetPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testHas() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Normal case: has existing value
                 """
                         var weakSet = new WeakSet();
@@ -123,11 +106,7 @@ public class WeakSetPrototypeTest extends BaseJavetTest {
                 // Edge case: non-object value
                 """
                         var weakSet = new WeakSet();
-                        weakSet.has('string');"""
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
+                        weakSet.has('string');""");
 
         // Edge case: called on non-WeakSet
         assertErrorWithJavet("WeakSet.prototype.has.call('not weakset', {});");

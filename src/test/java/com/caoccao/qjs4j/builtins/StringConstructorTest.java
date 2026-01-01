@@ -50,10 +50,7 @@ public class StringConstructorTest extends BaseJavetTest {
         JSStringObject strObj2 = (JSStringObject) result2;
         assertThat(strObj2.getValue().value()).isEqualTo("world");
 
-        Stream.of("typeof new String('a')", "typeof 'a'", "typeof String('a')").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeString(),
-                        () -> context.eval(code).toJavaObject()));
+        assertStringWithJavet("typeof new String('a')", "typeof 'a'", "typeof String('a')");
     }
 
     @Test
@@ -130,9 +127,7 @@ public class StringConstructorTest extends BaseJavetTest {
         JSValue result7 = context.eval("String.fromCharCode(65.9);");
         assertThat(result7).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("A"));
 
-        assertWithJavet(
-                () -> v8Runtime.getExecutor("String.fromCharCode(72, 101, 108, 108, 111)").executeString(),
-                () -> context.eval("String.fromCharCode(72, 101, 108, 108, 111)").toJavaObject());
+        assertStringWithJavet("String.fromCharCode(72, 101, 108, 108, 111)");
     }
 
     @Test
@@ -169,12 +164,7 @@ public class StringConstructorTest extends BaseJavetTest {
         JSValue error3 = context.eval("try { String.fromCodePoint(3.14); 'no error'; } catch(e) { e.name; }");
         assertThat(error3).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("RangeError"));
 
-        assertWithJavet(
-                () -> v8Runtime.getExecutor("String.fromCodePoint(72, 101, 108, 108, 111)").executeString(),
-                () -> context.eval("String.fromCodePoint(72, 101, 108, 108, 111)").toJavaObject());
-        assertWithJavet(
-                () -> v8Runtime.getExecutor("String.fromCodePoint(128512)").executeString(),
-                () -> context.eval("String.fromCodePoint(128512)").toJavaObject());
+        assertStringWithJavet("String.fromCodePoint(72, 101, 108, 108, 111)", "String.fromCodePoint(128512)");
     }
 
     @Test
@@ -301,17 +291,12 @@ public class StringConstructorTest extends BaseJavetTest {
         JSValue result8 = context.eval("String.raw({ raw: ['\\u4E2D\\u6587'] });");
         assertThat(result8).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("中文"));
 
-        assertWithJavet(
-                () -> v8Runtime.getExecutor("String.raw({ raw: ['Hello', ' ', 'World'] }, 'beautiful')").executeString(),
-                () -> context.eval("String.raw({ raw: ['Hello', ' ', 'World'] }, 'beautiful')").toJavaObject());
+        assertStringWithJavet("String.raw({ raw: ['Hello', ' ', 'World'] }, 'beautiful')");
     }
 
     @Test
     public void testStringTrim() {
-        String code = "String.prototype.trim.call`  abc  `";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("String.prototype.trim.call`  abc  `");
     }
 
     @Test
@@ -346,11 +331,7 @@ public class StringConstructorTest extends BaseJavetTest {
         assertThat(result3).isInstanceOfSatisfying(JSString.class, jsStr ->
                 assertThat(jsStr.value()).isEqualTo("1+2=3"));
 
-        Stream.of("String.raw`Hello\nWorld`", "String.raw`Value: ${42}`")
-                .forEach(code ->
-                        assertWithJavet(
-                                () -> v8Runtime.getExecutor(code).executeString(),
-                                () -> context.eval(code).toJavaObject()));
+        assertStringWithJavet("String.raw`Hello\nWorld`", "String.raw`Value: ${42}`");
     }
 
     @Test
@@ -385,8 +366,6 @@ public class StringConstructorTest extends BaseJavetTest {
         assertThat(result6).isInstanceOfSatisfying(JSString.class, jsStr ->
                 assertThat(jsStr.value()).isEqualTo("line1\nline2"));
 
-        assertWithJavet(
-                () -> v8Runtime.getExecutor("`Hello ${'World'}!`").executeString(),
-                () -> context.eval("`Hello ${'World'}!`").toJavaObject());
+        assertStringWithJavet("`Hello ${'World'}!`");
     }
 }

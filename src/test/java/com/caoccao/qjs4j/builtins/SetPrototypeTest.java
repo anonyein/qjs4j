@@ -20,6 +20,8 @@ import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
+import java.util.stream.Stream;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -151,6 +153,10 @@ public class SetPrototypeTest extends BaseJavetTest {
         // Edge case: called on non-Set
         assertTypeError(SetPrototype.getSize(context, new JSString("not set"), new JSValue[]{}));
         assertPendingException(context);
+
+        assertIntegerWithJavet(
+                "new Set().size",
+                "var a = new Set(); a.add('a'); a.size");
     }
 
     @Test

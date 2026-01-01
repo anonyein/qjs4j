@@ -157,17 +157,15 @@ public class RegExpPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testJavetAlternation() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/cat|dog/.test('I have a cat')",
                 "/cat|dog/.test('I have a dog')",
-                "/cat|dog/.test('I have a bird')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/cat|dog/.test('I have a bird')");
     }
 
     @Test
     public void testJavetBackReferences() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Simple back reference
                 "/(\\w+) \\1/.test('hello hello')",
                 "/(\\w+) \\1/.test('hello world')",
@@ -178,64 +176,52 @@ public class RegExpPrototypeTest extends BaseJavetTest {
                 "/(\\w)(\\w)\\2\\1/.test('abcd')",
                 // Nested groups
                 "/((\\w)\\w)\\1/.test('xyxy')",
-                "/((\\w)\\w)\\1/.test('xyzz')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/((\\w)\\w)\\1/.test('xyzz')");
 
         // Back reference with case insensitive
-        Stream.of(
+        assertBooleanWithJavet(
                 "/(\\w+) \\1/i.test('Hello HELLO')",
-                "/(abc)\\1/i.test('ABCABC')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/(abc)\\1/i.test('ABCABC')");
     }
 
     @Test
     public void testJavetBasicPatterns() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/hello/.test('hello world')",
                 "/hello/.test('goodbye')",
                 "/^hello/.test('hello world')",
                 "/world$/.test('hello world')",
                 "/^test$/.test('test')",
-                "/^test$/.test('testing')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/^test$/.test('testing')");
     }
 
     @Test
     public void testJavetBigIntPattern() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/^\\d+n$/.test('123n')",
                 "/^\\d+n$/.test('0n')",
                 "/^\\d+n$/.test('123')",
-                "/^\\d+n$/.test('n')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/^\\d+n$/.test('n')");
     }
 
     @Test
     public void testJavetBoundaries() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/\\btest\\b/.test('test')",
-                "/\\btest\\b/.test('testing')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/\\btest\\b/.test('testing')");
     }
 
     @Test
     public void testJavetCaptureGroups() {
-        Stream.of(
+        assertStringWithJavet(
                 "'hello world'.match(/(\\w+) (\\w+)/)[0]",
                 "'hello world'.match(/(\\w+) (\\w+)/)[1]",
-                "'hello world'.match(/(\\w+) (\\w+)/)[2]").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
+                "'hello world'.match(/(\\w+) (\\w+)/)[2]");
     }
 
     @Test
     public void testJavetCharacterClasses() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/\\d/.test('abc123')",
                 "/\\d/.test('abc')",
                 "/^\\d+$/.test('12345')",
@@ -244,90 +230,72 @@ public class RegExpPrototypeTest extends BaseJavetTest {
                 "/\\W/.test('!!')",
                 "/^\\w+$/.test('test_123')",
                 "/\\s/.test('hello world')",
-                "/\\s/.test('helloworld')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/\\s/.test('helloworld')");
     }
 
     @Test
     public void testJavetComplexPatterns() {
-        Stream.of(
+        assertStringWithJavet(
                 // Combination of features
                 "/(\\d{3})-(\\d{3})-(\\d{4})/.exec('123-456-7890')[0]",
                 "/(\\d{3})-(\\d{3})-(\\d{4})/.exec('123-456-7890')[1]",
                 "/(\\d{3})-(\\d{3})-(\\d{4})/.exec('123-456-7890')[2]",
-                "/(\\d{3})-(\\d{3})-(\\d{4})/.exec('123-456-7890')[3]").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
-        Stream.of(
+                "/(\\d{3})-(\\d{3})-(\\d{4})/.exec('123-456-7890')[3]");
+        assertBooleanWithJavet(
                 // Email-like pattern
                 "/\\w+@\\w+\\.\\w+/.test('test@example.com')",
                 "/\\w+@\\w+\\.\\w+/.test('not-an-email')",
                 // URL-like pattern with lookahead
                 "/https?(?=:\\/\\/)/.test('https://')",
                 "/https?(?=:\\/\\/)/.test('http://')",
-                "/https?(?=:\\/\\/)/.test('ftp://')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/https?(?=:\\/\\/)/.test('ftp://')");
     }
 
     @Test
     public void testJavetCustomCharacterClasses() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/[abc]/.test('apple')",
                 "/[abc]/.test('dog')",
                 "/[a-z]/.test('hello')",
-                "/[0-9]/.test('123')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/[0-9]/.test('123')");
     }
 
     @Test
     public void testJavetExecMethod() {
         // Test exec returning strings
-        Stream.of(
+        assertStringWithJavet(
                 "/test/.exec('this is a test')[0]",
                 "/(\\d+)n/.exec('123n')[0]",
-                "/(\\d+)n/.exec('123n')[1]").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
+                "/(\\d+)n/.exec('123n')[1]");
 
         // Test exec returning index (number)
-        assertWithJavet(
-                () -> v8Runtime.getExecutor("/test/.exec('this is a test').index").executeInteger().doubleValue(),
-                () -> context.eval("/test/.exec('this is a test').index").toJavaObject());
+        assertIntegerWithJavet("/test/.exec('this is a test').index");
     }
 
     @Test
     public void testJavetFlags() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/test/i.test('TEST')",
-                "/test/.test('TEST')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/test/.test('TEST')");
     }
 
     @Test
     public void testJavetHexEscapes() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/\\x41/.test('A')",
                 "/\\x41/.test('B')",
                 "/\\x30/.test('0')",
                 "/\\x20/.test(' ')",
                 "/\\x48\\x65\\x6C\\x6C\\x6F/.test('Hello')",
-                "/\\x48\\x65\\x6C\\x6C\\x6F/.test('World')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/\\x48\\x65\\x6C\\x6C\\x6F/.test('World')");
     }
 
     @Test
     public void testJavetLookaheadAssertions() {
-        Stream.of(
+        assertStringWithJavet(
                 // Positive lookahead
-                "/\\d+(?=px)/.exec('100px')[0]").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
-        Stream.of(
+                "/\\d+(?=px)/.exec('100px')[0]");
+        assertBooleanWithJavet(
                 // Positive lookahead
                 "/test(?=ing)/.test('testing')",
                 "/test(?=ing)/.test('tested')",
@@ -338,21 +306,16 @@ public class RegExpPrototypeTest extends BaseJavetTest {
                 "/test(?!ing)/.test('testing')",
                 "/\\d+(?!px)/.test('100em')",
                 "/foo(?!bar)/.test('foobaz')",
-                "/foo(?!bar)/.test('foobar')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/foo(?!bar)/.test('foobar')");
 
         // Lookahead doesn't consume characters
-        String code = "/test(?=ing)/.exec('testing').index";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("/test(?=ing)/.exec('testing').index");
     }
 
     @Test
     public void testJavetMixedFeatures() {
         // Test lookahead in isolation first
-        Stream.of(
+        assertBooleanWithJavet(
                 // Non-capturing group + lookahead
                 "/(?:test)(?=ing)/.test('testing')",
                 // Back reference + character class
@@ -364,101 +327,76 @@ public class RegExpPrototypeTest extends BaseJavetTest {
                 "/\\x48+/.test('HHH')",
                 // Complex email validation
                 "/\\w+(?:\\.[\\w-]+)*@\\w+(?:\\.[\\w-]+)+/.test('user.name@example.co.uk')",
-                "/\\w+(?:\\.[\\w-]+)*@\\w+(?:\\.[\\w-]+)+/.test('invalid@')").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
-        Stream.of(
+                "/\\w+(?:\\.[\\w-]+)*@\\w+(?:\\.[\\w-]+)+/.test('invalid@')");
+        assertStringWithJavet(
                 // Repeated back reference
                 "/(\\w)\\1+/.exec('aaa')[0]",
-                "/(\\w)\\1+/.exec('hello')[0]").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
+                "/(\\w)\\1+/.exec('hello')[0]");
     }
 
     @Test
     public void testJavetNonCapturingGroups() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/(?:abc)/.test('abc')",
                 "/(?:abc)/.test('xyz')",
                 "/(?:test)+/.test('testtesttest')",
-                "/(?:a|b|c)/.test('b')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/(?:a|b|c)/.test('b')");
 
         // Non-capturing groups don't create capture groups
-        Stream.of(
+        assertStringWithJavet(
                 "/(?:hello)+/.exec('hellohello')[0]",
-                "/(?:a)(b)/.exec('ab')[1]").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeString(),
-                        () -> context.eval(code).toJavaObject()));
+                "/(?:a)(b)/.exec('ab')[1]");
 
-        String code = "/(?:a)(b)/.exec('ab').length";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("/(?:a)(b)/.exec('ab').length");
     }
 
     @Test
     public void testJavetNonDigitClass() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/\\D/.test('abc')",
                 "/\\D/.test('123')",
                 "/^\\D+$/.test('abc')",
                 "/^\\D+$/.test('123')",
-                "/\\d+\\D+\\d+/.test('123abc456')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
-        Stream.of(
-                "/\\D+/.exec('abc123')[0]").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject()));
+                "/\\d+\\D+\\d+/.test('123abc456')");
+        assertStringWithJavet(
+                "/\\D+/.exec('abc123')[0]");
     }
 
     @Test
     public void testJavetQuantifiers() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/a+/.test('aaa')",
                 "/\\d+/.test('123')",
                 "/a*/.test('aaa')",
                 "/a*b/.test('b')",
                 "/colou?r/.test('color')",
                 "/colou?r/.test('colour')",
-                "/a{2,4}/.test('aaa')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/a{2,4}/.test('aaa')");
     }
 
     @Test
     public void testJavetSpecialCharacters() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/a.b/.test('aab')",
-                "/a.b/.test('ab')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/a.b/.test('ab')");
     }
 
     @Test
     public void testJavetTestMethod() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "/test/.test('this is a test')",
-                "/^\\d+$/.test('12345')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/^\\d+$/.test('12345')");
     }
 
     @Test
     public void testJavetUnicodeEscapes() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Basic Unicode escapes
                 "/\\u0041/.test('A')",
                 "/\\u0041/.test('B')",
                 "/\\u4E2D/.test('中')",
                 "/\\u4E2D/.test('国')",
-                "/\\u0048\\u0065\\u006C\\u006C\\u006F/.test('Hello')").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "/\\u0048\\u0065\\u006C\\u006C\\u006F/.test('Hello')");
     }
 
     @Test

@@ -146,8 +146,19 @@ public final class StringPrototype {
      * ES2020 21.1.3.10
      */
     public static JSValue getLength(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSString str = JSTypeConversions.toString(context, thisArg);
-        return new JSNumber(str.value().length());
+        long length = 0;
+        if (thisArg instanceof JSString jsString) {
+            length = jsString.value().length();
+        } else if (thisArg instanceof JSStringObject jsStringObject) {
+            length = jsStringObject.getValue().value().length();
+        } else if (thisArg instanceof JSObject jsObject) {
+            // Check if it's a wrapper object with a string primitive value
+            JSValue primitiveValue = jsObject.getPrimitiveValue();
+            if (primitiveValue instanceof JSString jsString) {
+                length = jsString.value().length();
+            }
+        }
+        return new JSNumber(length);
     }
 
     /**

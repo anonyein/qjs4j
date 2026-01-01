@@ -23,8 +23,6 @@ import com.caoccao.qjs4j.core.JSUndefined;
 import com.caoccao.qjs4j.core.JSValue;
 import org.junit.jupiter.api.Test;
 
-import java.util.stream.Stream;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
 
@@ -66,17 +64,11 @@ public class MathObjectTest extends BaseJavetTest {
 
     @Test
     public void testAdd() {
-        Stream.of(
+        assertIntegerWithJavet(
                 "1 + 1",
-                "var a = 1; var b = 2; a + b").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                        () -> context.eval(code).toJavaObject()));
-        Stream.of(
-                "2**32 + 2**32").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeLong().doubleValue(),
-                        () -> context.eval(code).toJavaObject()));
+                "var a = 1; var b = 2; a + b");
+        assertLongWithJavet(
+                "2**32 + 2**32");
     }
 
     @Test
@@ -134,19 +126,13 @@ public class MathObjectTest extends BaseJavetTest {
 
     @Test
     public void testDivide() {
-        Stream.of(
-                "1 / 1").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                        () -> context.eval(code).toJavaObject()));
-        Stream.of(
+        assertIntegerWithJavet(
+                "1 / 1");
+        assertDoubleWithJavet(
                 "var a = 1; var b = 2; a / b",
                 "-2 / -3",
                 "1 / 0",
-                "Infinity / -Infinity").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeDouble(),
-                        () -> context.eval(code).toJavaObject()));
+                "Infinity / -Infinity");
     }
 
     @Test
@@ -314,13 +300,10 @@ public class MathObjectTest extends BaseJavetTest {
 
     @Test
     public void testMultiply() {
-        Stream.of(
+        assertIntegerWithJavet(
                 "1 * 1",
                 "var a = 1; var b = 2; a * b",
-                "-2 * -3").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                        () -> context.eval(code).toJavaObject()));
+                "-2 * -3");
     }
 
     @Test
@@ -461,13 +444,10 @@ public class MathObjectTest extends BaseJavetTest {
 
     @Test
     public void testSubtract() {
-        Stream.of(
+        assertIntegerWithJavet(
                 "1 - 1",
                 "var a = 1; var b = 2; a - b",
-                "2**32 - 2**32").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                        () -> context.eval(code).toJavaObject()));
+                "2**32 - 2**32");
     }
 
     @Test

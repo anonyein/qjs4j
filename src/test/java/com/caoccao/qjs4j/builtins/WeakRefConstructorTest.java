@@ -29,44 +29,34 @@ public class WeakRefConstructorTest extends BaseJavetTest {
     @Test
     public void testConstruct() {
         // Normal case: create WeakRef with new
-        String code = """
+        assertBooleanWithJavet("""
                 var obj = {};
                 var ref = new WeakRef(obj);
-                ref.deref() === obj;""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject());
+                ref.deref() === obj;""");
     }
 
     @Test
     public void testCreateWeakRef() {
         // Verify WeakRef can be created
-        String code1 = """
+        assertStringWithJavet("""
                 var obj = {};
                 var ref = new WeakRef(obj);
-                typeof ref;""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code1).executeString(),
-                () -> context.eval(code1).toJavaObject());
+                typeof ref;""");
 
         // Test deref returns the target
-        String code2 = """
+        assertIntegerWithJavet("""
                 var obj = { x: 42 };
                 var ref = new WeakRef(obj);
-                ref.deref().x;""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code2).executeInteger().doubleValue(),
-                () -> context.eval(code2).toJavaObject());
+                ref.deref().x;""");
 
         // Edge case: target is null
         assertErrorWithJavet("new WeakRef(null);");
 
         // Edge case: target is not an object
-        Stream.of(
+        assertErrorWithJavet(
                 "new WeakRef('string');",
                 "new WeakRef(42);",
                 "new WeakRef(true);",
-                "new WeakRef(undefined);"
-        ).forEach(this::assertErrorWithJavet);
+                "new WeakRef(undefined);");
     }
 }

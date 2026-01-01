@@ -36,88 +36,63 @@ public class SymbolObjectTest extends BaseJavetTest {
     @Test
     public void testSymbolObjectCoercion() {
         // Symbol objects should behave like objects in boolean context
-        String code1 = "Boolean(Object(Symbol('test')));";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code1).executeBoolean(),
-                () -> context.eval(code1).toJavaObject());
+        assertBooleanWithJavet("Boolean(Object(Symbol('test')));");
 
         // Symbol object toString should work
-        String code2 = "Object(Symbol('test')).toString();";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code2).executeString(),
-                () -> context.eval(code2).toJavaObject());
+        assertStringWithJavet("Object(Symbol('test')).toString();");
     }
 
     @Test
     public void testSymbolObjectDescription() {
         // Test description property access
-        String code = """
+        assertStringWithJavet("""
                 var sym = Object(Symbol('test description'));
-                sym.description""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                sym.description""");
     }
 
     @Test
     public void testSymbolObjectEquality() {
         // Test equality comparisons
-        Stream.of(
+        assertBooleanWithJavet(
                 "var symObj1 = Object(Symbol('test')); var symObj2 = symObj1; symObj1 === symObj2;",
                 "var symObj1 = Object(Symbol('test')); var symObj2 = Object(Symbol('test')); symObj1 === symObj2;",
-                "var symObj = Object(Symbol('test')); var sym = symObj.valueOf(); symObj === sym;"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
+                "var symObj = Object(Symbol('test')); var sym = symObj.valueOf(); symObj === sym;");
     }
 
     @Test
     public void testSymbolObjectInObject() {
         // Test creating symbol object
-        String code = """
+        assertBooleanWithJavet("""
                 var symObj = Object(Symbol('prop'));
-                symObj instanceof Symbol""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject());
+                symObj instanceof Symbol""");
     }
 
     @Test
     public void testSymbolObjectInstanceof() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "Object(Symbol('test')) instanceof Symbol;",
-                "Object(Symbol('test')) instanceof Object;").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
+                "Object(Symbol('test')) instanceof Object;");
     }
 
     @Test
     public void testSymbolObjectPrototypeChain() {
         // Verify prototype chain
-        String code = """
+        assertBooleanWithJavet("""
                 var symObj = Object(Symbol('test'));
-                Object.getPrototypeOf(symObj) === Symbol.prototype""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject());
+                Object.getPrototypeOf(symObj) === Symbol.prototype""");
     }
 
     @Test
     public void testSymbolObjectToString() {
-        Stream.of(
+        assertStringWithJavet(
                 "Object(Symbol('foo')).toString();",
                 "Object(Symbol()).toString();",
-                "Object(Symbol('')).toString();").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeString(),
-                        () -> context.eval(code).toJavaObject()));
+                "Object(Symbol('')).toString();");
     }
 
     @Test
     public void testSymbolObjectTypeof() {
-        Stream.of(
+        assertStringWithJavet(
                 // typeof on Symbol object should return "object", not "symbol"
                 "typeof Object(Symbol('test'));",
                 "typeof Object(Symbol('foo'));",
@@ -125,39 +100,29 @@ public class SymbolObjectTest extends BaseJavetTest {
                 // Compare with primitive symbol
                 "typeof Symbol('test');",
                 "var symObj = Object(Symbol('key')); typeof symObj;",
-                "var sym = Symbol('key'); typeof sym;"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeString(),
-                        () -> context.eval(code).toJavaObject()));
+                "var sym = Symbol('key'); typeof sym;");
     }
 
     @Test
     public void testSymbolObjectUniqueness() {
         // Each Symbol() call creates a unique symbol, wrapped in different objects
-        String code = """
+        assertBooleanWithJavet("""
                 var sym1 = Object(Symbol('same'));
                 var sym2 = Object(Symbol('same'));
-                sym1 === sym2;""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject());
+                sym1 === sym2;""");
     }
 
     @Test
     public void testSymbolObjectValueOf() {
         // valueOf() should return the primitive symbol value, verify the type
-        String code = """
+        assertStringWithJavet("""
                 var symObj = Object(Symbol('test'));
-                typeof symObj.valueOf();""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                typeof symObj.valueOf();""");
     }
 
     @Test
     public void testSymbolObjectWithDifferentDescriptions() {
-        Stream.of(
+        assertStringWithJavet(
                 // Test with string description
                 "Object(Symbol('test')).description;",
                 // Test with numeric description (should be converted to string)
@@ -169,19 +134,12 @@ public class SymbolObjectTest extends BaseJavetTest {
                 // Test with null description (should convert to \"null\")
                 "Object(Symbol(null)).description;",
                 // Test with empty string
-                "Object(Symbol('')).description;"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeObject(),
-                        () -> context.eval(code).toJavaObject()));
+                "Object(Symbol('')).description;");
     }
 
     @Test
     public void testSymbolObjectWithWellKnownSymbols() {
         // Test wrapping well-known symbols with Object() - verify the type
-        String code = "typeof Object(Symbol.iterator);";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("typeof Object(Symbol.iterator);");
     }
 }

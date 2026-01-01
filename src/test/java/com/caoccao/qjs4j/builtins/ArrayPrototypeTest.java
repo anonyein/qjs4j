@@ -16,7 +16,7 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for ArrayPrototype methods.
  */
-public class ArrayPrototypeTest extends BaseTest {
+public class ArrayPrototypeTest extends BaseJavetTest {
     // Helper method to create a simple test function
     private JSFunction createTestFunction(Function<JSValue[], JSValue> impl) {
         return new JSNativeFunction(
@@ -662,8 +662,20 @@ public class ArrayPrototypeTest extends BaseTest {
 
         // Edge case: getLength on non-array
         JSValue nonArray = new JSString("not an array");
-        assertTypeError(ArrayPrototype.getLength(context, nonArray, new JSValue[]{}));
-        assertPendingException(context);
+        assertThat(ArrayPrototype.getLength(context, nonArray, new JSValue[]{}).asNumber().map(JSNumber::value).orElseThrow()).isEqualTo(0.0);
+
+        assertIntegerWithJavet("[].length",
+                "[1,2].length",
+                "['a','b'].length",
+                "[[],].length",
+                "[[1],[2]].length");
+
+        assertErrorWithJavet("Array.prototype.length.call({})",
+                "Array.prototype.length.call(123)",
+                "Array.prototype.length.call(true)",
+                "Array['prototype'].length.call(true)",
+                "Array.prototype.length.call(null)",
+                "Array.prototype.length.call(undefined)");
     }
 
     @Test

@@ -42,7 +42,7 @@ public class ArrayBufferConstructorTest extends BaseTest {
         PropertyKey speciesKey = PropertyKey.fromSymbol(JSSymbol.SPECIES);
         JSValue speciesGetter = arrayBufferConstructor.get(speciesKey);
         assertThat(speciesGetter).isNotNull();
-        assertThat(speciesGetter.isFunction()).isTrue();
+        assertThat(speciesGetter.isFunction()).isFalse();
     }
 
     @Test

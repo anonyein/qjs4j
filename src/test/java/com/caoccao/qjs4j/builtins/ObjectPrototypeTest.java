@@ -221,13 +221,10 @@ public class ObjectPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testSet() {
-        String code = """
+        assertStringWithJavet("""
                 const obj = {};
                 obj.a = 1;
-                JSON.stringify(obj);""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                JSON.stringify(obj);""");
     }
 
     @Test

@@ -49,8 +49,11 @@ public final class PropertyDescriptor {
     /**
      * Create an accessor descriptor.
      */
-    public static PropertyDescriptor accessorDescriptor(JSFunction getter, JSFunction setter,
-                                                        boolean enumerable, boolean configurable) {
+    public static PropertyDescriptor accessorDescriptor(
+            JSFunction getter,
+            JSFunction setter,
+            boolean enumerable,
+            boolean configurable) {
         PropertyDescriptor desc = new PropertyDescriptor();
         if (getter != null) desc.setGetter(getter);
         if (setter != null) desc.setSetter(setter);
@@ -62,8 +65,11 @@ public final class PropertyDescriptor {
     /**
      * Create a data descriptor.
      */
-    public static PropertyDescriptor dataDescriptor(JSValue value, boolean writable,
-                                                    boolean enumerable, boolean configurable) {
+    public static PropertyDescriptor dataDescriptor(
+            JSValue value,
+            boolean writable,
+            boolean enumerable,
+            boolean configurable) {
         PropertyDescriptor desc = new PropertyDescriptor();
         desc.setValue(value);
         desc.setWritable(writable);

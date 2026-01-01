@@ -386,9 +386,9 @@ public final class GlobalObject {
                 PropertyDescriptor.accessorDescriptor(resizableGetter, null, false, true));
 
         // Symbol.toStringTag
-        arrayBufferPrototype.set(
-                PropertyKey.fromSymbol(JSSymbol.TO_STRING_TAG),
-                new JSNativeFunction("get [Symbol.toStringTag]", 0, ArrayBufferPrototype::getToStringTag));
+        JSNativeFunction toStringTagGetter = new JSNativeFunction("get [Symbol.toStringTag]", 0, ArrayBufferPrototype::getToStringTag);
+        arrayBufferPrototype.defineProperty(PropertyKey.fromSymbol(JSSymbol.TO_STRING_TAG),
+                PropertyDescriptor.accessorDescriptor(toStringTagGetter, null, false, true));
 
         // Create ArrayBuffer constructor
         JSObject arrayBufferConstructor = new JSObject();
@@ -400,9 +400,9 @@ public final class GlobalObject {
         arrayBufferConstructor.set("isView", new JSNativeFunction("isView", 1, ArrayBufferConstructor::isView));
 
         // Symbol.species getter
-        arrayBufferConstructor.set(
-                PropertyKey.fromSymbol(JSSymbol.SPECIES),
-                new JSNativeFunction("get [Symbol.species]", 0, ArrayBufferConstructor::getSpecies));
+        JSNativeFunction speciesGetter = new JSNativeFunction("get [Symbol.species]", 0, ArrayBufferConstructor::getSpecies);
+        arrayBufferConstructor.defineProperty(PropertyKey.fromSymbol(JSSymbol.SPECIES),
+                PropertyDescriptor.accessorDescriptor(speciesGetter, null, false, true));
 
         global.set("ArrayBuffer", arrayBufferConstructor);
     }
@@ -455,13 +455,14 @@ public final class GlobalObject {
         arrayPrototype.set("copyWithin", new JSNativeFunction("copyWithin", 2, ArrayPrototype::copyWithin));
         arrayPrototype.set("fill", new JSNativeFunction("fill", 1, ArrayPrototype::fill));
 
-        // Array.prototype.length getter
-        arrayPrototype.set("length", new JSNativeFunction("get length", 0, ArrayPrototype::getLength));
+        // Array.prototype.length is a data property with value 0 (not writable, not enumerable, not configurable)
+        arrayPrototype.defineProperty(PropertyKey.fromString("length"),
+                PropertyDescriptor.dataDescriptor(new JSNumber(0), false, false, false));
 
         // Array.prototype[Symbol.unscopables]
-        arrayPrototype.set(
-                PropertyKey.fromSymbol(JSSymbol.UNSCOPABLES),
-                new JSNativeFunction("get [Symbol.unscopables]", 0, ArrayPrototype::getSymbolUnscopables));
+        JSNativeFunction unscopablesGetter = new JSNativeFunction("get [Symbol.unscopables]", 0, ArrayPrototype::getSymbolUnscopables);
+        arrayPrototype.defineProperty(PropertyKey.fromSymbol(JSSymbol.UNSCOPABLES),
+                PropertyDescriptor.accessorDescriptor(unscopablesGetter, null, false, true));
 
         // Create Array constructor with static methods
         JSObject arrayConstructor = new JSObject();
@@ -476,9 +477,9 @@ public final class GlobalObject {
         arrayConstructor.set("fromAsync", new JSNativeFunction("fromAsync", 1, ArrayConstructor::fromAsync));
 
         // Symbol.species getter
-        arrayConstructor.set(
-                PropertyKey.fromSymbol(JSSymbol.SPECIES),
-                new JSNativeFunction("get [Symbol.species]", 0, ArrayConstructor::getSpecies));
+        JSNativeFunction arraySpeciesGetter = new JSNativeFunction("get [Symbol.species]", 0, ArrayConstructor::getSpecies);
+        arrayConstructor.defineProperty(PropertyKey.fromSymbol(JSSymbol.SPECIES),
+                PropertyDescriptor.accessorDescriptor(arraySpeciesGetter, null, false, true));
 
         global.set("Array", arrayConstructor);
     }
@@ -783,6 +784,11 @@ public final class GlobalObject {
         // Map.prototype[Symbol.iterator] is the same as entries()
         mapPrototype.set(PropertyKey.fromSymbol(JSSymbol.ITERATOR), new JSNativeFunction("[Symbol.iterator]", 0, IteratorPrototype::mapEntriesIterator));
 
+        // Map.prototype.size getter
+        JSNativeFunction mapSizeGetter = new JSNativeFunction("get size", 0, MapPrototype::getSize);
+        mapPrototype.defineProperty(PropertyKey.fromString("size"),
+                PropertyDescriptor.accessorDescriptor(mapSizeGetter, null, false, true));
+
         // Create Map constructor
         JSObject mapConstructor = new JSObject();
         mapConstructor.set("prototype", mapPrototype);
@@ -1024,6 +1030,11 @@ public final class GlobalObject {
         // Set.prototype[Symbol.iterator] is the same as values()
         setPrototype.set(PropertyKey.fromSymbol(JSSymbol.ITERATOR), new JSNativeFunction("[Symbol.iterator]", 0, IteratorPrototype::setValuesIterator));
 
+        // Set.prototype.size getter
+        JSNativeFunction setSizeGetter = new JSNativeFunction("get size", 0, SetPrototype::getSize);
+        setPrototype.defineProperty(PropertyKey.fromString("size"),
+                PropertyDescriptor.accessorDescriptor(setSizeGetter, null, false, true));
+
         // Create Set constructor
         JSObject setConstructor = new JSObject();
         setConstructor.set("prototype", setPrototype);
@@ -1066,37 +1077,41 @@ public final class GlobalObject {
     private static void initializeStringConstructor(JSContext context, JSObject global) {
         // Create String.prototype
         JSObject stringPrototype = new JSObject();
+        stringPrototype.set("at", new JSNativeFunction("at", 1, StringPrototype::at));
         stringPrototype.set("charAt", new JSNativeFunction("charAt", 1, StringPrototype::charAt));
         stringPrototype.set("charCodeAt", new JSNativeFunction("charCodeAt", 1, StringPrototype::charCodeAt));
-        stringPrototype.set("at", new JSNativeFunction("at", 1, StringPrototype::at));
         stringPrototype.set("codePointAt", new JSNativeFunction("codePointAt", 1, StringPrototype::codePointAt));
         stringPrototype.set("concat", new JSNativeFunction("concat", 1, StringPrototype::concat));
         stringPrototype.set("endsWith", new JSNativeFunction("endsWith", 1, StringPrototype::endsWith));
-        stringPrototype.set("startsWith", new JSNativeFunction("startsWith", 1, StringPrototype::startsWith));
         stringPrototype.set("includes", new JSNativeFunction("includes", 1, StringPrototype::includes));
         stringPrototype.set("indexOf", new JSNativeFunction("indexOf", 1, StringPrototype::indexOf));
         stringPrototype.set("lastIndexOf", new JSNativeFunction("lastIndexOf", 1, StringPrototype::lastIndexOf));
+        stringPrototype.set("match", new JSNativeFunction("match", 1, StringPrototype::match));
+        stringPrototype.set("matchAll", new JSNativeFunction("matchAll", 1, StringPrototype::matchAll));
         stringPrototype.set("padEnd", new JSNativeFunction("padEnd", 1, StringPrototype::padEnd));
         stringPrototype.set("padStart", new JSNativeFunction("padStart", 1, StringPrototype::padStart));
         stringPrototype.set("repeat", new JSNativeFunction("repeat", 1, StringPrototype::repeat));
         stringPrototype.set("replace", new JSNativeFunction("replace", 2, StringPrototype::replace));
         stringPrototype.set("replaceAll", new JSNativeFunction("replaceAll", 2, StringPrototype::replaceAll));
-        stringPrototype.set("match", new JSNativeFunction("match", 1, StringPrototype::match));
-        stringPrototype.set("matchAll", new JSNativeFunction("matchAll", 1, StringPrototype::matchAll));
         stringPrototype.set("search", new JSNativeFunction("search", 1, StringPrototype::search));
         stringPrototype.set("slice", new JSNativeFunction("slice", 2, StringPrototype::slice));
         stringPrototype.set("split", new JSNativeFunction("split", 2, StringPrototype::split));
-        stringPrototype.set("substring", new JSNativeFunction("substring", 2, StringPrototype::substring));
+        stringPrototype.set("startsWith", new JSNativeFunction("startsWith", 1, StringPrototype::startsWith));
         stringPrototype.set("substr", new JSNativeFunction("substr", 2, StringPrototype::substr));
+        stringPrototype.set("substring", new JSNativeFunction("substring", 2, StringPrototype::substring));
         stringPrototype.set("toLowerCase", new JSNativeFunction("toLowerCase", 0, StringPrototype::toLowerCase));
+        stringPrototype.set("toString", new JSNativeFunction("toString", 0, StringPrototype::toString_));
         stringPrototype.set("toUpperCase", new JSNativeFunction("toUpperCase", 0, StringPrototype::toUpperCase));
         stringPrototype.set("trim", new JSNativeFunction("trim", 0, StringPrototype::trim));
-        stringPrototype.set("trimStart", new JSNativeFunction("trimStart", 0, StringPrototype::trimStart));
         stringPrototype.set("trimEnd", new JSNativeFunction("trimEnd", 0, StringPrototype::trimEnd));
-        stringPrototype.set("toString", new JSNativeFunction("toString", 0, StringPrototype::toString_));
+        stringPrototype.set("trimStart", new JSNativeFunction("trimStart", 0, StringPrototype::trimStart));
         stringPrototype.set("valueOf", new JSNativeFunction("valueOf", 0, StringPrototype::valueOf));
         // String.prototype[Symbol.iterator]
         stringPrototype.set(PropertyKey.fromSymbol(JSSymbol.ITERATOR), new JSNativeFunction("[Symbol.iterator]", 0, IteratorPrototype::stringIterator));
+
+        // String.prototype.length is a data property with value 0 (not writable, not enumerable, not configurable)
+        stringPrototype.defineProperty(PropertyKey.fromString("length"),
+                PropertyDescriptor.dataDescriptor(new JSNumber(0), false, false, false));
 
         // Create String constructor
         JSNativeFunction stringConstructor = new JSNativeFunction("String", 1, StringConstructor::call);

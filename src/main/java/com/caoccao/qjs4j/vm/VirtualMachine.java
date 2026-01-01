@@ -21,6 +21,7 @@ import com.caoccao.qjs4j.builtins.SharedArrayBufferConstructor;
 import com.caoccao.qjs4j.builtins.SymbolConstructor;
 import com.caoccao.qjs4j.core.*;
 import com.caoccao.qjs4j.exceptions.JSException;
+import com.caoccao.qjs4j.exceptions.JSVirtualMachineException;
 
 /**
  * The JavaScript virtual machine bytecode interpreter.
@@ -28,15 +29,19 @@ import com.caoccao.qjs4j.exceptions.JSException;
  */
 public final class VirtualMachine {
     private final JSContext context;
+    private final StringBuilder propertyAccessChain;  // Track last property access for better error messages
     private final CallStack valueStack;
     private StackFrame currentFrame;
     private JSValue pendingException;
+    private boolean propertyAccessLock;  // When true, don't update lastPropertyAccess (during argument evaluation)
 
     public VirtualMachine(JSContext context) {
         this.valueStack = new CallStack();
         this.context = context;
         this.currentFrame = null;
         this.pendingException = null;
+        this.propertyAccessChain = new StringBuilder();
+        this.propertyAccessLock = false;
     }
 
     /**
@@ -46,8 +51,6 @@ public final class VirtualMachine {
     public void clearPendingException() {
         this.pendingException = null;
     }
-
-    // ==================== Arithmetic Operation Handlers ====================
 
     /**
      * Execute a bytecode function.
@@ -100,7 +103,7 @@ public final class VirtualMachine {
                     if (!foundHandler) {
                         // No handler found - propagate exception
                         currentFrame = previousFrame;
-                        throw new VMException("Unhandled exception: " + exception);
+                        throw new JSVirtualMachineException("Unhandled exception: " + exception);
                     }
 
                     // Continue execution at catch handler
@@ -112,7 +115,7 @@ public final class VirtualMachine {
 
                 switch (op) {
                     // ==================== Constants and Literals ====================
-                    case INVALID -> throw new VMException("Invalid opcode at PC " + pc);
+                    case INVALID -> throw new JSVirtualMachineException("Invalid opcode at PC " + pc);
                     case PUSH_I32 -> {
                         valueStack.push(new JSNumber(bytecode.readI32(pc + 1)));
                         pc += op.getSize();
@@ -193,6 +196,9 @@ public final class VirtualMachine {
                         JSValue v2 = valueStack.pop();
                         valueStack.push(v1);
                         valueStack.push(v2);
+                        // After SWAP in a method call, we're evaluating arguments
+                        // Lock property access tracking to preserve the callee's property chain
+                        propertyAccessLock = true;
                         pc += op.getSize();
                     }
                     case ROT3L -> {
@@ -342,6 +348,11 @@ public final class VirtualMachine {
                         int getVarAtom = bytecode.readU32(pc + 1);
                         String getVarName = bytecode.getAtoms()[getVarAtom];
                         JSValue varValue = context.getGlobalObject().get(PropertyKey.fromString(getVarName));
+                        // Start tracking property access from variable name (unless locked)
+                        if (!propertyAccessLock) {
+                            resetPropertyAccessTracking();
+                            propertyAccessChain.append(getVarName);
+                        }
                         valueStack.push(varValue);
                         pc += op.getSize();
                     }
@@ -386,8 +397,17 @@ public final class VirtualMachine {
                         // Auto-box primitives to access their prototype methods
                         JSObject targetObj = toObject(obj);
                         if (targetObj != null) {
-                            valueStack.push(targetObj.get(PropertyKey.fromString(fieldName), context));
+                            JSValue result = targetObj.get(PropertyKey.fromString(fieldName), context);
+                            // Track property access for better error messages (unless locked)
+                            if (!propertyAccessLock) {
+                                if (!propertyAccessChain.isEmpty()) {
+                                    propertyAccessChain.append('.');
+                                }
+                                propertyAccessChain.append(fieldName);
+                            }
+                            valueStack.push(result);
                         } else {
+                            resetPropertyAccessTracking();
                             valueStack.push(JSUndefined.INSTANCE);
                         }
                         pc += op.getSize();
@@ -411,8 +431,28 @@ public final class VirtualMachine {
                         JSObject targetObj = toObject(arrayObj);
                         if (targetObj != null) {
                             PropertyKey key = PropertyKey.fromValue(context, index);
-                            valueStack.push(targetObj.get(key, context));
+                            JSValue result = targetObj.get(key, context);
+                            // Track property access for better error messages (unless locked)
+                            if (!propertyAccessLock) {
+                                if (index instanceof JSString jsString) {
+                                    String propertyName = jsString.value();
+                                    if (!propertyAccessChain.isEmpty()) {
+                                        propertyAccessChain.append('.');
+                                    }
+                                    propertyAccessChain.append(propertyName);
+                                } else if (index instanceof JSNumber jsNumber) {
+                                    String propertyName = JSTypeConversions.toString(context, jsNumber).value();
+                                    if (!propertyAccessChain.isEmpty()) {
+                                        propertyAccessChain.append('.');
+                                    }
+                                    propertyAccessChain.append(propertyName);
+                                } else if (index instanceof JSSymbol jsSymbol) {
+                                    propertyAccessChain.append("[Symbol.").append(jsSymbol.getDescription()).append("]");
+                                }
+                            }
+                            valueStack.push(result);
                         } else {
+                            resetPropertyAccessTracking();
                             valueStack.push(JSUndefined.INSTANCE);
                         }
                         pc += op.getSize();
@@ -564,10 +604,10 @@ public final class VirtualMachine {
                     }
 
                     // ==================== Other Operations ====================
-                    default -> throw new VMException("Unimplemented opcode: " + op + " at PC " + pc);
+                    default -> throw new JSVirtualMachineException("Unimplemented opcode: " + op + " at PC " + pc);
                 }
             }
-        } catch (VMException e) {
+        } catch (JSVirtualMachineException e) {
             // Restore stack and strict mode on exception
             valueStack.setStackTop(savedStackTop);
             currentFrame = previousFrame;
@@ -586,9 +626,11 @@ public final class VirtualMachine {
             } else {
                 context.exitStrictMode();
             }
-            throw new VMException("VM error: " + e.getMessage(), e);
+            throw new JSVirtualMachineException("VM error: " + e.getMessage(), e);
         }
     }
+
+    // ==================== Arithmetic Operation Handlers ====================
 
     private void handleAdd() {
         JSValue right = valueStack.pop();
@@ -653,6 +695,7 @@ public final class VirtualMachine {
         if (callee instanceof JSProxy proxy) {
             JSValue result = proxyApply(proxy, receiver, args);
             valueStack.push(result);
+            resetPropertyAccessTracking();
             return;
         }
 
@@ -694,8 +737,28 @@ public final class VirtualMachine {
             } else {
                 valueStack.push(JSUndefined.INSTANCE);
             }
+            // Clear property access tracking after successful call
+            resetPropertyAccessTracking();
         } else {
-            throw new VMException("Cannot call non-function value");
+            // Not a function - throw TypeError
+            // Generate a descriptive error message similar to V8/QuickJS
+            String message;
+            if (!propertyAccessChain.isEmpty()) {
+                // Use the tracked property access for better error messages
+                message = propertyAccessChain + " is not a function";
+            } else if (callee instanceof JSUndefined) {
+                message = "undefined is not a function";
+            } else if (callee instanceof JSNull) {
+                message = "null is not a function";
+            } else if (callee instanceof JSNumber) {
+                message = callee.toJavaObject() + " is not a function";
+            } else if (callee instanceof JSString str) {
+                message = "'" + str.value() + "' is not a function";
+            } else {
+                message = JSTypeChecking.typeof(callee) + " is not a function";
+            }
+            resetPropertyAccessTracking();
+            throw new JSVirtualMachineException(context.throwTypeError(message));
         }
     }
 
@@ -845,7 +908,7 @@ public final class VirtualMachine {
                             errorMsg = msgStr.value();
                         }
                     }
-                    throw new VMException(errorMsg);
+                    throw new JSVirtualMachineException(errorMsg);
                 }
             } else if (constructor instanceof JSBytecodeFunction bytecodeFunc) {
                 result = execute(bytecodeFunc, newObj, args);
@@ -1400,10 +1463,10 @@ public final class VirtualMachine {
 
                 valueStack.push(errorObj);
             } else {
-                throw new VMException("Cannot construct non-function value");
+                throw new JSVirtualMachineException("Cannot construct non-function value");
             }
         } else {
-            throw new VMException("Cannot construct non-function value");
+            throw new JSVirtualMachineException("Cannot construct non-function value");
         }
     }
 
@@ -1438,14 +1501,14 @@ public final class VirtualMachine {
         valueStack.push(JSBoolean.valueOf(result));
     }
 
-    // ==================== Bitwise Operation Handlers ====================
-
     private void handleExp() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         double result = Math.pow(JSTypeConversions.toNumber(context, left).value(), JSTypeConversions.toNumber(context, right).value());
         valueStack.push(new JSNumber(result));
     }
+
+    // ==================== Bitwise Operation Handlers ====================
 
     private void handleGt() {
         JSValue right = valueStack.pop();
@@ -1485,7 +1548,7 @@ public final class VirtualMachine {
 
         // Per ECMAScript spec, right must be an object
         if (!(right instanceof JSObject constructor)) {
-            throw new VMException("Right-hand side of instanceof is not an object");
+            throw new JSVirtualMachineException("Right-hand side of instanceof is not an object");
         }
 
         // Get the prototype property from the constructor (right operand)
@@ -1529,13 +1592,13 @@ public final class VirtualMachine {
         }
     }
 
-    // ==================== Comparison Operation Handlers ====================
-
     private void handleLogicalNot() {
         JSValue operand = valueStack.pop();
         boolean result = JSTypeConversions.toBoolean(operand) == JSBoolean.FALSE;
         valueStack.push(JSBoolean.valueOf(result));
     }
+
+    // ==================== Comparison Operation Handlers ====================
 
     private void handleLogicalOr() {
         JSValue right = valueStack.pop();
@@ -1607,14 +1670,14 @@ public final class VirtualMachine {
         }
     }
 
-    // ==================== Logical Operation Handlers ====================
-
     private void handleOr() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         int result = JSTypeConversions.toInt32(context, left) | JSTypeConversions.toInt32(context, right);
         valueStack.push(new JSNumber(result));
     }
+
+    // ==================== Logical Operation Handlers ====================
 
     private void handlePlus() {
         JSValue operand = valueStack.pop();
@@ -1638,8 +1701,6 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber(leftInt << (rightInt & 0x1F)));
     }
 
-    // ==================== Type Operation Handlers ====================
-
     private void handleShr() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
@@ -1648,14 +1709,14 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber((leftInt >>> (rightInt & 0x1F)) & 0xFFFFFFFFL));
     }
 
+    // ==================== Type Operation Handlers ====================
+
     private void handleStrictEq() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         boolean result = JSTypeConversions.strictEquals(left, right);
         valueStack.push(JSBoolean.valueOf(result));
     }
-
-    // ==================== Async Operation Handlers ====================
 
     private void handleStrictNeq() {
         JSValue right = valueStack.pop();
@@ -1664,7 +1725,7 @@ public final class VirtualMachine {
         valueStack.push(JSBoolean.valueOf(result));
     }
 
-    // ==================== Function Call Handlers ====================
+    // ==================== Async Operation Handlers ====================
 
     private void handleSub() {
         JSValue right = valueStack.pop();
@@ -1672,6 +1733,8 @@ public final class VirtualMachine {
         double result = JSTypeConversions.toNumber(context, left).value() - JSTypeConversions.toNumber(context, right).value();
         valueStack.push(new JSNumber(result));
     }
+
+    // ==================== Function Call Handlers ====================
 
     private void handleTypeof() {
         JSValue operand = valueStack.pop();
@@ -1833,6 +1896,11 @@ public final class VirtualMachine {
         return result;
     }
 
+    private void resetPropertyAccessTracking() {
+        this.propertyAccessChain.setLength(0);
+        this.propertyAccessLock = false;
+    }
+
     /**
      * Convert a value to an object (auto-boxing for primitives).
      * Returns null for null and undefined.
@@ -1861,6 +1929,10 @@ public final class VirtualMachine {
                     wrapper.setPrototype(protoObj);
                     // Store the primitive value
                     wrapper.setPrimitiveValue(str);
+                    // Add length property as own property (shadows prototype's length)
+                    // This is a data property with the actual string length
+                    wrapper.defineProperty(PropertyKey.fromString("length"),
+                            PropertyDescriptor.dataDescriptor(new JSNumber(str.value().length()), false, false, false));
                     return wrapper;
                 }
             }
@@ -1926,18 +1998,5 @@ public final class VirtualMachine {
         }
 
         return null;
-    }
-
-    /**
-     * VM exception for runtime errors.
-     */
-    public static class VMException extends RuntimeException {
-        public VMException(String message) {
-            super(message);
-        }
-
-        public VMException(String message, Throwable cause) {
-            super(message, cause);
-        }
     }
 }

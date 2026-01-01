@@ -16,8 +16,8 @@
 
 package com.caoccao.qjs4j.core;
 
+import com.caoccao.qjs4j.exceptions.JSVirtualMachineException;
 import com.caoccao.qjs4j.vm.Bytecode;
-import com.caoccao.qjs4j.vm.VirtualMachine;
 
 /**
  * Represents a JavaScript function compiled to bytecode.
@@ -117,7 +117,7 @@ public final class JSBytecodeFunction extends JSFunction {
 
                 // Otherwise, wrap the result in a fulfilled promise
                 promise.fulfill(result);
-            } catch (VirtualMachine.VMException e) {
+            } catch (JSVirtualMachineException e) {
                 // VM exception during async function execution
                 // Check if there's a pending exception in the context
                 if (context.hasPendingException()) {

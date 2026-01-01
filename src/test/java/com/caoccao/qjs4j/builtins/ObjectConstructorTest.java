@@ -62,10 +62,7 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertTypeError(ObjectConstructor.assign(context, JSUndefined.INSTANCE, new JSValue[]{JSNull.INSTANCE}));
         assertPendingException(context);
 
-        String code = "var target = {a: 1}; Object.assign(target, {b: 2}, {c: 3}); JSON.stringify(target)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("var target = {a: 1}; Object.assign(target, {b: 2}, {c: 3}); JSON.stringify(target)");
     }
 
     @Test
@@ -97,16 +94,13 @@ public class ObjectConstructorTest extends BaseJavetTest {
 
     @Test
     public void testDefineProperties() {
-        String code = """
+        assertStringWithJavet("""
                 var obj = {};
                 Object.defineProperties(obj, {
                   x: {value: 1, writable: true, enumerable: true},
                   y: {value: 2, writable: false, enumerable: true}
                 });
-                JSON.stringify({x: obj.x, y: obj.y})""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                JSON.stringify({x: obj.x, y: obj.y})""");
     }
 
     @Test
@@ -120,12 +114,9 @@ public class ObjectConstructorTest extends BaseJavetTest {
         descriptor.set("enumerable", JSBoolean.TRUE);
         descriptor.set("configurable", JSBoolean.TRUE);
 
-        Stream.of(
+        assertIntegerWithJavet(
                 "var obj = {}; Object.defineProperty(obj, 'x', {value: 42, writable: true}); obj.x",
-                "var obj2 = {}; Object.defineProperty(obj2, 'y', {value: 100}); obj2.y").forEach(
-                code -> assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                        () -> context.eval(code).toJavaObject()));
+                "var obj2 = {}; Object.defineProperty(obj2, 'y', {value: 100}); obj2.y");
     }
 
     @Test
@@ -156,12 +147,9 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertTypeError(ObjectConstructor.entries(context, JSUndefined.INSTANCE, new JSValue[]{}));
         assertPendingException(context);
 
-        String code = """
+        assertStringWithJavet("""
                 var obj = {a: 1, b: 2, c: 3};
-                JSON.stringify(Object.entries(obj))""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                JSON.stringify(Object.entries(obj))""");
     }
 
     @Test
@@ -265,13 +253,10 @@ public class ObjectConstructorTest extends BaseJavetTest {
 
     @Test
     public void testGetOwnPropertyDescriptors() {
-        String code = """
+        assertIntegerWithJavet("""
                 var obj = {a: 1, b: 2};
                 var descs = Object.getOwnPropertyDescriptors(obj);
-                descs.a.value + descs.b.value""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+                descs.a.value + descs.b.value""");
     }
 
     @Test
@@ -355,12 +340,9 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertTypeError(ObjectConstructor.getPrototypeOf(context, JSUndefined.INSTANCE, new JSValue[]{new JSString("not object")}));
         assertPendingException(context);
 
-        String code = """
+        assertBooleanWithJavet("""
                 var proto = {x: 10}; var newObj = Object.create(proto);
-                Object.getPrototypeOf(newObj) === proto""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject());
+                Object.getPrototypeOf(newObj) === proto""");
     }
 
     @Test
@@ -470,7 +452,7 @@ public class ObjectConstructorTest extends BaseJavetTest {
 
     @Test
     public void testIs() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "Object.is(42, 42)",
                 "Object.is('hello', 'hello')",
                 "Object.is(true, true)",
@@ -482,23 +464,16 @@ public class ObjectConstructorTest extends BaseJavetTest {
                 "Object.is(0, -0)",
                 "Object.is(0, 0)",
                 "var obj = {}; Object.is(obj, obj)",
-                "Object.is({}, {})").forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
+                "Object.is({}, {})");
     }
 
     @Test
     public void testIsExtensible() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "var obj = {}; Object.isExtensible(obj)",
                 "var obj2 = {}; Object.preventExtensions(obj2); Object.isExtensible(obj2)",
                 "var obj3 = {}; Object.seal(obj3); Object.isExtensible(obj3)",
-                "var obj4 = {}; Object.freeze(obj4); Object.isExtensible(obj4)"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
+                "var obj4 = {}; Object.freeze(obj4); Object.isExtensible(obj4)");
     }
 
     @Test
@@ -563,10 +538,7 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertTypeError(ObjectConstructor.keys(context, JSUndefined.INSTANCE, new JSValue[]{JSNull.INSTANCE}));
         assertPendingException(context);
 
-        String code = "var obj = {a: 1, b: 2, c: 3}; JSON.stringify(Object.keys(obj))";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("var obj = {a: 1, b: 2, c: 3}; JSON.stringify(Object.keys(obj))");
     }
 
     @Test
@@ -651,9 +623,6 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertTypeError(ObjectConstructor.values(context, JSUndefined.INSTANCE, new JSValue[]{}));
         assertPendingException(context);
 
-        String code = "var obj = {a: 1, b: 2, c: 3}; JSON.stringify(Object.values(obj))";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("var obj = {a: 1, b: 2, c: 3}; JSON.stringify(Object.values(obj))");
     }
 }

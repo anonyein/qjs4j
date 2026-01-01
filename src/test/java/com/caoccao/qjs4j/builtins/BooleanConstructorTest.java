@@ -17,14 +17,7 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.BaseJavetTest;
-import com.caoccao.qjs4j.core.JSBoolean;
-import com.caoccao.qjs4j.core.JSBooleanObject;
-import com.caoccao.qjs4j.core.JSValue;
 import org.junit.jupiter.api.Test;
-
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for Boolean constructor.
@@ -33,70 +26,50 @@ public class BooleanConstructorTest extends BaseJavetTest {
 
     @Test
     public void testBooleanConstructorWithDifferentValues() {
-        Stream.of(
+        assertBooleanObjectWithJavet(
                 // Test with truthy values
-                "new Boolean(1)", "new Boolean('hello')",
+                "new Boolean(1)",
+                "new Boolean('hello')",
                 // Test with falsy values
-                "new Boolean(0)", "new Boolean('')", "new Boolean(null)", "new Boolean(undefined)"
-        ).forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> {
-                    JSValue result = context.eval(code);
-                    assertThat(result.isBooleanObject()).isTrue();
-                    return result.asBooleanObject().map(JSBooleanObject::getValue).map(JSBoolean::value).orElseThrow();
-                }
-        ));
+                "new Boolean(0)",
+                "new Boolean('')",
+                "new Boolean(null)",
+                "new Boolean(undefined)"
+        );
     }
 
     @Test
     public void testBooleanObjectToString() {
-        Stream.of(
+        assertStringWithJavet(
                 "(new Boolean(true)).toString()",
-                "(new Boolean(false)).toString()").forEach(code -> {
-            assertWithJavet(
-                    () -> v8Runtime.getExecutor(code).executeString(),
-                    () -> context.eval(code).toJavaObject());
-        });
+                "(new Boolean(false)).toString()");
     }
 
     @Test
     public void testBooleanObjectTypeof() {
-        String code = "typeof new Boolean(true)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("typeof new Boolean(true)");
     }
 
     @Test
     public void testBooleanObjectValueOf() {
-        String code = "(new Boolean(true)).valueOf();";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject());
+        assertBooleanWithJavet("(new Boolean(true)).valueOf();");
     }
 
     @Test
     public void testBooleanWithoutNewReturnsPrimitive() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Test Boolean(true) without new returns primitive
                 "Boolean(true);",
                 // Test Boolean(false) without new returns primitive
-                "Boolean(false);"
-        ).forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "Boolean(false);");
     }
 
     @Test
     public void testNewBooleanCreatesJSBooleanObject() {
-        Stream.of(
+        assertBooleanObjectWithJavet(
                 // Test new Boolean(true) creates JSBooleanObject
                 "new Boolean(true);",
                 // Test new Boolean(false) creates JSBooleanObject
-                "new Boolean(false);"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).asBooleanObject().map(JSBooleanObject::toJavaObject).orElseThrow()));
+                "new Boolean(false);");
     }
 }

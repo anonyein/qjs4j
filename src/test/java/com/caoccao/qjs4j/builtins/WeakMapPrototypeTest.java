@@ -19,8 +19,6 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
 
-import java.util.stream.Stream;
-
 /**
  * Unit tests for WeakMap.prototype methods.
  */
@@ -29,41 +27,23 @@ public class WeakMapPrototypeTest extends BaseJavetTest {
     @Test
     public void testDelete() {
         // Normal case: delete existing key
-        String code1 = """
-                var weakMap = new WeakMap();
-                var key1 = {};
-                var key2 = {};
-                weakMap.set(key1, 'value1');
-                weakMap.set(key2, 'value2');
-                weakMap.delete(key1);""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code1).executeBoolean(),
-                () -> context.eval(code1).toJavaObject());
-
-        // Normal case: delete non-existing key
-        String code2 = """
-                var weakMap = new WeakMap();
-                var key = {};
-                weakMap.delete(key);""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code2).executeBoolean(),
-                () -> context.eval(code2).toJavaObject());
-
-        // Normal case: no arguments
-        String code3 = """
-                var weakMap = new WeakMap();
-                weakMap.delete();""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code3).executeBoolean(),
-                () -> context.eval(code3).toJavaObject());
-
-        // Edge case: non-object key
-        String code4 = """
-                var weakMap = new WeakMap();
-                weakMap.delete('string');""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code4).executeBoolean(),
-                () -> context.eval(code4).toJavaObject());
+        assertBooleanWithJavet("""
+                        var weakMap = new WeakMap();
+                        var key1 = {};
+                        var key2 = {};
+                        weakMap.set(key1, 'value1');
+                        weakMap.set(key2, 'value2');
+                        weakMap.delete(key1);""",
+                """
+                        var weakMap = new WeakMap();
+                        var key = {};
+                        weakMap.delete(key);""",
+                """
+                        var weakMap = new WeakMap();
+                        weakMap.delete();""",
+                """
+                        var weakMap = new WeakMap();
+                        weakMap.delete('string');""");
 
         // Edge case: called on non-WeakMap
         assertErrorWithJavet("WeakMap.prototype.delete.call('not weakmap', {});");
@@ -72,39 +52,17 @@ public class WeakMapPrototypeTest extends BaseJavetTest {
     @Test
     public void testGet() {
         // Normal case: get existing key
-        String code1 = """
+        assertStringWithJavet("""
                 var weakMap = new WeakMap();
                 var key1 = {};
                 weakMap.set(key1, 'value1');
-                weakMap.get(key1);""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code1).executeString(),
-                () -> context.eval(code1).toJavaObject());
+                weakMap.get(key1);""");
 
         // Normal case: get non-existing key
-        String code2 = """
-                var weakMap = new WeakMap();
-                var key = {};
-                weakMap.get(key);""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code2).executeObject(),
-                () -> context.eval(code2).toJavaObject());
-
-        // Normal case: no arguments
-        String code3 = """
-                var weakMap = new WeakMap();
-                weakMap.get();""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code3).executeObject(),
-                () -> context.eval(code3).toJavaObject());
-
-        // Edge case: non-object key
-        String code4 = """
-                var weakMap = new WeakMap();
-                weakMap.get('string');""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code4).executeObject(),
-                () -> context.eval(code4).toJavaObject());
+        assertBooleanWithJavet(
+                "var weakMap = new WeakMap(); var key = {}; weakMap.get(key) === undefined;",
+                "var weakMap = new WeakMap(); weakMap.get() === undefined;",
+                "var weakMap = new WeakMap(); weakMap.get('string') === undefined;");
 
         // Edge case: called on non-WeakMap
         assertErrorWithJavet("WeakMap.prototype.get.call('not weakmap', {});");
@@ -112,7 +70,7 @@ public class WeakMapPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testHas() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Normal case: has existing key
                 """
                         var weakMap = new WeakMap();
@@ -131,11 +89,7 @@ public class WeakMapPrototypeTest extends BaseJavetTest {
                 // Edge case: non-object key
                 """
                         var weakMap = new WeakMap();
-                        weakMap.has('string');"""
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
+                        weakMap.has('string');""");
 
         // Edge case: called on non-WeakMap
         assertErrorWithJavet("WeakMap.prototype.has.call('not weakmap', {});");
@@ -144,32 +98,18 @@ public class WeakMapPrototypeTest extends BaseJavetTest {
     @Test
     public void testSet() {
         // Normal case: set new key-value
-        String code1 = """
-                var weakMap = new WeakMap();
-                var key1 = {};
-                weakMap.set(key1, 'value1').constructor === WeakMap""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code1).executeBoolean(),
-                () -> context.eval(code1).toJavaObject());
-
-        // Verify set returns the WeakMap
-        String code2 = """
-                var weakMap = new WeakMap();
-                var key = {};
-                weakMap.set(key, 'value') === weakMap;""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code2).executeBoolean(),
-                () -> context.eval(code2).toJavaObject());
-
-        // Normal case: set with undefined value
-        String code3 = """
-                var weakMap = new WeakMap();
-                var key = {};
-                weakMap.set(key);
-                weakMap.get(key);""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code3).executeObject(),
-                () -> context.eval(code3).toJavaObject());
+        assertBooleanWithJavet(
+                """
+                        var weakMap = new WeakMap();
+                        var key1 = {};
+                        weakMap.set(key1, 'value1').constructor === WeakMap""", """
+                        var weakMap = new WeakMap();
+                        var key = {};
+                        weakMap.set(key, 'value') === weakMap;""", """
+                        var weakMap = new WeakMap();
+                        var key = {};
+                        weakMap.set(key);
+                        weakMap.get(key) === undefined;""");
 
         // Edge case: no arguments
         assertErrorWithJavet("""

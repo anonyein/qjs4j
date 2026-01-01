@@ -17,7 +17,9 @@
 package com.caoccao.qjs4j.core;
 
 import com.caoccao.qjs4j.builtins.GlobalObject;
+import com.caoccao.qjs4j.compiler.Compiler;
 import com.caoccao.qjs4j.exceptions.JSException;
+import com.caoccao.qjs4j.exceptions.JSVirtualMachineException;
 import com.caoccao.qjs4j.types.JSModule;
 
 import java.util.*;
@@ -238,20 +240,26 @@ public final class JSContext implements AutoCloseable {
 
             return result != null ? result : JSUndefined.INSTANCE;
         } catch (JSException e) {
-            // Re-throw JavaScript exceptions
+            // JavaScript exception thrown during execution
             throw e;
-        } catch (com.caoccao.qjs4j.compiler.Compiler.CompilerException e) {
-            return throwError("SyntaxError", e.getMessage());
-        } catch (com.caoccao.qjs4j.vm.VirtualMachine.VMException e) {
-            // VM exception - check if there's a pending JavaScript exception
+        } catch (Compiler.CompilerException e) {
+            JSValue error = throwError("SyntaxError", e.getMessage());
+            throw new JSException(error);
+        } catch (JSVirtualMachineException e) {
+            // VM exception - check if it has a JSError, otherwise check pending exception
+            if (e.getJsError() != null) {
+                throw new JSException(e.getJsError());
+            }
             if (hasPendingException()) {
                 JSValue exception = getPendingException();
                 clearPendingException();
                 throw new JSException(exception);
             }
-            return throwError("Error", "VM error: " + e.getMessage());
+            JSValue error = throwError("Error", "VM error: " + e.getMessage());
+            throw new JSException(error);
         } catch (Exception e) {
-            return throwError("Error", "Execution error: " + e.getMessage());
+            JSValue error = throwError("Error", "Execution error: " + e.getMessage());
+            throw new JSException(error);
         } finally {
             popStackFrame();
         }
@@ -473,7 +481,7 @@ public final class JSContext implements AutoCloseable {
      * @param message Error message
      * @return The error value
      */
-    public JSValue throwAggregateError(String message) {
+    public JSError throwAggregateError(String message) {
         return throwError(JSAggregateError.NAME, message);
     }
 
@@ -484,7 +492,7 @@ public final class JSContext implements AutoCloseable {
      * @param message Error message
      * @return The error value (for convenience in return statements)
      */
-    public JSValue throwError(String message) {
+    public JSError throwError(String message) {
         return throwError(JSError.NAME, message);
     }
 
@@ -495,9 +503,9 @@ public final class JSContext implements AutoCloseable {
      * @param message   Error message
      * @return The error value
      */
-    public JSValue throwError(String errorType, String message) {
+    public JSError throwError(String errorType, String message) {
         // Create error object using the proper error class
-        JSError error = switch (errorType) {
+        JSError jsError = switch (errorType) {
             case JSAggregateError.NAME -> new JSAggregateError(this, message);
             case JSEvalError.NAME -> new JSEvalError(this, message);
             case JSRangeError.NAME -> new JSRangeError(this, message);
@@ -507,23 +515,23 @@ public final class JSContext implements AutoCloseable {
             case JSURIError.NAME -> new JSURIError(this, message);
             default -> new JSError(this, message);
         };
+        return throwError(jsError);
+    }
 
+    public JSError throwError(JSError jsError) {
         // Set prototype from the global error constructor
-        JSValue errorCtor = globalObject.get(errorType);
+        JSValue errorCtor = globalObject.get(jsError.getName().value());
         if (errorCtor instanceof JSObject ctorObj) {
             JSValue prototypeValue = ctorObj.get("prototype");
             if (prototypeValue instanceof JSObject prototype) {
-                error.setPrototype(prototype);
+                jsError.setPrototype(prototype);
             }
         }
-
         // Capture stack trace
-        captureStackTrace(error);
-
+        captureStackTrace(jsError);
         // Set as pending exception
-        setPendingException(error);
-
-        return error;
+        setPendingException(jsError);
+        return jsError;
     }
 
     /**
@@ -532,7 +540,7 @@ public final class JSContext implements AutoCloseable {
      * @param message Error message
      * @return The error value
      */
-    public JSValue throwEvalError(String message) {
+    public JSError throwEvalError(String message) {
         return throwError(JSEvalError.NAME, message);
     }
 
@@ -542,7 +550,7 @@ public final class JSContext implements AutoCloseable {
      * @param message Error message
      * @return The error value
      */
-    public JSValue throwRangeError(String message) {
+    public JSError throwRangeError(String message) {
         return throwError(JSRangeError.NAME, message);
     }
 
@@ -552,7 +560,7 @@ public final class JSContext implements AutoCloseable {
      * @param message Error message
      * @return The error value
      */
-    public JSValue throwReferenceError(String message) {
+    public JSError throwReferenceError(String message) {
         return throwError(JSReferenceError.NAME, message);
     }
 
@@ -562,7 +570,7 @@ public final class JSContext implements AutoCloseable {
      * @param message Error message
      * @return The error value
      */
-    public JSValue throwSyntaxError(String message) {
+    public JSError throwSyntaxError(String message) {
         return throwError(JSSyntaxError.NAME, message);
     }
 
@@ -572,7 +580,7 @@ public final class JSContext implements AutoCloseable {
      * @param message Error message
      * @return The error value
      */
-    public JSValue throwTypeError(String message) {
+    public JSError throwTypeError(String message) {
         return throwError(JSTypeError.NAME, message);
     }
 
@@ -582,7 +590,7 @@ public final class JSContext implements AutoCloseable {
      * @param message Error message
      * @return The error value
      */
-    public JSValue throwURIError(String message) {
+    public JSError throwURIError(String message) {
         return throwError(JSURIError.NAME, message);
     }
 

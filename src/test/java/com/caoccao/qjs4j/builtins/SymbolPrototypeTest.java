@@ -19,8 +19,6 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
 
-import java.util.stream.Stream;
-
 /**
  * Unit tests for SymbolPrototype methods.
  */
@@ -28,29 +26,18 @@ public class SymbolPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testGetDescription() {
-        Stream.of(
-                // Normal case: symbol with description
+        assertStringWithJavet(
                 "Symbol('testDescription').description;",
-                // Normal case: symbol without description
                 "Symbol().description;",
-                // Test with well-known symbol
-                "Symbol.iterator.description;"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeObject(),
-                        () -> context.eval(code).toJavaObject()));
+                "Symbol.iterator.description;");
     }
 
     @Test
     public void testToPrimitive() {
         // Test Symbol[@@toPrimitive] - returns the symbol itself
-        Stream.of(
+        assertBooleanWithJavet(
                 "var sym1 = Symbol('test'); sym1[Symbol.toPrimitive]() === sym1",
-                "var sym2 = Symbol.iterator; sym2[Symbol.toPrimitive]() === sym2"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeBoolean(),
-                        () -> context.eval(code).toJavaObject()));
+                "var sym2 = Symbol.iterator; sym2[Symbol.toPrimitive]() === sym2");
 
         // Edge case: called on non-symbol should throw TypeError
         assertErrorWithJavet("Symbol.prototype[Symbol.toPrimitive].call('not a symbol');");
@@ -58,7 +45,7 @@ public class SymbolPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testToString() {
-        Stream.of(
+        assertStringWithJavet(
                 // Normal case: symbol with description
                 "Symbol('testDescription').toString();",
                 // Normal case: symbol without description
@@ -69,45 +56,31 @@ public class SymbolPrototypeTest extends BaseJavetTest {
                 "Symbol('').toString();",
                 // Well-known symbols
                 "Symbol.asyncIterator.toString();",
-                "Symbol.hasInstance.toString();"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeString(),
-                        () -> context.eval(code).toJavaObject()));
+                "Symbol.hasInstance.toString();");
 
         // Edge case: called on non-symbol should throw TypeError
-        assertErrorWithJavet("Symbol.prototype.toString.call('not a symbol');");
-
-        // Test that concatenating symbol with string throws TypeError
-        assertErrorWithJavet("const a = '' + Symbol.iterator;", "Cannot convert a Symbol value to a string");
+        assertErrorWithJavet(
+                "Symbol.prototype.toString.call('not a symbol');",
+                "const a = '' + Symbol.iterator;");
     }
 
     @Test
     public void testToStringTag() {
         // Symbol.prototype[@@toStringTag] should return "Symbol"
-        Stream.of(
+        assertStringWithJavet(
                 "Symbol.prototype[Symbol.toStringTag];",
                 "Object.prototype.toString.call(Symbol('test'));",
-                "Object.prototype.toString.call(Symbol.iterator);"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeString(),
-                        () -> context.eval(code).toJavaObject()));
+                "Object.prototype.toString.call(Symbol.iterator);");
     }
 
     @Test
     public void testValueOf() {
-        Stream.of(
-                // Normal case: symbol valueOf returns itself
+        assertBooleanWithJavet(
+                "var sym = Symbol('test'); sym.valueOf() === sym;",
                 "var sym = Symbol('test'); sym.valueOf() === sym;",
                 "var sym = Symbol.iterator; sym.valueOf() === sym;",
-                // Test with Object(Symbol())
-                "var symObj = Object(Symbol('test')); typeof symObj.valueOf();",
-                "var symObj = Object(Symbol('test')); symObj.valueOf() !== symObj;"
-        ).forEach(code ->
-                assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeObject(),
-                        () -> context.eval(code).toJavaObject()));
+                "var symObj = Object(Symbol('test')); typeof symObj.valueOf() === 'symbol';",
+                "var symObj = Object(Symbol('test')); symObj.valueOf() !== symObj");
 
         // Edge case: called on non-symbol should throw TypeError
         assertErrorWithJavet("Symbol.prototype.valueOf.call('not a symbol');");

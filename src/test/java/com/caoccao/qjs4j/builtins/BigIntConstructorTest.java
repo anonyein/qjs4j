@@ -153,94 +153,62 @@ public class BigIntConstructorTest extends BaseJavetTest {
     @Test
     public void testBigIntObjectArithmetic() {
         // BigInt objects can be converted via valueOf
-        String code = """
+        assertBigIntegerWithJavet("""
                 var obj = Object(BigInt(10));
-                obj.valueOf()""";
-        assertWithJavet(
-                () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
-                () -> context.eval(code).toJavaObject());
+                obj.valueOf()""");
     }
 
     @Test
     public void testBigIntObjectComparison() {
         // Test using valueOf for comparison
-        String code = """
+        assertBigIntegerWithJavet("""
                 var obj = Object(BigInt(42));
                 var val = obj.valueOf();
-                val""";
-        assertWithJavet(
-                () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
-                () -> context.eval(code).toJavaObject());
+                val""");
     }
 
     @Test
     public void testBigIntObjectCreation() {
         // Test that 'Object(BigInt(42))' creates a JSBigIntObject
-        assertThat(context.eval("Object(BigInt(42))"))
-                .isInstanceOfSatisfying(JSBigIntObject.class, bigIntObj ->
-                        assertThat(bigIntObj.getValue().value()).isEqualTo(BigInteger.valueOf(42)));
+        assertBigIntegerObjectWithJavet("Object(BigInt(42))");
     }
 
     @Test
     public void testBigIntObjectEquality() {
         // BigInt object is not the same as primitive when checking with typeof
-        String code1 = "typeof Object(BigInt(42))";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code1).executeString(),
-                () -> context.eval(code1).toJavaObject());
-
-        String code2 = "typeof BigInt(42)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code2).executeString(),
-                () -> context.eval(code2).toJavaObject());
+        assertStringWithJavet(
+                "typeof Object(BigInt(42))",
+                "typeof BigInt(42)");
     }
 
     @Test
     public void testBigIntObjectLargeValue() {
-        String code = "Object(BigInt('9007199254740991')).valueOf()";
-        assertWithJavet(
-                () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
-                () -> context.eval(code).toJavaObject());
+        assertBigIntegerWithJavet("Object(BigInt('9007199254740991')).valueOf()");
     }
 
     @Test
     public void testBigIntObjectNegative() {
-        String code = "Object(BigInt(-999)).valueOf()";
-        assertWithJavet(
-                () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
-                () -> context.eval("Object(BigInt(-999)).valueOf()").toJavaObject());
+        assertBigIntegerWithJavet("Object(BigInt(-999)).valueOf()");
     }
 
     @Test
     public void testBigIntObjectToString() {
-        String code = "Object(BigInt(123)).toString()";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("Object(BigInt(123)).toString()");
     }
 
     @Test
     public void testBigIntObjectToStringWithRadix() {
-        String code = "Object(BigInt(255)).toString(16)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("Object(BigInt(255)).toString(16)");
     }
 
     @Test
     public void testBigIntObjectTypeof() {
-        String code = "typeof Object(BigInt(42))";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("typeof Object(BigInt(42))");
     }
 
     @Test
     public void testBigIntObjectValueOf() {
-        String code = "Object(BigInt(42)).valueOf()";
-        assertWithJavet(
-                () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
-                () -> context.eval(code).toJavaObject());
+        assertBigIntegerWithJavet("Object(BigInt(42)).valueOf()");
     }
 
     @Test

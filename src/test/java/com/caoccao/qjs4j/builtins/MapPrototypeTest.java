@@ -16,16 +16,18 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
+
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for Map.prototype methods.
  */
-public class MapPrototypeTest extends BaseTest {
+public class MapPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testClear() {
@@ -185,6 +187,10 @@ public class MapPrototypeTest extends BaseTest {
         // Edge case: called on non-Map
         assertTypeError(MapPrototype.getSize(context, new JSString("not map"), new JSValue[]{}));
         assertPendingException(context);
+
+        assertIntegerWithJavet(
+                "new Map().size",
+                "var a = new Map(); a.set('a', 1); a.size");
     }
 
     @Test

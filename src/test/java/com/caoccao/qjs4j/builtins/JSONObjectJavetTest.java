@@ -19,8 +19,6 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigInteger;
-
 /**
  * Javet-based tests for JSON.stringify() and JSON.parse() methods.
  * Tests cover replacer/reviver functionality, edge cases, and error conditions.
@@ -29,37 +27,25 @@ public class JSONObjectJavetTest extends BaseJavetTest {
 
     @Test
     public void testParseArrayElement() {
-        String code = "JSON.parse('[1,2,3]')[1]";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("JSON.parse('[1,2,3]')[1]");
     }
 
     @Test
     public void testParseArrayLength() {
-        String code = "JSON.parse('[1,\"two\",true,null]').length";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("JSON.parse('[1,\"two\",true,null]').length");
     }
 
     @Test
     public void testParseBoolean() {
-        String code = "JSON.parse('true')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject());
+        assertBooleanWithJavet("JSON.parse('true')");
     }
 
     @Test
     public void testParseComplexNested() {
-        String code = """
+        assertStringWithJavet("""
                 var json = '{"users":[{"name":"Alice","age":30},{"name":"Bob","age":25}],"metadata":{"version":"1.0"}}';
                 var obj = JSON.parse(json);
-                obj.users[0].name""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                obj.users[0].name""");
     }
 
     @Test
@@ -69,18 +55,12 @@ public class JSONObjectJavetTest extends BaseJavetTest {
 
     @Test
     public void testParseEscapedNewline() {
-        String code = "JSON.parse('\"hello\\\\nworld\"')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.parse('\"hello\\\\nworld\"')");
     }
 
     @Test
     public void testParseEscapedTab() {
-        String code = "JSON.parse('\"tab\\\\there\"')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.parse('\"tab\\\\there\"')");
     }
 
     @Test
@@ -95,18 +75,12 @@ public class JSONObjectJavetTest extends BaseJavetTest {
 
     @Test
     public void testParseNestedArray() {
-        String code = "JSON.parse('{\"items\":[1,2,3]}').items[1]";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("JSON.parse('{\"items\":[1,2,3]}').items[1]");
     }
 
     @Test
     public void testParseNestedObject() {
-        String code = "JSON.parse('{\"user\":{\"name\":\"Alice\",\"age\":30}}').user.name";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.parse('{\"user\":{\"name\":\"Alice\",\"age\":30}}').user.name");
     }
 
     @Test
@@ -116,42 +90,27 @@ public class JSONObjectJavetTest extends BaseJavetTest {
 
     @Test
     public void testParseNull() {
-        String code = "JSON.parse('null')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeObject(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.parse('null')");
     }
 
     @Test
     public void testParseNumber() {
-        String code = "JSON.parse('42')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("JSON.parse('42')");
     }
 
     @Test
     public void testParseObjectProperty() {
-        String code = "JSON.parse('{\"a\":1,\"b\":2}').a";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("JSON.parse('{\"a\":1,\"b\":2}').a");
     }
 
     @Test
     public void testParseObjectStringProperty() {
-        String code = "JSON.parse('{\"name\":\"test\",\"value\":42}').name";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.parse('{\"name\":\"test\",\"value\":42}').name");
     }
 
     @Test
     public void testParseString() {
-        String code = "JSON.parse('\"hello\"')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.parse('\"hello\"')");
     }
 
     @Test
@@ -176,21 +135,18 @@ public class JSONObjectJavetTest extends BaseJavetTest {
 
     @Test
     public void testParseWithReviver() {
-        String code = """
+        assertIntegerWithJavet("""
                 JSON.parse('{"a":1,"b":2,"c":3}', function(key, value) {
                   if (typeof value === 'number') {
                     return value * 2;
                   }
                   return value;
-                }).b""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+                }).b""");
     }
 
     @Test
     public void testParseWithReviverAndComplexStructure() {
-        String code = """
+        assertIntegerWithJavet("""
                 var json = '{"numbers":[1,2,3],"data":{"x":10,"y":20}}';
                 var result = JSON.parse(json, function(key, value) {
                   if (typeof value === 'number') {
@@ -198,92 +154,71 @@ public class JSONObjectJavetTest extends BaseJavetTest {
                   }
                   return value;
                 });
-                result.data.x""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+                result.data.x""");
     }
 
     @Test
     public void testParseWithReviverArray() {
-        String code = """
+        assertIntegerWithJavet("""
                 JSON.parse('[1,2,3,4,5]', function(key, value) {
                   if (typeof value === 'number') {
                     return value * 2;
                   }
                   return value;
-                })[2]""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+                })[2]""");
     }
 
     @Test
     public void testParseWithReviverFilter() {
-        String code = """
+        assertBooleanWithJavet("""
                 var result = JSON.parse('{"a":1,"b":2,"c":3}', function(key, value) {
                   if (key === 'b') {
                     return undefined;
                   }
                   return value;
                 });
-                result.b""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeObject(),
-                () -> context.eval(code).toJavaObject());
+                result.b === undefined""");
     }
 
     @Test
     public void testParseWithReviverNested() {
-        String code = """
+        assertIntegerWithJavet("""
                 JSON.parse('{"user":{"name":"Bob","age":25}}', function(key, value) {
                   if (key === 'age' && typeof value === 'number') {
                     return value + 10;
                   }
                   return value;
-                }).user.age""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+                }).user.age""");
     }
 
     @Test
     public void testParseWithReviverTransform() {
-        String code = """
+        assertStringWithJavet("""
                 JSON.parse('{"date":"2023-01-01"}', function(key, value) {
                   if (key === 'date') {
                     return 'Transformed: ' + value;
                   }
                   return value;
-                }).date""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                }).date""");
     }
 
     @Test
     public void testParseWithWhitespace() {
-        String code = "JSON.parse('  {  \"a\"  :  1  }  ').a";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("JSON.parse('  {  \"a\"  :  1  }  ').a");
     }
 
     @Test
     public void testRoundTrip() {
-        String code = """
+        assertIntegerWithJavet("""
                 var original = {name: 'test', value: 42, items: [1, 2, 3]};
                 var json = JSON.stringify(original);
                 var parsed = JSON.parse(json);
-                parsed.value""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+                parsed.value""");
     }
 
     @Test
     public void testRoundTripWithReplacerReviverForBigInt() {
-        String code = """
+        assertBigIntegerWithJavet("""
                 var original = {a: 1n, b: 2n, c: 3};
                 var json = JSON.stringify(original, function(key, value) {
                   if (typeof value === "bigint") {
@@ -297,15 +232,12 @@ public class JSONObjectJavetTest extends BaseJavetTest {
                   }
                   return value;
                 });
-                parsed.b""";
-        assertWithJavet(
-                () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
-                () -> context.eval(code).toJavaObject());
+                parsed.b""");
     }
 
     @Test
     public void testRoundTripWithReplacerReviverForNumber() {
-        String code = """
+        assertIntegerWithJavet("""
                 var original = {a: 1, b: 2, c: 3};
                 var json = JSON.stringify(original, function(key, value) {
                   if (typeof value === 'number') {
@@ -319,78 +251,51 @@ public class JSONObjectJavetTest extends BaseJavetTest {
                   }
                   return value;
                 });
-                parsed.b""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+                parsed.b""");
     }
 
     @Test
     public void testRoundTripWithSpace() {
-        String code = """
+        assertIntegerWithJavet("""
                 var original = {a: 1, b: 2};
                 var json = JSON.stringify(original, null, 2);
                 var parsed = JSON.parse(json);
-                parsed.b""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+                parsed.b""");
     }
 
     @Test
     public void testStringifyArrayMixed() {
-        String code = "JSON.stringify([1, 'two', true, null])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify([1, 'two', true, null])");
     }
 
     @Test
     public void testStringifyArrayNested() {
-        String code = "JSON.stringify([[1, 2], [3, 4]])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify([[1, 2], [3, 4]])");
     }
 
     @Test
     public void testStringifyArraySimple() {
-        String code = "JSON.stringify([1, 2, 3])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify([1, 2, 3])");
     }
 
     @Test
     public void testStringifyArrayWithMixedTypes() {
-        String code = "JSON.stringify([1, 'two', true, null, {a: 5}, [6, 7]])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify([1, 'two', true, null, {a: 5}, [6, 7]])");
     }
 
     @Test
     public void testStringifyArrayWithNumberSpace() {
-        String code = "JSON.stringify([1, 2, 3], null, 4)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify([1, 2, 3], null, 4)");
     }
 
     @Test
     public void testStringifyArrayWithUndefined() {
-        String code = "JSON.stringify([1, undefined, 3])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify([1, undefined, 3])");
     }
 
     @Test
     public void testStringifyBoolean() {
-        String code = "JSON.stringify(true)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(true)");
     }
 
     @Test
@@ -428,315 +333,214 @@ public class JSONObjectJavetTest extends BaseJavetTest {
                   ],
                   metadata: {version: '1.0', count: 2}
                 })""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet(code);
     }
 
     @Test
     public void testStringifyEmptyArray() {
-        String code = "JSON.stringify([])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify([])");
     }
 
     @Test
     public void testStringifyEmptyObject() {
-        String code = "JSON.stringify({})";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({})");
     }
 
     @Test
     public void testStringifyEscapeNewline() {
-        String code = "JSON.stringify('hello\\nworld')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify('hello\\nworld')");
     }
 
     @Test
     public void testStringifyEscapeQuote() {
-        String code = "JSON.stringify('quote\\\"test')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify('quote\\\"test')");
     }
 
     @Test
     public void testStringifyEscapeTab() {
-        String code = "JSON.stringify('tab\\there')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify('tab\\there')");
     }
 
     @Test
     public void testStringifyFloatingPoint() {
-        String code = "JSON.stringify(0.1 + 0.2)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(0.1 + 0.2)");
     }
 
     @Test
     public void testStringifyFunction() {
-        String code = "JSON.stringify(function() {})";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeObject(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(function() {})");
     }
 
     @Test
     public void testStringifyInfinity() {
-        String code = "JSON.stringify(Infinity)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(Infinity)");
     }
 
     @Test
     public void testStringifyNaN() {
-        String code = "JSON.stringify(NaN)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(NaN)");
     }
 
     @Test
     public void testStringifyNegativeInfinity() {
-        String code = "JSON.stringify(-Infinity)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(-Infinity)");
     }
 
     @Test
     public void testStringifyNestedStructure() {
-        String code = """
+        assertStringWithJavet("""
                 JSON.stringify({
                   user: {
                     name: 'Alice',
                     age: 30
                   },
                   items: [1, 2, 3]
-                })""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                })""");
     }
 
     @Test
     public void testStringifyNull() {
-        String code = "JSON.stringify(null)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(null)");
     }
 
     @Test
     public void testStringifyNumber() {
-        String code = "JSON.stringify(42)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(42)");
     }
 
     @Test
     public void testStringifyObjectComplex() {
-        String code = "JSON.stringify({name: 'test', value: 42, active: true})";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({name: 'test', value: 42, active: true})");
     }
 
     @Test
     public void testStringifyObjectSimple() {
-        String code = "JSON.stringify({a: 1, b: 2})";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1, b: 2})");
     }
 
     @Test
     public void testStringifyObjectWithFunction() {
-        String code = "JSON.stringify({a: 1, b: function() {}, c: 2})";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1, b: function() {}, c: 2})");
     }
 
     @Test
     public void testStringifyObjectWithUndefined() {
-        String code = "JSON.stringify({a: 1, b: undefined, c: 3})";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1, b: undefined, c: 3})");
     }
 
     @Test
     public void testStringifyScientificNotationLarge() {
-        String code = "JSON.stringify(1e10)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(1e10)");
     }
 
     @Test
     public void testStringifyScientificNotationSmall() {
-        String code = "JSON.stringify(1e-10)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify(1e-10)");
     }
 
     @Test
     public void testStringifyString() {
-        String code = "JSON.stringify('hello')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify('hello')");
     }
 
     @Test
     public void testStringifyUndefined() {
-        String code = "JSON.stringify(undefined)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeObject(),
-                () -> context.eval(code).toJavaObject());
+        assertBooleanWithJavet("JSON.stringify(undefined) === undefined");
     }
 
     @Test
     public void testStringifyWithNumberSpace() {
-        String code = "JSON.stringify({a: 1, b: 2}, null, 2)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1, b: 2}, null, 2)");
     }
 
     @Test
     public void testStringifyWithReplacerAndSpace() {
-        String code = """
+        assertStringWithJavet("""
                 JSON.stringify(
                   {a: 1, b: 2, c: 3, d: 4},
                   ['a', 'c'],
                   2
-                )""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                )""");
     }
 
     @Test
     public void testStringifyWithReplacerArray() {
-        String code = "JSON.stringify({a: 1, b: 2, c: 3, d: 4}, ['a', 'c'])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1, b: 2, c: 3, d: 4}, ['a', 'c'])");
     }
 
     @Test
     public void testStringifyWithReplacerArrayNested() {
-        String code = """
+        assertStringWithJavet("""
                 JSON.stringify({
                   name: 'test',
                   data: {x: 1, y: 2, z: 3},
                   extra: 'value'
-                }, ['name', 'data', 'x', 'y'])""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                }, ['name', 'data', 'x', 'y'])""");
     }
 
     @Test
     public void testStringifyWithReplacerArrayNumbers() {
-        String code = "JSON.stringify({0: 'a', 1: 'b', 2: 'c'}, [0, 2])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({0: 'a', 1: 'b', 2: 'c'}, [0, 2])");
     }
 
     @Test
     public void testStringifyWithReplacerFilteringOut() {
-        String code = """
+        assertStringWithJavet("""
                 JSON.stringify({a: 1, b: 2, c: 3}, function(key, value) {
                   if (key === 'b') {
                     return undefined;
                   }
                   return value;
-                })""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                })""");
     }
 
     @Test
     public void testStringifyWithReplacerFunction() {
-        String code = """
+        assertStringWithJavet("""
                 JSON.stringify({a: 1, b: 2, c: 3}, function(key, value) {
                   if (typeof value === 'number') {
                     return value * 2;
                   }
                   return value;
-                })""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                })""");
     }
 
     @Test
     public void testStringifyWithSpaceLimitNumber() {
         // Space is limited to 10 characters
-        String code = "JSON.stringify({a: 1}, null, 20)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1}, null, 20)");
     }
 
     @Test
     public void testStringifyWithSpaceLimitString() {
-        String code = "JSON.stringify({a: 1}, null, 'abcdefghijklmnop')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1}, null, 'abcdefghijklmnop')");
     }
 
     @Test
     public void testStringifyWithStringSpace() {
-        String code = "JSON.stringify({a: 1, b: 2}, null, '  ')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1, b: 2}, null, '  ')");
     }
 
     @Test
     public void testStringifyWithTabSpace() {
-        String code = "JSON.stringify({a: 1}, null, '\\t')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("JSON.stringify({a: 1}, null, '\\t')");
     }
 
     @Test
     public void testStringifyWithToJSON() {
-        String code = """
+        assertStringWithJavet("""
                 var obj = {
                   value: 42,
                   toJSON: function() {
                     return this.value * 2;
                   }
                 };
-                JSON.stringify(obj)""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                JSON.stringify(obj)""");
     }
 
     @Test
     public void testStringifyWithToJSONAndReplacer() {
-        String code = """
+        assertStringWithJavet("""
                 var obj = {
                   value: 10,
                   toJSON: function() {
@@ -748,9 +552,6 @@ public class JSONObjectJavetTest extends BaseJavetTest {
                     return value + 10;
                   }
                   return value;
-                })""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+                })""");
     }
 }

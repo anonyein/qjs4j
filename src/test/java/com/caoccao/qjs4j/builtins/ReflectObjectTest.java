@@ -31,37 +31,26 @@ public class ReflectObjectTest extends BaseJavetTest {
 
     @Test
     public void testReflectDeleteProperty() {
-        String code = "var obj = {x: 1, y: 2}; Reflect.deleteProperty(obj, 'x'); JSON.stringify(obj)";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("var obj = {x: 1, y: 2}; Reflect.deleteProperty(obj, 'x'); JSON.stringify(obj)");
     }
 
     @Test
     public void testReflectGet() {
-        String code = "var obj = {x: 1}; Reflect.get(obj, 'x')";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("var obj = {x: 1}; Reflect.get(obj, 'x')");
     }
 
     @Test
     public void testReflectHas() {
-        String code = "var obj = {x: 1}; JSON.stringify([Reflect.has(obj, 'x'), Reflect.has(obj, 'y')])";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("var obj = {x: 1}; JSON.stringify([Reflect.has(obj, 'x'), Reflect.has(obj, 'y')])");
     }
 
     @Test
     public void testReflectIsExtensible() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "var obj = {}; Reflect.isExtensible(obj)",
                 "var obj2 = {}; Reflect.preventExtensions(obj2); Reflect.isExtensible(obj2)",
                 "var obj3 = {}; Object.freeze(obj3); Reflect.isExtensible(obj3)",
-                "var obj4 = {}; Object.seal(obj4); Reflect.isExtensible(obj4)").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "var obj4 = {}; Object.seal(obj4); Reflect.isExtensible(obj4)");
     }
 
     @Test
@@ -83,22 +72,16 @@ public class ReflectObjectTest extends BaseJavetTest {
     @Test
     public void testReflectPreventExtensionsWithObjectPreventExtensions() {
         // Test that Reflect.preventExtensions and Object.preventExtensions are consistent
-        String code = """
+        assertBooleanWithJavet("""
                 var obj1 = {};
                 var obj2 = {};
                 Reflect.preventExtensions(obj1);
                 Object.preventExtensions(obj2);
-                Reflect.isExtensible(obj1) === Object.isExtensible(obj2)""";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject());
+                Reflect.isExtensible(obj1) === Object.isExtensible(obj2)""");
     }
 
     @Test
     public void testReflectSet() {
-        String code = "var obj = {}; Reflect.set(obj, 'x', 42); obj.x";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeInteger().doubleValue(),
-                () -> context.eval(code).toJavaObject());
+        assertIntegerWithJavet("var obj = {}; Reflect.set(obj, 'x', 42); obj.x");
     }
 }

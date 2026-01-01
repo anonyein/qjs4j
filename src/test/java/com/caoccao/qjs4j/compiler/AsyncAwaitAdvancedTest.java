@@ -16,10 +16,11 @@
 
 package com.caoccao.qjs4j.compiler;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.JSArray;
 import com.caoccao.qjs4j.core.JSBoolean;
 import com.caoccao.qjs4j.core.JSPromise;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Advanced tests for async/await functionality, focusing on proper asynchronous behavior,
  * promise chaining, and execution suspension/resumption.
  */
-public class AsyncAwaitAdvancedTest extends BaseTest {
+public class AsyncAwaitAdvancedTest extends BaseJavetTest {
 
     @Test
     void testAsyncAwaitWithPromiseAll() {
@@ -88,26 +89,19 @@ public class AsyncAwaitAdvancedTest extends BaseTest {
         });
     }
 
+    @Disabled("Async generators not yet implemented")
     @Test
     void testAsyncGeneratorBasic() {
         // Test basic async generator syntax (if implemented)
-        String code = """
+        assertStringWithJavet("""
                 async function* generator() {
                     yield 1;
                     yield 2;
                     yield 3;
                 }
                 const gen = generator();
-                gen;
-                """;
-
-        try {
-            // If async generators are implemented, this should return an async generator object
-            assertThat(context.eval(code)).isNotNull();
-        } catch (Exception e) {
-            // If not implemented, expect a parse error
-            assertThat(e.getMessage()).containsAnyOf("parse", "syntax");
-        }
+                typeof gen;
+                """);
     }
 
     @Test

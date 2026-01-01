@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class NumberPrototypeTest extends BaseJavetTest {
     @Test
     public void testEquals() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Verify that loose equality passes between primitive and primitive
                 "123 == 123",
                 "123 == 321",
@@ -58,9 +58,7 @@ public class NumberPrototypeTest extends BaseJavetTest {
                 // Verify that strict equality fails between primitive and object
                 "123 === new Number(123)",
                 // Verify that strict equality fails between object and object
-                "new Number(123) === new Number(123)").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "new Number(123) === new Number(123)");
     }
 
     @Test

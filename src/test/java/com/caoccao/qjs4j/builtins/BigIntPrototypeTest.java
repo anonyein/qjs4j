@@ -24,7 +24,6 @@ import com.caoccao.qjs4j.core.JSValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,7 +34,7 @@ public class BigIntPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testEquals() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Verify that loose equality passes between primitive and primitive
                 "123n == 123n",
                 "123n == 321n",
@@ -61,26 +60,15 @@ public class BigIntPrototypeTest extends BaseJavetTest {
                 // Verify that strict equality fails between primitive and object
                 "123n === Object(BigInt(123))",
                 // Verify that strict equality fails between object and object
-                "Object(BigInt(123)) === Object(BigInt(123))").forEach(code -> {
-            assertWithJavet(
-                    () -> v8Runtime.getExecutor(code).executeBoolean(),
-                    () -> context.eval(code).toJavaObject());
-        });
+                "Object(BigInt(123)) === Object(BigInt(123))");
     }
 
     @Test
     public void testLiterals() {
         // Test typeof for BigInt literal
-        String code1 = "typeof 123n";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code1).executeString(),
-                () -> context.eval(code1).toJavaObject());
-
+        assertStringWithJavet("typeof 123n");
         // Test basic decimal BigInt literal
-        Stream.of("123n", "0xFFn", "0b1111n", "0o77n", "9007199254740991n")
-                .forEach(code -> assertWithJavet(
-                        () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
-                        () -> context.eval(code).toJavaObject()));
+        assertBigIntegerWithJavet("123n", "0xFFn", "0b1111n", "0o77n", "9007199254740991n");
     }
 
     @Test
@@ -156,10 +144,7 @@ public class BigIntPrototypeTest extends BaseJavetTest {
         assertTypeError(result);
         assertPendingException(context);
 
-        String code = "Object(BigInt(123n)).toString()";
-        assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeString(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet("Object(BigInt(123n)).toString()");
     }
 
     @Test
@@ -174,9 +159,6 @@ public class BigIntPrototypeTest extends BaseJavetTest {
         assertTypeError(result);
         assertPendingException(context);
 
-        String code = "Object(BigInt(123n)).valueOf()";
-        assertWithJavet(
-                () -> BigInteger.valueOf(v8Runtime.getExecutor(code).executeLong()),
-                () -> context.eval(code).toJavaObject());
+        assertBigIntegerWithJavet("Object(BigInt(123n)).valueOf()");
     }
 }

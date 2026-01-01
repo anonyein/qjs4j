@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class BooleanPrototypeTest extends BaseJavetTest {
     @Test
     public void testEquals() {
-        Stream.of(
+        assertBooleanWithJavet(
                 // Verify that loose equality passes between primitive and primitive
                 "true == true",
                 "true == false",
@@ -55,11 +55,7 @@ public class BooleanPrototypeTest extends BaseJavetTest {
                 // Verify that strict equality fails between primitive and object
                 "true === new Boolean(true)",
                 // Verify that strict equality fails between object and object
-                "new Boolean(true) === new Boolean(true)").forEach(code -> {
-            assertWithJavet(
-                    () -> v8Runtime.getExecutor(code).executeBoolean(),
-                    () -> context.eval(code).toJavaObject());
-        });
+                "new Boolean(true) === new Boolean(true)");
     }
 
     @Test
@@ -84,10 +80,7 @@ public class BooleanPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testTypeof() {
-        Stream.of("typeof true", "typeof false", "typeof new Boolean(true)")
-                .forEach(code -> assertWithJavet(
-                        () -> v8Runtime.getExecutor(code).executeString(),
-                        () -> context.eval(code).toJavaObject()));
+        assertStringWithJavet("typeof true", "typeof false", "typeof new Boolean(true)");
     }
 
     @Test

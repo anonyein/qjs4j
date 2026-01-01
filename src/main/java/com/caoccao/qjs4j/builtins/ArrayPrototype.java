@@ -455,10 +455,11 @@ public final class ArrayPrototype {
      * This is a getter for the length property.
      */
     public static JSValue getLength(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSArray arr)) {
-            return context.throwTypeError("Array.prototype.length getter called on non-array");
+        long length = 0;
+        if (thisArg instanceof JSArray jsArray) {
+            length = jsArray.getLength();
         }
-        return new JSNumber(arr.getLength());
+        return new JSNumber(length);
     }
 
     /**

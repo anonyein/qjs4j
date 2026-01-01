@@ -3,14 +3,10 @@ package com.caoccao.qjs4j.core;
 import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
 
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
 public class JSErrorTest extends BaseJavetTest {
     @Test
     public void testInstanceof() {
-        Stream.of(
+        assertBooleanWithJavet(
                 "new Error('Error') instanceof Error",
                 "new EvalError('EvalError') instanceof EvalError",
                 "new Error('Error') instanceof Error",
@@ -20,16 +16,11 @@ public class JSErrorTest extends BaseJavetTest {
                 "new TypeError('TypeError') instanceof TypeError",
                 "new URIError('URIError') instanceof URIError",
                 "new Error('Error') instanceof Error",
-                "new AggregateError('AggregateError') instanceof AggregateError").forEach(code -> assertWithJavet(
-                () -> v8Runtime.getExecutor(code).executeBoolean(),
-                () -> context.eval(code).toJavaObject()));
+                "new AggregateError('AggregateError') instanceof AggregateError");
     }
 
     @Test
     public void testTryCatchTypeError() {
-        JSValue result = context.eval("try { throw new TypeError('I am a TypeError'); } catch (e) { e.name + ': ' + e.message; }");
-        assertThat(result).isInstanceOfSatisfying(JSString.class, jsString -> {
-            assertThat(jsString.value()).isEqualTo("TypeError: I am a TypeError");
-        });
+        assertStringWithJavet("try { throw new TypeError('I am a TypeError'); } catch (e) { e.name + ': ' + e.message; }");
     }
 }
