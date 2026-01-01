@@ -219,6 +219,42 @@ public final class JSContext implements AutoCloseable {
     }
 
     /**
+     * Create a new JSBigInt64Array with proper prototype chain.
+     *
+     * @param length The length of the array
+     * @return A new JSBigInt64Array instance with prototype set
+     */
+    public JSBigInt64Array createJSBigInt64Array(int length) {
+        JSBigInt64Array jsBigInt64Array = new JSBigInt64Array(length);
+        JSValue bigInt64ArrayCtor = globalObject.get("BigInt64Array");
+        if (bigInt64ArrayCtor instanceof JSObject) {
+            JSValue bigInt64ArrayProto = ((JSObject) bigInt64ArrayCtor).get("prototype");
+            if (bigInt64ArrayProto instanceof JSObject) {
+                jsBigInt64Array.setPrototype((JSObject) bigInt64ArrayProto);
+            }
+        }
+        return jsBigInt64Array;
+    }
+
+    /**
+     * Create a new JSBigUint64Array with proper prototype chain.
+     *
+     * @param length The length of the array
+     * @return A new JSBigUint64Array instance with prototype set
+     */
+    public JSBigUint64Array createJSBigUint64Array(int length) {
+        JSBigUint64Array jsBigUint64Array = new JSBigUint64Array(length);
+        JSValue bigUint64ArrayCtor = globalObject.get("BigUint64Array");
+        if (bigUint64ArrayCtor instanceof JSObject) {
+            JSValue bigUint64ArrayProto = ((JSObject) bigUint64ArrayCtor).get("prototype");
+            if (bigUint64ArrayProto instanceof JSObject) {
+                jsBigUint64Array.setPrototype((JSObject) bigUint64ArrayProto);
+            }
+        }
+        return jsBigUint64Array;
+    }
+
+    /**
      * Create a new JSDataView with proper prototype chain.
      *
      * @param buffer     The ArrayBuffer to view
@@ -504,42 +540,6 @@ public final class JSContext implements AutoCloseable {
             }
         }
         return jsUint8ClampedArray;
-    }
-
-    /**
-     * Create a new JSBigInt64Array with proper prototype chain.
-     *
-     * @param length The length of the array
-     * @return A new JSBigInt64Array instance with prototype set
-     */
-    public JSBigInt64Array createJSBigInt64Array(int length) {
-        JSBigInt64Array jsBigInt64Array = new JSBigInt64Array(length);
-        JSValue bigInt64ArrayCtor = globalObject.get("BigInt64Array");
-        if (bigInt64ArrayCtor instanceof JSObject) {
-            JSValue bigInt64ArrayProto = ((JSObject) bigInt64ArrayCtor).get("prototype");
-            if (bigInt64ArrayProto instanceof JSObject) {
-                jsBigInt64Array.setPrototype((JSObject) bigInt64ArrayProto);
-            }
-        }
-        return jsBigInt64Array;
-    }
-
-    /**
-     * Create a new JSBigUint64Array with proper prototype chain.
-     *
-     * @param length The length of the array
-     * @return A new JSBigUint64Array instance with prototype set
-     */
-    public JSBigUint64Array createJSBigUint64Array(int length) {
-        JSBigUint64Array jsBigUint64Array = new JSBigUint64Array(length);
-        JSValue bigUint64ArrayCtor = globalObject.get("BigUint64Array");
-        if (bigUint64ArrayCtor instanceof JSObject) {
-            JSValue bigUint64ArrayProto = ((JSObject) bigUint64ArrayCtor).get("prototype");
-            if (bigUint64ArrayProto instanceof JSObject) {
-                jsBigUint64Array.setPrototype((JSObject) bigUint64ArrayProto);
-            }
-        }
-        return jsBigUint64Array;
     }
 
     /**

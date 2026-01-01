@@ -45,9 +45,9 @@ public final class JSBigUint64Array extends JSTypedArray {
         ByteBuffer buf = getByteBuffer();
         long value = buf.getLong(index * BYTES_PER_ELEMENT);
         // Convert unsigned long to double (may lose precision for very large values)
-        return Long.compareUnsigned(value, 0) < 0 ? 
-            (double) (value & Long.MAX_VALUE) + Math.pow(2, 63) : 
-            (double) value;
+        return Long.compareUnsigned(value, 0) < 0 ?
+                (double) (value & Long.MAX_VALUE) + Math.pow(2, 63) :
+                (double) value;
     }
 
     @Override

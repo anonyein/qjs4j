@@ -16,7 +16,7 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for FunctionPrototype methods.
  */
-public class FunctionPrototypeTest extends BaseTest {
+public class FunctionPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testApply() {
@@ -176,6 +176,105 @@ public class FunctionPrototypeTest extends BaseTest {
                     assertThat(name.value()).isEqualTo("TypeError"));
         });
         assertThat(context.getPendingException()).isNotNull();
+    }
+
+    @Test
+    public void testFunctionConstructor() {
+        // Normal case: function with parameters and body
+        JSValue result = FunctionConstructor.call(context, JSUndefined.INSTANCE, new JSValue[]{
+                new JSString("a"),
+                new JSString("b"),
+                new JSString("return a + b;")
+        });
+        assertThat(result).isInstanceOfSatisfying(JSFunction.class, func -> {
+            JSValue callResult = func.call(context, JSUndefined.INSTANCE, new JSValue[]{
+                    new JSNumber(2),
+                    new JSNumber(3)
+            });
+            assertThat(callResult).isInstanceOfSatisfying(JSNumber.class, num ->
+                    assertThat(num.value()).isEqualTo(5.0));
+        });
+
+        // Normal case: function with only body (no parameters)
+        result = FunctionConstructor.call(context, JSUndefined.INSTANCE, new JSValue[]{
+                new JSString("return 42;")
+        });
+        assertThat(result).isInstanceOfSatisfying(JSFunction.class, func -> {
+            JSValue callResult = func.call(context, JSUndefined.INSTANCE, new JSValue[]{});
+            assertThat(callResult).isInstanceOfSatisfying(JSNumber.class, num ->
+                    assertThat(num.value()).isEqualTo(42.0));
+        });
+
+        // Normal case: function with empty body
+        result = FunctionConstructor.call(context, JSUndefined.INSTANCE, new JSValue[]{});
+        assertThat(result).isInstanceOfSatisfying(JSFunction.class, func -> {
+            JSValue callResult = func.call(context, JSUndefined.INSTANCE, new JSValue[]{});
+            assertThat(callResult).isEqualTo(JSUndefined.INSTANCE);
+        });
+
+        // Normal case: function with multiple parameters
+        result = FunctionConstructor.call(context, JSUndefined.INSTANCE, new JSValue[]{
+                new JSString("x"),
+                new JSString("y"),
+                new JSString("z"),
+                new JSString("return x * y + z;")
+        });
+        assertThat(result).isInstanceOfSatisfying(JSFunction.class, func -> {
+            JSValue callResult = func.call(context, JSUndefined.INSTANCE, new JSValue[]{
+                    new JSNumber(3),
+                    new JSNumber(4),
+                    new JSNumber(5)
+            });
+            assertThat(callResult).isInstanceOfSatisfying(JSNumber.class, num ->
+                    assertThat(num.value()).isEqualTo(17.0));
+        });
+
+        // Edge case: syntax error in function body
+        result = FunctionConstructor.call(context, JSUndefined.INSTANCE, new JSValue[]{
+                new JSString("a"),
+                new JSString("return a +")  // Incomplete expression
+        });
+        assertSyntaxError(result);
+        assertPendingException(context);
+    }
+
+    @Test
+    public void testFunctionConstructorWithJavet() {
+        assertIntegerWithJavet(
+                // Test basic function creation with parameters and body
+                "new Function('a', 'b', 'return a + b;')(2, 3)",
+                "new Function('x', 'y', 'return x * y;')(4, 5)",
+                // Test function with single parameter
+                "new Function('n', 'return n * 2;')(21)",
+                // Test function with multiple statements in body
+                "new Function('x', 'var y = x * 2; return y + 1;')(5)",
+                // Test function that uses this context
+                "var obj = {value: 10}; new Function('return this.value;').call(obj)",
+                // Test function with closure
+                "(function() { var x = 5; var f = new Function('y', 'return y * 2;'); return f(x); })()",
+                // Test function length property (number of parameters)
+                "new Function('a', 'b', 'c', 'return a + b + c;').length",
+                "new Function('return 1;').length",
+                "new Function('x', 'return x;').length",
+                // Test function with only body (no parameters)
+                "new Function('return 42;')()");
+        assertDoubleWithJavet(
+                "new Function('return Math.PI * 2;')()");
+
+        assertObjectWithJavet(
+                // Test function with empty body
+                "new Function()()");
+
+        assertStringWithJavet(
+                "new Function('name', 'return \"Hello, \" + name;')('World')",
+                "new Function('a', 'b', 'return a + b;')('foo', 'bar')",
+                // Test function name property
+                "new Function('x', 'return x;').name");
+
+        assertBooleanWithJavet(
+                // Test boolean return
+                "new Function('x', 'return x > 5;')(10)",
+                "new Function('a', 'b', 'return a === b;')(5, 5)");
     }
 
     @Test

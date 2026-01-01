@@ -694,8 +694,8 @@ public final class GlobalObject {
         functionPrototype.set("bind", new JSNativeFunction("bind", 1, FunctionPrototype::bind));
         functionPrototype.set("toString", new JSNativeFunction("toString", 0, FunctionPrototype::toString_));
 
-        // Function constructor is a placeholder
-        JSObject functionConstructor = new JSObject();
+        // Function constructor should be a function, not a plain object
+        JSNativeFunction functionConstructor = new JSNativeFunction("Function", 1, FunctionConstructor::call);
         functionConstructor.set("prototype", functionPrototype);
         functionPrototype.set("constructor", functionConstructor);
 
@@ -897,6 +897,22 @@ public final class GlobalObject {
         objectPrototype.set("hasOwnProperty", new JSNativeFunction("hasOwnProperty", 1, ObjectConstructor::hasOwnProperty));
         objectPrototype.set("toString", new JSNativeFunction("toString", 0, ObjectPrototype::toString));
         objectPrototype.set("valueOf", new JSNativeFunction("valueOf", 0, ObjectPrototype::valueOf));
+        objectPrototype.set("isPrototypeOf", new JSNativeFunction("isPrototypeOf", 1, ObjectPrototype::isPrototypeOf));
+        objectPrototype.set("propertyIsEnumerable", new JSNativeFunction("propertyIsEnumerable", 1, ObjectPrototype::propertyIsEnumerable));
+        objectPrototype.set("toLocaleString", new JSNativeFunction("toLocaleString", 0, ObjectPrototype::toLocaleString));
+        objectPrototype.set("__defineGetter__", new JSNativeFunction("__defineGetter__", 2, ObjectPrototype::__defineGetter__));
+        objectPrototype.set("__defineSetter__", new JSNativeFunction("__defineSetter__", 2, ObjectPrototype::__defineSetter__));
+        objectPrototype.set("__lookupGetter__", new JSNativeFunction("__lookupGetter__", 1, ObjectPrototype::__lookupGetter__));
+        objectPrototype.set("__lookupSetter__", new JSNativeFunction("__lookupSetter__", 1, ObjectPrototype::__lookupSetter__));
+
+        // Define __proto__ as an accessor property
+        PropertyDescriptor protoDesc = PropertyDescriptor.accessorDescriptor(
+                new JSNativeFunction("get __proto__", 0, ObjectPrototype::__proto__Getter),
+                new JSNativeFunction("set __proto__", 1, ObjectPrototype::__proto__Setter),
+                true,
+                true
+        );
+        objectPrototype.defineProperty(PropertyKey.fromString("__proto__"), protoDesc);
 
         // Create Object constructor
         JSNativeFunction objectConstructor = new JSNativeFunction("Object", 1, ObjectConstructor::call);

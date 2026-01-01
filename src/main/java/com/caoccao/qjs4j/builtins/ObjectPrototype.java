@@ -29,6 +29,163 @@ import java.util.List;
 public final class ObjectPrototype {
 
     /**
+     * Object.prototype.__defineGetter__(prop, func)
+     * Legacy method for defining getter
+     */
+    public static JSValue __defineGetter__(JSContext context, JSValue thisArg, JSValue[] args) {
+        if (args.length < 2) {
+            return context.throwTypeError("__defineGetter__ requires 2 arguments");
+        }
+
+        if (!(thisArg instanceof JSObject obj)) {
+            return context.throwTypeError("__defineGetter__ called on null or undefined");
+        }
+
+        JSValue prop = args[0];
+        JSValue getter = args[1];
+
+        if (!(getter instanceof JSFunction)) {
+            return context.throwTypeError("Getter must be a function");
+        }
+
+        PropertyKey key = PropertyKey.fromValue(context, prop);
+        PropertyDescriptor desc = PropertyDescriptor.accessorDescriptor(
+                (JSFunction) getter,
+                null,
+                true,
+                true
+        );
+
+        obj.defineProperty(key, desc);
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Object.prototype.__defineSetter__(prop, func)
+     * Legacy method for defining setter
+     */
+    public static JSValue __defineSetter__(JSContext context, JSValue thisArg, JSValue[] args) {
+        if (args.length < 2) {
+            return context.throwTypeError("__defineSetter__ requires 2 arguments");
+        }
+
+        if (!(thisArg instanceof JSObject obj)) {
+            return context.throwTypeError("__defineSetter__ called on null or undefined");
+        }
+
+        JSValue prop = args[0];
+        JSValue setter = args[1];
+
+        if (!(setter instanceof JSFunction)) {
+            return context.throwTypeError("Setter must be a function");
+        }
+
+        PropertyKey key = PropertyKey.fromValue(context, prop);
+        PropertyDescriptor desc = PropertyDescriptor.accessorDescriptor(
+                null,
+                (JSFunction) setter,
+                true,
+                true
+        );
+
+        obj.defineProperty(key, desc);
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Object.prototype.__lookupGetter__(prop)
+     * Legacy method for looking up getter
+     */
+    public static JSValue __lookupGetter__(JSContext context, JSValue thisArg, JSValue[] args) {
+        if (args.length < 1) {
+            return JSUndefined.INSTANCE;
+        }
+
+        if (!(thisArg instanceof JSObject obj)) {
+            return context.throwTypeError("__lookupGetter__ called on null or undefined");
+        }
+
+        JSValue prop = args[0];
+        PropertyKey key = PropertyKey.fromValue(context, prop);
+
+        // Walk up the prototype chain
+        JSObject current = obj;
+        while (current != null) {
+            PropertyDescriptor desc = current.getOwnPropertyDescriptor(key);
+            if (desc != null && desc.getGetter() != null) {
+                return desc.getGetter();
+            }
+            current = current.getPrototype();
+        }
+
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Object.prototype.__lookupSetter__(prop)
+     * Legacy method for looking up setter
+     */
+    public static JSValue __lookupSetter__(JSContext context, JSValue thisArg, JSValue[] args) {
+        if (args.length < 1) {
+            return JSUndefined.INSTANCE;
+        }
+
+        if (!(thisArg instanceof JSObject obj)) {
+            return context.throwTypeError("__lookupSetter__ called on null or undefined");
+        }
+
+        JSValue prop = args[0];
+        PropertyKey key = PropertyKey.fromValue(context, prop);
+
+        // Walk up the prototype chain
+        JSObject current = obj;
+        while (current != null) {
+            PropertyDescriptor desc = current.getOwnPropertyDescriptor(key);
+            if (desc != null && desc.getSetter() != null) {
+                return desc.getSetter();
+            }
+            current = current.getPrototype();
+        }
+
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Object.prototype.__proto__ getter
+     */
+    public static JSValue __proto__Getter(JSContext context, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSObject obj)) {
+            return JSNull.INSTANCE;
+        }
+
+        JSObject proto = obj.getPrototype();
+        return proto != null ? proto : JSNull.INSTANCE;
+    }
+
+    /**
+     * Object.prototype.__proto__ setter
+     */
+    public static JSValue __proto__Setter(JSContext context, JSValue thisArg, JSValue[] args) {
+        if (args.length < 1) {
+            return JSUndefined.INSTANCE;
+        }
+
+        JSValue proto = args[0];
+
+        if (!(thisArg instanceof JSObject obj)) {
+            return JSUndefined.INSTANCE;
+        }
+
+        if (proto instanceof JSNull) {
+            obj.setPrototype(null);
+        } else if (proto instanceof JSObject protoObj) {
+            obj.setPrototype(protoObj);
+        }
+
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
      * Object.assign(target, ...sources)
      */
     public static JSValue assign(JSContext context, JSValue thisArg, JSValue[] args) {
@@ -280,6 +437,32 @@ public final class ObjectPrototype {
     }
 
     /**
+     * Object.prototype.isPrototypeOf(V)
+     */
+    public static JSValue isPrototypeOf(JSContext context, JSValue thisArg, JSValue[] args) {
+        JSValue v = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+
+        if (!(v instanceof JSObject obj)) {
+            return JSBoolean.FALSE;
+        }
+
+        if (!(thisArg instanceof JSObject thisObj)) {
+            return context.throwTypeError("Object.prototype.isPrototypeOf called on null or undefined");
+        }
+
+        // Walk up the prototype chain
+        JSObject proto = obj.getPrototype();
+        while (proto != null) {
+            if (proto == thisObj) {
+                return JSBoolean.TRUE;
+            }
+            proto = proto.getPrototype();
+        }
+
+        return JSBoolean.FALSE;
+    }
+
+    /**
      * Object.keys(obj)
      */
     public static JSValue keys(JSContext context, JSValue thisArg, JSValue[] args) {
@@ -301,6 +484,43 @@ public final class ObjectPrototype {
         }
 
         return new JSArray(keyStrings);
+    }
+
+    /**
+     * Object.prototype.propertyIsEnumerable(V)
+     */
+    public static JSValue propertyIsEnumerable(JSContext context, JSValue thisArg, JSValue[] args) {
+        JSValue prop = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
+
+        if (!(thisArg instanceof JSObject obj)) {
+            return context.throwTypeError("Object.prototype.propertyIsEnumerable called on null or undefined");
+        }
+
+        PropertyKey key = PropertyKey.fromValue(context, prop);
+        PropertyDescriptor desc = obj.getOwnPropertyDescriptor(key);
+
+        if (desc == null) {
+            return JSBoolean.FALSE;
+        }
+
+        return JSBoolean.valueOf(desc.isEnumerable());
+    }
+
+    /**
+     * Object.prototype.toLocaleString()
+     */
+    public static JSValue toLocaleString(JSContext context, JSValue thisArg, JSValue[] args) {
+        // Default implementation: call toString
+        if (!(thisArg instanceof JSObject obj)) {
+            return context.throwTypeError("Object.prototype.toLocaleString called on null or undefined");
+        }
+
+        JSValue toStringMethod = obj.get("toString");
+        if (toStringMethod instanceof JSFunction func) {
+            return func.call(context, thisArg, new JSValue[]{});
+        }
+
+        return new JSString("[object Object]");
     }
 
     /**
