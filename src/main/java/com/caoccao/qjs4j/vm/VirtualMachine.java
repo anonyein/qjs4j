@@ -1096,7 +1096,7 @@ public final class VirtualMachine {
         boolean result = false;
         if (object instanceof JSObject jsObj) {
             PropertyKey key = PropertyKey.fromValue(context, property);
-            result = jsObj.delete(key);
+            result = jsObj.delete(key, context);
         }
         valueStack.push(JSBoolean.valueOf(result));
     }

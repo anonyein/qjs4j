@@ -214,20 +214,6 @@ public class ObjectPrototypeTest extends BaseJavetTest {
     }
 
     @Test
-    public void testFreeze() {
-        JSObject obj = new JSObject();
-        obj.set("a", new JSNumber(1));
-
-        // Normal case: freeze object
-        JSValue result = ObjectPrototype.freeze(context, JSUndefined.INSTANCE, new JSValue[]{obj});
-        assertThat(result).isEqualTo(obj);
-
-        // Normal case: freeze primitive (returns primitive)
-        result = ObjectPrototype.freeze(context, JSUndefined.INSTANCE, new JSValue[]{new JSString("string")});
-        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("string"));
-    }
-
-    @Test
     public void testHasOwnProperty() {
         JSObject obj = new JSObject();
         obj.set("a", new JSNumber(1));

@@ -203,16 +203,53 @@ public final class JSArray extends JSObject {
      * Add element to the end of the array.
      */
     public void push(JSValue value) {
-        set(length, value);
+        push(value, null);
+    }
+
+    /**
+     * Add element to the end of the array with context for strict mode checking.
+     */
+    public void push(JSValue value, JSContext context) {
+        set(length, value, context);
     }
 
     /**
      * Set element at index.
      */
     public void set(long index, JSValue value) {
+        set(index, value, null);
+    }
+
+    /**
+     * Set element at index with context for strict mode checking.
+     */
+    public void set(long index, JSValue value, JSContext context) {
         if (index < 0) {
             // Negative indices are treated as string properties
-            super.set(Long.toString(index), value);
+            super.set(PropertyKey.fromString(Long.toString(index)), value, context);
+            return;
+        }
+
+        // Check if we're adding a new element beyond current length
+        boolean isAddingNewElement = index >= length;
+
+        // Check if array is not extensible/frozen before adding new elements
+        if (isAddingNewElement && !extensible) {
+            // In strict mode, throw TypeError when trying to add to non-extensible/frozen array
+            if (context != null && context.isStrictMode()) {
+                context.throwTypeError(
+                        "Cannot add property " + index + ", object is not extensible");
+            }
+            return;
+        }
+
+        // Check if array is frozen when modifying existing elements
+        if (!isAddingNewElement && frozen) {
+            // In strict mode, throw TypeError when trying to modify frozen array
+            if (context != null && context.isStrictMode()) {
+                context.throwTypeError(
+                        "Cannot assign to read only property '" + index + "' of object '[object Array]'");
+            }
             return;
         }
 
@@ -254,7 +291,7 @@ public final class JSArray extends JSObject {
     public void set(PropertyKey key, JSValue value, JSContext context) {
         // If it's an index, use dense/sparse array storage
         if (key.isIndex()) {
-            set(key.asIndex(), value);
+            set(key.asIndex(), value, context);
         } else {
             // Otherwise, use the shape-based storage from JSObject
             super.set(key, value, context);

@@ -706,7 +706,7 @@ public final class ArrayPrototype {
         }
 
         for (JSValue arg : args) {
-            arr.push(arg);
+            arr.push(arg, context);
         }
 
         return new JSNumber(arr.getLength());

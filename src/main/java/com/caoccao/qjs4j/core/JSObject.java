@@ -129,7 +129,7 @@ public non-sealed class JSObject implements JSValue {
      * Following QuickJS delete_property() logic.
      */
     public boolean delete(String propertyName) {
-        return delete(PropertyKey.fromString(propertyName));
+        return delete(PropertyKey.fromString(propertyName), null);
     }
 
     /**
@@ -137,8 +137,21 @@ public non-sealed class JSObject implements JSValue {
      * Following QuickJS delete_property() implementation.
      */
     public boolean delete(PropertyKey key) {
+        return delete(key, null);
+    }
+
+    /**
+     * Delete a property by key with context for strict mode checking.
+     * Following QuickJS delete_property() implementation.
+     */
+    public boolean delete(PropertyKey key, JSContext context) {
         // Cannot delete from sealed or frozen objects
         if (sealed || frozen) {
+            // In strict mode, throw TypeError when trying to delete from frozen/sealed object
+            if (context != null && context.isStrictMode()) {
+                context.throwTypeError(
+                        "Cannot delete property '" + key.toPropertyString() + "' of " + getObjectDescriptionForError(true));
+            }
             return false;
         }
 
@@ -152,6 +165,17 @@ public non-sealed class JSObject implements JSValue {
         int offset = shape.getPropertyOffset(key);
         if (offset < 0) {
             return true; // Property doesn't exist, deletion successful
+        }
+
+        // Check if property is configurable before removing
+        PropertyDescriptor desc = shape.getDescriptorAt(offset);
+        if (!desc.isConfigurable()) {
+            // In strict mode, throw TypeError when trying to delete non-configurable property
+            if (context != null && context.isStrictMode()) {
+                context.throwTypeError(
+                        "Cannot delete property '" + key.toPropertyString() + "' of " + getObjectDescriptionForError(true));
+            }
+            return false;
         }
 
         // Remove from shape (checks configurability internally)
@@ -316,6 +340,37 @@ public non-sealed class JSObject implements JSValue {
     }
 
     /**
+     * Get a V8-style object description for error messages.
+     * Returns format that matches V8 error messages.
+     *
+     * @param forDelete if true, returns format for delete errors, otherwise for assignment errors
+     */
+    private String getObjectDescriptionForError(boolean forDelete) {
+        // For functions, use format: "function 'functionString'"
+        if (this instanceof JSFunction func) {
+            return "function '" + func + "'";
+        }
+
+        // For objects, format depends on error type:
+        // Delete errors: "#<ConstructorName>"
+        // Assignment errors: "object '#<ConstructorName>'"
+        String prefix = forDelete ? "" : "object '";
+        String suffix = forDelete ? "" : "'";
+
+        // Get constructor name if available
+        JSValue constructor = get("constructor");
+        if (constructor instanceof JSFunction constructorFunc) {
+            JSValue name = constructorFunc.get("name");
+            if (name instanceof JSString nameStr && !nameStr.value().isEmpty()) {
+                return prefix + "#<" + nameStr.value() + ">" + suffix;
+            }
+        }
+
+        // Default to Object
+        return prefix + "#<Object>" + suffix;
+    }
+
+    /**
      * Get the property descriptor for a property.
      */
     public PropertyDescriptor getOwnPropertyDescriptor(PropertyKey key) {
@@ -444,6 +499,8 @@ public non-sealed class JSObject implements JSValue {
         this.extensible = false;
     }
 
+    // Prototype chain
+
     /**
      * Seal this object.
      * Prevents adding new properties and deleting existing properties.
@@ -454,14 +511,14 @@ public non-sealed class JSObject implements JSValue {
         this.extensible = false; // Sealed objects are not extensible
     }
 
-    // Prototype chain
-
     /**
      * Set a property value by string name.
      */
     public void set(String propertyName, JSValue value) {
         set(PropertyKey.fromString(propertyName), value);
     }
+
+    // Object integrity levels (ES5)
 
     /**
      * Set a property value by integer index.
@@ -478,8 +535,6 @@ public non-sealed class JSObject implements JSValue {
 
         set(PropertyKey.fromIndex(index), value);
     }
-
-    // Object integrity levels (ES5)
 
     /**
      * Set a property value by property key.
@@ -515,11 +570,8 @@ public non-sealed class JSObject implements JSValue {
             if (!desc.isWritable() || frozen) {
                 // In strict mode, throw TypeError
                 if (context != null && context.isStrictMode()) {
-                    // Get better description of object for error message
-                    String objectDesc = this instanceof JSFunction func ?
-                            "function '" + func + "'" : this.toString();
                     context.throwTypeError(
-                            "Cannot assign to read only property '" + key.asString() + "' of " + objectDesc);
+                            "Cannot assign to read only property '" + key.toPropertyString() + "' of " + getObjectDescriptionForError(false));
                 }
                 // In non-strict mode, silently fail
                 return;
@@ -531,6 +583,13 @@ public non-sealed class JSObject implements JSValue {
         // Property doesn't exist, add it (only if extensible)
         if (extensible) {
             defineProperty(key, PropertyDescriptor.defaultData(value));
+        } else {
+            // In strict mode, throw TypeError when trying to add property to non-extensible object
+            if (context != null && context.isStrictMode()) {
+                context.throwTypeError(
+                        "Cannot add property " + key.toPropertyString() + ", object is not extensible");
+            }
+            // In non-strict mode, silently fail
         }
     }
 
@@ -550,11 +609,11 @@ public non-sealed class JSObject implements JSValue {
         this.primitiveValue = value;
     }
 
+    // JSValue implementation
+
     public void setPrototype(JSObject prototype) {
         this.prototype = prototype;
     }
-
-    // JSValue implementation
 
     @Override
     public Object toJavaObject() {

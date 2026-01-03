@@ -117,15 +117,6 @@ public class ObjectConstructorTest extends BaseJavetTest {
 
     @Test
     public void testDefineProperty() {
-        JSObject obj = new JSObject();
-
-        // Create a data descriptor
-        JSObject descriptor = new JSObject();
-        descriptor.set("value", new JSNumber(42));
-        descriptor.set("writable", JSBoolean.TRUE);
-        descriptor.set("enumerable", JSBoolean.TRUE);
-        descriptor.set("configurable", JSBoolean.TRUE);
-
         assertIntegerWithJavet(
                 "var obj = {}; Object.defineProperty(obj, 'x', {value: 42, writable: true}); obj.x",
                 "var obj2 = {}; Object.defineProperty(obj2, 'y', {value: 100}); obj2.y");
@@ -177,6 +168,110 @@ public class ObjectConstructorTest extends BaseJavetTest {
         // Edge case: no arguments
         assertTypeError(ObjectConstructor.freeze(context, JSUndefined.INSTANCE, new JSValue[]{}));
         assertPendingException(context);
+
+        // Normal case: freeze primitive (returns primitive)
+        result = ObjectPrototype.freeze(context, JSUndefined.INSTANCE, new JSValue[]{new JSString("string")});
+        assertThat(result).isInstanceOfSatisfying(JSString.class, jsStr -> assertThat(jsStr.value()).isEqualTo("string"));
+
+        // Edge case: freeze number primitive
+        result = ObjectPrototype.freeze(context, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(42)});
+        assertThat(result).isInstanceOfSatisfying(JSNumber.class, jsNum -> assertThat(jsNum.value()).isEqualTo(42.0));
+
+        // Edge case: freeze boolean primitive
+        result = ObjectPrototype.freeze(context, JSUndefined.INSTANCE, new JSValue[]{JSBoolean.TRUE});
+        assertThat(result).isEqualTo(JSBoolean.TRUE);
+
+        // Edge case: freeze null (returns null)
+        result = ObjectPrototype.freeze(context, JSUndefined.INSTANCE, new JSValue[]{JSNull.INSTANCE});
+        assertThat(result).isEqualTo(JSNull.INSTANCE);
+
+        // Edge case: freeze undefined (returns undefined)
+        result = ObjectPrototype.freeze(context, JSUndefined.INSTANCE, new JSValue[]{JSUndefined.INSTANCE});
+        assertThat(result).isEqualTo(JSUndefined.INSTANCE);
+
+        // Test Object.isFrozen returns true after freeze
+        assertBooleanWithJavet(
+                "var obj = {a: 1}; Object.freeze(obj); Object.isFrozen(obj)",
+                // Test Object.isFrozen returns false before freeze
+                "var obj = {a: 1}; !Object.isFrozen(obj)",
+                // Test freeze on empty object
+                "var obj = {}; Object.freeze(obj); Object.isFrozen(obj)",
+                // Test freeze returns same object
+                "var obj = {a: 1}; Object.freeze(obj) === obj",
+                // Test freeze on nested object (shallow freeze)
+                "var obj = {a: {b: 1}}; Object.freeze(obj); obj.a.b = 999; obj.a.b === 999",
+                // Test freeze on object with getter/setter
+                """
+                        var obj = {_a: 1}; Object.defineProperty(obj, 'a', {get: function() {return this._a;}});
+                        Object.freeze(obj);
+                        Object.isFrozen(obj)""",
+                // Test isExtensible returns false after freeze
+                "var obj = {a: 1}; Object.freeze(obj); !Object.isExtensible(obj)",
+                // Test isSealed returns true after freeze
+                "var obj = {a: 1}; Object.freeze(obj); Object.isSealed(obj)",
+                // Test freeze on already frozen object
+                """
+                        var obj = {a: 1}; Object.freeze(obj);
+                        Object.freeze(obj);
+                        Object.isFrozen(obj)""");
+
+        assertErrorWithJavet(
+                // Test freeze prevents adding properties
+                """
+                        'use strict';
+                        var obj = {a: 1}; Object.freeze(obj);
+                        obj.b = 2;
+                        obj.b === undefined""",
+                // Test freeze prevents deleting properties
+                """
+                        'use strict';
+                        var obj = {a: 1}; Object.freeze(obj);
+                        delete obj.a;
+                        obj.a === 1""",
+                // Test freeze prevents modifying properties
+                """
+                        'use strict';
+                        var obj = {a: 1}; Object.freeze(obj);
+                        obj.a = 999;
+                        obj.a === 1""",
+                // Test freeze on array
+                """
+                        'use strict';
+                        var arr = [1, 2, 3]; Object.freeze(arr);
+                        arr.push(4);
+                        arr.length === 3""",
+                // Test freeze on array prevents modification
+                """
+                        'use strict';
+                        var arr = [1, 2, 3]; Object.freeze(arr);
+                        arr[0] = 999;
+                        arr[0] === 1""",
+                // Test freeze prevents adding to nested object but parent is frozen
+                """
+                        'use strict';
+                        var obj = {a: {b: 1}}; Object.freeze(obj);
+                        obj.c = 2;
+                        obj.c === undefined""",
+                // Test freeze on object with symbols
+                """
+                        'use strict';
+                        var sym = Symbol('test'); var obj = {}; obj[sym] = 1;
+                        Object.freeze(obj);
+                        obj[sym] = 999;
+                        obj[sym] === 1""",
+                // Test freeze on object with non-enumerable properties
+                """
+                        'use strict';
+                        var obj = {}; Object.defineProperty(obj, 'a', {value: 1, enumerable: false});
+                        Object.freeze(obj);
+                        obj.a = 999;
+                        obj.a === 1""",
+                // Test freeze on function
+                """
+                        'use strict';
+                        var func = function() {}; Object.freeze(func);
+                        func.newProp = 1;
+                        func.newProp === undefined""");
     }
 
     @Test

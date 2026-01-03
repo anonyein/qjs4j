@@ -230,6 +230,12 @@ public final class JSProxy extends JSObject {
      */
     @Override
     public boolean delete(PropertyKey key) {
+        return delete(key, null);
+    }
+
+    @Override
+    public boolean delete(PropertyKey key, JSContext ctx) {
+        // Use the proxy's context, not the passed one
         if (revoked) {
             throw new JSException(context.throwTypeError("Cannot perform 'delete' on a proxy that has been revoked"));
         }
@@ -259,8 +265,8 @@ public final class JSProxy extends JSObject {
             return success;
         }
 
-        // No trap, forward to target
-        return ((JSObject) target).delete(key);
+        // No trap, forward to target (pass context for strict mode checking)
+        return ((JSObject) target).delete(key, context);
     }
 
     /**
