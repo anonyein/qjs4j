@@ -181,6 +181,9 @@ public enum Opcode {
     FOR_OF_START(129, 1, 1, 3),  // Start sync iteration: iterable -> iter next catch_offset
     FOR_OF_NEXT(130, 2, 3, 5),   // Get next from sync iterator: iter next catch_offset -> iter next catch_offset value done
 
+    // Type checking operations
+    IS_UNDEFINED_OR_NULL(174, 1, 1, 1),  // Check if value is null or undefined - replaces value with boolean
+
     // Generator operations (following QuickJS opcode numbers)
     INITIAL_YIELD(212, 1, 0, 0),  // Initial yield in generator - suspends generator at start
     YIELD(213, 1, 1, 2),          // Yield value from generator - pops value, yields it

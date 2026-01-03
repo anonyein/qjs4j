@@ -145,6 +145,14 @@ public final class BytecodeCompiler {
         Expression left = assignExpr.left();
         AssignmentExpression.AssignmentOperator operator = assignExpr.operator();
 
+        // Handle logical assignment operators (&&=, ||=, ??=) with short-circuit evaluation
+        if (operator == AssignmentExpression.AssignmentOperator.LOGICAL_AND_ASSIGN ||
+                operator == AssignmentExpression.AssignmentOperator.LOGICAL_OR_ASSIGN ||
+                operator == AssignmentExpression.AssignmentOperator.NULLISH_ASSIGN) {
+            compileLogicalAssignment(assignExpr);
+            return;
+        }
+
         // For compound assignments (+=, -=, etc.), we need to load the current value first
         if (operator != AssignmentExpression.AssignmentOperator.ASSIGN) {
             // Load current value of left side
@@ -186,8 +194,6 @@ public final class BytecodeCompiler {
                 case AND_ASSIGN -> emitter.emitOpcode(Opcode.AND);
                 case OR_ASSIGN -> emitter.emitOpcode(Opcode.OR);
                 case XOR_ASSIGN -> emitter.emitOpcode(Opcode.XOR);
-                case LOGICAL_AND_ASSIGN, LOGICAL_OR_ASSIGN, NULLISH_ASSIGN ->
-                        throw new CompilerException("Logical assignment operators not yet implemented");
                 default -> throw new CompilerException("Unknown assignment operator: " + operator);
             }
         } else {
@@ -225,6 +231,150 @@ public final class BytecodeCompiler {
                 }
             }
         }
+    }
+
+    /**
+     * Compile logical assignment operators (&&=, ||=, ??=) with short-circuit evaluation.
+     * Based on QuickJS implementation in quickjs.c (lines 27635-27690).
+     * <p>
+     * For a ??= b:
+     * 1. Load current value of a (with DUP for member expressions)
+     * 2. Duplicate it
+     * 3. Check if it's null or undefined
+     * 4. If not null/undefined, jump to end (keep current value, cleanup lvalue stack)
+     * 5. If null/undefined, drop duplicate, evaluate b, insert below lvalue, assign, jump to end2
+     * 6. At end: cleanup lvalue stack with NIP operations
+     * 7. At end2: continue
+     * <p>
+     * For a &&= b:
+     * Similar but check for falsy
+     * <p>
+     * For a ||= b:
+     * Similar but check for truthy
+     */
+    private void compileLogicalAssignment(AssignmentExpression assignExpr) {
+        Expression left = assignExpr.left();
+        AssignmentExpression.AssignmentOperator operator = assignExpr.operator();
+
+        // Determine the depth of lvalue for proper stack manipulation
+        // depth 0 = identifier, depth 1 = obj.prop, depth 2 = obj[prop]
+        int depthLvalue;
+        if (left instanceof Identifier) {
+            depthLvalue = 0;
+        } else if (left instanceof MemberExpression memberExpr) {
+            depthLvalue = memberExpr.computed() ? 2 : 1;
+        } else {
+            throw new CompilerException("Invalid left-hand side in logical assignment");
+        }
+
+        // Load the current value
+        if (left instanceof Identifier id) {
+            String name = id.name();
+            Integer localIndex = findLocalInScopes(name);
+            if (localIndex != null) {
+                emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
+            } else {
+                emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
+            }
+        } else if (left instanceof MemberExpression memberExpr) {
+            compileExpression(memberExpr.object());
+            if (memberExpr.computed()) {
+                compileExpression(memberExpr.property());
+                emitter.emitOpcode(Opcode.DUP2);  // Duplicate obj and prop
+                emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+            } else if (memberExpr.property() instanceof Identifier propId) {
+                emitter.emitOpcode(Opcode.DUP);  // Duplicate object
+                emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
+            }
+        }
+
+        // Duplicate the current value for the test
+        emitter.emitOpcode(Opcode.DUP);
+
+        // Emit the test based on operator type
+        int jumpToCleanup;
+        if (operator == AssignmentExpression.AssignmentOperator.NULLISH_ASSIGN) {
+            // For ??=, check if null or undefined
+            emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
+            // Jump to cleanup if NOT null/undefined (value is on stack)
+            jumpToCleanup = emitter.emitJump(Opcode.IF_FALSE);
+        } else if (operator == AssignmentExpression.AssignmentOperator.LOGICAL_OR_ASSIGN) {
+            // For ||=, jump to cleanup if truthy
+            jumpToCleanup = emitter.emitJump(Opcode.IF_TRUE);
+        } else { // LOGICAL_AND_ASSIGN
+            // For &&=, jump to cleanup if falsy
+            jumpToCleanup = emitter.emitJump(Opcode.IF_FALSE);
+        }
+
+        // The current value didn't meet the condition, so we assign the new value
+        // The boolean was already popped by IF_FALSE
+        // Drop the old value
+        emitter.emitOpcode(Opcode.DROP);
+
+        // Compile the right-hand side expression
+        compileExpression(assignExpr.right());
+
+        // Insert the new value below the lvalue on stack for proper assignment
+        // This matches QuickJS's OP_insert2, OP_insert3, OP_insert4 pattern
+        // INSERT2: [a, b] -> [b, a, b]
+        // INSERT3: [a, b, c] -> [c, a, b, c]
+        // INSERT4: [a, b, c, d] -> [d, a, b, c, d]
+        switch (depthLvalue) {
+            case 0 -> {
+                // For identifier: stack is [newValue]
+                // We need to keep the value on stack for the result
+                emitter.emitOpcode(Opcode.DUP);
+            }
+            case 1 -> {
+                // For obj.prop: stack is [obj, newValue]
+                // We need: [newValue, obj] for PUT_FIELD
+                // PUT_FIELD pops obj, peeks newValue, leaves newValue on stack
+                emitter.emitOpcode(Opcode.SWAP);
+            }
+            case 2 -> {
+                // For obj[prop]: stack is [obj, prop, newValue]
+                // We need: [newValue, obj, prop] for PUT_ARRAY_EL
+                // ROT3R rotates right: [a, b, c] -> [c, a, b]
+                // So [obj, prop, newValue] -> [newValue, obj, prop]
+                emitter.emitOpcode(Opcode.ROT3R);
+            }
+            default -> throw new CompilerException("Invalid depth for logical assignment");
+        }
+
+        // Store the result to left side
+        if (left instanceof Identifier id) {
+            String name = id.name();
+            Integer localIndex = findLocalInScopes(name);
+            if (localIndex != null) {
+                emitter.emitOpcodeU16(Opcode.SET_LOCAL, localIndex);
+            } else {
+                emitter.emitOpcodeAtom(Opcode.SET_VAR, name);
+            }
+        } else if (left instanceof MemberExpression memberExpr) {
+            if (memberExpr.computed()) {
+                emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+            } else if (memberExpr.property() instanceof Identifier propId) {
+                emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
+            }
+        }
+
+        // Jump over the cleanup code
+        int jumpToEnd = emitter.emitJump(Opcode.GOTO);
+
+        // Patch the jump to cleanup - if we took this branch, we need to cleanup lvalue stack
+        emitter.patchJump(jumpToCleanup, emitter.currentOffset());
+
+        // Remove the lvalue stack entries using NIP
+        // NIP removes the value below the top, keeping the top value
+        // For depth 0 (identifier): no cleanup needed
+        // For depth 1 (obj.prop): NIP removes obj, keeps the value
+        // For depth 2 (obj[prop]): NIP twice removes obj and prop, keeps the value
+        for (int i = 0; i < depthLvalue; i++) {
+            emitter.emitOpcode(Opcode.NIP);
+        }
+
+        // Patch the jump to end - both paths converge here
+        emitter.patchJump(jumpToEnd, emitter.currentOffset());
     }
 
     // ==================== Statement Compilation ====================

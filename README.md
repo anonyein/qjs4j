@@ -22,7 +22,6 @@ qjs4j includes features not present in the original QuickJS:
 The following QuickJS features are planned but not yet implemented:
 
 - **Internationalization (Intl)**: i18n support for dates, numbers, and strings
-- **Some operators**: Nullish coalescing assignment (??=), logical assignment (&&=, ||=)
 - **Advanced class features**: Private fields (#field), static blocks
 - **Top-level await**: Module-level await expressions
 

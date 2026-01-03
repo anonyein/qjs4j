@@ -332,7 +332,11 @@ public final class Lexer {
             case '~' -> TokenType.BIT_NOT;
             case '?' -> {
                 if (match('?')) {
-                    yield TokenType.NULLISH_COALESCING;
+                    if (match('=')) {
+                        yield TokenType.NULLISH_ASSIGN;
+                    } else {
+                        yield TokenType.NULLISH_COALESCING;
+                    }
                 } else if (match('.')) {
                     yield TokenType.OPTIONAL_CHAINING;
                 }
@@ -375,7 +379,7 @@ public final class Lexer {
             }
             case '&' -> {
                 if (match('&')) {
-                    if (match('=')) yield TokenType.AND_ASSIGN;
+                    if (match('=')) yield TokenType.LOGICAL_AND_ASSIGN;
                     else yield TokenType.LOGICAL_AND;
                 } else if (match('=')) {
                     yield TokenType.AND_ASSIGN;
@@ -385,7 +389,7 @@ public final class Lexer {
             }
             case '|' -> {
                 if (match('|')) {
-                    if (match('=')) yield TokenType.OR_ASSIGN;
+                    if (match('=')) yield TokenType.LOGICAL_OR_ASSIGN;
                     else yield TokenType.LOGICAL_OR;
                 } else if (match('=')) {
                     yield TokenType.OR_ASSIGN;

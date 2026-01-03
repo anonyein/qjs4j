@@ -94,7 +94,12 @@ public final class Parser {
     private boolean isAssignmentOperator(TokenType type) {
         return type == TokenType.ASSIGN || type == TokenType.PLUS_ASSIGN ||
                 type == TokenType.MINUS_ASSIGN || type == TokenType.MUL_ASSIGN ||
-                type == TokenType.DIV_ASSIGN || type == TokenType.MOD_ASSIGN;
+                type == TokenType.DIV_ASSIGN || type == TokenType.MOD_ASSIGN ||
+                type == TokenType.EXP_ASSIGN || type == TokenType.LSHIFT_ASSIGN ||
+                type == TokenType.RSHIFT_ASSIGN || type == TokenType.URSHIFT_ASSIGN ||
+                type == TokenType.AND_ASSIGN || type == TokenType.OR_ASSIGN ||
+                type == TokenType.XOR_ASSIGN || type == TokenType.LOGICAL_AND_ASSIGN ||
+                type == TokenType.LOGICAL_OR_ASSIGN || type == TokenType.NULLISH_ASSIGN;
     }
 
     private boolean match(TokenType type) {
@@ -324,11 +329,21 @@ public final class Parser {
 
             AssignmentExpression.AssignmentOperator operator = switch (op) {
                 case ASSIGN -> AssignmentExpression.AssignmentOperator.ASSIGN;
+                case AND_ASSIGN -> AssignmentExpression.AssignmentOperator.AND_ASSIGN;
                 case DIV_ASSIGN -> AssignmentExpression.AssignmentOperator.DIV_ASSIGN;
+                case EXP_ASSIGN -> AssignmentExpression.AssignmentOperator.EXP_ASSIGN;
+                case LOGICAL_AND_ASSIGN -> AssignmentExpression.AssignmentOperator.LOGICAL_AND_ASSIGN;
+                case LOGICAL_OR_ASSIGN -> AssignmentExpression.AssignmentOperator.LOGICAL_OR_ASSIGN;
+                case LSHIFT_ASSIGN -> AssignmentExpression.AssignmentOperator.LSHIFT_ASSIGN;
                 case MINUS_ASSIGN -> AssignmentExpression.AssignmentOperator.MINUS_ASSIGN;
                 case MOD_ASSIGN -> AssignmentExpression.AssignmentOperator.MOD_ASSIGN;
                 case MUL_ASSIGN -> AssignmentExpression.AssignmentOperator.MUL_ASSIGN;
+                case NULLISH_ASSIGN -> AssignmentExpression.AssignmentOperator.NULLISH_ASSIGN;
+                case OR_ASSIGN -> AssignmentExpression.AssignmentOperator.OR_ASSIGN;
                 case PLUS_ASSIGN -> AssignmentExpression.AssignmentOperator.PLUS_ASSIGN;
+                case RSHIFT_ASSIGN -> AssignmentExpression.AssignmentOperator.RSHIFT_ASSIGN;
+                case URSHIFT_ASSIGN -> AssignmentExpression.AssignmentOperator.URSHIFT_ASSIGN;
+                case XOR_ASSIGN -> AssignmentExpression.AssignmentOperator.XOR_ASSIGN;
                 default -> AssignmentExpression.AssignmentOperator.ASSIGN;
             };
 
@@ -1043,6 +1058,27 @@ public final class Parser {
 
                 // Check if next token is identifier - could be arrow function param
                 if (match(TokenType.IDENTIFIER)) {
+                    // Peek ahead to distinguish between:
+                    // (id) => expr (arrow function with single param)
+                    // (id, id2) => expr (arrow function with multiple params)
+                    // (id = value) (grouped assignment expression)
+                    // (id + value) (grouped binary expression)
+                    
+                    // We need to look at what comes after the identifier
+                    // to decide if this is arrow function params or a grouped expression
+                    
+                    // Check if the token after identifier is an assignment operator
+                    // If so, this is a grouped expression like (b = 10), not arrow params
+                    if (nextToken.type() != TokenType.COMMA && 
+                        nextToken.type() != TokenType.RPAREN &&
+                        nextToken.type() != TokenType.ARROW) {
+                        // This looks like a grouped expression, not arrow function params
+                        // Parse the whole thing as an expression
+                        Expression expr = parseExpression();
+                        expect(TokenType.RPAREN);
+                        yield expr;
+                    }
+                    
                     // Could be (id) or (id, id, ...)
                     // Parse as parameter list tentatively
                     List<Identifier> potentialParams = new ArrayList<>();

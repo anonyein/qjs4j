@@ -39,6 +39,7 @@ This document provides a comprehensive list of all JavaScript features implement
 - **Bitwise**: &, |, ^, ~, <<, >>, >>>
 - **Comparison**: ==, !=, ===, !==, <, >, <=, >=
 - **Assignment**: =, +=, -=, *=, /=, %=, etc.
+- **Logical assignment**: &&=, ||=, ??= (ES2021)
 - **Unary**: typeof, delete, void, +, -, ++, --
 - **Ternary**: condition ? true : false
 - **Optional chaining**: ?. (ES2020)
@@ -420,8 +421,6 @@ This document provides a comprehensive list of all JavaScript features implement
 ## Not Yet Implemented ⏳
 
 ### Syntax Features
-- **Nullish coalescing assignment**: ??=
-- **Logical assignment**: &&=, ||=
 - **Private class fields**: #field
 - **Static class blocks**: static { }
 - **Top-level await**: Module-level await

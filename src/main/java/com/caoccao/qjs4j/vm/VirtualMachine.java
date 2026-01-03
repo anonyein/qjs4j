@@ -197,6 +197,51 @@ public final class VirtualMachine {
                         valueStack.push(valueStack.peek(1));
                         pc += op.getSize();
                     }
+                    case INSERT2 -> {
+                        // INSERT2: [a, b] -> [b, a, b]
+                        // Duplicate top and insert below second element
+                        JSValue top = valueStack.peek(0);
+                        JSValue second = valueStack.peek(1);
+                        valueStack.pop();  // Remove original top
+                        valueStack.pop();  // Remove second
+                        valueStack.push(top);
+                        valueStack.push(second);
+                        valueStack.push(top);
+                        pc += op.getSize();
+                    }
+                    case INSERT3 -> {
+                        // INSERT3: [a, b, c] -> [c, a, b, c]
+                        // Duplicate top and insert below third element
+                        JSValue top = valueStack.peek(0);
+                        JSValue second = valueStack.peek(1);
+                        JSValue third = valueStack.peek(2);
+                        valueStack.pop();  // Remove original top
+                        valueStack.pop();  // Remove second
+                        valueStack.pop();  // Remove third
+                        valueStack.push(top);
+                        valueStack.push(third);
+                        valueStack.push(second);
+                        valueStack.push(top);
+                        pc += op.getSize();
+                    }
+                    case INSERT4 -> {
+                        // INSERT4: [a, b, c, d] -> [d, a, b, c, d]
+                        // Duplicate top and insert below fourth element
+                        JSValue top = valueStack.peek(0);
+                        JSValue second = valueStack.peek(1);
+                        JSValue third = valueStack.peek(2);
+                        JSValue fourth = valueStack.peek(3);
+                        valueStack.pop();  // Remove original top
+                        valueStack.pop();  // Remove second
+                        valueStack.pop();  // Remove third
+                        valueStack.pop();  // Remove fourth
+                        valueStack.push(top);
+                        valueStack.push(fourth);
+                        valueStack.push(third);
+                        valueStack.push(second);
+                        valueStack.push(top);
+                        pc += op.getSize();
+                    }
                     case SWAP -> {
                         JSValue v1 = valueStack.pop();
                         JSValue v2 = valueStack.pop();
@@ -214,6 +259,15 @@ public final class VirtualMachine {
                         valueStack.push(b);
                         valueStack.push(a);
                         valueStack.push(c);
+                        pc += op.getSize();
+                    }
+                    case ROT3R -> {
+                        JSValue a = valueStack.pop();
+                        JSValue b = valueStack.pop();
+                        JSValue c = valueStack.pop();
+                        valueStack.push(a);
+                        valueStack.push(c);
+                        valueStack.push(b);
                         pc += op.getSize();
                     }
 
@@ -638,6 +692,10 @@ public final class VirtualMachine {
                     }
                     case DELETE -> {
                         handleDelete();
+                        pc += op.getSize();
+                    }
+                    case IS_UNDEFINED_OR_NULL -> {
+                        handleIsUndefinedOrNull();
                         pc += op.getSize();
                     }
 
@@ -1475,6 +1533,12 @@ public final class VirtualMachine {
         JSValue operand = valueStack.pop();
         String type = JSTypeChecking.typeof(operand);
         valueStack.push(new JSString(type));
+    }
+
+    private void handleIsUndefinedOrNull() {
+        JSValue value = valueStack.pop();
+        boolean result = value instanceof JSNull || value instanceof JSUndefined;
+        valueStack.push(result ? JSBoolean.TRUE : JSBoolean.FALSE);
     }
 
     private void handleXor() {
