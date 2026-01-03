@@ -804,11 +804,58 @@ public final class Parser {
         List<ObjectExpression.Property> properties = new ArrayList<>();
 
         while (!match(TokenType.RBRACE) && !match(TokenType.EOF)) {
-            Expression key = parsePropertyName();
-            expect(TokenType.COLON);
-            Expression value = parseExpression();
+            boolean isAsync = false;
+            boolean isGenerator = false;
 
-            properties.add(new ObjectExpression.Property(key, value, "init", false, false));
+            // Check for 'async' modifier (only if NOT followed by colon or comma)
+            if (match(TokenType.ASYNC)) {
+                // Peek ahead to determine if this is a modifier or property name
+                if (nextToken.type() == TokenType.COLON || nextToken.type() == TokenType.COMMA) {
+                    // { async: value } or { async, ... } - async is property name
+                    // Don't advance, let parsePropertyName handle it
+                } else {
+                    // async is likely a modifier for method
+                    isAsync = true;
+                    advance();
+                }
+            }
+
+            // Check for generator *
+            if (match(TokenType.MUL)) {
+                isGenerator = true;
+                advance();
+            }
+
+            // Parse property name (can be identifier, string, number, or computed [expr])
+            Expression key = parsePropertyName();
+
+            // Determine if this is a method or regular property
+            if (match(TokenType.LPAREN)) {
+                // Method shorthand: name() {} or async name() {} or *name() {} or async *name() {}
+                SourceLocation funcLocation = getLocation();
+                expect(TokenType.LPAREN);
+                List<Identifier> params = new ArrayList<>();
+
+                if (!match(TokenType.RPAREN)) {
+                    do {
+                        if (match(TokenType.COMMA)) {
+                            advance();
+                        }
+                        params.add(parseIdentifier());
+                    } while (match(TokenType.COMMA));
+                }
+
+                expect(TokenType.RPAREN);
+                BlockStatement body = parseBlockStatement();
+
+                Expression value = new FunctionExpression(null, params, body, isAsync, isGenerator, funcLocation);
+                properties.add(new ObjectExpression.Property(key, value, "init", false, false));
+            } else {
+                // Regular property: key: value
+                expect(TokenType.COLON);
+                Expression value = parseExpression();
+                properties.add(new ObjectExpression.Property(key, value, "init", false, false));
+            }
 
             if (match(TokenType.COMMA)) {
                 advance();
@@ -1027,6 +1074,13 @@ public final class Parser {
                 advance();
                 // Numeric keys are converted to strings
                 yield new Literal(value, location);
+            }
+            case LBRACKET -> {
+                // Computed property name: [expression]
+                advance();
+                Expression expr = parseExpression();
+                expect(TokenType.RBRACKET);
+                yield expr;
             }
             // Allow keywords as property names (e.g., obj.delete, obj.class, obj.return)
             case AS, ASYNC, AWAIT, BREAK, CASE, CATCH, CLASS, CONST, CONTINUE,
@@ -1292,6 +1346,28 @@ public final class Parser {
             advance();
             Expression argument = parseUnaryExpression();
             return new AwaitExpression(argument, location);
+        }
+
+        // Handle yield expressions
+        if (match(TokenType.YIELD)) {
+            SourceLocation location = getLocation();
+            advance();
+
+            // Check for yield* (delegating yield)
+            boolean delegate = false;
+            if (match(TokenType.MUL)) {
+                delegate = true;
+                advance();
+            }
+
+            // Yield can have no argument: just "yield" by itself
+            // or can have an argument: "yield expr" or "yield* expr"
+            Expression argument = null;
+            if (!match(TokenType.SEMICOLON) && !match(TokenType.RBRACE) && !match(TokenType.EOF)) {
+                argument = parseAssignmentExpression();
+            }
+
+            return new YieldExpression(argument, delegate, location);
         }
 
         if (match(TokenType.INC) || match(TokenType.DEC)) {

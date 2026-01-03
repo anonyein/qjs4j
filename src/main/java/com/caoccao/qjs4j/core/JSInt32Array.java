@@ -23,8 +23,8 @@ import java.nio.ByteBuffer;
  * 32-bit signed integer array.
  */
 public final class JSInt32Array extends JSTypedArray {
-    public static final String NAME = "Int32Array";
     public static final int BYTES_PER_ELEMENT = 4;
+    public static final String NAME = "Int32Array";
 
     /**
      * Create an Int32Array with a new buffer.

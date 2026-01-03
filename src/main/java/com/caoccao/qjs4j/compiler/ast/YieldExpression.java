@@ -17,12 +17,20 @@
 package com.caoccao.qjs4j.compiler.ast;
 
 /**
- * Base sealed interface for all expression nodes.
+ * Represents a yield expression in JavaScript.
+ * Used in generator functions to produce values.
+ * <p>
+ * Examples:
+ * yield value;
+ * yield* iterable;
  */
-public sealed interface Expression extends ASTNode permits
-        Literal, Identifier, BinaryExpression, UnaryExpression,
-        AssignmentExpression, ConditionalExpression, CallExpression,
-        MemberExpression, NewExpression, FunctionExpression,
-        ArrowFunctionExpression, ArrayExpression, ObjectExpression, AwaitExpression,
-        YieldExpression, TemplateLiteral, TaggedTemplateExpression {
+public record YieldExpression(
+        Expression argument,
+        boolean delegate,
+        SourceLocation location
+) implements Expression {
+    @Override
+    public SourceLocation getLocation() {
+        return location;
+    }
 }

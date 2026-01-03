@@ -37,29 +37,25 @@ public class PromiseConstructorTest extends BaseJavetTest {
         assertThat(((JSString) result).value()).isEqualTo("function");
     }
 
-    @Disabled
     @Test
     public void testAsyncForAwaitOfLoop() {
-        // Test async for-await-of loop with async iterable
-        JSValue result = context.eval(
-                "async function test() { " +
-                        "  let sum = 0; " +
-                        "  const asyncIterable = { " +
-                        "    async *[Symbol.asyncIterator]() { " +
-                        "      yield 1; " +
-                        "      yield 2; " +
-                        "      yield 3; " +
-                        "    } " +
-                        "  }; " +
-                        "  for await (const item of asyncIterable) { " +
-                        "    sum += item; " +
-                        "  } " +
-                        "  return sum; " +
-                        "} " +
-                        "test()"
+        assertIntegerWithJavet("""
+                async function test() {
+                  let sum = 0;
+                  const asyncIterable = {
+                    async *[Symbol.asyncIterator]() {
+                      yield 1;
+                      yield 2;
+                      yield 3;
+                    }
+                  };
+                  for await (const item of asyncIterable) {
+                    sum += item;
+                  }
+                  return sum;
+                }
+                test()"""
         );
-        assertThat(result).isNotNull();
-        // Result should be a promise that resolves to 6
     }
 
     @Disabled

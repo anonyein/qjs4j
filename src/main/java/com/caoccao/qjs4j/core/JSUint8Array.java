@@ -24,8 +24,8 @@ import java.util.StringJoiner;
  * 8-bit unsigned integer array.
  */
 public final class JSUint8Array extends JSTypedArray {
-    public static final String NAME = "Uint8Array";
     public static final int BYTES_PER_ELEMENT = 1;
+    public static final String NAME = "Uint8Array";
 
     /**
      * Create a Uint8Array with a new buffer.

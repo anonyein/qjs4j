@@ -17,8 +17,6 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.JSContext;
-import com.caoccao.qjs4j.core.JSFinalizationRegistry;
-import com.caoccao.qjs4j.core.JSFunction;
 import com.caoccao.qjs4j.core.JSValue;
 
 /**

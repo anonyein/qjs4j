@@ -16,7 +16,6 @@
 
 package com.caoccao.qjs4j.core;
 
-import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.exceptions.RangeError;
 
 import java.nio.ByteBuffer;

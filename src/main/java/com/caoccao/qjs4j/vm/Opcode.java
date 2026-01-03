@@ -179,11 +179,17 @@ public enum Opcode {
 
     // Sync iteration operations
     FOR_OF_START(129, 1, 1, 3),  // Start sync iteration: iterable -> iter next catch_offset
-    FOR_OF_NEXT(130, 2, 3, 5);   // Get next from sync iterator: iter next catch_offset -> iter next catch_offset value done
+    FOR_OF_NEXT(130, 2, 3, 5),   // Get next from sync iterator: iter next catch_offset -> iter next catch_offset value done
+
+    // Generator operations (following QuickJS opcode numbers)
+    INITIAL_YIELD(212, 1, 0, 0),  // Initial yield in generator - suspends generator at start
+    YIELD(213, 1, 1, 2),          // Yield value from generator - pops value, yields it
+    YIELD_STAR(214, 1, 1, 2),     // Yield* delegating to another generator
+    ASYNC_YIELD_STAR(215, 1, 1, 2);  // Async yield* for async generators
 
     // This is a subset of QuickJS opcodes - full implementation would have ~244 opcodes
 
-    private static final Opcode[] opcodes = new Opcode[values().length];
+    private static final Opcode[] opcodes = new Opcode[256];  // Use fixed size to accommodate all opcode numbers
 
     static {
         Stream.of(values()).forEach(opcode -> opcodes[opcode.code] = opcode);

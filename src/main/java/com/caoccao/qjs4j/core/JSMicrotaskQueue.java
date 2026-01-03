@@ -16,6 +16,8 @@
 
 package com.caoccao.qjs4j.core;
 
+import com.caoccao.qjs4j.exceptions.JSException;
+
 import java.util.LinkedList;
 import java.util.Queue;
 
@@ -28,13 +30,17 @@ import java.util.Queue;
  * right time.
  */
 public final class JSMicrotaskQueue {
+    private final JSContext context;
     private final Queue<Microtask> queue;
     private boolean executing;
 
     /**
      * Create a new microtask queue.
+     *
+     * @param context The JavaScript context
      */
-    public JSMicrotaskQueue() {
+    public JSMicrotaskQueue(JSContext context) {
+        this.context = context;
         this.queue = new LinkedList<>();
         this.executing = false;
     }
@@ -85,9 +91,12 @@ public final class JSMicrotaskQueue {
                     try {
                         microtask.execute();
                     } catch (Exception e) {
-                        // In a full implementation, this would trigger
-                        // the unhandled rejection handler
-                        System.err.println("Microtask error: " + e.getMessage());
+                        // Trigger unhandled rejection handler if set
+                        PromiseRejectCallback callback = context.getPromiseRejectCallback();
+                        if (callback != null && e instanceof JSException jsException) {
+                            JSValue reason = jsException.getErrorValue();
+                            callback.callback(PromiseRejectEvent.PromiseRejectWithNoHandler, null, reason);
+                        }
                     }
                 }
             }

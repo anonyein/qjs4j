@@ -23,8 +23,8 @@ import java.nio.ByteBuffer;
  * 16-bit unsigned integer array.
  */
 public final class JSUint16Array extends JSTypedArray {
-    public static final String NAME = "Uint16Array";
     public static final int BYTES_PER_ELEMENT = 2;
+    public static final String NAME = "Uint16Array";
 
     /**
      * Create a Uint16Array with a new buffer.

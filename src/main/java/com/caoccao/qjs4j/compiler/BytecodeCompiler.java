@@ -394,6 +394,8 @@ public final class BytecodeCompiler {
             compileArrowFunctionExpression(arrowExpr);
         } else if (expr instanceof AwaitExpression awaitExpr) {
             compileAwaitExpression(awaitExpr);
+        } else if (expr instanceof YieldExpression yieldExpr) {
+            compileYieldExpression(yieldExpr);
         } else if (expr instanceof ArrayExpression arrayExpr) {
             compileArrayExpression(arrayExpr);
         } else if (expr instanceof ObjectExpression objExpr) {
@@ -403,68 +405,6 @@ public final class BytecodeCompiler {
         } else if (expr instanceof TaggedTemplateExpression taggedTemplate) {
             compileTaggedTemplateExpression(taggedTemplate);
         }
-    }
-
-    private void compileForStatement(ForStatement forStmt) {
-        enterScope();
-
-        // Compile init
-        if (forStmt.init() != null) {
-            if (forStmt.init() instanceof VariableDeclaration varDecl) {
-                compileVariableDeclaration(varDecl);
-            } else if (forStmt.init() instanceof Expression expr) {
-                compileExpression(expr);
-                emitter.emitOpcode(Opcode.DROP);
-            }
-        }
-
-        int loopStart = emitter.currentOffset();
-        LoopContext loop = new LoopContext(loopStart);
-        loopStack.push(loop);
-
-        int jumpToEnd = -1;
-        // Compile test
-        if (forStmt.test() != null) {
-            compileExpression(forStmt.test());
-            jumpToEnd = emitter.emitJump(Opcode.IF_FALSE);
-        }
-
-        // Compile body
-        compileStatement(forStmt.body());
-
-        // Update position for continue statements
-        int updateStart = emitter.currentOffset();
-
-        // Compile update
-        if (forStmt.update() != null) {
-            compileExpression(forStmt.update());
-            emitter.emitOpcode(Opcode.DROP);
-        }
-
-        // Jump back to test
-        emitter.emitOpcode(Opcode.GOTO);
-        int backJumpPos = emitter.currentOffset();
-        emitter.emitU32(loopStart - (backJumpPos + 4));
-
-        int loopEnd = emitter.currentOffset();
-
-        // Patch test jump
-        if (jumpToEnd != -1) {
-            emitter.patchJump(jumpToEnd, loopEnd);
-        }
-
-        // Patch break statements
-        for (int breakPos : loop.breakPositions) {
-            emitter.patchJump(breakPos, loopEnd);
-        }
-
-        // Patch continue statements
-        for (int continuePos : loop.continuePositions) {
-            emitter.patchJump(continuePos, updateStart);
-        }
-
-        loopStack.pop();
-        exitScope();
     }
 
     private void compileForOfStatement(ForOfStatement forOfStmt) {
@@ -503,10 +443,15 @@ public final class BytecodeCompiler {
         int jumpToEnd;
 
         if (forOfStmt.isAsync()) {
-            // Async for-of: FOR_AWAIT_OF_NEXT pushes result object
+            // Async for-of: FOR_AWAIT_OF_NEXT pushes promise
             // Stack before: iter, next, catch_offset
-            // Stack after: iter, next, catch_offset, result
+            // Stack after: iter, next, catch_offset, promise
             emitter.emitOpcode(Opcode.FOR_AWAIT_OF_NEXT);
+
+            // Await the promise to get the result object
+            // Stack before: iter, next, catch_offset, promise
+            // Stack after: iter, next, catch_offset, result
+            emitter.emitOpcode(Opcode.AWAIT);
 
             // Extract {value, done} from the iterator result object
             // Stack: iter, next, catch_offset, result
@@ -598,6 +543,68 @@ public final class BytecodeCompiler {
         exitScope();
     }
 
+    private void compileForStatement(ForStatement forStmt) {
+        enterScope();
+
+        // Compile init
+        if (forStmt.init() != null) {
+            if (forStmt.init() instanceof VariableDeclaration varDecl) {
+                compileVariableDeclaration(varDecl);
+            } else if (forStmt.init() instanceof Expression expr) {
+                compileExpression(expr);
+                emitter.emitOpcode(Opcode.DROP);
+            }
+        }
+
+        int loopStart = emitter.currentOffset();
+        LoopContext loop = new LoopContext(loopStart);
+        loopStack.push(loop);
+
+        int jumpToEnd = -1;
+        // Compile test
+        if (forStmt.test() != null) {
+            compileExpression(forStmt.test());
+            jumpToEnd = emitter.emitJump(Opcode.IF_FALSE);
+        }
+
+        // Compile body
+        compileStatement(forStmt.body());
+
+        // Update position for continue statements
+        int updateStart = emitter.currentOffset();
+
+        // Compile update
+        if (forStmt.update() != null) {
+            compileExpression(forStmt.update());
+            emitter.emitOpcode(Opcode.DROP);
+        }
+
+        // Jump back to test
+        emitter.emitOpcode(Opcode.GOTO);
+        int backJumpPos = emitter.currentOffset();
+        emitter.emitU32(loopStart - (backJumpPos + 4));
+
+        int loopEnd = emitter.currentOffset();
+
+        // Patch test jump
+        if (jumpToEnd != -1) {
+            emitter.patchJump(jumpToEnd, loopEnd);
+        }
+
+        // Patch break statements
+        for (int breakPos : loop.breakPositions) {
+            emitter.patchJump(breakPos, loopEnd);
+        }
+
+        // Patch continue statements
+        for (int continuePos : loop.continuePositions) {
+            emitter.patchJump(continuePos, updateStart);
+        }
+
+        loopStack.pop();
+        exitScope();
+    }
+
     private void compileFunctionDeclaration(FunctionDeclaration funcDecl) {
         // Create a new compiler for the function body
         BytecodeCompiler functionCompiler = new BytecodeCompiler();
@@ -609,6 +616,11 @@ public final class BytecodeCompiler {
 
         for (Identifier param : funcDecl.params()) {
             functionCompiler.currentScope().declareLocal(param.name());
+        }
+
+        // If this is a generator function, emit INITIAL_YIELD at the start
+        if (funcDecl.isGenerator()) {
+            functionCompiler.emitter.emitOpcode(Opcode.INITIAL_YIELD);
         }
 
         // Compile function body statements
@@ -675,6 +687,11 @@ public final class BytecodeCompiler {
 
         for (Identifier param : funcExpr.params()) {
             functionCompiler.currentScope().declareLocal(param.name());
+        }
+
+        // If this is a generator function, emit INITIAL_YIELD at the start
+        if (funcExpr.isGenerator()) {
+            functionCompiler.emitter.emitOpcode(Opcode.INITIAL_YIELD);
         }
 
         // Compile function body statements (don't call compileBlockStatement as it would create a new scope)
@@ -780,8 +797,6 @@ public final class BytecodeCompiler {
         }
     }
 
-    // ==================== Expression Compilation ====================
-
     private void compileLiteral(Literal literal) {
         Object value = literal.value();
 
@@ -827,6 +842,8 @@ public final class BytecodeCompiler {
             throw new CompilerException("Unsupported literal type: " + value.getClass());
         }
     }
+
+    // ==================== Expression Compilation ====================
 
     private void compileMemberExpression(MemberExpression memberExpr) {
         compileExpression(memberExpr.object());
@@ -1368,8 +1385,6 @@ public final class BytecodeCompiler {
         emitter.emitOpcode(op);
     }
 
-    // ==================== Scope Management ====================
-
     private void compileVariableDeclaration(VariableDeclaration varDecl) {
         for (VariableDeclaration.VariableDeclarator declarator : varDecl.declarations()) {
             // Compile initializer or push undefined
@@ -1383,6 +1398,8 @@ public final class BytecodeCompiler {
             compilePatternAssignment(declarator.id());
         }
     }
+
+    // ==================== Scope Management ====================
 
     private void compileWhileStatement(WhileStatement whileStmt) {
         int loopStart = emitter.currentOffset();
@@ -1418,6 +1435,27 @@ public final class BytecodeCompiler {
         }
 
         loopStack.pop();
+    }
+
+    private void compileYieldExpression(YieldExpression yieldExpr) {
+        // Compile the argument expression (if present)
+        if (yieldExpr.argument() != null) {
+            compileExpression(yieldExpr.argument());
+        } else {
+            // No argument means yield undefined
+            emitter.emitConstant(null);
+        }
+
+        // Emit the appropriate yield opcode
+        if (yieldExpr.delegate()) {
+            // yield* delegates to another generator/iterable
+            // For now, use YIELD_STAR for sync generators
+            // TODO: Need to check if in async generator for ASYNC_YIELD_STAR
+            emitter.emitOpcode(Opcode.YIELD_STAR);
+        } else {
+            // Regular yield
+            emitter.emitOpcode(Opcode.YIELD);
+        }
     }
 
     private Scope currentScope() {

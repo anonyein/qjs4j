@@ -16,7 +16,6 @@
 
 package com.caoccao.qjs4j.core;
 
-import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.regexp.RegExpBytecode;
 import com.caoccao.qjs4j.regexp.RegExpCompiler;
 import com.caoccao.qjs4j.regexp.RegExpEngine;

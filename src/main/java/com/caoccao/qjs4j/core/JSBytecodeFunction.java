@@ -103,6 +103,54 @@ public final class JSBytecodeFunction extends JSFunction {
 
     @Override
     public JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
+        // If this is an async generator function, create and return an async generator object
+        // Following QuickJS pattern: create generator without executing the body
+        if (isAsync && isGenerator) {
+            // Create generator state to track execution
+            GeneratorState generatorState = new GeneratorState(this, thisArg, args);
+
+            return new JSAsyncGenerator((inputValue, isThrow) -> {
+                JSPromise promise = new JSPromise();
+
+                // Check if generator is completed
+                if (generatorState.isCompleted()) {
+                    JSObject result = new JSObject();
+                    result.set("value", JSUndefined.INSTANCE);
+                    result.set("done", JSBoolean.TRUE);
+                    promise.fulfill(result);
+                    return promise;
+                }
+
+                try {
+                    // Execute/resume the generator function
+                    // The VM will execute until it hits a yield or return
+                    JSValue result = context.getVirtualMachine().executeGenerator(generatorState, context);
+
+                    // Check if this was a yield or completion
+                    if (generatorState.isCompleted()) {
+                        // Generator completed - return final value with done: true
+                        JSObject iterResult = new JSObject();
+                        iterResult.set("value", result);
+                        iterResult.set("done", JSBoolean.TRUE);
+                        promise.fulfill(iterResult);
+                    } else {
+                        // Generator yielded - return value with done: false  
+                        JSObject iterResult = new JSObject();
+                        iterResult.set("value", result);
+                        iterResult.set("done", JSBoolean.FALSE);
+                        promise.fulfill(iterResult);
+                    }
+                } catch (Exception e) {
+                    String errorMessage = e.getMessage() != null ? e.getMessage() : e.toString();
+                    JSObject errorObj = new JSObject();
+                    errorObj.set("message", new JSString(errorMessage));
+                    promise.reject(errorObj);
+                }
+
+                return promise;
+            }, context);
+        }
+
         // If this is an async function, wrap execution in a promise
         if (isAsync) {
             JSPromise promise = new JSPromise();

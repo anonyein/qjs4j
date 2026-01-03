@@ -16,8 +16,6 @@
 
 package com.caoccao.qjs4j.core;
 
-import com.caoccao.qjs4j.exceptions.JSException;
-
 import java.util.WeakHashMap;
 
 /**

@@ -55,11 +55,11 @@ public final class JSContext implements AutoCloseable {
     private int maxStackDepth;
     // Exception state
     private JSValue pendingException;
+    // Promise rejection callback
+    private PromiseRejectCallback promiseRejectCallback;
     private int stackDepth;
     // Execution state
     private boolean strictMode;
-    // Promise rejection callback
-    private PromiseRejectCallback promiseRejectCallback;
 
     /**
      * Create a new execution context.
@@ -76,7 +76,7 @@ public final class JSContext implements AutoCloseable {
         this.strictMode = false;
         this.currentThis = globalObject;
         this.errorStackTrace = new ArrayList<>();
-        this.microtaskQueue = new JSMicrotaskQueue();
+        this.microtaskQueue = new JSMicrotaskQueue(this);
         this.virtualMachine = new VirtualMachine(this);
 
         initializeGlobalObject();
@@ -916,16 +916,6 @@ public final class JSContext implements AutoCloseable {
     }
 
     /**
-     * Set the promise rejection callback.
-     * This callback is invoked when a promise rejection occurs in an await expression.
-     * If the callback returns true, the rejection is considered handled and the catch
-     * clause will take effect instead of throwing an exception.
-     */
-    public void setPromiseRejectCallback(PromiseRejectCallback callback) {
-        this.promiseRejectCallback = callback;
-    }
-
-    /**
      * Set the pending exception.
      */
     public void setPendingException(JSValue exception) {
@@ -933,6 +923,16 @@ public final class JSContext implements AutoCloseable {
             this.pendingException = exception;
             captureErrorStackTrace();
         }
+    }
+
+    /**
+     * Set the promise rejection callback.
+     * This callback is invoked when a promise rejection occurs in an await expression.
+     * If the callback returns true, the rejection is considered handled and the catch
+     * clause will take effect instead of throwing an exception.
+     */
+    public void setPromiseRejectCallback(PromiseRejectCallback callback) {
+        this.promiseRejectCallback = callback;
     }
 
     /**

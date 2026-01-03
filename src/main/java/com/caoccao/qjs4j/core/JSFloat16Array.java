@@ -25,8 +25,8 @@ import java.nio.ByteBuffer;
  * 16-bit half-precision floating point array.
  */
 public final class JSFloat16Array extends JSTypedArray {
-    public static final String NAME = "Float16Array";
     public static final int BYTES_PER_ELEMENT = 2;
+    public static final String NAME = "Float16Array";
 
     /**
      * Create a Float16Array with a new buffer.

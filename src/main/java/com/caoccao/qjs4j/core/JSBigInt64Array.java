@@ -23,8 +23,8 @@ import java.nio.ByteBuffer;
  * 64-bit signed integer array.
  */
 public final class JSBigInt64Array extends JSTypedArray {
-    public static final String NAME = "BigInt64Array";
     public static final int BYTES_PER_ELEMENT = 8;
+    public static final String NAME = "BigInt64Array";
 
     /**
      * Create a BigInt64Array with a new buffer.
