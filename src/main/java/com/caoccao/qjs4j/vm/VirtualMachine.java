@@ -728,28 +728,79 @@ public final class VirtualMachine {
             promise.fulfill(value);
         }
 
-        // Push the promise onto the stack
-        // Note: For a full implementation with proper async/await support,
-        // we would need to suspend the current execution context here
-        // and resume it when the promise settles. For now, this simple
-        // implementation just returns the promise value.
-        valueStack.push(promise);
+        // For proper async/await support, we need to wait for the promise to settle
+        // and push the resolved value (not the promise itself)
+        
+        // If the promise is pending, we need to process microtasks until it settles
+        if (promise.getState() == JSPromise.PromiseState.PENDING) {
+            // Process microtasks until the promise settles
+            context.processMicrotasks();
+        }
+        
+        // Now the promise should be settled, push the resolved value
+        if (promise.getState() == JSPromise.PromiseState.FULFILLED) {
+            valueStack.push(promise.getResult());
+        } else if (promise.getState() == JSPromise.PromiseState.REJECTED) {
+            // Check if there's a promise rejection callback
+            PromiseRejectCallback callback = context.getPromiseRejectCallback();
+            if (callback != null) {
+                // Callback handles the rejection, set pending exception so catch clause can handle it
+                JSValue result = promise.getResult();
+                callback.callback(PromiseRejectEvent.PromiseRejectWithNoHandler, promise, result);
+                pendingException = result;
+                context.setPendingException(result);
+            } else {
+                // No callback set, follow current design: throw VM exception
+                throw new JSVirtualMachineException("Unhandled promise rejection: " + promise.getResult());
+            }
+        } else {
+            // Promise is still pending - this shouldn't happen
+            throw new JSVirtualMachineException("Promise did not settle after processing microtasks");
+        }
     }
 
     private void handleForAwaitOfStart() {
         // Pop the iterable from the stack
         JSValue iterable = valueStack.pop();
 
-        // Get async iterator from the iterable
-        JSAsyncIterator iterator = JSAsyncIteratorHelper.getAsyncIterator(iterable, context);
+        // Auto-box primitives (strings, numbers, etc.) to access their Symbol.asyncIterator or Symbol.iterator
+        JSObject iterableObj;
+        if (iterable instanceof JSObject obj) {
+            iterableObj = obj;
+        } else {
+            // Try to auto-box the primitive
+            iterableObj = toObject(iterable);
+            if (iterableObj == null) {
+                throw new JSVirtualMachineException("Object is not async iterable");
+            }
+        }
 
-        if (iterator == null) {
-            throw new JSVirtualMachineException("Object is not async iterable");
+        // First, try Symbol.asyncIterator
+        JSValue asyncIteratorMethod = iterableObj.get(PropertyKey.fromSymbol(JSSymbol.ASYNC_ITERATOR));
+        JSValue iteratorMethod = null;
+        boolean isAsync = true;
+
+        if (asyncIteratorMethod instanceof JSFunction) {
+            iteratorMethod = asyncIteratorMethod;
+        } else {
+            // Fall back to Symbol.iterator (sync iterator that will be auto-wrapped)
+            iteratorMethod = iterableObj.get(PropertyKey.fromSymbol(JSSymbol.ITERATOR));
+            isAsync = false;
+            
+            if (!(iteratorMethod instanceof JSFunction)) {
+                throw new JSVirtualMachineException("Object is not async iterable");
+            }
+        }
+
+        // Call the iterator method to get an iterator
+        JSValue iterator = ((JSFunction) iteratorMethod).call(context, iterable, new JSValue[0]);
+
+        if (!(iterator instanceof JSObject iteratorObj)) {
+            throw new JSVirtualMachineException("Iterator method must return an object");
         }
 
         // Get the next() method from the iterator
-        PropertyKey nextKey = PropertyKey.fromString("next");
-        JSValue nextMethod = iterator.get(nextKey);
+        JSValue nextMethod = iteratorObj.get(PropertyKey.fromString("next"));
 
         if (!(nextMethod instanceof JSFunction)) {
             throw new JSVirtualMachineException("Iterator must have a next method");
@@ -762,8 +813,10 @@ public final class VirtualMachine {
     }
 
     private void handleForAwaitOfNext() {
-        // Stack layout: iter, next, catch_offset (top to bottom)
-        // Pop catch offset (not used in current implementation)
+        // Stack layout before: iter, next, catch_offset (bottom to top)
+        // Stack layout after: iter, next, catch_offset, result (bottom to top)
+        
+        // Pop catch offset temporarily
         JSValue catchOffset = valueStack.pop();
 
         // Peek next method and iterator (don't pop - they stay for next iteration)
@@ -777,19 +830,25 @@ public final class VirtualMachine {
 
         JSValue result = nextFunc.call(context, iterator, new JSValue[0]);
 
-        // Push the result onto the stack
-        // The result should be a promise that resolves to {value, done}
-        valueStack.push(result);
+        // Restore catch_offset and push the result
+        valueStack.push(catchOffset);  // Restore catch_offset
+        valueStack.push(result);        // Push the result (promise that resolves to {value, done})
     }
 
     private void handleForOfStart() {
         // Pop the iterable from the stack
         JSValue iterable = valueStack.pop();
 
-        // For JavaScript native objects (arrays, strings, etc.), we need to call Symbol.iterator
-        // directly as a JavaScript operation since JSIteratorHelper doesn't bridge properly
-        if (!(iterable instanceof JSObject iterableObj)) {
-            throw new JSVirtualMachineException("Object is not iterable");
+        // Auto-box primitives (strings, numbers, etc.) to access their Symbol.iterator
+        JSObject iterableObj;
+        if (iterable instanceof JSObject obj) {
+            iterableObj = obj;
+        } else {
+            // Try to auto-box the primitive
+            iterableObj = toObject(iterable);
+            if (iterableObj == null) {
+                throw new JSVirtualMachineException("Object is not iterable");
+            }
         }
 
         // Get Symbol.iterator method
@@ -800,6 +859,7 @@ public final class VirtualMachine {
         }
 
         // Call the Symbol.iterator method to get an iterator
+        // Use the original iterable value for the 'this' binding, not the boxed version
         JSValue iterator = iteratorFunc.call(context, iterable, new JSValue[0]);
 
         if (!(iterator instanceof JSObject iteratorObj)) {

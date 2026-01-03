@@ -27,7 +27,7 @@ public class SymbolPrototypeTest extends BaseJavetTest {
     public void testGetDescription() {
         assertStringWithJavet(
                 "Symbol('testDescription').description;",
-                "Symbol().description;",
+                "String(Symbol().description);",
                 "Symbol.iterator.description;");
     }
 

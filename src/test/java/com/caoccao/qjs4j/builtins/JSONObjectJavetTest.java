@@ -90,7 +90,7 @@ public class JSONObjectJavetTest extends BaseJavetTest {
 
     @Test
     public void testParseNull() {
-        assertStringWithJavet("JSON.parse('null')");
+        assertStringWithJavet("String(JSON.parse('null'))");
     }
 
     @Test
@@ -368,7 +368,7 @@ public class JSONObjectJavetTest extends BaseJavetTest {
 
     @Test
     public void testStringifyFunction() {
-        assertStringWithJavet("JSON.stringify(function() {})");
+        assertStringWithJavet("String(JSON.stringify(function() {}))");
     }
 
     @Test

@@ -67,7 +67,7 @@ public class MathObjectTest extends BaseJavetTest {
         assertIntegerWithJavet(
                 "1 + 1",
                 "var a = 1; var b = 2; a + b");
-        assertLongWithJavet(
+        assertDoubleWithJavet(
                 "2**32 + 2**32");
     }
 

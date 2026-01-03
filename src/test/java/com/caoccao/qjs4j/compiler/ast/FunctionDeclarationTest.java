@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.caoccao.qjs4j.compiler;
+package com.caoccao.qjs4j.compiler.ast;
 
 import com.caoccao.qjs4j.BaseTest;
 import com.caoccao.qjs4j.core.JSBytecodeFunction;

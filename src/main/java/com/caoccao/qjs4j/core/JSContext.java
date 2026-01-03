@@ -58,6 +58,8 @@ public final class JSContext implements AutoCloseable {
     private int stackDepth;
     // Execution state
     private boolean strictMode;
+    // Promise rejection callback
+    private PromiseRejectCallback promiseRejectCallback;
 
     /**
      * Create a new execution context.
@@ -778,6 +780,10 @@ public final class JSContext implements AutoCloseable {
         return pendingException;
     }
 
+    public PromiseRejectCallback getPromiseRejectCallback() {
+        return promiseRejectCallback;
+    }
+
     public JSRuntime getRuntime() {
         return runtime;
     }
@@ -907,6 +913,16 @@ public final class JSContext implements AutoCloseable {
      */
     public void setMaxStackDepth(int depth) {
         this.maxStackDepth = depth;
+    }
+
+    /**
+     * Set the promise rejection callback.
+     * This callback is invoked when a promise rejection occurs in an await expression.
+     * If the callback returns true, the rejection is considered handled and the catch
+     * clause will take effect instead of throwing an exception.
+     */
+    public void setPromiseRejectCallback(PromiseRejectCallback callback) {
+        this.promiseRejectCallback = callback;
     }
 
     /**

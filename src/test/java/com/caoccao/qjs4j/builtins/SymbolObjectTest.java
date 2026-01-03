@@ -128,7 +128,7 @@ public class SymbolObjectTest extends BaseJavetTest {
                 // Test with boolean description
                 "Object(Symbol(true)).description;",
                 // Test with undefined description
-                "Object(Symbol(undefined)).description;",
+                "String(Object(Symbol(undefined)).description);",
                 // Test with null description (should convert to \"null\")
                 "Object(Symbol(null)).description;",
                 // Test with empty string

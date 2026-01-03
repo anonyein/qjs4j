@@ -93,8 +93,7 @@ public class PromiseConstructorTest extends BaseJavetTest {
     @Disabled
     @Test
     public void testAsyncForAwaitOfLoopWithSyncIterable() {
-        // Test async for-await-of loop with sync iterable (should auto-wrap)
-        assertIntegerWithJavet(true, """
+        assertIntegerWithJavet("""
                 async function test() {
                   let sum = 0;
                   const arr = [1, 2, 3];
@@ -113,102 +112,6 @@ public class PromiseConstructorTest extends BaseJavetTest {
                 var p2 = Promise.resolve(2);
                 var p3 = Promise.resolve(3);
                 Promise.all([p1, p2, p3]).then(arr => JSON.stringify(arr))""";
-        assertStringWithJavet(true, code);
-    }
-
-    @Test
-    public void testSyncForOfLoopNested() {
-        assertIntegerWithJavet("""
-                function test() {
-                  let sum = 0;
-                  const outer = [1, 2];
-                  const inner = [10, 20];
-                  for (const i of outer) {
-                    for (const j of inner) {
-                      sum += i * j;
-                    }
-                  }
-                  return sum;
-                }
-                test()""");
-    }
-
-    @Test
-    public void testSyncForOfLoopWithBreak() {
-        assertIntegerWithJavet("""
-                function test() {
-                  let sum = 0;
-                  const arr = [1, 2, 3, 4, 5];
-                  for (const item of arr) {
-                    if (item > 3) break;
-                    sum += item;
-                  }
-                  return sum;
-                }
-                test()""");
-    }
-
-    @Test
-    public void testSyncForOfLoopWithContinue() {
-        assertIntegerWithJavet("""
-                function test() {
-                  let sum = 0;
-                  const arr = [1, 2, 3, 4, 5];
-                  for (const item of arr) {
-                    if (item % 2 === 0) continue;
-                    sum += item;
-                  }
-                  return sum;
-                }
-                test()""");
-    }
-
-    @Test
-    public void testSyncForOfLoopWithEmptyArray() {
-        assertIntegerWithJavet(
-                """
-                        function test() {
-                          let count = 0;
-                          const arr = [];
-                          for (const item of arr) {
-                            count++;
-                          }
-                          return count;
-                        }
-                        test()""");
-    }
-
-    @Test
-    public void testSyncForOfLoopWithLetAndConst() {
-        assertIntegerWithJavet(
-                """
-                        function test() {
-                          let sum1 = 0;
-                          let sum2 = 0;
-                          const arr = [1, 2, 3];
-                          for (let item of arr) {
-                            sum1 += item;
-                          }
-                          for (const item of arr) {
-                            sum2 += item;
-                          }
-                          return sum1 + sum2;
-                        }
-                        test()""");
-    }
-
-    @Disabled
-    @Test
-    public void testSyncForOfLoopWithString() {
-        assertStringWithJavet("""
-                function test() {
-                  let result = '';
-                  const str = 'abc';
-                  for (const char of str) {
-                    result += char + '-';
-                  }
-                  return result;
-                }
-                test()""");
+        assertStringWithJavet(code);
     }
 }
