@@ -746,3 +746,89 @@ async function processItems() {
 - ✅ All existing tests still pass
 - ✅ No regressions introduced
 - ✅ Proper iterator protocol compliance
+
+---
+
+## Resolution: Primitive Auto-Boxing for Iteration ✅
+
+### Issue Resolved
+
+The initial sync for-of implementation had issues with primitive values (especially strings) because JavaScript primitives like `JSString` are not `JSObject` instances, yet they need to support iteration through `Symbol.iterator`.
+
+### The Fix
+
+Added **primitive auto-boxing** in `handleForOfStart()` (VirtualMachine.java:1198-1208):
+
+```java
+// Auto-box primitives (strings, numbers, etc.) to access their Symbol.iterator
+JSObject iterableObj;
+if (iterable instanceof JSObject obj) {
+    iterableObj = obj;
+} else {
+    // Try to auto-box the primitive
+    iterableObj = toObject(iterable);
+    if (iterableObj == null) {
+        throw new JSVirtualMachineException("Object is not iterable");
+    }
+}
+```
+
+**Key Points**:
+1. Primitives are temporarily boxed to access their `Symbol.iterator` method
+2. The original primitive value is used for the `this` binding when calling the iterator method:
+   ```java
+   JSValue iterator = iteratorFunc.call(context, iterable, new JSValue[0]);
+   ```
+3. This ensures proper JavaScript semantics where `"abc"[Symbol.iterator]()` works correctly
+
+### Test Coverage
+
+All sync for-of tests now pass (AsyncTest.java):
+
+- ✅ **testSyncForOfLoopNested**: Nested for-of loops with arrays
+- ✅ **testSyncForOfLoopWithBreak**: Break statement in for-of
+- ✅ **testSyncForOfLoopWithContinue**: Continue statement in for-of
+- ✅ **testSyncForOfLoopWithEmptyArray**: Empty array iteration
+- ✅ **testSyncForOfLoopWithLetAndConst**: Different variable declarations
+- ✅ **testSyncForOfLoopWithString**: String iteration (primitives)
+
+### What Works Now
+
+```javascript
+// Arrays
+for (const item of [1, 2, 3]) {
+  console.log(item); // Works!
+}
+
+// Strings (primitives - auto-boxed)
+for (const char of "abc") {
+  console.log(char); // Works!
+}
+
+// Maps
+for (const [key, value] of new Map([['a', 1]])) {
+  console.log(key, value); // Works!
+}
+
+// Sets
+for (const value of new Set([1, 2, 3])) {
+  console.log(value); // Works!
+}
+
+// Break and continue
+for (const x of [1, 2, 3, 4, 5]) {
+  if (x === 3) continue;
+  if (x === 4) break;
+  console.log(x); // Works!
+}
+```
+
+### Implementation Complete
+
+Both sync and async iteration are now fully functional:
+
+- ✅ **for-of loops**: Sync iteration with arrays, strings, Maps, Sets, and custom iterables
+- ✅ **for-await-of loops**: Async iteration with async iterables and generators
+- ✅ **Break/continue**: Full control flow support
+- ✅ **Primitive auto-boxing**: Transparent boxing for string iteration
+- ✅ **QuickJS compliance**: Matches QuickJS behavior and specification
