@@ -218,7 +218,7 @@ public class JSONObjectJavetTest extends BaseJavetTest {
 
     @Test
     public void testRoundTripWithReplacerReviverForBigInt() {
-        assertBigIntegerWithJavet("""
+        assertLongWithJavet("""
                 var original = {a: 1n, b: 2n, c: 3};
                 var json = JSON.stringify(original, function(key, value) {
                   if (typeof value === "bigint") {

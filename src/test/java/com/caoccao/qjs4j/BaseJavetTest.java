@@ -39,7 +39,8 @@ import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class BaseJavetTest extends BaseTest {
     protected boolean moduleMode;
@@ -81,10 +82,10 @@ public class BaseJavetTest extends BaseTest {
                             if (v8Value instanceof V8ValuePromise v8ValuePromise) {
                                 v8Runtime.await();
                                 assertThat(v8ValuePromise.getState()).as(code).isNotEqualTo(V8ValuePromise.STATE_PENDING);
-                                return BigInteger.valueOf(v8ValuePromise.getResultLong());
+                                return v8ValuePromise.getResultBigInteger();
                             } else {
-                                assertThat(v8Value).as(code).isInstanceOf(V8ValueLong.class);
-                                return BigInteger.valueOf(((V8ValueLong) v8Value).getValue());
+                                assertThat(v8Value).as(code).isInstanceOf(V8ValueBigInteger.class);
+                                return ((V8ValueBigInteger) v8Value).getValue();
                             }
                         }
                     },
@@ -337,20 +338,17 @@ public class BaseJavetTest extends BaseTest {
             expectedResult = javetSupplier.get();
         } catch (Throwable t) {
             expectedException = t;
+            assertThat(expectedException).isInstanceOf(JavetException.class);
         }
-        try {
+        if (expectedException == null) {
             T result = qjs4jSupplier.get();
-            if (expectedException == null) {
-                assertThat(result).isEqualTo(expectedResult);
-            } else {
-                fail("Expected exception to be thrown: " + expectedException);
-            }
-        } catch (Throwable t) {
-            if (expectedException == null) {
-                fail("Unexpected exception thrown: " + t);
-            } else {
-                assertThat(t.getMessage()).isEqualTo(expectedException.getMessage());
-            }
+            assertThat(result).isEqualTo(expectedResult);
+        } else {
+            String expectedMessage = expectedException.getMessage();
+            assertThatThrownBy(qjs4jSupplier::get, expectedMessage)
+                    .isInstanceOfSatisfying(JSException.class, jsException -> {
+                        assertThat(jsException.getMessage()).isEqualTo(expectedMessage);
+                    });
         }
     }
 

@@ -16,7 +16,7 @@
 
 package com.caoccao.qjs4j.core;
 
-import com.caoccao.qjs4j.exceptions.RangeError;
+import com.caoccao.qjs4j.exceptions.JSRangeErrorException;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -49,10 +49,10 @@ public final class JSDataView extends JSObject {
             throw new IllegalArgumentException("Cannot create DataView on detached buffer");
         }
         if (byteOffset < 0 || byteOffset > buffer.getByteLength()) {
-            throw new RangeError("DataView byteOffset out of range");
+            throw new JSRangeErrorException("DataView byteOffset out of range");
         }
         if (byteLength < 0 || byteOffset + byteLength > buffer.getByteLength()) {
-            throw new RangeError("DataView byteLength out of range");
+            throw new JSRangeErrorException("DataView byteLength out of range");
         }
 
         this.buffer = buffer;
@@ -65,7 +65,7 @@ public final class JSDataView extends JSObject {
             throw new IllegalStateException("DataView buffer is detached");
         }
         if (offset < 0 || offset + size > byteLength) {
-            throw new RangeError("DataView offset out of range");
+            throw new JSRangeErrorException("DataView offset out of range");
         }
     }
 

@@ -20,6 +20,7 @@ import com.caoccao.qjs4j.compiler.Compiler;
 import com.caoccao.qjs4j.core.JSBytecodeFunction;
 import com.caoccao.qjs4j.core.JSContext;
 import com.caoccao.qjs4j.core.JSValue;
+import com.caoccao.qjs4j.exceptions.JSCompilerException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -87,7 +88,7 @@ public final class FunctionConstructor {
             JSValue result = context.getVirtualMachine().execute(func, context.getGlobalObject(), new JSValue[0]);
 
             return result;
-        } catch (Compiler.CompilerException e) {
+        } catch (JSCompilerException e) {
             return context.throwSyntaxError(e.getMessage());
         } catch (Exception e) {
             return context.throwError("Failed to create function: " + e.getMessage());

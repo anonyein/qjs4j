@@ -16,6 +16,7 @@
 
 package com.caoccao.qjs4j.compiler;
 
+import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 import com.caoccao.qjs4j.unicode.UnicodeData;
 
 import java.util.HashMap;
@@ -203,8 +204,17 @@ public final class Lexer {
     }
 
     private Token scanBinaryNumber(int startPos, int startLine, int startColumn) {
+        int digitStart = position;
         while (!isAtEnd() && (peek() == '0' || peek() == '1')) {
             advance();
+        }
+        // Validate at least one binary digit was scanned
+        if (position == digitStart) {
+            throw new JSSyntaxErrorException("Invalid or unexpected token");
+        }
+        // Validate no invalid digits, decimal point, or exponent follow
+        if (!isAtEnd() && (Character.isDigit(peek()) || peek() == '.' || peek() == 'e' || peek() == 'E')) {
+            throw new JSSyntaxErrorException("Invalid or unexpected token");
         }
         // Check for BigInt literal suffix 'n'
         if (!isAtEnd() && peek() == 'n') {
@@ -219,8 +229,17 @@ public final class Lexer {
     // Character utilities
 
     private Token scanHexNumber(int startPos, int startLine, int startColumn) {
+        int digitStart = position;
         while (!isAtEnd() && isHexDigit(peek())) {
             advance();
+        }
+        // Validate at least one hex digit was scanned
+        if (position == digitStart) {
+            throw new JSSyntaxErrorException("Invalid or unexpected token");
+        }
+        // Validate no invalid characters or decimal point follow (e.g., 'g' in '0xFFg' or '.' in '0xFF.')
+        if (!isAtEnd() && ((Character.isLetterOrDigit(peek()) && peek() != 'n') || peek() == '.')) {
+            throw new JSSyntaxErrorException("Invalid or unexpected token");
         }
         // Check for BigInt literal suffix 'n'
         if (!isAtEnd() && peek() == 'n') {
@@ -262,6 +281,9 @@ public final class Lexer {
         }
 
         // Scan decimal number
+        boolean hasDecimalPoint = false;
+        boolean hasExponent = false;
+
         while (!isAtEnd() && Character.isDigit(peek())) {
             advance();
         }
@@ -269,6 +291,7 @@ public final class Lexer {
         // Check for decimal point
         if (!isAtEnd() && peek() == '.' && position + 1 < source.length() &&
                 Character.isDigit(source.charAt(position + 1))) {
+            hasDecimalPoint = true;
             advance(); // consume '.'
             while (!isAtEnd() && Character.isDigit(peek())) {
                 advance();
@@ -277,17 +300,32 @@ public final class Lexer {
 
         // Check for exponent
         if (!isAtEnd() && (peek() == 'e' || peek() == 'E')) {
+            hasExponent = true;
             advance(); // consume 'e'
             if (!isAtEnd() && (peek() == '+' || peek() == '-')) {
                 advance(); // consume sign
             }
+            int exponentStart = position;
             while (!isAtEnd() && Character.isDigit(peek())) {
                 advance();
             }
+            // Validate at least one digit in exponent
+            if (position == exponentStart) {
+                throw new JSSyntaxErrorException("Invalid or unexpected token");
+            }
+        }
+
+        // Check for invalid identifier characters after number (e.g., '1abc')
+        if (!isAtEnd() && isIdentifierStart(peek()) && peek() != 'n') {
+            throw new JSSyntaxErrorException("Invalid or unexpected token");
         }
 
         // Check for BigInt literal suffix 'n'
         if (!isAtEnd() && peek() == 'n') {
+            // BigInt literals cannot have decimal points or exponents
+            if (hasDecimalPoint || hasExponent) {
+                throw new JSSyntaxErrorException("Invalid or unexpected token");
+            }
             advance(); // consume 'n'
             String value = source.substring(startPos, position - 1); // exclude 'n' from value
             return new Token(TokenType.BIGINT, value, startLine, startColumn, startPos);
@@ -298,8 +336,17 @@ public final class Lexer {
     }
 
     private Token scanOctalNumber(int startPos, int startLine, int startColumn) {
+        int digitStart = position;
         while (!isAtEnd() && peek() >= '0' && peek() <= '7') {
             advance();
+        }
+        // Validate at least one octal digit was scanned
+        if (position == digitStart) {
+            throw new JSSyntaxErrorException("Invalid or unexpected token");
+        }
+        // Validate no invalid digits, decimal point, or exponent follow (e.g., '8' or '9' in '0o78', or '.' in '0o7.' or 'e' in '0o7e1')
+        if (!isAtEnd() && (Character.isDigit(peek()) || peek() == '.' || peek() == 'e' || peek() == 'E')) {
+            throw new JSSyntaxErrorException("Invalid or unexpected token");
         }
         // Check for BigInt literal suffix 'n'
         if (!isAtEnd() && peek() == 'n') {

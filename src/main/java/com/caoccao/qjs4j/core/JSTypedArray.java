@@ -16,7 +16,7 @@
 
 package com.caoccao.qjs4j.core;
 
-import com.caoccao.qjs4j.exceptions.RangeError;
+import com.caoccao.qjs4j.exceptions.JSRangeErrorException;
 
 import java.nio.ByteBuffer;
 
@@ -61,10 +61,10 @@ public abstract class JSTypedArray extends JSObject {
 
         // Validate and normalize byteOffset
         if (byteOffset < 0 || byteOffset % bytesPerElement != 0) {
-            throw new RangeError("TypedArray byteOffset must be aligned");
+            throw new JSRangeErrorException("TypedArray byteOffset must be aligned");
         }
         if (byteOffset > buffer.getByteLength()) {
-            throw new RangeError("TypedArray byteOffset out of range");
+            throw new JSRangeErrorException("TypedArray byteOffset out of range");
         }
         this.byteOffset = byteOffset;
 
@@ -72,7 +72,7 @@ public abstract class JSTypedArray extends JSObject {
         if (length < 0) {
             int remainingBytes = buffer.getByteLength() - byteOffset;
             if (remainingBytes % bytesPerElement != 0) {
-                throw new RangeError("Buffer byte length must be a multiple of element size");
+                throw new JSRangeErrorException("Buffer byte length must be a multiple of element size");
             }
             this.length = remainingBytes / bytesPerElement;
             this.byteLength = remainingBytes;
@@ -80,7 +80,7 @@ public abstract class JSTypedArray extends JSObject {
             this.length = length;
             this.byteLength = length * bytesPerElement;
             if (byteOffset + this.byteLength > buffer.getByteLength()) {
-                throw new RangeError("TypedArray extends beyond buffer");
+                throw new JSRangeErrorException("TypedArray extends beyond buffer");
             }
         }
 
@@ -95,7 +95,7 @@ public abstract class JSTypedArray extends JSObject {
             throw new IllegalStateException("TypedArray buffer is detached");
         }
         if (index < 0 || index >= length) {
-            throw new RangeError("TypedArray index out of range: " + index);
+            throw new JSRangeErrorException("TypedArray index out of range: " + index);
         }
     }
 
@@ -158,13 +158,13 @@ public abstract class JSTypedArray extends JSObject {
      */
     public void setArray(JSContext context, JSValue source, int offset) {
         if (offset < 0 || offset >= length) {
-            throw new RangeError("TypedArray offset out of range");
+            throw new JSRangeErrorException("TypedArray offset out of range");
         }
 
         if (source instanceof JSArray srcArray) {
             int srcLength = (int) srcArray.getLength();
             if (offset + srcLength > length) {
-                throw new RangeError("Source array too large");
+                throw new JSRangeErrorException("Source array too large");
             }
             for (int i = 0; i < srcLength; i++) {
                 JSValue value = srcArray.get(i);
@@ -174,7 +174,7 @@ public abstract class JSTypedArray extends JSObject {
         } else if (source instanceof JSTypedArray srcTyped) {
             int srcLength = srcTyped.getLength();
             if (offset + srcLength > length) {
-                throw new RangeError("Source array too large");
+                throw new JSRangeErrorException("Source array too large");
             }
             for (int i = 0; i < srcLength; i++) {
                 setElement(offset + i, srcTyped.getElement(i));

@@ -19,6 +19,7 @@ package com.caoccao.qjs4j.compiler;
 import com.caoccao.qjs4j.compiler.ast.*;
 import com.caoccao.qjs4j.compiler.ast.BinaryExpression.BinaryOperator;
 import com.caoccao.qjs4j.compiler.ast.UnaryExpression.UnaryOperator;
+import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -984,7 +985,34 @@ public final class Parser {
             case NUMBER -> {
                 String value = currentToken.value();
                 advance();
-                yield new Literal(Double.parseDouble(value), location);
+                Object numValue;
+                if (value.startsWith("0x") || value.startsWith("0X")) {
+                    // Parse hex number - store as long or int
+                    long longVal = Long.parseLong(value.substring(2), 16);
+                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE) 
+                        ? (int) longVal : (double) longVal;
+                } else if (value.startsWith("0b") || value.startsWith("0B")) {
+                    // Parse binary number - store as long or int
+                    long longVal = Long.parseLong(value.substring(2), 2);
+                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE) 
+                        ? (int) longVal : (double) longVal;
+                } else if (value.startsWith("0o") || value.startsWith("0O")) {
+                    // Parse octal number - store as long or int
+                    long longVal = Long.parseLong(value.substring(2), 8);
+                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE) 
+                        ? (int) longVal : (double) longVal;
+                } else {
+                    // Parse decimal number - use double
+                    double doubleVal = Double.parseDouble(value);
+                    // Check if it's a whole number that fits in an int
+                    if (doubleVal == Math.floor(doubleVal) && !Double.isInfinite(doubleVal) &&
+                        doubleVal >= Integer.MIN_VALUE && doubleVal <= Integer.MAX_VALUE) {
+                        numValue = (int) doubleVal;
+                    } else {
+                        numValue = doubleVal;
+                    }
+                }
+                yield new Literal(numValue, location);
             }
             case BIGINT -> {
                 String value = currentToken.value();
@@ -1165,8 +1193,7 @@ public final class Parser {
                 advance();
                 yield new Identifier(name, location);
             }
-            default -> throw new RuntimeException("Expected property name but got " + currentToken.type() +
-                    " at line " + currentToken.line() + ", column " + currentToken.column());
+            default -> throw new JSSyntaxErrorException("Unexpected end of input");
         };
     }
 

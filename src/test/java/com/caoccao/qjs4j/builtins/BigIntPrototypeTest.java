@@ -68,7 +68,7 @@ public class BigIntPrototypeTest extends BaseJavetTest {
         // Test typeof for BigInt literal
         assertStringWithJavet("typeof 123n");
         // Test basic decimal BigInt literal
-        assertBigIntegerWithJavet("123n", "0xFFn", "0b1111n", "0o77n", "9007199254740991n");
+        assertLongWithJavet("123n", "0xFFn", "0b1111n", "0o77n", "9007199254740991n");
     }
 
     @Test
@@ -159,6 +159,6 @@ public class BigIntPrototypeTest extends BaseJavetTest {
         assertTypeError(result);
         assertPendingException(context);
 
-        assertBigIntegerWithJavet("Object(BigInt(123n)).valueOf()");
+        assertLongWithJavet("Object(BigInt(123n)).valueOf()");
     }
 }

@@ -18,6 +18,8 @@ package com.caoccao.qjs4j.core;
 
 import com.caoccao.qjs4j.builtins.GlobalObject;
 import com.caoccao.qjs4j.compiler.Compiler;
+import com.caoccao.qjs4j.exceptions.JSCompilerException;
+import com.caoccao.qjs4j.exceptions.JSErrorException;
 import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.exceptions.JSVirtualMachineException;
 import com.caoccao.qjs4j.types.JSModule;
@@ -559,7 +561,7 @@ public final class JSContext implements AutoCloseable {
             return result != null ? result : JSUndefined.INSTANCE;
         } catch (JSException e) {
             throw e;
-        } catch (Compiler.CompilerException e) {
+        } catch (JSCompilerException e) {
             JSValue error = throwError("SyntaxError", e.getMessage());
             throw new JSException(error);
         } catch (JSVirtualMachineException e) {
@@ -572,6 +574,9 @@ public final class JSContext implements AutoCloseable {
                 throw new JSException(exception);
             }
             JSValue error = throwError("Error", "VM error: " + e.getMessage());
+            throw new JSException(error);
+        } catch (JSErrorException e) {
+            JSValue error = throwError(e.getErrorType().name(), e.getMessage());
             throw new JSException(error);
         } catch (Exception e) {
             JSValue error = throwError("Error", "Execution error: " + e.getMessage());

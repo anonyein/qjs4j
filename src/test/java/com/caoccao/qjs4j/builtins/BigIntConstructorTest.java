@@ -153,7 +153,7 @@ public class BigIntConstructorTest extends BaseJavetTest {
     @Test
     public void testBigIntObjectArithmetic() {
         // BigInt objects can be converted via valueOf
-        assertBigIntegerWithJavet("""
+        assertLongWithJavet("""
                 var obj = Object(BigInt(10));
                 obj.valueOf()""");
     }
@@ -161,7 +161,7 @@ public class BigIntConstructorTest extends BaseJavetTest {
     @Test
     public void testBigIntObjectComparison() {
         // Test using valueOf for comparison
-        assertBigIntegerWithJavet("""
+        assertLongWithJavet("""
                 var obj = Object(BigInt(42));
                 var val = obj.valueOf();
                 val""");
@@ -183,12 +183,12 @@ public class BigIntConstructorTest extends BaseJavetTest {
 
     @Test
     public void testBigIntObjectLargeValue() {
-        assertBigIntegerWithJavet("Object(BigInt('9007199254740991')).valueOf()");
+        assertLongWithJavet("Object(BigInt('9007199254740991')).valueOf()");
     }
 
     @Test
     public void testBigIntObjectNegative() {
-        assertBigIntegerWithJavet("Object(BigInt(-999)).valueOf()");
+        assertLongWithJavet("Object(BigInt(-999)).valueOf()");
     }
 
     @Test
@@ -208,7 +208,7 @@ public class BigIntConstructorTest extends BaseJavetTest {
 
     @Test
     public void testBigIntObjectValueOf() {
-        assertBigIntegerWithJavet("Object(BigInt(42)).valueOf()");
+        assertLongWithJavet("Object(BigInt(42)).valueOf()");
     }
 
     @Test

@@ -18,6 +18,8 @@ package com.caoccao.qjs4j.compiler;
 
 import com.caoccao.qjs4j.compiler.ast.Program;
 import com.caoccao.qjs4j.core.JSBytecodeFunction;
+import com.caoccao.qjs4j.exceptions.JSCompilerException;
+import com.caoccao.qjs4j.exceptions.JSErrorException;
 import com.caoccao.qjs4j.vm.Bytecode;
 
 /**
@@ -33,11 +35,11 @@ public final class Compiler {
      * @param source   The JavaScript source code to compile
      * @param filename Optional filename for error reporting (can be null)
      * @return A JSBytecodeFunction containing the compiled bytecode
-     * @throws CompilerException if compilation fails
+     * @throws JSCompilerException if compilation fails
      */
     public static JSBytecodeFunction compile(String source, String filename) {
         if (source == null) {
-            throw new CompilerException("Source code cannot be null");
+            throw new JSCompilerException("Source code cannot be null");
         }
 
         try {
@@ -56,11 +58,11 @@ public final class Compiler {
             return new JSBytecodeFunction(bytecode, name, 0, ast.strict(), null);
 
         } catch (BytecodeCompiler.CompilerException e) {
-            throw new CompilerException("Bytecode compiler error: " + e.getMessage(), e);
-        } catch (RuntimeException e) {
-            throw new CompilerException("Compilation error: " + e.getMessage(), e);
+            throw new JSCompilerException("Bytecode compiler error: " + e.getMessage(), e);
+        } catch (JSErrorException e) {
+            throw e;
         } catch (Exception e) {
-            throw new CompilerException("Unexpected compilation error: " + e.getMessage(), e);
+            throw new JSCompilerException("Unexpected compilation error: " + e.getMessage(), e);
         }
     }
 
@@ -69,7 +71,7 @@ public final class Compiler {
      *
      * @param source The JavaScript source code to compile
      * @return A JSBytecodeFunction containing the compiled bytecode
-     * @throws CompilerException if compilation fails
+     * @throws JSCompilerException if compilation fails
      */
     public static JSBytecodeFunction compile(String source) {
         return compile(source, null);
@@ -82,11 +84,11 @@ public final class Compiler {
      * @param source   The module source code to compile
      * @param filename Optional filename for error reporting (can be null)
      * @return A JSBytecodeFunction containing the compiled module bytecode
-     * @throws CompilerException if compilation fails
+     * @throws JSCompilerException if compilation fails
      */
     public static JSBytecodeFunction compileModule(String source, String filename) {
         if (source == null) {
-            throw new CompilerException("Source code cannot be null");
+            throw new JSCompilerException("Source code cannot be null");
         }
 
         try {
@@ -108,11 +110,11 @@ public final class Compiler {
             return new JSBytecodeFunction(bytecode, name, 0, true, null);
 
         } catch (BytecodeCompiler.CompilerException e) {
-            throw new CompilerException("Module compiler error: " + e.getMessage(), e);
+            throw new JSCompilerException("Module compiler error: " + e.getMessage(), e);
         } catch (RuntimeException e) {
-            throw new CompilerException("Module compilation error: " + e.getMessage(), e);
+            throw new JSCompilerException("Module compilation error: " + e.getMessage(), e);
         } catch (Exception e) {
-            throw new CompilerException("Unexpected module compilation error: " + e.getMessage(), e);
+            throw new JSCompilerException("Unexpected module compilation error: " + e.getMessage(), e);
         }
     }
 
@@ -123,11 +125,11 @@ public final class Compiler {
      * @param source   The JavaScript source code to parse
      * @param filename Optional filename for error reporting (can be null)
      * @return The parsed AST Program node
-     * @throws CompilerException if parsing fails
+     * @throws JSCompilerException if parsing fails
      */
     public static Program parse(String source, String filename) {
         if (source == null) {
-            throw new CompilerException("Source code cannot be null");
+            throw new JSCompilerException("Source code cannot be null");
         }
 
         try {
@@ -136,9 +138,9 @@ public final class Compiler {
             return parser.parse();
 
         } catch (RuntimeException e) {
-            throw new CompilerException("Parsing error: " + e.getMessage(), e);
+            throw new JSCompilerException("Parsing error: " + e.getMessage(), e);
         } catch (Exception e) {
-            throw new CompilerException("Unexpected parsing error: " + e.getMessage(), e);
+            throw new JSCompilerException("Unexpected parsing error: " + e.getMessage(), e);
         }
     }
 
@@ -147,7 +149,7 @@ public final class Compiler {
      *
      * @param source The JavaScript source code to parse
      * @return The parsed AST Program node
-     * @throws CompilerException if parsing fails
+     * @throws JSCompilerException if parsing fails
      */
     public static Program parse(String source) {
         return parse(source, null);
@@ -156,16 +158,4 @@ public final class Compiler {
     // Note: Tokenization is internal to the Lexer/Parser pipeline
     // and not exposed as a public API in this implementation.
 
-    /**
-     * Exception thrown when compilation fails.
-     */
-    public static class CompilerException extends RuntimeException {
-        public CompilerException(String message) {
-            super(message);
-        }
-
-        public CompilerException(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
 }
