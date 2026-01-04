@@ -60,6 +60,11 @@ public final class ReflectObject {
             return context.throwTypeError("Reflect.construct called on non-function");
         }
 
+        // Check if the target is constructable
+        if (!JSTypeChecking.isConstructor(target)) {
+            return context.throwTypeError("Reflect.construct called on non-constructor");
+        }
+
         JSValue[] constructorArgs = new JSValue[0];
         if (args.length > 1 && args[1] instanceof JSArray argsArray) {
             int length = (int) argsArray.getLength();
@@ -67,6 +72,15 @@ public final class ReflectObject {
             for (int i = 0; i < length; i++) {
                 constructorArgs[i] = argsArray.get(i);
             }
+        }
+
+        // Check newTarget if provided (third argument)
+        JSValue newTarget = args.length > 2 ? args[2] : target;
+        if (!(newTarget instanceof JSFunction newTargetFunc)) {
+            return context.throwTypeError("Reflect.construct newTarget is not a function");
+        }
+        if (!JSTypeChecking.isConstructor(newTargetFunc)) {
+            return context.throwTypeError("Reflect.construct newTarget is not a constructor");
         }
 
         // Simplified: Create a new object and call the constructor with it

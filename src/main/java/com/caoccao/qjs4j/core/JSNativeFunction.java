@@ -21,14 +21,20 @@ package com.caoccao.qjs4j.core;
  */
 public final class JSNativeFunction extends JSFunction {
     private final NativeCallback callback;
+    private final boolean isConstructor;
     private final int length;
     private final String name;
 
     public JSNativeFunction(String name, int length, NativeCallback callback) {
+        this(name, length, callback, true);
+    }
+
+    public JSNativeFunction(String name, int length, NativeCallback callback, boolean isConstructor) {
         super(); // Initialize as JSObject
         this.name = name;
         this.length = length;
         this.callback = callback;
+        this.isConstructor = isConstructor;
 
         // Set up function properties on the object
         // Functions are objects in JavaScript and have these standard properties
@@ -36,10 +42,12 @@ public final class JSNativeFunction extends JSFunction {
         this.set("name", new JSString(this.name != null ? this.name : ""));
         this.set("length", new JSNumber(this.length));
 
-        // Native functions also have a prototype property
-        JSObject funcPrototype = new JSObject();
-        funcPrototype.set("constructor", this);
-        this.set("prototype", funcPrototype);
+        // Native functions have a prototype property only if they are constructors
+        if (isConstructor) {
+            JSObject funcPrototype = new JSObject();
+            funcPrototype.set("constructor", this);
+            this.set("prototype", funcPrototype);
+        }
     }
 
     @Override
@@ -55,6 +63,10 @@ public final class JSNativeFunction extends JSFunction {
     @Override
     public String getName() {
         return name;
+    }
+
+    public boolean isConstructor() {
+        return isConstructor;
     }
 
     @Override

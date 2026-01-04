@@ -357,8 +357,8 @@ public final class GlobalObject {
         global.set("decodeURI", new JSNativeFunction("decodeURI", 1, GlobalObject::decodeURI));
         global.set("encodeURIComponent", new JSNativeFunction("encodeURIComponent", 1, GlobalObject::encodeURIComponent));
         global.set("decodeURIComponent", new JSNativeFunction("decodeURIComponent", 1, GlobalObject::decodeURIComponent));
-        global.set("escape", new JSNativeFunction("escape", 1, GlobalObject::escape));
-        global.set("unescape", new JSNativeFunction("unescape", 1, GlobalObject::unescape));
+        global.set("escape", new JSNativeFunction("escape", 1, GlobalObject::escape, false));
+        global.set("unescape", new JSNativeFunction("unescape", 1, GlobalObject::unescape, false));
 
         // Console object for debugging
         initializeConsoleObject(context, global);

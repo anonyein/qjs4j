@@ -94,8 +94,18 @@ public final class JSTypeChecking {
      * Check if value is a constructor (can be used with new).
      */
     public static boolean isConstructor(JSValue value) {
-        // In full implementation, check if function has [[Construct]] internal method
-        return value instanceof JSFunction;
+        // Check if function has [[Construct]] internal method
+        if (value instanceof JSBytecodeFunction bytecodeFunc) {
+            return bytecodeFunc.isConstructor();
+        } else if (value instanceof JSNativeFunction nativeFunc) {
+            return nativeFunc.isConstructor();
+        } else if (value instanceof JSClass) {
+            return true;
+        } else if (value instanceof JSFunction) {
+            // Other function types (bound functions) default to true
+            return true;
+        }
+        return false;
     }
 
     /**

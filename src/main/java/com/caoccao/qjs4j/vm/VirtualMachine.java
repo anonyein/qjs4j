@@ -1215,6 +1215,12 @@ public final class VirtualMachine {
             JSObject instance = jsClass.construct(context, args);
             valueStack.push(instance);
         } else if (constructor instanceof JSFunction jsFunction) {
+            // Check if the function is constructable
+            if (!JSTypeChecking.isConstructor(jsFunction)) {
+                context.throwTypeError(jsFunction.getName() + " is not a constructor");
+                valueStack.push(JSUndefined.INSTANCE);
+                return;
+            }
             JSConstructorType constructorType = jsFunction.getConstructorType();
             if (constructorType == null) {
                 JSObject thisObject = new JSObject();
