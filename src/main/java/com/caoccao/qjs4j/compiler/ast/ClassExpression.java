@@ -16,13 +16,20 @@
 
 package com.caoccao.qjs4j.compiler.ast;
 
+import java.util.List;
+
 /**
- * Base sealed interface for all expression nodes.
+ * Represents a class expression (class used as an expression, not a declaration).
+ * Example: const MyClass = class { ... } or new (class extends Base {})()
  */
-public sealed interface Expression extends ASTNode permits
-        Literal, Identifier, PrivateIdentifier, BinaryExpression, UnaryExpression,
-        AssignmentExpression, ConditionalExpression, CallExpression,
-        MemberExpression, NewExpression, FunctionExpression,
-        ArrowFunctionExpression, ArrayExpression, ObjectExpression, AwaitExpression,
-        YieldExpression, TemplateLiteral, TaggedTemplateExpression, ClassExpression {
+public record ClassExpression(
+        Identifier id,  // Optional - class expressions can be anonymous
+        Expression superClass,
+        List<ClassDeclaration.ClassElement> body,
+        SourceLocation location
+) implements Expression {
+    @Override
+    public SourceLocation getLocation() {
+        return location;
+    }
 }

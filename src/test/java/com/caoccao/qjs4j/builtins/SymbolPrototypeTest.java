@@ -53,6 +53,7 @@ public class SymbolPrototypeTest extends BaseJavetTest {
                 "Symbol.prototype.toString.call(Symbol.iterator);",
                 // Symbol with empty string description
                 "Symbol('').toString();",
+                "var a = Symbol(''); escape(a);",
                 // Well-known symbols
                 "Symbol.asyncIterator.toString();",
                 "Symbol.hasInstance.toString();");

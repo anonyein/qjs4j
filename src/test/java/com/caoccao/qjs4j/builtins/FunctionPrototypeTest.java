@@ -179,6 +179,31 @@ public class FunctionPrototypeTest extends BaseJavetTest {
     }
 
     @Test
+    public void testFunctionCall() {
+        assertStringWithJavet("""
+                const a = {};
+                a.x = function f(a, b) {
+                  if (a === b) {
+                    // Handle +/-0 vs. -/+0
+                    return a !== 0 || 1 / a === 1 / b;
+                  }
+                  // Handle NaN vs. NaN
+                  return a !== a && b !== b;
+                };
+                a.f = a.x;
+                JSON.stringify(a.f(2,3), a.f('a','b'), a.f(null, undefined));""");
+        assertIntegerWithJavet("""
+                function f1(a, b) {
+                    return a + b;
+                }
+                f1(2, 3);""", """
+                function f2(a, b) {
+                    return a - b;
+                }
+                f2(5, 7);""");
+    }
+
+    @Test
     public void testFunctionConstructor() {
         // Normal case: function with parameters and body
         JSValue result = FunctionConstructor.call(context, JSUndefined.INSTANCE, new JSValue[]{

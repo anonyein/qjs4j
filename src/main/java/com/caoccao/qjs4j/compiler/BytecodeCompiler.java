@@ -523,6 +523,109 @@ public final class BytecodeCompiler {
         }
     }
 
+    private void compileClassExpression(ClassExpression classExpr) {
+        // Class expressions are almost identical to class declarations,
+        // but they leave the constructor on the stack instead of binding it to a variable
+        
+        String className = classExpr.id() != null ? classExpr.id().name() : "";
+
+        // Compile superclass expression or emit undefined
+        if (classExpr.superClass() != null) {
+            compileExpression(classExpr.superClass());
+        } else {
+            emitter.emitOpcode(Opcode.UNDEFINED);
+        }
+        // Stack: superClass
+
+        // Separate class elements by type
+        List<ClassDeclaration.MethodDefinition> methods = new ArrayList<>();
+        List<ClassDeclaration.PropertyDefinition> instanceFields = new ArrayList<>();
+        List<ClassDeclaration.PropertyDefinition> staticFields = new ArrayList<>();
+        List<ClassDeclaration.StaticBlock> staticBlocks = new ArrayList<>();
+        ClassDeclaration.MethodDefinition constructor = null;
+
+        for (ClassDeclaration.ClassElement element : classExpr.body()) {
+            if (element instanceof ClassDeclaration.MethodDefinition method) {
+                // Check if it's a constructor
+                if (method.key() instanceof Identifier id && "constructor".equals(id.name()) && !method.isStatic()) {
+                    constructor = method;
+                } else {
+                    methods.add(method);
+                }
+            } else if (element instanceof ClassDeclaration.PropertyDefinition field) {
+                if (field.isStatic()) {
+                    staticFields.add(field);
+                } else {
+                    instanceFields.add(field);
+                }
+            } else if (element instanceof ClassDeclaration.StaticBlock block) {
+                staticBlocks.add(block);
+            }
+        }
+
+        // Create private symbols once for the class
+        List<String> privateFieldNames = instanceFields.stream()
+                .filter(ClassDeclaration.PropertyDefinition::isPrivate)
+                .map(field -> {
+                    if (field.key() instanceof PrivateIdentifier privateId) {
+                        return privateId.name();
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        Map<String, JSSymbol> privateSymbols = new LinkedHashMap<>();
+        for (String privateFieldName : privateFieldNames) {
+            privateSymbols.put(privateFieldName, new JSSymbol(privateFieldName));
+        }
+
+        // Compile constructor function (or create default)
+        JSBytecodeFunction constructorFunc;
+        if (constructor != null) {
+            constructorFunc = compileMethodAsFunction(constructor, className, classExpr.superClass() != null, instanceFields, privateSymbols);
+        } else {
+            constructorFunc = createDefaultConstructor(className, classExpr.superClass() != null, instanceFields, privateSymbols);
+        }
+
+        // Emit constructor in constant pool
+        emitter.emitOpcodeConstant(Opcode.PUSH_CONST, constructorFunc);
+        // Stack: superClass constructor
+
+        // Emit DEFINE_CLASS opcode with class name
+        emitter.emitOpcodeAtom(Opcode.DEFINE_CLASS, className);
+        // Stack: proto constructor
+
+        // Compile methods
+        emitter.emitOpcode(Opcode.SWAP);
+        // Stack: constructor proto
+
+        for (ClassDeclaration.MethodDefinition method : methods) {
+            if (method.isStatic()) {
+                throw new CompilerException("Static methods not yet implemented");
+            } else {
+                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false, List.of(), Map.of());
+                emitter.emitOpcodeConstant(Opcode.PUSH_CONST, methodFunc);
+                // Stack: constructor proto method
+
+                String methodName = getMethodName(method);
+                emitter.emitOpcodeAtom(Opcode.DEFINE_METHOD, methodName);
+                // Stack: constructor proto
+            }
+        }
+
+        // Swap back to: proto constructor
+        emitter.emitOpcode(Opcode.SWAP);
+        // Stack: proto constructor
+
+        // Drop prototype, keep constructor on stack
+        emitter.emitOpcode(Opcode.NIP);
+        // Stack: constructor
+        
+        // For class expressions, we leave the constructor on the stack
+        // (unlike class declarations which bind it to a variable)
+    }
+
     private void compileConditionalExpression(ConditionalExpression condExpr) {
         // Compile test
         compileExpression(condExpr.test());
@@ -589,6 +692,8 @@ public final class BytecodeCompiler {
             compileTemplateLiteral(templateLiteral);
         } else if (expr instanceof TaggedTemplateExpression taggedTemplate) {
             compileTaggedTemplateExpression(taggedTemplate);
+        } else if (expr instanceof ClassExpression classExpr) {
+            compileClassExpression(classExpr);
         }
     }
 
