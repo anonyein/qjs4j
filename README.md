@@ -21,17 +21,16 @@ qjs4j includes features not present in the original QuickJS:
 
 The following features have infrastructure in place but require additional implementation:
 
-- **Basic class features**: Classes with constructors and methods
+- **Basic class features**: Classes with constructors, methods, and public fields
   - ✅ Lexer support for `class` keyword
-  - ✅ AST nodes (ClassDeclaration, MethodDefinition, ClassElement)
-  - ✅ Opcodes (DEFINE_CLASS, DEFINE_METHOD)
-  - ✅ Parser support (parseClassDeclaration, parseClassElement)
+  - ✅ AST nodes (ClassDeclaration, MethodDefinition, PropertyDefinition, ClassElement)
+  - ✅ Opcodes (DEFINE_CLASS, DEFINE_METHOD, DEFINE_FIELD)
+  - ✅ Parser support (parseClassDeclaration, parseClassElement, fields)
   - ✅ Parser tests (ClassParserTest with 8 test cases)
-  - ✅ Compiler implementation (basic classes, constructors, instance methods)
-  - ✅ Runtime support (DEFINE_CLASS and DEFINE_METHOD opcodes)
-  - ✅ Compiler tests (ClassCompilerTest with 3 test cases)
+  - ✅ Compiler implementation (classes, constructors, instance methods, public fields)
+  - ✅ Runtime support (DEFINE_CLASS, DEFINE_METHOD, DEFINE_FIELD opcodes)
+  - ✅ Compiler tests (ClassCompilerTest with 7 test cases - all passing)
   - ⏳ Static methods (not yet implemented)
-  - ⏳ Public class fields (not yet implemented)
   - ⏳ Private fields and methods (#field, #method) (infrastructure ready, needs compiler/runtime)
   - ⏳ Static blocks (infrastructure ready, needs compiler/runtime)
 

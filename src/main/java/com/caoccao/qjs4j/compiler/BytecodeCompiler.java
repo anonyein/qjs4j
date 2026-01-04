@@ -35,6 +35,7 @@ public final class BytecodeCompiler {
     private boolean inGlobalScope;
     private boolean isInAsyncFunction;  // Track if we're currently compiling an async function
     private int maxLocalCount;
+    private Map<String, JSSymbol> privateSymbols;  // Private field symbols for current class
     private String sourceCode;  // Original source code for extracting function sources
 
     public BytecodeCompiler() {
@@ -45,6 +46,7 @@ public final class BytecodeCompiler {
         this.isInAsyncFunction = false;
         this.maxLocalCount = 0;
         this.sourceCode = null;
+        this.privateSymbols = Map.of();  // Empty by default
     }
 
     /**
@@ -171,6 +173,17 @@ public final class BytecodeCompiler {
                     compileExpression(memberExpr.property());
                     emitter.emitOpcode(Opcode.DUP2);  // Duplicate obj and prop
                     emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+                } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
+                    // obj.#field += value
+                    String fieldName = privateId.name();
+                    JSSymbol symbol = privateSymbols.get(fieldName);
+                    if (symbol != null) {
+                        emitter.emitOpcode(Opcode.DUP);  // Duplicate object
+                        emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                        emitter.emitOpcode(Opcode.GET_PRIVATE_FIELD);
+                    } else {
+                        emitter.emitOpcode(Opcode.UNDEFINED);
+                    }
                 } else if (memberExpr.property() instanceof Identifier propId) {
                     emitter.emitOpcode(Opcode.DUP);  // Duplicate object
                     emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
@@ -212,13 +225,25 @@ public final class BytecodeCompiler {
                 emitter.emitOpcodeAtom(Opcode.SET_VAR, name);
             }
         } else if (left instanceof MemberExpression memberExpr) {
-            // obj[prop] = value or obj.prop = value
+            // obj[prop] = value or obj.prop = value or obj.#field = value
             if (operator == AssignmentExpression.AssignmentOperator.ASSIGN) {
                 // For simple assignment, compile object and property now
                 compileExpression(memberExpr.object());
                 if (memberExpr.computed()) {
                     compileExpression(memberExpr.property());
                     emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+                } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
+                    // obj.#field = value
+                    // Stack: value obj
+                    // Need: obj value symbol (for PUT_PRIVATE_FIELD)
+                    String fieldName = privateId.name();
+                    JSSymbol symbol = privateSymbols.get(fieldName);
+                    if (symbol != null) {
+                        emitter.emitOpcode(Opcode.SWAP);  // Stack: obj value
+                        emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                        // Stack: obj value symbol
+                        emitter.emitOpcode(Opcode.PUT_PRIVATE_FIELD);
+                    }
                 } else if (memberExpr.property() instanceof Identifier propId) {
                     emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
                 }
@@ -226,6 +251,16 @@ public final class BytecodeCompiler {
                 // For compound assignment, object and property are already on stack from DUP
                 if (memberExpr.computed()) {
                     emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+                } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
+                    // obj.#field += value
+                    // Stack: obj value (from compound operation)
+                    String fieldName = privateId.name();
+                    JSSymbol symbol = privateSymbols.get(fieldName);
+                    if (symbol != null) {
+                        emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                        // Stack: obj value symbol
+                        emitter.emitOpcode(Opcode.PUT_PRIVATE_FIELD);
+                    }
                 } else if (memberExpr.property() instanceof Identifier propId) {
                     emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
                 }
@@ -389,13 +424,33 @@ public final class BytecodeCompiler {
             }
         }
 
-        // Compile constructor function (or create default)
+        // Create private symbols once for the class (not per instance)
+        // These symbols will be passed as closure variables to all methods
+        List<String> privateFieldNames = instanceFields.stream()
+                .filter(ClassDeclaration.PropertyDefinition::isPrivate)
+                .map(field -> {
+                    if (field.key() instanceof PrivateIdentifier privateId) {
+                        return privateId.name();
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        // Create JSSymbol instances for each private field
+        // These symbols are created once and shared across all instances
+        Map<String, JSSymbol> privateSymbols = new LinkedHashMap<>();
+        for (String privateFieldName : privateFieldNames) {
+            privateSymbols.put(privateFieldName, new JSSymbol(privateFieldName));
+        }
+
+        // Compile constructor function (or create default) with field initialization
         JSBytecodeFunction constructorFunc;
         if (constructor != null) {
-            constructorFunc = compileMethodAsFunction(constructor, className, classDecl.superClass() != null);
+            constructorFunc = compileMethodAsFunction(constructor, className, classDecl.superClass() != null, instanceFields, privateSymbols);
         } else {
-            // Create default constructor
-            constructorFunc = createDefaultConstructor(className, classDecl.superClass() != null);
+            // Create default constructor with field initialization
+            constructorFunc = createDefaultConstructor(className, classDecl.superClass() != null, instanceFields, privateSymbols);
         }
 
         // Emit constructor in constant pool
@@ -421,8 +476,9 @@ public final class BytecodeCompiler {
             } else {
                 // For instance methods, proto is the target
                 // Current: constructor proto
-                // Compile method
-                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false);
+                // Compile method (no field initialization for regular methods)
+                // Pass empty private symbols map since methods don't initialize fields
+                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false, List.of(), Map.of());
                 emitter.emitOpcodeConstant(Opcode.PUSH_CONST, methodFunc);
                 // Stack: constructor proto method
 
@@ -534,6 +590,160 @@ public final class BytecodeCompiler {
         } else if (expr instanceof TaggedTemplateExpression taggedTemplate) {
             compileTaggedTemplateExpression(taggedTemplate);
         }
+    }
+
+    /**
+     * Compile field initialization code for instance fields.
+     * Emits code to set each field on 'this' with its initializer value.
+     * For private fields, uses the symbol from privateSymbols map.
+     */
+    private void compileFieldInitialization(List<ClassDeclaration.PropertyDefinition> fields,
+                                            Map<String, JSSymbol> privateSymbols) {
+        for (ClassDeclaration.PropertyDefinition field : fields) {
+            // Get field name
+            String fieldName = null;
+            boolean isPrivate = field.isPrivate();
+
+            if (isPrivate && field.key() instanceof PrivateIdentifier privateId) {
+                fieldName = privateId.name();
+            } else if (field.key() instanceof Identifier id) {
+                fieldName = id.name();
+            } else if (field.key() instanceof Literal literal) {
+                fieldName = literal.value().toString();
+            } else {
+                // Computed - skip for now
+                continue;
+            }
+
+            // Push 'this' onto stack
+            emitter.emitOpcode(Opcode.PUSH_THIS);
+
+            // Compile initializer or emit undefined
+            if (field.value() != null) {
+                compileExpression(field.value());
+            } else {
+                emitter.emitOpcode(Opcode.UNDEFINED);
+            }
+
+            if (isPrivate) {
+                // For private fields, we need to push the private symbol
+                // Stack: this value
+                // Need: this symbol value (for DEFINE_PRIVATE_FIELD)
+
+                // Get the symbol from the map and emit as constant
+                JSSymbol symbol = privateSymbols.get(fieldName);
+                if (symbol != null) {
+                    emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                    // Stack: this value symbol
+
+                    // DEFINE_PRIVATE_FIELD expects: obj symbol value
+                    // We have: this value symbol
+                    // Need to rotate stack: this symbol value
+                    emitter.emitOpcode(Opcode.SWAP);  // Stack: this symbol value
+
+                    // Emit DEFINE_PRIVATE_FIELD
+                    emitter.emitOpcode(Opcode.DEFINE_PRIVATE_FIELD);
+                    // Stack: this (DEFINE_PRIVATE_FIELD pops symbol and value, modifies this, pushes this back)
+                } else {
+                    // Error: private field symbol not found - skip this field
+                    emitter.emitOpcode(Opcode.DROP);  // Drop value
+                    emitter.emitOpcode(Opcode.DROP);  // Drop this
+                    continue;
+                }
+            } else {
+                // Public field
+                // Stack: this value
+                // Emit DEFINE_FIELD to set the field on 'this'
+                emitter.emitOpcodeAtom(Opcode.DEFINE_FIELD, fieldName);
+                // Stack: this (DEFINE_FIELD pops value, modifies this, pushes this back)
+            }
+
+            // Drop 'this' from stack
+            emitter.emitOpcode(Opcode.DROP);
+        }
+    }
+
+    private void compileForInStatement(ForInStatement forInStmt) {
+        enterScope();
+
+        // Get the loop variable name
+        VariableDeclaration varDecl = forInStmt.left();
+        if (varDecl.declarations().size() != 1) {
+            throw new CompilerException("for-in loop must have exactly one variable");
+        }
+        Pattern pattern = varDecl.declarations().get(0).id();
+        if (!(pattern instanceof Identifier id)) {
+            throw new CompilerException("for-in loop variable must be an identifier");
+        }
+        String varName = id.name();
+        currentScope().declareLocal(varName);
+        Integer varIndex = currentScope().getLocal(varName);
+
+        // Compile the object expression
+        compileExpression(forInStmt.right());
+        // Stack: obj
+
+        // Emit FOR_IN_START to create enumerator
+        emitter.emitOpcode(Opcode.FOR_IN_START);
+        // Stack: enum_obj
+
+        // Start of loop
+        int loopStart = emitter.currentOffset();
+        LoopContext loop = new LoopContext(loopStart);
+        loopStack.push(loop);
+
+        // Emit FOR_IN_NEXT to get next key
+        emitter.emitOpcode(Opcode.FOR_IN_NEXT);
+        // Stack: enum_obj key
+        // key is null/undefined when iteration is done
+
+        // Check if key is null/undefined (iteration complete)
+        emitter.emitOpcode(Opcode.DUP);
+        // Stack: enum_obj key key
+        emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
+        // Stack: enum_obj key is_done
+        int jumpToEnd = emitter.emitJump(Opcode.IF_TRUE);
+        // Stack: enum_obj key
+
+        // Store key in loop variable
+        if (varIndex != null) {
+            emitter.emitOpcodeU16(Opcode.PUT_LOCAL, varIndex);
+        } else {
+            emitter.emitOpcode(Opcode.DROP);
+        }
+        // Stack: enum_obj
+
+        // Compile loop body
+        compileStatement(forInStmt.body());
+
+        // Jump back to loop start
+        emitter.emitOpcode(Opcode.GOTO);
+        int backJumpPos = emitter.currentOffset();
+        emitter.emitU32(loopStart - (backJumpPos + 4));
+
+        // Break target - patch the jump to end
+        emitter.patchJump(jumpToEnd, emitter.currentOffset());
+        // Stack: enum_obj key (where key is null/undefined)
+
+        // Clean up: drop the null/undefined key
+        emitter.emitOpcode(Opcode.DROP);
+        // Stack: enum_obj
+
+        // Patch break statements
+        for (int breakPos : loop.breakPositions) {
+            emitter.patchJump(breakPos, emitter.currentOffset());
+        }
+
+        // Patch continue statements
+        for (int continuePos : loop.continuePositions) {
+            emitter.patchJump(continuePos, loopStart);
+        }
+
+        // Clean up stack: drop enum_obj using FOR_IN_END
+        emitter.emitOpcode(Opcode.FOR_IN_END);
+
+        loopStack.pop();
+        exitScope();
     }
 
     private void compileForOfStatement(ForOfStatement forOfStmt) {
@@ -667,89 +877,6 @@ public final class BytecodeCompiler {
         emitter.emitOpcode(Opcode.DROP);  // catch_offset
         emitter.emitOpcode(Opcode.DROP);  // next
         emitter.emitOpcode(Opcode.DROP);  // iter
-
-        loopStack.pop();
-        exitScope();
-    }
-
-    private void compileForInStatement(ForInStatement forInStmt) {
-        enterScope();
-
-        // Get the loop variable name
-        VariableDeclaration varDecl = forInStmt.left();
-        if (varDecl.declarations().size() != 1) {
-            throw new CompilerException("for-in loop must have exactly one variable");
-        }
-        Pattern pattern = varDecl.declarations().get(0).id();
-        if (!(pattern instanceof Identifier id)) {
-            throw new CompilerException("for-in loop variable must be an identifier");
-        }
-        String varName = id.name();
-        currentScope().declareLocal(varName);
-        Integer varIndex = currentScope().getLocal(varName);
-
-        // Compile the object expression
-        compileExpression(forInStmt.right());
-        // Stack: obj
-
-        // Emit FOR_IN_START to create enumerator
-        emitter.emitOpcode(Opcode.FOR_IN_START);
-        // Stack: enum_obj
-
-        // Start of loop
-        int loopStart = emitter.currentOffset();
-        LoopContext loop = new LoopContext(loopStart);
-        loopStack.push(loop);
-
-        // Emit FOR_IN_NEXT to get next key
-        emitter.emitOpcode(Opcode.FOR_IN_NEXT);
-        // Stack: enum_obj key
-        // key is null/undefined when iteration is done
-
-        // Check if key is null/undefined (iteration complete)
-        emitter.emitOpcode(Opcode.DUP);
-        // Stack: enum_obj key key
-        emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
-        // Stack: enum_obj key is_done
-        int jumpToEnd = emitter.emitJump(Opcode.IF_TRUE);
-        // Stack: enum_obj key
-
-        // Store key in loop variable
-        if (varIndex != null) {
-            emitter.emitOpcodeU16(Opcode.PUT_LOCAL, varIndex);
-        } else {
-            emitter.emitOpcode(Opcode.DROP);
-        }
-        // Stack: enum_obj
-
-        // Compile loop body
-        compileStatement(forInStmt.body());
-
-        // Jump back to loop start
-        emitter.emitOpcode(Opcode.GOTO);
-        int backJumpPos = emitter.currentOffset();
-        emitter.emitU32(loopStart - (backJumpPos + 4));
-
-        // Break target - patch the jump to end
-        emitter.patchJump(jumpToEnd, emitter.currentOffset());
-        // Stack: enum_obj key (where key is null/undefined)
-
-        // Clean up: drop the null/undefined key
-        emitter.emitOpcode(Opcode.DROP);
-        // Stack: enum_obj
-
-        // Patch break statements
-        for (int breakPos : loop.breakPositions) {
-            emitter.patchJump(breakPos, emitter.currentOffset());
-        }
-
-        // Patch continue statements
-        for (int continuePos : loop.continuePositions) {
-            emitter.patchJump(continuePos, loopStart);
-        }
-
-        // Clean up stack: drop enum_obj using FOR_IN_END
-        emitter.emitOpcode(Opcode.FOR_IN_END);
 
         loopStack.pop();
         exitScope();
@@ -1235,6 +1362,23 @@ public final class BytecodeCompiler {
             // obj[expr]
             compileExpression(memberExpr.property());
             emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+        } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
+            // obj.#privateField
+            // Stack: obj
+            // Need: obj symbol
+            String fieldName = privateId.name();
+            JSSymbol symbol = privateSymbols.get(fieldName);
+            if (symbol != null) {
+                emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                // Stack: obj symbol
+                emitter.emitOpcode(Opcode.GET_PRIVATE_FIELD);
+                // Stack: value
+            } else {
+                // Error: private field not found
+                // For now, just emit undefined
+                emitter.emitOpcode(Opcode.DROP);  // Drop obj
+                emitter.emitOpcode(Opcode.UNDEFINED);
+            }
         } else if (memberExpr.property() instanceof Identifier propId) {
             // obj.prop
             emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
@@ -1243,9 +1387,17 @@ public final class BytecodeCompiler {
 
     /**
      * Compile a method definition as a function.
+     * For constructors, instanceFields contains fields to initialize.
+     * privateSymbols contains JSSymbol instances for private fields (passed as closure variables).
      */
-    private JSBytecodeFunction compileMethodAsFunction(ClassDeclaration.MethodDefinition method, String methodName, boolean isDerivedConstructor) {
+    private JSBytecodeFunction compileMethodAsFunction(
+            ClassDeclaration.MethodDefinition method,
+            String methodName,
+            boolean isDerivedConstructor,
+            List<ClassDeclaration.PropertyDefinition> instanceFields,
+            Map<String, JSSymbol> privateSymbols) {
         BytecodeCompiler methodCompiler = new BytecodeCompiler();
+        methodCompiler.privateSymbols = privateSymbols;  // Make private symbols available in method
 
         FunctionExpression funcExpr = method.value();
 
@@ -1261,6 +1413,12 @@ public final class BytecodeCompiler {
         // If this is a generator method, emit INITIAL_YIELD at the start
         if (funcExpr.isGenerator()) {
             methodCompiler.emitter.emitOpcode(Opcode.INITIAL_YIELD);
+        }
+
+        // For constructors, emit field initialization BEFORE the constructor body
+        // This ensures fields are initialized before user code runs
+        if (!instanceFields.isEmpty()) {
+            methodCompiler.compileFieldInitialization(instanceFields, privateSymbols);
         }
 
         // Compile method body statements
@@ -1281,12 +1439,19 @@ public final class BytecodeCompiler {
         // Build the method bytecode
         Bytecode methodBytecode = methodCompiler.emitter.build(localCount);
 
+        // Convert private symbols to closure variable array
+        JSValue[] closureVars = new JSValue[privateSymbols.size()];
+        int idx = 0;
+        for (JSSymbol symbol : privateSymbols.values()) {
+            closureVars[idx++] = symbol;
+        }
+
         // Create JSBytecodeFunction for the method
         return new JSBytecodeFunction(
                 methodBytecode,
                 methodName,
                 funcExpr.params().size(),
-                new JSValue[0],  // closure vars
+                closureVars,     // closure vars contain private symbols
                 null,            // prototype
                 false,           // isConstructor - methods are not constructors
                 funcExpr.isAsync(),
@@ -1810,17 +1975,17 @@ public final class BytecodeCompiler {
         // 1. Compile get_lvalue (loads current value)
         // 2. Apply INC/DEC (prefix) or POST_INC/POST_DEC (postfix)  
         // 3. Apply put_lvalue (stores with appropriate stack manipulation)
-        if (unaryExpr.operator() == UnaryExpression.UnaryOperator.INC || 
-            unaryExpr.operator() == UnaryExpression.UnaryOperator.DEC) {
+        if (unaryExpr.operator() == UnaryExpression.UnaryOperator.INC ||
+                unaryExpr.operator() == UnaryExpression.UnaryOperator.DEC) {
             Expression operand = unaryExpr.operand();
             boolean isInc = unaryExpr.operator() == UnaryExpression.UnaryOperator.INC;
             boolean isPrefix = unaryExpr.prefix();
-            
+
             if (operand instanceof Identifier id) {
                 // Simple variable: get, inc/dec, set/put
                 compileExpression(operand);
                 emitter.emitOpcode(isPrefix ? (isInc ? Opcode.INC : Opcode.DEC)
-                                             : (isInc ? Opcode.POST_INC : Opcode.POST_DEC));
+                        : (isInc ? Opcode.POST_INC : Opcode.POST_DEC));
                 Integer localIndex = currentScope().getLocal(id.name());
                 if (localIndex != null) {
                     emitter.emitOpcodeU16(isPrefix ? Opcode.SET_LOCAL : Opcode.PUT_LOCAL, localIndex);
@@ -1832,7 +1997,7 @@ public final class BytecodeCompiler {
                     // Array element: obj[prop]  
                     compileExpression(memberExpr.object());
                     compileExpression(memberExpr.property());
-                    
+
                     if (isPrefix) {
                         // Prefix: ++arr[i] - returns new value
                         emitter.emitOpcode(Opcode.DUP2);
@@ -1855,10 +2020,10 @@ public final class BytecodeCompiler {
                         emitter.emitOpcode(Opcode.DROP); // old_val
                     }
                 } else {
-                    // Object property: obj.prop
+                    // Object property: obj.prop or obj.#field
                     if (memberExpr.property() instanceof Identifier propId) {
                         compileExpression(memberExpr.object());
-                        
+
                         if (isPrefix) {
                             // Prefix: ++obj.prop - returns new value
                             emitter.emitOpcode(Opcode.DUP);
@@ -1882,6 +2047,46 @@ public final class BytecodeCompiler {
                             // PUT_FIELD pops obj, peeks new_val, leaves [old_val, new_val]
                             emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name()); // old_val new_val
                             emitter.emitOpcode(Opcode.DROP); // old_val
+                        }
+                    } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
+                        // Private field: obj.#field
+                        String fieldName = privateId.name();
+                        JSSymbol symbol = privateSymbols.get(fieldName);
+                        if (symbol == null) {
+                            throw new CompilerException("Private field not found: #" + fieldName);
+                        }
+
+                        compileExpression(memberExpr.object());
+
+                        if (isPrefix) {
+                            // Prefix: ++obj.#field - returns new value
+                            emitter.emitOpcode(Opcode.DUP); // obj obj
+                            emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                            emitter.emitOpcode(Opcode.GET_PRIVATE_FIELD); // obj old_val
+                            emitter.emitOpcodeConstant(Opcode.PUSH_CONST, new JSNumber(1));
+                            emitter.emitOpcode(isInc ? Opcode.ADD : Opcode.SUB); // obj new_val
+                            emitter.emitOpcode(Opcode.DUP); // obj new_val new_val
+                            emitter.emitOpcode(Opcode.ROT3R); // new_val obj new_val
+                            emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol); // new_val obj new_val symbol
+                            emitter.emitOpcode(Opcode.SWAP); // new_val obj symbol new_val
+                            emitter.emitOpcode(Opcode.PUT_PRIVATE_FIELD); // new_val
+                        } else {
+                            // Postfix: obj.#field++ - returns old value
+                            emitter.emitOpcode(Opcode.DUP); // obj obj
+                            emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                            emitter.emitOpcode(Opcode.GET_PRIVATE_FIELD); // obj old_val
+                            emitter.emitOpcode(Opcode.DUP); // obj old_val old_val
+                            emitter.emitOpcodeConstant(Opcode.PUSH_CONST, new JSNumber(1));
+                            emitter.emitOpcode(isInc ? Opcode.ADD : Opcode.SUB); // obj old_val new_val
+                            emitter.emitOpcode(Opcode.ROT3L); // old_val new_val obj
+                            emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol); // old_val new_val obj symbol
+                            // Need: obj symbol new_val for PUT_PRIVATE_FIELD
+                            // Have: old_val new_val obj symbol
+                            // SWAP to get: old_val new_val symbol obj
+                            emitter.emitOpcode(Opcode.SWAP); // old_val new_val symbol obj
+                            // ROT3L to get: old_val obj symbol new_val
+                            emitter.emitOpcode(Opcode.ROT3L); // old_val obj symbol new_val
+                            emitter.emitOpcode(Opcode.PUT_PRIVATE_FIELD); // old_val
                         }
                     } else {
                         throw new CompilerException("Invalid member expression property for increment/decrement");
@@ -1985,11 +2190,21 @@ public final class BytecodeCompiler {
     /**
      * Create a default constructor for a class.
      */
-    private JSBytecodeFunction createDefaultConstructor(String className, boolean hasSuper) {
+    private JSBytecodeFunction createDefaultConstructor(
+            String className,
+            boolean hasSuper,
+            List<ClassDeclaration.PropertyDefinition> instanceFields,
+            Map<String, JSSymbol> privateSymbols) {
         BytecodeCompiler constructorCompiler = new BytecodeCompiler();
+        constructorCompiler.privateSymbols = privateSymbols;  // Make private symbols available
 
         constructorCompiler.enterScope();
         constructorCompiler.inGlobalScope = false;
+
+        // Initialize fields before constructor body
+        if (!instanceFields.isEmpty()) {
+            constructorCompiler.compileFieldInitialization(instanceFields, privateSymbols);
+        }
 
         // Default constructor just returns undefined (or calls super for derived classes)
         if (hasSuper) {

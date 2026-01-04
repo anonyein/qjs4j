@@ -103,27 +103,36 @@ Added the following opcodes matching QuickJS specification:
 - Private names are properly tokenized by the lexer as `PRIVATE_NAME` tokens
 - All parser functionality is tested in `ClassParserTest.java` with 8 comprehensive test cases
 
-### 6. Compiler Implementation ✅ PARTIAL (Basic classes complete)
+### 6. Compiler Implementation ✅ PARTIAL (Basic classes + public fields complete)
 **File**: `src/main/java/com/caoccao/qjs4j/compiler/BytecodeCompiler.java`
 
-**Completed** (Lines 861-1091):
+**Completed** (Lines 361-2078):
 
-1. **Compile Class Declarations** (`compileClassDeclaration`):
-   - ✅ Removed "not yet implemented" exception (line 1211)
+1. **Compile Class Declarations** (`compileClassDeclaration` - lines 361-468):
+   - ✅ Removed "not yet implemented" exception
    - ✅ Compile superclass expression or emit undefined
    - ✅ Separate class elements by type (methods, fields, static blocks, constructor)
-   - ✅ Compile constructor function or create default constructor
+   - ✅ Compile constructor function or create default constructor with field initialization
    - ✅ Emit `DEFINE_CLASS` opcode with class name
    - ✅ Compile and emit instance methods with `DEFINE_METHOD`
    - ✅ Handle class name storage in local or global scope
    - ⏳ Static methods (throws exception - not yet implemented)
-   - ⏳ Fields compilation (TODO comment added)
    - ⏳ Static blocks (TODO comment added)
 
-2. **Helper Methods**:
-   - ✅ `compileMethodAsFunction` - Compiles method definitions into JSBytecodeFunction
-   - ✅ `createDefaultConstructor` - Creates default constructor for classes without explicit constructor
-   - ✅ `getMethodName` - Extracts method name from various key types (Identifier, Literal, PrivateIdentifier)
+2. **Public Field Compilation** (`compileFieldInitialization` - lines 1170-1207):
+   - ✅ Emits field initialization code in constructor
+   - ✅ Pushes `this` onto stack
+   - ✅ Compiles field initializer expression or emits undefined
+   - ✅ Emits `DEFINE_FIELD` opcode to set field on instance
+   - ✅ Handles fields with and without initializers
+   - ⏳ Private fields skipped (will be implemented separately)
+   - ⏳ Computed field names skipped for now
+
+3. **Helper Methods**:
+   - ✅ `compileMethodAsFunction` - Compiles methods with field initialization support
+   - ✅ `createDefaultConstructor` - Creates default constructor with field initialization
+   - ✅ `getMethodName` - Extracts method name from various key types
+   - ✅ `compileFieldInitialization` - Generates field initialization bytecode
 
 2. **Private Field Compilation**:
    - For each private field, emit `PRIVATE_SYMBOL` to create unique symbol
@@ -167,14 +176,14 @@ if (is_static && s->token.val == '{') {
 }
 ```
 
-### 7. Runtime Support ✅ PARTIAL (Basic opcodes complete)
+### 7. Runtime Support ✅ PARTIAL (Basic opcodes + DEFINE_FIELD complete)
 **Files**:
 - `src/main/java/com/caoccao/qjs4j/core/JSObject.java`
 - `src/main/java/com/caoccao/qjs4j/vm/VirtualMachine.java`
 
-**Completed** (VirtualMachine.java lines 669-734):
+**Completed** (VirtualMachine.java lines 669-803):
 
-1. **DEFINE_CLASS Opcode Handler**:
+1. **DEFINE_CLASS Opcode Handler** (lines 669-771):
    - ✅ Pops constructor and superClass from stack
    - ✅ Creates prototype object
    - ✅ Sets up prototype chain for inheritance
@@ -182,11 +191,18 @@ if (is_static && s->token.val == '{') {
    - ✅ Sets prototype.constructor = constructor
    - ✅ Pushes proto and constructor back to stack
 
-2. **DEFINE_METHOD Opcode Handler**:
+2. **DEFINE_METHOD Opcode Handler** (lines 772-787):
    - ✅ Reads method name from atom table
    - ✅ Pops method and object from stack
    - ✅ Adds method to object as property
    - ✅ Pushes object back to stack
+
+3. **DEFINE_FIELD Opcode Handler** (lines 788-803):
+   - ✅ Reads field name from atom table
+   - ✅ Pops value and object from stack
+   - ✅ Sets field on object as property
+   - ✅ Pushes object back to stack
+   - ✅ Works for both instance and static fields
 
 **Remaining Work**:
 
@@ -236,10 +252,10 @@ CASE(OP_define_private_field):
 BREAK;
 ```
 
-### 8. Testing ✅ PARTIAL (Basic class tests complete)
+### 8. Testing ✅ PARTIAL (Basic class + public field tests complete)
 **Files**:
 - `src/test/java/com/caoccao/qjs4j/compiler/ClassParserTest.java` (8 tests - ✅ all passing)
-- `src/test/java/com/caoccao/qjs4j/compiler/ClassCompilerTest.java` (3 tests - ✅ all passing)
+- `src/test/java/com/caoccao/qjs4j/compiler/ClassCompilerTest.java` (7 tests - ✅ all passing)
 - `src/test/java/com/caoccao/qjs4j/compiler/ClassDebugTest.java` (2 debug tests)
 
 **Completed Test Coverage**:
@@ -248,6 +264,9 @@ BREAK;
    - ✅ Simple empty class declaration
    - ✅ Class with instance method
    - ✅ Class with constructor setting properties
+   - ✅ Class with public field (default value 0)
+   - ✅ Class with public field initializers (x = 10, y = 20)
+   - ✅ Class with both fields and constructor (fields + constructor params)
 
 **Test Coverage Needed**:
 
@@ -359,8 +378,9 @@ Following QuickJS implementation:
 
 ✅ **Current Build**: Compiles successfully with lexer, AST, parser, compiler, and VM changes
 ✅ **Parser Tests**: All ClassParserTest cases pass (8/8)
-✅ **Compiler Tests**: All ClassCompilerTest cases pass (3/3)
-✅ **Basic Class Support**: Classes with constructors and instance methods working
-⏳ **Next Step**: Implement public field compilation, then private fields and static blocks
+✅ **Compiler Tests**: All ClassCompilerTest cases pass (7/7)
+✅ **Basic Class Support**: Classes with constructors, instance methods, and public fields working
+✅ **Public Fields**: Fully implemented and tested
+⏳ **Next Step**: Implement private fields with symbols, then static methods and static blocks
 
 ## Remaining Work ⏳

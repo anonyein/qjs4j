@@ -144,6 +144,20 @@ public final class VirtualMachine {
                         valueStack.push(constValue);
                         pc += op.getSize();
                     }
+                    case PRIVATE_SYMBOL -> {
+                        // Create a unique private symbol for a private class field
+                        // Reads: atom (field name)
+                        // Result: pushes new symbol onto stack
+                        int fieldNameAtom = bytecode.readU32(pc + 1);
+                        String fieldName = bytecode.getAtoms()[fieldNameAtom];
+
+                        // Create a unique symbol with the field name as description
+                        // Each private field gets its own unique symbol
+                        JSSymbol privateSymbol = new JSSymbol(fieldName);
+
+                        valueStack.push(privateSymbol);
+                        pc += op.getSize();
+                    }
                     case FCLOSURE -> {
                         // Load function from constant pool and create closure
                         int funcIndex = bytecode.readU32(pc + 1);
@@ -783,6 +797,64 @@ public final class VirtualMachine {
                         }
 
                         valueStack.push(obj);  // Push obj back
+                        pc += op.getSize();
+                    }
+                    case DEFINE_FIELD -> {
+                        // Stack: obj value
+                        // Reads: atom (field name)
+                        // Result: obj (pops both, adds field to obj, pushes obj back)
+                        int fieldNameAtom = bytecode.readU32(pc + 1);
+                        String fieldName = bytecode.getAtoms()[fieldNameAtom];
+                        JSValue value = valueStack.pop();   // Pop value
+                        JSValue obj = valueStack.pop();     // Pop obj
+
+                        if (obj instanceof JSObject jsObj) {
+                            jsObj.set(PropertyKey.fromString(fieldName), value);
+                        }
+
+                        valueStack.push(obj);  // Push obj back
+                        pc += op.getSize();
+                    }
+                    case DEFINE_PRIVATE_FIELD -> {
+                        // Stack: obj privateSymbol value
+                        // Result: obj (pops privateSymbol and value, adds private field to obj, pushes obj back)
+                        JSValue value = valueStack.pop();           // Pop value
+                        JSValue privateSymbol = valueStack.pop();   // Pop private symbol
+                        JSValue obj = valueStack.pop();             // Pop obj
+
+                        if (obj instanceof JSObject jsObj && privateSymbol instanceof JSSymbol symbol) {
+                            // Set the private field using the symbol as the key
+                            jsObj.set(PropertyKey.fromSymbol(symbol), value);
+                        }
+
+                        valueStack.push(obj);  // Push obj back
+                        pc += op.getSize();
+                    }
+                    case GET_PRIVATE_FIELD -> {
+                        // Stack: obj privateSymbol
+                        // Result: value (pops both, gets value from obj using privateSymbol)
+                        JSValue privateSymbol = valueStack.pop();  // Pop private symbol
+                        JSValue obj = valueStack.pop();            // Pop obj
+
+                        JSValue value = JSUndefined.INSTANCE;
+                        if (obj instanceof JSObject jsObj && privateSymbol instanceof JSSymbol symbol) {
+                            value = jsObj.get(PropertyKey.fromSymbol(symbol));
+                        }
+
+                        valueStack.push(value);
+                        pc += op.getSize();
+                    }
+                    case PUT_PRIVATE_FIELD -> {
+                        // Stack: obj value privateSymbol
+                        // Result: (pops all three, sets private field on obj)
+                        JSValue privateSymbol = valueStack.pop();  // Pop private symbol
+                        JSValue value = valueStack.pop();          // Pop value
+                        JSValue obj = valueStack.pop();            // Pop obj
+
+                        if (obj instanceof JSObject jsObj && privateSymbol instanceof JSSymbol symbol) {
+                            jsObj.set(PropertyKey.fromSymbol(symbol), value);
+                        }
+
                         pc += op.getSize();
                     }
 

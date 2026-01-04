@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package com.caoccao.qjs4j.compiler;
+package com.caoccao.qjs4j.compiler.ast;
 
-import com.caoccao.qjs4j.compiler.ast.ClassDeclaration;
-import com.caoccao.qjs4j.compiler.ast.Identifier;
-import com.caoccao.qjs4j.compiler.ast.PrivateIdentifier;
-import com.caoccao.qjs4j.compiler.ast.Program;
+import com.caoccao.qjs4j.compiler.Lexer;
+import com.caoccao.qjs4j.compiler.Parser;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

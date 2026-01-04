@@ -1397,6 +1397,14 @@ public final class Parser {
                 advance();
                 yield new Identifier(name, location);
             }
+            case PRIVATE_NAME -> {
+                // Private field access: obj.#field
+                String name = currentToken.value();
+                // Remove '#' prefix for the PrivateIdentifier name
+                String fieldName = name.substring(1);
+                advance();
+                yield new PrivateIdentifier(fieldName, location);
+            }
             case STRING -> {
                 String value = currentToken.value();
                 advance();
