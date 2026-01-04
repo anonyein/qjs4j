@@ -17,12 +17,14 @@
 package com.caoccao.qjs4j.compiler.ast;
 
 /**
- * Base sealed interface for all expression nodes.
+ * Represents a private identifier in a class (#name).
  */
-public sealed interface Expression extends ASTNode permits
-        Literal, Identifier, PrivateIdentifier, BinaryExpression, UnaryExpression,
-        AssignmentExpression, ConditionalExpression, CallExpression,
-        MemberExpression, NewExpression, FunctionExpression,
-        ArrowFunctionExpression, ArrayExpression, ObjectExpression, AwaitExpression,
-        YieldExpression, TemplateLiteral, TaggedTemplateExpression {
+public record PrivateIdentifier(
+        String name,  // name without the # prefix
+        SourceLocation location
+) implements Expression {
+    @Override
+    public SourceLocation getLocation() {
+        return location;
+    }
 }

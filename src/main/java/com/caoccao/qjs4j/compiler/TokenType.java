@@ -121,6 +121,7 @@ public enum TokenType {
     COMMA,
     DOT,
     ELLIPSIS,
+    HASH,
     LBRACE,
     LBRACKET,
     LPAREN,
@@ -130,4 +131,7 @@ public enum TokenType {
     RBRACKET,
     RPAREN,
     SEMICOLON,
+
+    // Special
+    PRIVATE_NAME,  // #identifier for private class fields
 }

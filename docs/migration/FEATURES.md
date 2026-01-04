@@ -418,11 +418,35 @@ This document provides a comprehensive list of all JavaScript features implement
 - **Map.groupBy**: Group array elements into Map
 - **ArrayBuffer.prototype.detach**: Transfer ownership
 
+## Partially Implemented 🚧
+
+### Syntax Features (Parser Complete, Needs Compiler/Runtime)
+- **Private class fields**: #field
+  - ✅ Lexer: PRIVATE_NAME token type for `#identifier`
+  - ✅ AST: PrivateIdentifier node, PropertyDefinition with isPrivate flag
+  - ✅ Opcodes: GET_PRIVATE_FIELD(131), PUT_PRIVATE_FIELD(132), DEFINE_PRIVATE_FIELD(133), DEFINE_FIELD(134), PRIVATE_IN(135)
+  - ✅ Parser: Full support for parsing private fields, methods, getters/setters in classes
+  - ✅ Parser Tests: ClassParserTest with comprehensive test coverage
+  - ⏳ Compiler: Needs implementation for emitting private field opcodes
+  - ⏳ Runtime: Needs JSObject support for private field storage and access
+
+- **Static class blocks**: static { }
+  - ✅ AST: StaticBlock node as ClassElement
+  - ✅ Parser: Full support for parsing `static { }` blocks
+  - ✅ Parser Tests: Included in ClassParserTest
+  - ⏳ Compiler: Needs implementation for generating class static init functions
+  - ⏳ Runtime: Needs support for executing static initializers
+
+- **Public class fields**:
+  - ✅ AST: PropertyDefinition with isPrivate=false
+  - ✅ Parser: Full support for parsing public instance and static fields
+  - ✅ Parser Tests: Included in ClassParserTest
+  - ⏳ Compiler: Needs implementation for field initialization
+  - ⏳ Runtime: Needs support for field initialization in constructors
+
 ## Not Yet Implemented ⏳
 
 ### Syntax Features
-- **Private class fields**: #field
-- **Static class blocks**: static { }
 - **Top-level await**: Module-level await
 
 ### Built-in Objects

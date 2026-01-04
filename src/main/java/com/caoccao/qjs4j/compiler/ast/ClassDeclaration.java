@@ -24,7 +24,7 @@ import java.util.List;
 public record ClassDeclaration(
         Identifier id,
         Expression superClass,
-        List<MethodDefinition> body,
+        List<ClassElement> body,
         SourceLocation location
 ) implements Declaration {
     @Override
@@ -32,12 +32,42 @@ public record ClassDeclaration(
         return location;
     }
 
+    /**
+     * Base interface for class elements (methods, fields, static blocks)
+     */
+    public sealed interface ClassElement permits MethodDefinition, PropertyDefinition, StaticBlock {
+    }
+
+    /**
+     * Represents a method in a class
+     */
     public record MethodDefinition(
             Expression key,
             FunctionExpression value,
             String kind,
             boolean computed,
-            boolean isStatic
-    ) {
+            boolean isStatic,
+            boolean isPrivate
+    ) implements ClassElement {
+    }
+
+    /**
+     * Represents a field in a class (public or private)
+     */
+    public record PropertyDefinition(
+            Expression key,
+            Expression value,  // initializer expression, can be null
+            boolean computed,
+            boolean isStatic,
+            boolean isPrivate
+    ) implements ClassElement {
+    }
+
+    /**
+     * Represents a static initialization block
+     */
+    public record StaticBlock(
+            List<Statement> body
+    ) implements ClassElement {
     }
 }

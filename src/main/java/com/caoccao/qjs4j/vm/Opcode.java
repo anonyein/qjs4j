@@ -181,6 +181,13 @@ public enum Opcode {
     FOR_OF_START(129, 1, 1, 3),  // Start sync iteration: iterable -> iter next catch_offset
     FOR_OF_NEXT(130, 2, 3, 5),   // Get next from sync iterator: iter next catch_offset -> iter next catch_offset value done
 
+    // Private field operations
+    GET_PRIVATE_FIELD(131, 1, 2, 1),     // Get private field: obj prop -> value
+    PUT_PRIVATE_FIELD(132, 1, 3, 0),     // Set private field: obj value prop ->
+    DEFINE_PRIVATE_FIELD(133, 1, 3, 1),  // Define private field: obj prop value -> obj
+    DEFINE_FIELD(134, 5, 2, 1),          // Define regular field: obj value -> obj (takes atom parameter)
+    PRIVATE_IN(135, 1, 2, 1),            // Check if object has private field: obj prop -> boolean
+
     // Type checking operations
     IS_UNDEFINED_OR_NULL(174, 1, 1, 1),  // Check if value is null or undefined - replaces value with boolean
 

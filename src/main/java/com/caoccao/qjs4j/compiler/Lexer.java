@@ -694,6 +694,28 @@ public final class Lexer {
             return token;
         }
 
+        // Private identifiers (#name)
+        if (c == '#') {
+            // Check if next character is an identifier start
+            if (!isAtEnd() && isIdentifierStart(peek())) {
+                // Scan the identifier part (without the #)
+                int nameStart = position;
+                while (!isAtEnd() && isIdentifierPart(peek())) {
+                    advance();
+                }
+                String name = source.substring(nameStart, position);
+                // The value includes the # prefix
+                String value = "#" + name;
+                Token token = new Token(TokenType.PRIVATE_NAME, value, startLine, startColumn, startPos);
+                lastTokenType = token.type();
+                return token;
+            }
+            // Otherwise, it's just a # token (for potential future use)
+            Token token = makeToken(TokenType.HASH, "#");
+            lastTokenType = token.type();
+            return token;
+        }
+
         // Operators and punctuation
         Token token = scanOperatorOrPunctuation(c, startPos, startLine, startColumn);
         lastTokenType = token.type();

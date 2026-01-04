@@ -17,12 +17,29 @@ qjs4j includes features not present in the original QuickJS:
 - **Enhanced Module System**: Complete ES6 module implementation with dynamic import()
 - **Microtask Queue**: Full ES2020-compliant microtask infrastructure
 
+### Partially Implemented
+
+The following features have infrastructure in place but require additional implementation:
+
+- **Basic class features**: Classes with constructors and methods
+  - ✅ Lexer support for `class` keyword
+  - ✅ AST nodes (ClassDeclaration, MethodDefinition, ClassElement)
+  - ✅ Opcodes (DEFINE_CLASS, DEFINE_METHOD)
+  - ✅ Parser support (parseClassDeclaration, parseClassElement)
+  - ✅ Parser tests (ClassParserTest with 8 test cases)
+  - ✅ Compiler implementation (basic classes, constructors, instance methods)
+  - ✅ Runtime support (DEFINE_CLASS and DEFINE_METHOD opcodes)
+  - ✅ Compiler tests (ClassCompilerTest with 3 test cases)
+  - ⏳ Static methods (not yet implemented)
+  - ⏳ Public class fields (not yet implemented)
+  - ⏳ Private fields and methods (#field, #method) (infrastructure ready, needs compiler/runtime)
+  - ⏳ Static blocks (infrastructure ready, needs compiler/runtime)
+
 ### Not Yet Implemented
 
 The following QuickJS features are planned but not yet implemented:
 
 - **Internationalization (Intl)**: i18n support for dates, numbers, and strings
-- **Advanced class features**: Private fields (#field), static blocks
 - **Top-level await**: Module-level await expressions
 
 See [ASYNC_AWAIT_ENHANCEMENTS.md](docs/migration/ASYNC_AWAIT_ENHANCEMENTS.md) for async/await implementation details.

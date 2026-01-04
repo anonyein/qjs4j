@@ -666,6 +666,72 @@ public final class VirtualMachine {
                         }
                         pc += op.getSize();
                     }
+                    case DEFINE_CLASS -> {
+                        // Stack: superClass constructor
+                        // Reads: atom (class name)
+                        // Result: proto constructor (pushes prototype object)
+                        int classNameAtom = bytecode.readU32(pc + 1);
+                        String className = bytecode.getAtoms()[classNameAtom];
+                        JSValue constructor = valueStack.pop();
+                        JSValue superClass = valueStack.pop();
+
+                        if (!(constructor instanceof JSFunction)) {
+                            throw new JSVirtualMachineException("DEFINE_CLASS: constructor must be a function");
+                        }
+                        JSFunction constructorFunc = (JSFunction) constructor;
+
+                        // Create the class prototype object
+                        JSObject prototype = new JSObject();
+
+                        // Set up prototype chain
+                        if (superClass != JSUndefined.INSTANCE && superClass != JSNull.INSTANCE) {
+                            if (superClass instanceof JSFunction) {
+                                JSFunction superFunc = (JSFunction) superClass;
+                                // Get super prototype
+                                JSValue superProto = superFunc.get(PropertyKey.fromString("prototype"));
+                                if (superProto instanceof JSObject) {
+                                    JSObject superProtoObj = (JSObject) superProto;
+                                    prototype.setPrototype(superProtoObj);
+                                }
+                                // Set constructor's prototype to super constructor
+                                if (constructorFunc instanceof JSObject) {
+                                    JSObject constructorObj = (JSObject) constructorFunc;
+                                    constructorObj.setPrototype(superFunc);
+                                }
+                            }
+                        }
+
+                        // Set constructor.prototype = prototype
+                        if (constructorFunc instanceof JSObject) {
+                            JSObject constructorObj = (JSObject) constructorFunc;
+                            constructorObj.set(PropertyKey.fromString("prototype"), prototype);
+                        }
+
+                        // Set prototype.constructor = constructor
+                        prototype.set(PropertyKey.fromString("constructor"), constructor);
+
+                        // Push prototype and constructor onto stack
+                        valueStack.push(prototype);
+                        valueStack.push(constructor);
+                        pc += op.getSize();
+                    }
+                    case DEFINE_METHOD -> {
+                        // Stack: obj method
+                        // Reads: atom (method name)
+                        // Result: obj (pops both, adds method to obj, pushes obj back)
+                        int methodNameAtom = bytecode.readU32(pc + 1);
+                        String methodName = bytecode.getAtoms()[methodNameAtom];
+                        JSValue method = valueStack.pop();  // Pop method
+                        JSValue obj = valueStack.pop();     // Pop obj
+
+                        if (obj instanceof JSObject) {
+                            JSObject jsObj = (JSObject) obj;
+                            jsObj.set(PropertyKey.fromString(methodName), method);
+                        }
+
+                        valueStack.push(obj);  // Push obj back
+                        pc += op.getSize();
+                    }
 
                     // ==================== Exception Handling ====================
                     case THROW -> {

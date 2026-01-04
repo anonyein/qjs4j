@@ -858,6 +858,234 @@ public final class BytecodeCompiler {
         }
     }
 
+    private void compileClassDeclaration(ClassDeclaration classDecl) {
+        // Following QuickJS implementation in quickjs.c:24700-25200
+
+        String className = classDecl.id() != null ? classDecl.id().name() : "";
+
+        // Compile superclass expression or emit undefined
+        if (classDecl.superClass() != null) {
+            compileExpression(classDecl.superClass());
+        } else {
+            emitter.emitOpcode(Opcode.UNDEFINED);
+        }
+        // Stack: superClass
+
+        // Separate class elements by type
+        List<ClassDeclaration.MethodDefinition> methods = new ArrayList<>();
+        List<ClassDeclaration.PropertyDefinition> instanceFields = new ArrayList<>();
+        List<ClassDeclaration.PropertyDefinition> staticFields = new ArrayList<>();
+        List<ClassDeclaration.StaticBlock> staticBlocks = new ArrayList<>();
+        ClassDeclaration.MethodDefinition constructor = null;
+
+        for (ClassDeclaration.ClassElement element : classDecl.body()) {
+            if (element instanceof ClassDeclaration.MethodDefinition method) {
+                // Check if it's a constructor
+                if (method.key() instanceof Identifier id && "constructor".equals(id.name()) && !method.isStatic()) {
+                    constructor = method;
+                } else {
+                    methods.add(method);
+                }
+            } else if (element instanceof ClassDeclaration.PropertyDefinition field) {
+                if (field.isStatic()) {
+                    staticFields.add(field);
+                } else {
+                    instanceFields.add(field);
+                }
+            } else if (element instanceof ClassDeclaration.StaticBlock block) {
+                staticBlocks.add(block);
+            }
+        }
+
+        // Compile constructor function (or create default)
+        JSBytecodeFunction constructorFunc;
+        if (constructor != null) {
+            constructorFunc = compileMethodAsFunction(constructor, className, classDecl.superClass() != null);
+        } else {
+            // Create default constructor
+            constructorFunc = createDefaultConstructor(className, classDecl.superClass() != null);
+        }
+
+        // Emit constructor in constant pool
+        emitter.emitOpcodeConstant(Opcode.PUSH_CONST, constructorFunc);
+        // Stack: superClass constructor
+
+        // Emit DEFINE_CLASS opcode with class name
+        emitter.emitOpcodeAtom(Opcode.DEFINE_CLASS, className);
+        // Stack: proto constructor
+
+        // Now compile methods and add them to the prototype
+        // After DEFINE_CLASS: Stack is proto constructor (constructor on TOP)
+        // For simplicity, swap so proto is on top: constructor proto
+        emitter.emitOpcode(Opcode.SWAP);
+        // Stack: constructor proto
+
+        for (ClassDeclaration.MethodDefinition method : methods) {
+            // Stack before each iteration: constructor proto
+
+            if (method.isStatic()) {
+                // TODO: Implement static method compilation
+                throw new CompilerException("Static methods not yet implemented");
+            } else {
+                // For instance methods, proto is the target
+                // Current: constructor proto
+                // Compile method
+                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false);
+                emitter.emitOpcodeConstant(Opcode.PUSH_CONST, methodFunc);
+                // Stack: constructor proto method
+
+                // DEFINE_METHOD wants: obj method -> obj
+                // We have: constructor proto method
+                // We want proto and method together: constructor proto method (already correct!)
+                // But after DEFINE_METHOD we'll have: constructor proto
+                // which is what we want!
+
+                String methodName = getMethodName(method);
+                emitter.emitOpcodeAtom(Opcode.DEFINE_METHOD, methodName);
+                // Stack: constructor proto (method added to proto)
+            }
+        }
+
+        // Swap back to original order: proto constructor
+        emitter.emitOpcode(Opcode.SWAP);
+        // Stack: proto constructor
+
+        // For now, we'll skip field and static block compilation
+        // TODO: Implement field initialization and static blocks
+
+        // Drop prototype, keep constructor
+        emitter.emitOpcode(Opcode.NIP);
+        // Stack: constructor
+
+        // Store the class constructor in a variable
+        if (classDecl.id() != null) {
+            String varName = classDecl.id().name();
+            if (!inGlobalScope) {
+                currentScope().declareLocal(varName);
+                Integer localIndex = currentScope().getLocal(varName);
+                if (localIndex != null) {
+                    emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
+                }
+            } else {
+                emitter.emitOpcodeAtom(Opcode.PUT_VAR, varName);
+            }
+        } else {
+            // Anonymous class expression - leave on stack
+            // For class declarations, we always have a name, so this shouldn't happen
+        }
+    }
+
+    /**
+     * Compile a method definition as a function.
+     */
+    private JSBytecodeFunction compileMethodAsFunction(ClassDeclaration.MethodDefinition method, String methodName, boolean isDerivedConstructor) {
+        BytecodeCompiler methodCompiler = new BytecodeCompiler();
+
+        FunctionExpression funcExpr = method.value();
+
+        // Enter function scope and add parameters as locals
+        methodCompiler.enterScope();
+        methodCompiler.inGlobalScope = false;
+        methodCompiler.isInAsyncFunction = funcExpr.isAsync();
+
+        for (Identifier param : funcExpr.params()) {
+            methodCompiler.currentScope().declareLocal(param.name());
+        }
+
+        // If this is a generator method, emit INITIAL_YIELD at the start
+        if (funcExpr.isGenerator()) {
+            methodCompiler.emitter.emitOpcode(Opcode.INITIAL_YIELD);
+        }
+
+        // Compile method body statements
+        for (Statement stmt : funcExpr.body().body()) {
+            methodCompiler.compileStatement(stmt);
+        }
+
+        // If body doesn't end with return, add implicit return undefined
+        List<Statement> bodyStatements = funcExpr.body().body();
+        if (bodyStatements.isEmpty() || !(bodyStatements.get(bodyStatements.size() - 1) instanceof ReturnStatement)) {
+            methodCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
+            methodCompiler.emitter.emitOpcode(funcExpr.isAsync() ? Opcode.RETURN_ASYNC : Opcode.RETURN);
+        }
+
+        int localCount = methodCompiler.currentScope().getLocalCount();
+        methodCompiler.exitScope();
+
+        // Build the method bytecode
+        Bytecode methodBytecode = methodCompiler.emitter.build(localCount);
+
+        // Create JSBytecodeFunction for the method
+        return new JSBytecodeFunction(
+                methodBytecode,
+                methodName,
+                funcExpr.params().size(),
+                new JSValue[0],  // closure vars
+                null,            // prototype
+                false,           // isConstructor - methods are not constructors
+                funcExpr.isAsync(),
+                funcExpr.isGenerator(),
+                true,            // strict - classes are always strict mode
+                "method " + methodName + "() { [method body] }"  // source for toString
+        );
+    }
+
+    /**
+     * Create a default constructor for a class.
+     */
+    private JSBytecodeFunction createDefaultConstructor(String className, boolean hasSuper) {
+        BytecodeCompiler constructorCompiler = new BytecodeCompiler();
+
+        constructorCompiler.enterScope();
+        constructorCompiler.inGlobalScope = false;
+
+        // Default constructor just returns undefined (or calls super for derived classes)
+        if (hasSuper) {
+            // TODO: Implement super() call for derived class constructor
+            // For now, just return undefined
+            constructorCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
+        } else {
+            constructorCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
+        }
+        constructorCompiler.emitter.emitOpcode(Opcode.RETURN);
+
+        int localCount = constructorCompiler.currentScope().getLocalCount();
+        constructorCompiler.exitScope();
+
+        Bytecode constructorBytecode = constructorCompiler.emitter.build(localCount);
+
+        return new JSBytecodeFunction(
+                constructorBytecode,
+                className,
+                0,               // no parameters
+                new JSValue[0],  // no closure vars
+                null,            // prototype will be set by VM
+                true,            // isConstructor
+                false,           // not async
+                false,           // not generator
+                true,            // strict mode
+                "constructor() { [default] }"
+        );
+    }
+
+    /**
+     * Get the name of a method from its key.
+     */
+    private String getMethodName(ClassDeclaration.MethodDefinition method) {
+        Expression key = method.key();
+        if (key instanceof Identifier id) {
+            return id.name();
+        } else if (key instanceof Literal literal) {
+            return literal.value().toString();
+        } else if (key instanceof PrivateIdentifier privateId) {
+            // Private identifier - return name without # prefix
+            return privateId.name();
+        } else {
+            // Computed property name - for now use a placeholder
+            return "[computed]";
+        }
+    }
+
     private void compileFunctionExpression(FunctionExpression funcExpr) {
         // Create a new compiler for the function body
         BytecodeCompiler functionCompiler = new BytecodeCompiler();
@@ -1208,8 +1436,7 @@ public final class BytecodeCompiler {
         } else if (stmt instanceof FunctionDeclaration funcDecl) {
             compileFunctionDeclaration(funcDecl);
         } else if (stmt instanceof ClassDeclaration classDecl) {
-            // Class declarations not yet implemented
-            throw new CompilerException("Class declarations not yet implemented");
+            compileClassDeclaration(classDecl);
         }
     }
 
