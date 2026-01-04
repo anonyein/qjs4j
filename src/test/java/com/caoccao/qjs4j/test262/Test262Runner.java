@@ -30,11 +30,11 @@ import java.util.stream.Stream;
  * Main runner for executing test262 conformance tests.
  */
 public class Test262Runner {
-    private final Path test262Root;
     private final Test262Config config;
-    private final Test262Parser parser;
     private final Test262Executor executor;
+    private final Test262Parser parser;
     private final Test262Reporter reporter;
+    private final Path test262Root;
 
     public Test262Runner(Path test262Root, Test262Config config) {
         this.test262Root = test262Root;
@@ -45,13 +45,53 @@ public class Test262Runner {
         this.reporter = new Test262Reporter();
     }
 
+    public static void main(String[] args) {
+        try {
+            Path test262Root = args.length > 0
+                    ? Paths.get(args[0])
+                    : Paths.get("../test262");
+
+            // Determine config based on arguments
+            Test262Config config;
+            if (args.length > 1 && args[1].equals("--quick")) {
+                config = Test262Config.forQuickTest();
+            } else if (args.length > 1 && args[1].equals("--language")) {
+                config = Test262Config.forLanguageTests();
+            } else {
+                config = Test262Config.loadDefault();
+            }
+
+            Test262Runner runner = new Test262Runner(test262Root, config);
+            runner.run();
+
+        } catch (Exception e) {
+            System.err.println("Error running test262: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    private List<Path> discoverTests(Path testsDir) throws IOException {
+        List<Path> testFiles = new ArrayList<>();
+
+        try (Stream<Path> paths = Files.walk(testsDir)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".js"))
+                    .filter(p -> !p.toString().contains("_FIXTURE"))
+                    .filter(p -> config.matchesIncludePattern(p))
+                    .forEach(testFiles::add);
+        }
+
+        return testFiles;
+    }
+
     public void run() throws IOException {
         System.out.println("Test262 Runner for qjs4j");
         System.out.println("Test262 root: " + test262Root.toAbsolutePath());
         System.out.println();
 
         Path testsDir = test262Root.resolve("test");
-        
+
         if (!Files.exists(testsDir)) {
             System.err.println("Error: Test262 test directory not found at " + testsDir);
             System.err.println("Please ensure test262 is cloned at " + test262Root.toAbsolutePath());
@@ -72,7 +112,7 @@ public class Test262Runner {
         int testCount = 0;
         for (Path testFile : testFiles) {
             testCount++;
-            
+
             try {
                 Test262TestCase testCase = parser.parse(testFile);
 
@@ -90,52 +130,12 @@ public class Test262Runner {
                 if (testCount % 100 == 0) {
                     reporter.printProgress();
                 }
-                
+
             } catch (Exception e) {
                 System.err.println("Error processing test " + testFile + ": " + e.getMessage());
             }
         }
 
         reporter.printSummary();
-    }
-
-    private List<Path> discoverTests(Path testsDir) throws IOException {
-        List<Path> testFiles = new ArrayList<>();
-
-        try (Stream<Path> paths = Files.walk(testsDir)) {
-            paths.filter(Files::isRegularFile)
-                 .filter(p -> p.toString().endsWith(".js"))
-                 .filter(p -> !p.toString().contains("_FIXTURE"))
-                 .filter(p -> config.matchesIncludePattern(p))
-                 .forEach(testFiles::add);
-        }
-
-        return testFiles;
-    }
-
-    public static void main(String[] args) {
-        try {
-            Path test262Root = args.length > 0
-                ? Paths.get(args[0])
-                : Paths.get("../test262");
-
-            // Determine config based on arguments
-            Test262Config config;
-            if (args.length > 1 && args[1].equals("--quick")) {
-                config = Test262Config.forQuickTest();
-            } else if (args.length > 1 && args[1].equals("--language")) {
-                config = Test262Config.forLanguageTests();
-            } else {
-                config = Test262Config.loadDefault();
-            }
-
-            Test262Runner runner = new Test262Runner(test262Root, config);
-            runner.run();
-
-        } catch (Exception e) {
-            System.err.println("Error running test262: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(1);
-        }
     }
 }

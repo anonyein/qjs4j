@@ -25,13 +25,28 @@ import java.util.regex.Pattern;
  * Configuration for test262 test execution.
  */
 public class Test262Config {
-    private Set<String> unsupportedFeatures;
-    private Set<Pattern> includePatterns;
-    private Set<Pattern> excludePatterns;
     private long asyncTimeoutMs;
+    private Set<Pattern> excludePatterns;
+    private Set<Pattern> includePatterns;
     private int maxTests;
+    private Set<String> unsupportedFeatures;
 
     private Test262Config() {
+    }
+
+    public static Test262Config forLanguageTests() {
+        Test262Config config = loadDefault();
+        // Only run language tests
+        config.includePatterns.clear();
+        config.includePatterns.add(Pattern.compile(".*/test/language/.*\\.js$"));
+        return config;
+    }
+
+    public static Test262Config forQuickTest() {
+        Test262Config config = loadDefault();
+        // Run a subset of tests for quick validation
+        config.maxTests = 100;
+        return config;
     }
 
     public static Test262Config loadDefault() {
@@ -70,23 +85,60 @@ public class Test262Config {
         return config;
     }
 
-    public static Test262Config forQuickTest() {
-        Test262Config config = loadDefault();
-        // Run a subset of tests for quick validation
-        config.maxTests = 100;
-        return config;
+    public void addExcludePattern(String pattern) {
+        excludePatterns.add(Pattern.compile(pattern));
     }
 
-    public static Test262Config forLanguageTests() {
-        Test262Config config = loadDefault();
-        // Only run language tests
-        config.includePatterns.clear();
-        config.includePatterns.add(Pattern.compile(".*/test/language/.*\\.js$"));
-        return config;
+    public void addIncludePattern(String pattern) {
+        includePatterns.add(Pattern.compile(pattern));
+    }
+
+    public void addUnsupportedFeature(String feature) {
+        unsupportedFeatures.add(feature);
+    }
+
+    public long getAsyncTimeoutMs() {
+        return asyncTimeoutMs;
+    }
+
+    public int getMaxTests() {
+        return maxTests;
+    }
+
+    public Set<String> getUnsupportedFeatures() {
+        return unsupportedFeatures;
     }
 
     public boolean isFeatureUnsupported(String feature) {
         return unsupportedFeatures.contains(feature);
+    }
+
+    public boolean matchesIncludePattern(Path testPath) {
+        String pathStr = testPath.toString();
+
+        // Check exclusions first
+        for (Pattern exclude : excludePatterns) {
+            if (exclude.matcher(pathStr).find()) {
+                return false;
+            }
+        }
+
+        // Check inclusions
+        for (Pattern include : includePatterns) {
+            if (include.matcher(pathStr).find()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void setAsyncTimeoutMs(long asyncTimeoutMs) {
+        this.asyncTimeoutMs = asyncTimeoutMs;
+    }
+
+    public void setMaxTests(int maxTests) {
+        this.maxTests = maxTests;
     }
 
     public boolean shouldSkipTest(Test262TestCase test) {
@@ -117,57 +169,5 @@ public class Test262Config {
         }
 
         return !matchesInclude;
-    }
-
-    public boolean matchesIncludePattern(Path testPath) {
-        String pathStr = testPath.toString();
-
-        // Check exclusions first
-        for (Pattern exclude : excludePatterns) {
-            if (exclude.matcher(pathStr).find()) {
-                return false;
-            }
-        }
-
-        // Check inclusions
-        for (Pattern include : includePatterns) {
-            if (include.matcher(pathStr).find()) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public long getAsyncTimeoutMs() {
-        return asyncTimeoutMs;
-    }
-
-    public void setAsyncTimeoutMs(long asyncTimeoutMs) {
-        this.asyncTimeoutMs = asyncTimeoutMs;
-    }
-
-    public int getMaxTests() {
-        return maxTests;
-    }
-
-    public void setMaxTests(int maxTests) {
-        this.maxTests = maxTests;
-    }
-
-    public Set<String> getUnsupportedFeatures() {
-        return unsupportedFeatures;
-    }
-
-    public void addUnsupportedFeature(String feature) {
-        unsupportedFeatures.add(feature);
-    }
-
-    public void addIncludePattern(String pattern) {
-        includePatterns.add(Pattern.compile(pattern));
-    }
-
-    public void addExcludePattern(String pattern) {
-        excludePatterns.add(Pattern.compile(pattern));
     }
 }

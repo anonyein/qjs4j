@@ -1401,6 +1401,49 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber(0));  // Catch offset (placeholder)
     }
 
+    private void handleForInEnd() {
+        // Clean up the enumerator from the stack
+        JSStackValue stackValue = valueStack.popStackValue();
+        if (!(stackValue instanceof JSInternalValue internal) ||
+                !(internal.value() instanceof JSForInEnumerator)) {
+            throw new JSVirtualMachineException("Invalid for-in enumerator in FOR_IN_END");
+        }
+        // Just pop it, no need to do anything else
+    }
+
+    // ==================== Bitwise Operation Handlers ====================
+
+    private void handleForInNext() {
+        // The enumerator should be on top of the stack (peek at it, don't pop)
+        JSStackValue stackValue = valueStack.popStackValue();
+
+        if (!(stackValue instanceof JSInternalValue internal) ||
+                !(internal.value() instanceof JSForInEnumerator enumerator)) {
+            throw new JSVirtualMachineException("Invalid for-in enumerator");
+        }
+
+        // Get the next key from the enumerator
+        JSValue nextKey = enumerator.next();
+
+        // Push enumerator back first (so it stays at same position)
+        valueStack.pushStackValue(new JSInternalValue(enumerator));
+
+        // Then push the key onto the stack
+        valueStack.push(nextKey);
+    }
+
+    private void handleForInStart() {
+        // Pop the object from the stack
+        JSValue obj = valueStack.pop();
+
+        // Create a for-in enumerator
+        JSForInEnumerator enumerator = new JSForInEnumerator(obj);
+
+        // Push the enumerator onto the stack (wrapped in a special internal object)
+        // We'll use JSInternalValue to hold it
+        valueStack.pushStackValue(new JSInternalValue(enumerator));
+    }
+
     private void handleForOfNext() {
         // Stack layout before: iter, next, catch_offset (bottom to top)
         // Stack layout after: iter, next, catch_offset, value, done (bottom to top)
@@ -1450,8 +1493,6 @@ public final class VirtualMachine {
         valueStack.push(done ? JSBoolean.TRUE : JSBoolean.FALSE);
     }
 
-    // ==================== Bitwise Operation Handlers ====================
-
     private void handleForOfStart() {
         // Pop the iterable from the stack
         JSValue iterable = valueStack.pop();
@@ -1499,47 +1540,6 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber(0));  // Catch offset (placeholder)
     }
 
-    private void handleForInStart() {
-        // Pop the object from the stack
-        JSValue obj = valueStack.pop();
-
-        // Create a for-in enumerator
-        JSForInEnumerator enumerator = new JSForInEnumerator(obj);
-
-        // Push the enumerator onto the stack (wrapped in a special internal object)
-        // We'll use JSInternalValue to hold it
-        valueStack.pushStackValue(new JSInternalValue(enumerator));
-    }
-
-    private void handleForInNext() {
-        // The enumerator should be on top of the stack (peek at it, don't pop)
-        JSStackValue stackValue = valueStack.popStackValue();
-
-        if (!(stackValue instanceof JSInternalValue internal) ||
-            !(internal.getValue() instanceof JSForInEnumerator enumerator)) {
-            throw new JSVirtualMachineException("Invalid for-in enumerator");
-        }
-
-        // Get the next key from the enumerator
-        JSValue nextKey = enumerator.next();
-
-        // Push enumerator back first (so it stays at same position)
-        valueStack.pushStackValue(new JSInternalValue(enumerator));
-        
-        // Then push the key onto the stack
-        valueStack.push(nextKey);
-    }
-
-    private void handleForInEnd() {
-        // Clean up the enumerator from the stack
-        JSStackValue stackValue = valueStack.popStackValue();
-        if (!(stackValue instanceof JSInternalValue internal) ||
-            !(internal.getValue() instanceof JSForInEnumerator)) {
-            throw new JSVirtualMachineException("Invalid for-in enumerator in FOR_IN_END");
-        }
-        // Just pop it, no need to do anything else
-    }
-
     private void handleGt() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
@@ -1570,26 +1570,6 @@ public final class VirtualMachine {
         JSValue operand = valueStack.pop();
         double result = JSTypeConversions.toNumber(context, operand).value() + 1;
         valueStack.push(new JSNumber(result));
-    }
-
-    private void handlePostInc() {
-        // POST_INC: [value] -> [old_value, new_value]
-        // Takes value on top, pushes old value then new value
-        JSValue operand = valueStack.pop();
-        double oldValue = JSTypeConversions.toNumber(context, operand).value();
-        double newValue = oldValue + 1;
-        valueStack.push(new JSNumber(oldValue));
-        valueStack.push(new JSNumber(newValue));
-    }
-
-    private void handlePostDec() {
-        // POST_DEC: [value] -> [old_value, new_value]
-        // Takes value on top, pushes old value then new value
-        JSValue operand = valueStack.pop();
-        double oldValue = JSTypeConversions.toNumber(context, operand).value();
-        double newValue = oldValue - 1;
-        valueStack.push(new JSNumber(oldValue));
-        valueStack.push(new JSNumber(newValue));
     }
 
     private void handleInitialYield() {
@@ -1638,8 +1618,6 @@ public final class VirtualMachine {
         valueStack.push(JSBoolean.FALSE);
     }
 
-    // ==================== Comparison Operation Handlers ====================
-
     private void handleIsUndefinedOrNull() {
         JSValue value = valueStack.pop();
         boolean result = value instanceof JSNull || value instanceof JSUndefined;
@@ -1656,6 +1634,8 @@ public final class VirtualMachine {
             valueStack.push(right);
         }
     }
+
+    // ==================== Comparison Operation Handlers ====================
 
     private void handleLogicalNot() {
         JSValue operand = valueStack.pop();
@@ -1716,8 +1696,6 @@ public final class VirtualMachine {
         valueStack.push(JSBoolean.valueOf(result));
     }
 
-    // ==================== Logical Operation Handlers ====================
-
     private void handleNot() {
         JSValue operand = valueStack.pop();
         int result = ~JSTypeConversions.toInt32(context, operand);
@@ -1735,6 +1713,8 @@ public final class VirtualMachine {
         }
     }
 
+    // ==================== Logical Operation Handlers ====================
+
     private void handleOr() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
@@ -1746,6 +1726,26 @@ public final class VirtualMachine {
         JSValue operand = valueStack.pop();
         double result = JSTypeConversions.toNumber(context, operand).value();
         valueStack.push(new JSNumber(result));
+    }
+
+    private void handlePostDec() {
+        // POST_DEC: [value] -> [old_value, new_value]
+        // Takes value on top, pushes old value then new value
+        JSValue operand = valueStack.pop();
+        double oldValue = JSTypeConversions.toNumber(context, operand).value();
+        double newValue = oldValue - 1;
+        valueStack.push(new JSNumber(oldValue));
+        valueStack.push(new JSNumber(newValue));
+    }
+
+    private void handlePostInc() {
+        // POST_INC: [value] -> [old_value, new_value]
+        // Takes value on top, pushes old value then new value
+        JSValue operand = valueStack.pop();
+        double oldValue = JSTypeConversions.toNumber(context, operand).value();
+        double newValue = oldValue + 1;
+        valueStack.push(new JSNumber(oldValue));
+        valueStack.push(new JSNumber(newValue));
     }
 
     // ==================== Type Operation Handlers ====================

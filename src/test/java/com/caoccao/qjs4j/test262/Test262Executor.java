@@ -30,8 +30,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * Executes test262 test cases with proper flag handling.
  */
 public class Test262Executor {
-    private final HarnessLoader harnessLoader;
     private final long asyncTimeoutMs;
+    private final HarnessLoader harnessLoader;
 
     public Test262Executor(HarnessLoader harnessLoader) {
         this(harnessLoader, 5000);
@@ -40,6 +40,18 @@ public class Test262Executor {
     public Test262Executor(HarnessLoader harnessLoader, long asyncTimeoutMs) {
         this.harnessLoader = harnessLoader;
         this.asyncTimeoutMs = asyncTimeoutMs;
+    }
+
+    private TestResult checkNegativeResult(String errorMessage, Test262TestCase test) {
+        Test262TestCase.NegativeInfo negative = test.getNegative();
+
+        // Simple check: does the error message contain the expected error type?
+        if (errorMessage.contains(negative.getType())) {
+            return TestResult.pass(test);
+        } else {
+            return TestResult.fail(test,
+                    "Expected " + negative.getType() + " but got: " + errorMessage);
+        }
     }
 
     public TestResult execute(Test262TestCase test) {
@@ -73,41 +85,29 @@ public class Test262Executor {
         }
     }
 
-    private String prepareCode(Test262TestCase test) {
-        String code = test.getCode();
-
-        // Handle strict mode flags
-        if (test.hasFlag("onlyStrict") && !code.trim().startsWith("\"use strict\"") 
-                && !code.trim().startsWith("'use strict'")) {
-            code = "\"use strict\";\n" + code;
-        }
-
-        return code;
-    }
-
-    private TestResult executeAsync(JSContext context, JSRuntime runtime, 
-                                     String code, Test262TestCase test) {
+    private TestResult executeAsync(JSContext context, JSRuntime runtime,
+                                    String code, Test262TestCase test) {
         // Set up $DONE callback
         AtomicReference<Object> doneResult = new AtomicReference<>();
         CountDownLatch doneLatch = new CountDownLatch(1);
 
         try {
             JSObject globalObject = context.getGlobalObject();
-            
-            JSNativeFunction doneFunction = new JSNativeFunction("$DONE", 1, 
-                (ctx, thisArg, args) -> {
-                    if (args.length > 0 && !(args[0] instanceof JSUndefined)) {
-                        // Error passed to $DONE
-                        doneResult.set(args[0].toString());
-                    } else {
-                        // Success - no error
-                        doneResult.set(null);
+
+            JSNativeFunction doneFunction = new JSNativeFunction("$DONE", 1,
+                    (ctx, thisArg, args) -> {
+                        if (args.length > 0 && !(args[0] instanceof JSUndefined)) {
+                            // Error passed to $DONE
+                            doneResult.set(args[0].toString());
+                        } else {
+                            // Success - no error
+                            doneResult.set(null);
+                        }
+                        doneLatch.countDown();
+                        return JSUndefined.INSTANCE;
                     }
-                    doneLatch.countDown();
-                    return JSUndefined.INSTANCE;
-                }
             );
-            
+
             globalObject.set("$DONE", doneFunction);
 
             // Execute test code
@@ -186,47 +186,11 @@ public class Test262Executor {
         }
     }
 
-    private TestResult handleException(Exception e, Test262TestCase test) {
-        if (test.getNegative() == null) {
-            // Unexpected error
-            String message = e.getMessage();
-            if (message == null) {
-                message = e.getClass().getSimpleName();
-            }
-            return TestResult.fail(test, "Unexpected error: " + message);
-        }
-
-        // Check if error type matches expected
-        Test262TestCase.NegativeInfo negative = test.getNegative();
-        String errorType = extractErrorType(e);
-
-        if (errorType.equals(negative.getType())) {
-            return TestResult.pass(test);
-        } else {
-            return TestResult.fail(test, 
-                "Expected " + negative.getType() + " but got " + errorType);
-        }
-    }
-
-    private TestResult checkNegativeResult(String errorMessage, Test262TestCase test) {
-        Test262TestCase.NegativeInfo negative = test.getNegative();
-        
-        // Simple check: does the error message contain the expected error type?
-        if (errorMessage.contains(negative.getType())) {
-            return TestResult.pass(test);
-        } else {
-            return TestResult.fail(test, 
-                "Expected " + negative.getType() + " but got: " + errorMessage);
-        }
-    }
-
     private String extractErrorType(Exception e) {
-        if (e instanceof JSException) {
-            JSException jsException = (JSException) e;
+        if (e instanceof JSException jsException) {
             JSValue error = jsException.getErrorValue();
 
-            if (error instanceof JSObject) {
-                JSObject errorObj = (JSObject) error;
+            if (error instanceof JSObject errorObj) {
                 try {
                     JSValue nameValue = errorObj.get("name");
                     if (nameValue != null && !(nameValue instanceof JSUndefined)) {
@@ -251,5 +215,39 @@ public class Test262Executor {
 
         // Fallback to generic Error
         return "Error";
+    }
+
+    private TestResult handleException(Exception e, Test262TestCase test) {
+        if (test.getNegative() == null) {
+            // Unexpected error
+            String message = e.getMessage();
+            if (message == null) {
+                message = e.getClass().getSimpleName();
+            }
+            return TestResult.fail(test, "Unexpected error: " + message);
+        }
+
+        // Check if error type matches expected
+        Test262TestCase.NegativeInfo negative = test.getNegative();
+        String errorType = extractErrorType(e);
+
+        if (errorType.equals(negative.getType())) {
+            return TestResult.pass(test);
+        } else {
+            return TestResult.fail(test,
+                    "Expected " + negative.getType() + " but got " + errorType);
+        }
+    }
+
+    private String prepareCode(Test262TestCase test) {
+        String code = test.getCode();
+
+        // Handle strict mode flags
+        if (test.hasFlag("onlyStrict") && !code.trim().startsWith("\"use strict\"")
+                && !code.trim().startsWith("'use strict'")) {
+            code = "\"use strict\";\n" + code;
+        }
+
+        return code;
     }
 }

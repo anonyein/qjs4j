@@ -7,6 +7,7 @@ function isPrime(number) {
     }
     return true;
 }
+
 const primeNumbers = [];
 const upperLimit = 100;
 for (let number = 2; number < upperLimit; number++) {

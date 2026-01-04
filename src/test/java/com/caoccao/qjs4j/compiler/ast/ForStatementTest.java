@@ -18,7 +18,6 @@ package com.caoccao.qjs4j.compiler.ast;
 
 import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 

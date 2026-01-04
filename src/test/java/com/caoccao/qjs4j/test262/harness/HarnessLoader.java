@@ -31,16 +31,32 @@ import java.util.concurrent.ConcurrentHashMap;
  * Loads and caches test262 harness files.
  */
 public class HarnessLoader {
-    private final Path harnessDir;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
+    private final Path harnessDir;
 
     public HarnessLoader(Path test262Root) {
         this.harnessDir = test262Root.resolve("harness");
     }
 
     /**
+     * Get default harness files that should be loaded for most tests.
+     *
+     * @return Set of default harness file names
+     */
+    public static Set<String> getDefaultIncludes() {
+        return Set.of("assert.js", "sta.js");
+    }
+
+    /**
+     * Clear the harness file cache.
+     */
+    public void clearCache() {
+        cache.clear();
+    }
+
+    /**
      * Load a harness file by name.
-     * 
+     *
      * @param filename The harness file name (e.g., "assert.js")
      * @return The harness file content
      */
@@ -60,33 +76,17 @@ public class HarnessLoader {
 
     /**
      * Load harness files into a JavaScript context.
-     * 
-     * @param context The JavaScript context
+     *
+     * @param context  The JavaScript context
      * @param includes The harness files to load
      * @throws IOException If a harness file cannot be read
      * @throws JSException If a harness file cannot be evaluated
      */
-    public void loadIntoContext(JSContext context, Set<String> includes) 
+    public void loadIntoContext(JSContext context, Set<String> includes)
             throws IOException, JSException {
         for (String include : includes) {
             String code = loadHarness(include);
             context.eval(code, include, false);
         }
-    }
-
-    /**
-     * Get default harness files that should be loaded for most tests.
-     * 
-     * @return Set of default harness file names
-     */
-    public static Set<String> getDefaultIncludes() {
-        return Set.of("assert.js", "sta.js");
-    }
-
-    /**
-     * Clear the harness file cache.
-     */
-    public void clearCache() {
-        cache.clear();
     }
 }

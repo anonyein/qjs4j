@@ -28,51 +28,8 @@ import java.util.regex.Pattern;
  * Parses test262 test files extracting YAML frontmatter and JavaScript code.
  */
 public class Test262Parser {
-    private static final Pattern FRONTMATTER_PATTERN = 
-        Pattern.compile("/\\*---\\s*(.+?)\\s*---\\*/", Pattern.DOTALL);
-
-    public Test262TestCase parse(Path testFile) throws IOException {
-        String content = Files.readString(testFile);
-        Test262TestCase testCase = new Test262TestCase(testFile);
-
-        Matcher matcher = FRONTMATTER_PATTERN.matcher(content);
-        
-        if (matcher.find()) {
-            String yaml = matcher.group(1);
-            parseYaml(yaml, testCase);
-            
-            // Extract JavaScript code after frontmatter
-            int codeStart = matcher.end();
-            testCase.setCode(content.substring(codeStart).trim());
-        } else {
-            // No frontmatter - entire file is code
-            testCase.setCode(content);
-        }
-        
-        return testCase;
-    }
-
-    private void parseYaml(String yaml, Test262TestCase testCase) {
-        String[] lines = yaml.split("\n");
-        
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i].trim();
-            
-            if (line.startsWith("description:")) {
-                testCase.setDescription(extractValue(line, "description:"));
-            } else if (line.startsWith("esid:")) {
-                testCase.setEsid(extractValue(line, "esid:"));
-            } else if (line.startsWith("flags:")) {
-                testCase.setFlags(parseArray(line, i, lines));
-            } else if (line.startsWith("features:")) {
-                testCase.setFeatures(parseArray(line, i, lines));
-            } else if (line.startsWith("includes:")) {
-                testCase.setIncludes(parseArray(line, i, lines));
-            } else if (line.equals("negative:")) {
-                testCase.setNegative(parseNegative(i, lines));
-            }
-        }
-    }
+    private static final Pattern FRONTMATTER_PATTERN =
+            Pattern.compile("/\\*---\\s*(.+?)\\s*---\\*/", Pattern.DOTALL);
 
     private String extractValue(String line, String prefix) {
         String value = line.substring(prefix.length()).trim();
@@ -89,9 +46,30 @@ public class Test262Parser {
         return value;
     }
 
+    public Test262TestCase parse(Path testFile) throws IOException {
+        String content = Files.readString(testFile);
+        Test262TestCase testCase = new Test262TestCase(testFile);
+
+        Matcher matcher = FRONTMATTER_PATTERN.matcher(content);
+
+        if (matcher.find()) {
+            String yaml = matcher.group(1);
+            parseYaml(yaml, testCase);
+
+            // Extract JavaScript code after frontmatter
+            int codeStart = matcher.end();
+            testCase.setCode(content.substring(codeStart).trim());
+        } else {
+            // No frontmatter - entire file is code
+            testCase.setCode(content);
+        }
+
+        return testCase;
+    }
+
     private Set<String> parseArray(String line, int currentIndex, String[] lines) {
         Set<String> result = new HashSet<>();
-        
+
         // Inline array: [item1, item2]
         if (line.contains("[") && line.contains("]")) {
             String arrayContent = line.substring(line.indexOf('[') + 1, line.indexOf(']'));
@@ -115,16 +93,16 @@ public class Test262Parser {
                 }
             }
         }
-        
+
         return result;
     }
 
     private Test262TestCase.NegativeInfo parseNegative(int currentIndex, String[] lines) {
         Test262TestCase.NegativeInfo negative = new Test262TestCase.NegativeInfo();
-        
+
         for (int i = currentIndex + 1; i < lines.length; i++) {
             String line = lines[i].trim();
-            
+
             if (line.startsWith("phase:")) {
                 negative.setPhase(extractValue(line, "phase:"));
             } else if (line.startsWith("type:")) {
@@ -134,14 +112,36 @@ public class Test262Parser {
                 break;
             }
         }
-        
+
         return negative;
+    }
+
+    private void parseYaml(String yaml, Test262TestCase testCase) {
+        String[] lines = yaml.split("\n");
+
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+
+            if (line.startsWith("description:")) {
+                testCase.setDescription(extractValue(line, "description:"));
+            } else if (line.startsWith("esid:")) {
+                testCase.setEsid(extractValue(line, "esid:"));
+            } else if (line.startsWith("flags:")) {
+                testCase.setFlags(parseArray(line, i, lines));
+            } else if (line.startsWith("features:")) {
+                testCase.setFeatures(parseArray(line, i, lines));
+            } else if (line.startsWith("includes:")) {
+                testCase.setIncludes(parseArray(line, i, lines));
+            } else if (line.equals("negative:")) {
+                testCase.setNegative(parseNegative(i, lines));
+            }
+        }
     }
 
     private String removeQuotes(String str) {
         str = str.trim();
         if ((str.startsWith("\"") && str.endsWith("\"")) ||
-            (str.startsWith("'") && str.endsWith("'"))) {
+                (str.startsWith("'") && str.endsWith("'"))) {
             return str.substring(1, str.length() - 1);
         }
         return str;

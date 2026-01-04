@@ -4,7 +4,8 @@ This directory contains the Test262 ECMAScript conformance test runner for qjs4j
 
 ## Overview
 
-[Test262](https://github.com/tc39/test262) is the official ECMAScript conformance test suite maintained by TC39. This runner allows qjs4j to validate its ECMAScript compliance against thousands of official tests.
+[Test262](https://github.com/tc39/test262) is the official ECMAScript conformance test suite maintained by TC39. This
+runner allows qjs4j to validate its ECMAScript compliance against thousands of official tests.
 
 ## Setup
 

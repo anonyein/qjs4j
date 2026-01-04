@@ -25,51 +25,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Tracks and reports test262 execution results.
  */
 public class Test262Reporter {
-    private final AtomicInteger passed = new AtomicInteger(0);
     private final AtomicInteger failed = new AtomicInteger(0);
+    private final List<TestResult> failures = Collections.synchronizedList(new ArrayList<>());
+    private final AtomicInteger passed = new AtomicInteger(0);
     private final AtomicInteger skipped = new AtomicInteger(0);
     private final AtomicInteger timeout = new AtomicInteger(0);
-
-    private final List<TestResult> failures = Collections.synchronizedList(new ArrayList<>());
     private final List<TestResult> timeouts = Collections.synchronizedList(new ArrayList<>());
 
-    public void recordResult(TestResult result) {
-        switch (result.getStatus()) {
-            case PASS:
-                passed.incrementAndGet();
-                break;
-            case FAIL:
-                failed.incrementAndGet();
-                failures.add(result);
-                break;
-            case SKIP:
-                skipped.incrementAndGet();
-                break;
-            case TIMEOUT:
-                timeout.incrementAndGet();
-                timeouts.add(result);
-                break;
-        }
-    }
-
-    public void recordSkipped(Test262TestCase test, String reason) {
-        skipped.incrementAndGet();
-    }
-
-    public int getTotalExecuted() {
-        return passed.get() + failed.get() + timeout.get();
-    }
-
-    public int getTotalTests() {
-        return getTotalExecuted() + skipped.get();
+    public int getFailed() {
+        return failed.get();
     }
 
     public int getPassed() {
         return passed.get();
-    }
-
-    public int getFailed() {
-        return failed.get();
     }
 
     public int getSkipped() {
@@ -80,6 +48,14 @@ public class Test262Reporter {
         return timeout.get();
     }
 
+    public int getTotalExecuted() {
+        return passed.get() + failed.get() + timeout.get();
+    }
+
+    public int getTotalTests() {
+        return getTotalExecuted() + skipped.get();
+    }
+
     public void printProgress() {
         int total = getTotalExecuted();
         int pass = passed.get();
@@ -87,7 +63,7 @@ public class Test262Reporter {
         int time = timeout.get();
 
         System.out.printf("Progress: %d tests executed (%d passed, %d failed, %d timeout)%n",
-            total, pass, fail, time);
+                total, pass, fail, time);
     }
 
     public void printSummary() {
@@ -99,16 +75,16 @@ public class Test262Reporter {
         System.out.println("=".repeat(70));
         System.out.printf("Total tests:   %d%n", total);
         System.out.printf("Executed:      %d%n", executed);
-        
+
         if (executed > 0) {
             System.out.printf("Passed:        %d (%.1f%%)%n",
-                passed.get(), 100.0 * passed.get() / executed);
+                    passed.get(), 100.0 * passed.get() / executed);
             System.out.printf("Failed:        %d (%.1f%%)%n",
-                failed.get(), 100.0 * failed.get() / executed);
+                    failed.get(), 100.0 * failed.get() / executed);
             System.out.printf("Timeout:       %d (%.1f%%)%n",
-                timeout.get(), 100.0 * timeout.get() / executed);
+                    timeout.get(), 100.0 * timeout.get() / executed);
         }
-        
+
         System.out.printf("Skipped:       %d%n", skipped.get());
         System.out.println("=".repeat(70));
 
@@ -133,6 +109,29 @@ public class Test262Reporter {
                 System.out.printf("  ⏱️  %s%n", timeout.getTestCase().getPath());
             }
         }
+    }
+
+    public void recordResult(TestResult result) {
+        switch (result.getStatus()) {
+            case PASS:
+                passed.incrementAndGet();
+                break;
+            case FAIL:
+                failed.incrementAndGet();
+                failures.add(result);
+                break;
+            case SKIP:
+                skipped.incrementAndGet();
+                break;
+            case TIMEOUT:
+                timeout.incrementAndGet();
+                timeouts.add(result);
+                break;
+        }
+    }
+
+    public void recordSkipped(Test262TestCase test, String reason) {
+        skipped.incrementAndGet();
     }
 
     public void reset() {

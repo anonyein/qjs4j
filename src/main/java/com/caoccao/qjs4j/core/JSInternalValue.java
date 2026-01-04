@@ -21,16 +21,7 @@ package com.caoccao.qjs4j.core;
  * Used for things like for-in enumerators that need to be on the value stack but
  * aren't accessible from user code.
  */
-public final class JSInternalValue implements JSStackValue {
-    private final Object value;
-
-    public JSInternalValue(Object value) {
-        this.value = value;
-    }
-
-    public Object getValue() {
-        return value;
-    }
+public record JSInternalValue(Object value) implements JSStackValue {
 
     @Override
     public String toString() {

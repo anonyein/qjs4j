@@ -49,6 +49,27 @@ public class ClassCompilerTest {
     }
 
     @Test
+    public void testClassWithFieldsAndConstructor() throws Exception {
+        String source = """
+                class Point {
+                    z = 5;
+                    constructor(x, y) {
+                        this.x = x;
+                        this.y = y;
+                    }
+                }
+                const p = new Point(1, 2);
+                p.x + p.y + p.z
+                """;
+
+        try (JSContext context = new JSContext(new JSRuntime())) {
+            JSValue result = context.eval(source);
+            assertThat(result).isNotNull();
+            System.out.println("Class with fields and constructor test result: " + result);
+        }
+    }
+
+    @Test
     public void testClassWithMethod() throws Exception {
         String source = """
                 class Counter {
@@ -68,17 +89,60 @@ public class ClassCompilerTest {
     }
 
     @Test
-    public void testSimpleClass() throws Exception {
+    public void testClassWithPrivateField() throws Exception {
         String source = """
-                class Point {
+                class Counter {
+                    #count = 0;
                 }
-                Point
+                const c = new Counter();
+                c
                 """;
 
         try (JSContext context = new JSContext(new JSRuntime())) {
             JSValue result = context.eval(source);
             assertThat(result).isNotNull();
-            System.out.println("Simple class test passed: " + result);
+            System.out.println("Class with private field test result: " + result);
+        }
+    }
+
+    @Test
+    public void testClassWithPrivateFieldAccess() throws Exception {
+        String source = """
+                class Counter {
+                    #count = 5;
+                    getCount() {
+                        return this.#count;
+                    }
+                    setCount(val) {
+                        this.#count = val;
+                    }
+                }
+                const c = new Counter();
+                c.setCount(10);
+                c.getCount()
+                """;
+
+        try (JSContext context = new JSContext(new JSRuntime())) {
+            JSValue result = context.eval(source);
+            assertThat(result).isNotNull();
+            System.out.println("Class with private field access test result: " + result);
+        }
+    }
+
+    @Test
+    public void testClassWithPrivateFieldInitializer() throws Exception {
+        String source = """
+                class Counter {
+                    #count = 42;
+                }
+                const c = new Counter();
+                c
+                """;
+
+        try (JSContext context = new JSContext(new JSRuntime())) {
+            JSValue result = context.eval(source);
+            assertThat(result).isNotNull();
+            System.out.println("Class with private field initializer test result: " + result);
         }
     }
 
@@ -118,81 +182,17 @@ public class ClassCompilerTest {
     }
 
     @Test
-    public void testClassWithFieldsAndConstructor() throws Exception {
+    public void testSimpleClass() throws Exception {
         String source = """
                 class Point {
-                    z = 5;
-                    constructor(x, y) {
-                        this.x = x;
-                        this.y = y;
-                    }
                 }
-                const p = new Point(1, 2);
-                p.x + p.y + p.z
+                Point
                 """;
 
         try (JSContext context = new JSContext(new JSRuntime())) {
             JSValue result = context.eval(source);
             assertThat(result).isNotNull();
-            System.out.println("Class with fields and constructor test result: " + result);
-        }
-    }
-
-    @Test
-    public void testClassWithPrivateField() throws Exception {
-        String source = """
-                class Counter {
-                    #count = 0;
-                }
-                const c = new Counter();
-                c
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with private field test result: " + result);
-        }
-    }
-
-    @Test
-    public void testClassWithPrivateFieldInitializer() throws Exception {
-        String source = """
-                class Counter {
-                    #count = 42;
-                }
-                const c = new Counter();
-                c
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with private field initializer test result: " + result);
-        }
-    }
-
-    @Test
-    public void testClassWithPrivateFieldAccess() throws Exception {
-        String source = """
-                class Counter {
-                    #count = 5;
-                    getCount() {
-                        return this.#count;
-                    }
-                    setCount(val) {
-                        this.#count = val;
-                    }
-                }
-                const c = new Counter();
-                c.setCount(10);
-                c.getCount()
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with private field access test result: " + result);
+            System.out.println("Simple class test passed: " + result);
         }
     }
 }

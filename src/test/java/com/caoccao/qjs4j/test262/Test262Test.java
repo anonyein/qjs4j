@@ -37,15 +37,35 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * JUnit integration for test262 tests.
  * This allows running test262 tests from IDEs and Gradle.
- * 
+ * <p>
  * Note: This test is disabled by default as it runs a large suite of tests.
  * Enable it by removing the @Disabled annotation or run via command line:
  * ./gradlew test --tests "Test262Test"
  */
-@Disabled
 public class Test262Test {
     private static final Path TEST262_ROOT = Paths.get("../test262");
 
+    private List<Path> discoverTests(Path testsDir, Test262Config config) throws IOException {
+        List<Path> testFiles = new ArrayList<>();
+
+        try (Stream<Path> paths = Files.walk(testsDir)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".js"))
+                    .filter(p -> !p.toString().contains("_FIXTURE"))
+                    .filter(p -> config.matchesIncludePattern(p))
+                    .limit(config.getMaxTests())
+                    .forEach(testFiles::add);
+        }
+
+        return testFiles;
+    }
+
+    private String getTestName(Path testFile) {
+        Path relativePath = TEST262_ROOT.relativize(testFile);
+        return relativePath.toString();
+    }
+
+    @Disabled
     @TestFactory
     Collection<DynamicTest> test262Suite() throws IOException {
         if (!Files.exists(TEST262_ROOT)) {
@@ -64,27 +84,27 @@ public class Test262Test {
         List<Path> testFiles = discoverTests(testsDir, config);
 
         return testFiles.stream()
-            .map(testFile -> DynamicTest.dynamicTest(
-                getTestName(testFile),
-                () -> {
-                    Test262TestCase testCase = parser.parse(testFile);
-                    
-                    // Skip if necessary
-                    if (config.shouldSkipTest(testCase)) {
-                        return; // JUnit doesn't have explicit skip, just return
-                    }
-                    
-                    TestResult result = executor.execute(testCase);
+                .map(testFile -> DynamicTest.dynamicTest(
+                        getTestName(testFile),
+                        () -> {
+                            Test262TestCase testCase = parser.parse(testFile);
 
-                    if (result.isFailed()) {
-                        fail(result.getMessage());
-                    } else if (result.isTimeout()) {
-                        fail("Test timeout after " + config.getAsyncTimeoutMs() + "ms");
-                    }
-                    // Pass and skip are both successful
-                }
-            ))
-            .collect(Collectors.toList());
+                            // Skip if necessary
+                            if (config.shouldSkipTest(testCase)) {
+                                return; // JUnit doesn't have explicit skip, just return
+                            }
+
+                            TestResult result = executor.execute(testCase);
+
+                            if (result.isFailed()) {
+                                fail(result.getMessage());
+                            } else if (result.isTimeout()) {
+                                fail("Test timeout after " + config.getAsyncTimeoutMs() + "ms");
+                            }
+                            // Pass and skip are both successful
+                        }
+                ))
+                .collect(Collectors.toList());
     }
 
     @Test
@@ -93,25 +113,5 @@ public class Test262Test {
         Test262Config config = Test262Config.loadDefault();
         Test262Runner runner = new Test262Runner(TEST262_ROOT, config);
         // Success if no exception
-    }
-
-    private List<Path> discoverTests(Path testsDir, Test262Config config) throws IOException {
-        List<Path> testFiles = new ArrayList<>();
-
-        try (Stream<Path> paths = Files.walk(testsDir)) {
-            paths.filter(Files::isRegularFile)
-                 .filter(p -> p.toString().endsWith(".js"))
-                 .filter(p -> !p.toString().contains("_FIXTURE"))
-                 .filter(p -> config.matchesIncludePattern(p))
-                 .limit(config.getMaxTests())
-                 .forEach(testFiles::add);
-        }
-
-        return testFiles;
-    }
-
-    private String getTestName(Path testFile) {
-        Path relativePath = TEST262_ROOT.relativize(testFile);
-        return relativePath.toString();
     }
 }

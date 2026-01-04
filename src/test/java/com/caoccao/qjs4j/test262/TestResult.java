@@ -20,9 +20,9 @@ package com.caoccao.qjs4j.test262;
  * Represents the result of executing a test262 test.
  */
 public class TestResult {
-    private final Test262TestCase testCase;
-    private final TestStatus status;
     private final String message;
+    private final TestStatus status;
+    private final Test262TestCase testCase;
 
     private TestResult(Test262TestCase testCase, TestStatus status, String message) {
         this.testCase = testCase;
@@ -30,12 +30,12 @@ public class TestResult {
         this.message = message;
     }
 
-    public static TestResult pass(Test262TestCase testCase) {
-        return new TestResult(testCase, TestStatus.PASS, null);
-    }
-
     public static TestResult fail(Test262TestCase testCase, String message) {
         return new TestResult(testCase, TestStatus.FAIL, message);
+    }
+
+    public static TestResult pass(Test262TestCase testCase) {
+        return new TestResult(testCase, TestStatus.PASS, null);
     }
 
     public static TestResult skip(Test262TestCase testCase, String reason) {
@@ -76,10 +76,10 @@ public class TestResult {
 
     @Override
     public String toString() {
-        return String.format("TestResult{%s: %s%s}", 
-            status, 
-            testCase.getPath(),
-            message != null ? " - " + message : "");
+        return String.format("TestResult{%s: %s%s}",
+                status,
+                testCase.getPath(),
+                message != null ? " - " + message : "");
     }
 
     public enum TestStatus {

@@ -25,88 +25,20 @@ import java.util.Set;
  * Represents a single test262 test case with its metadata and code.
  */
 public class Test262TestCase {
-    private Path path;
+    private String code;
     private String description;
-    private Set<String> flags = new HashSet<>();
+    private String esid;
     private Set<String> features = new HashSet<>();
+    private Set<String> flags = new HashSet<>();
     private Set<String> includes = new HashSet<>();
     private NegativeInfo negative;
-    private String code;
-    private String esid;
+    private Path path;
 
     public Test262TestCase() {
     }
 
     public Test262TestCase(Path path) {
         this.path = path;
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public void setCode(String code) {
-        this.code = code;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getEsid() {
-        return esid;
-    }
-
-    public void setEsid(String esid) {
-        this.esid = esid;
-    }
-
-    public Set<String> getFeatures() {
-        return features;
-    }
-
-    public void setFeatures(Set<String> features) {
-        this.features = features;
-    }
-
-    public Set<String> getFlags() {
-        return flags;
-    }
-
-    public void setFlags(Set<String> flags) {
-        this.flags = flags;
-    }
-
-    public Set<String> getIncludes() {
-        return includes;
-    }
-
-    public void setIncludes(Set<String> includes) {
-        this.includes = includes;
-    }
-
-    public NegativeInfo getNegative() {
-        return negative;
-    }
-
-    public void setNegative(NegativeInfo negative) {
-        this.negative = negative;
-    }
-
-    public Path getPath() {
-        return path;
-    }
-
-    public void setPath(Path path) {
-        this.path = path;
-    }
-
-    public boolean hasFlag(String flag) {
-        return flags.contains(flag);
     }
 
     @Override
@@ -117,9 +49,77 @@ public class Test262TestCase {
         return Objects.equals(path, that.path);
     }
 
+    public String getCode() {
+        return code;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getEsid() {
+        return esid;
+    }
+
+    public Set<String> getFeatures() {
+        return features;
+    }
+
+    public Set<String> getFlags() {
+        return flags;
+    }
+
+    public Set<String> getIncludes() {
+        return includes;
+    }
+
+    public NegativeInfo getNegative() {
+        return negative;
+    }
+
+    public Path getPath() {
+        return path;
+    }
+
+    public boolean hasFlag(String flag) {
+        return flags.contains(flag);
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(path);
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setEsid(String esid) {
+        this.esid = esid;
+    }
+
+    public void setFeatures(Set<String> features) {
+        this.features = features;
+    }
+
+    public void setFlags(Set<String> flags) {
+        this.flags = flags;
+    }
+
+    public void setIncludes(Set<String> includes) {
+        this.includes = includes;
+    }
+
+    public void setNegative(NegativeInfo negative) {
+        this.negative = negative;
+    }
+
+    public void setPath(Path path) {
+        this.path = path;
     }
 
     @Override
@@ -146,12 +146,12 @@ public class Test262TestCase {
             return phase;
         }
 
-        public void setPhase(String phase) {
-            this.phase = phase;
-        }
-
         public String getType() {
             return type;
+        }
+
+        public void setPhase(String phase) {
+            this.phase = phase;
         }
 
         public void setType(String type) {
