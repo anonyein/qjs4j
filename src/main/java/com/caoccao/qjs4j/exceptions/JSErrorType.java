@@ -26,5 +26,4 @@ public enum JSErrorType {
     SyntaxError,
     TypeError,
     URIError,
-    ;
 }

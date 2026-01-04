@@ -17,7 +17,6 @@
 package com.caoccao.qjs4j.compiler.ast;
 
 import com.caoccao.qjs4j.BaseJavetTest;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;

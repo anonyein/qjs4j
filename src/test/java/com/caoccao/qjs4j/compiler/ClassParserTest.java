@@ -16,31 +16,18 @@
 
 package com.caoccao.qjs4j.compiler;
 
-import com.caoccao.qjs4j.compiler.ast.*;
+import com.caoccao.qjs4j.compiler.ast.ClassDeclaration;
+import com.caoccao.qjs4j.compiler.ast.Identifier;
+import com.caoccao.qjs4j.compiler.ast.PrivateIdentifier;
+import com.caoccao.qjs4j.compiler.ast.Program;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test class declaration parsing including private fields and static blocks.
  */
 public class ClassParserTest {
-
-    @Test
-    public void testSimpleClassDeclaration() {
-        String source = "class Point { }";
-        Parser parser = new Parser(new Lexer(source));
-        Program program = parser.parse();
-
-        assertThat(program.body()).hasSize(1);
-        assertThat(program.body().get(0)).isInstanceOf(ClassDeclaration.class);
-
-        ClassDeclaration classDecl = (ClassDeclaration) program.body().get(0);
-        assertThat(classDecl.id()).isNotNull();
-        assertThat(classDecl.id().name()).isEqualTo("Point");
-        assertThat(classDecl.superClass()).isNull();
-        assertThat(classDecl.body()).isEmpty();
-    }
 
     @Test
     public void testClassWithExtends() {
@@ -76,23 +63,38 @@ public class ClassParserTest {
     }
 
     @Test
-    public void testClassWithPublicField() {
-        String source = "class Example { count = 0; }";
+    public void testClassWithMultipleElements() {
+        String source = """
+                class Example {
+                    #private = 1;
+                    public = 2;
+                    static shared = 3;
+                
+                    constructor() {}
+                
+                    #privateMethod() {}
+                
+                    static staticMethod() {}
+                
+                    static {
+                        console.log('init');
+                    }
+                }
+                """;
         Parser parser = new Parser(new Lexer(source));
         Program program = parser.parse();
 
         ClassDeclaration classDecl = (ClassDeclaration) program.body().get(0);
-        assertThat(classDecl.body()).hasSize(1);
+        assertThat(classDecl.body()).hasSize(7);
 
-        ClassDeclaration.ClassElement element = classDecl.body().get(0);
-        assertThat(element).isInstanceOf(ClassDeclaration.PropertyDefinition.class);
-
-        ClassDeclaration.PropertyDefinition field = (ClassDeclaration.PropertyDefinition) element;
-        assertThat(field.key()).isInstanceOf(Identifier.class);
-        assertThat(((Identifier) field.key()).name()).isEqualTo("count");
-        assertThat(field.value()).isNotNull();
-        assertThat(field.isStatic()).isFalse();
-        assertThat(field.isPrivate()).isFalse();
+        // Verify types
+        assertThat(classDecl.body().get(0)).isInstanceOf(ClassDeclaration.PropertyDefinition.class);
+        assertThat(classDecl.body().get(1)).isInstanceOf(ClassDeclaration.PropertyDefinition.class);
+        assertThat(classDecl.body().get(2)).isInstanceOf(ClassDeclaration.PropertyDefinition.class);
+        assertThat(classDecl.body().get(3)).isInstanceOf(ClassDeclaration.MethodDefinition.class);
+        assertThat(classDecl.body().get(4)).isInstanceOf(ClassDeclaration.MethodDefinition.class);
+        assertThat(classDecl.body().get(5)).isInstanceOf(ClassDeclaration.MethodDefinition.class);
+        assertThat(classDecl.body().get(6)).isInstanceOf(ClassDeclaration.StaticBlock.class);
     }
 
     @Test
@@ -116,17 +118,23 @@ public class ClassParserTest {
     }
 
     @Test
-    public void testClassWithStaticField() {
-        String source = "class Example { static version = 1; }";
+    public void testClassWithPublicField() {
+        String source = "class Example { count = 0; }";
         Parser parser = new Parser(new Lexer(source));
         Program program = parser.parse();
 
         ClassDeclaration classDecl = (ClassDeclaration) program.body().get(0);
         assertThat(classDecl.body()).hasSize(1);
 
-        ClassDeclaration.PropertyDefinition field = (ClassDeclaration.PropertyDefinition) classDecl.body().get(0);
-        assertThat(((Identifier) field.key()).name()).isEqualTo("version");
-        assertThat(field.isStatic()).isTrue();
+        ClassDeclaration.ClassElement element = classDecl.body().get(0);
+        assertThat(element).isInstanceOf(ClassDeclaration.PropertyDefinition.class);
+
+        ClassDeclaration.PropertyDefinition field = (ClassDeclaration.PropertyDefinition) element;
+        assertThat(field.key()).isInstanceOf(Identifier.class);
+        assertThat(((Identifier) field.key()).name()).isEqualTo("count");
+        assertThat(field.value()).isNotNull();
+        assertThat(field.isStatic()).isFalse();
+        assertThat(field.isPrivate()).isFalse();
     }
 
     @Test
@@ -146,37 +154,32 @@ public class ClassParserTest {
     }
 
     @Test
-    public void testClassWithMultipleElements() {
-        String source = """
-            class Example {
-                #private = 1;
-                public = 2;
-                static shared = 3;
-
-                constructor() {}
-
-                #privateMethod() {}
-
-                static staticMethod() {}
-
-                static {
-                    console.log('init');
-                }
-            }
-            """;
+    public void testClassWithStaticField() {
+        String source = "class Example { static version = 1; }";
         Parser parser = new Parser(new Lexer(source));
         Program program = parser.parse();
 
         ClassDeclaration classDecl = (ClassDeclaration) program.body().get(0);
-        assertThat(classDecl.body()).hasSize(7);
+        assertThat(classDecl.body()).hasSize(1);
 
-        // Verify types
-        assertThat(classDecl.body().get(0)).isInstanceOf(ClassDeclaration.PropertyDefinition.class);
-        assertThat(classDecl.body().get(1)).isInstanceOf(ClassDeclaration.PropertyDefinition.class);
-        assertThat(classDecl.body().get(2)).isInstanceOf(ClassDeclaration.PropertyDefinition.class);
-        assertThat(classDecl.body().get(3)).isInstanceOf(ClassDeclaration.MethodDefinition.class);
-        assertThat(classDecl.body().get(4)).isInstanceOf(ClassDeclaration.MethodDefinition.class);
-        assertThat(classDecl.body().get(5)).isInstanceOf(ClassDeclaration.MethodDefinition.class);
-        assertThat(classDecl.body().get(6)).isInstanceOf(ClassDeclaration.StaticBlock.class);
+        ClassDeclaration.PropertyDefinition field = (ClassDeclaration.PropertyDefinition) classDecl.body().get(0);
+        assertThat(((Identifier) field.key()).name()).isEqualTo("version");
+        assertThat(field.isStatic()).isTrue();
+    }
+
+    @Test
+    public void testSimpleClassDeclaration() {
+        String source = "class Point { }";
+        Parser parser = new Parser(new Lexer(source));
+        Program program = parser.parse();
+
+        assertThat(program.body()).hasSize(1);
+        assertThat(program.body().get(0)).isInstanceOf(ClassDeclaration.class);
+
+        ClassDeclaration classDecl = (ClassDeclaration) program.body().get(0);
+        assertThat(classDecl.id()).isNotNull();
+        assertThat(classDecl.id().name()).isEqualTo("Point");
+        assertThat(classDecl.superClass()).isNull();
+        assertThat(classDecl.body()).isEmpty();
     }
 }

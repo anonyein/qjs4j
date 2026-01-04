@@ -18,7 +18,6 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -190,8 +189,8 @@ public class ObjectConstructorTest extends BaseJavetTest {
         result = ObjectPrototype.freeze(context, JSUndefined.INSTANCE, new JSValue[]{JSUndefined.INSTANCE});
         assertThat(result).isEqualTo(JSUndefined.INSTANCE);
 
-        // Test Object.isFrozen returns true after freeze
         assertBooleanWithJavet(
+                // Test Object.isFrozen returns true after freeze
                 "var obj = {a: 1}; Object.freeze(obj); Object.isFrozen(obj)",
                 // Test Object.isFrozen returns false before freeze
                 "var obj = {a: 1}; !Object.isFrozen(obj)",
@@ -214,9 +213,7 @@ public class ObjectConstructorTest extends BaseJavetTest {
                 """
                         var obj = {a: 1}; Object.freeze(obj);
                         Object.freeze(obj);
-                        Object.isFrozen(obj)""");
-
-        assertBooleanWithJavet(
+                        Object.isFrozen(obj)""",
                 // Test freeze prevents adding properties
                 """
                         var obj = {a: 1}; Object.freeze(obj);
@@ -263,7 +260,71 @@ public class ObjectConstructorTest extends BaseJavetTest {
                 """
                         var func = function() {}; Object.freeze(func);
                         func.newProp = 1;
-                        func.newProp === undefined""");
+                        func.newProp === undefined""",
+                // Test writable is false after freeze
+                """
+                        var obj = {a: 1};
+                        Object.freeze(obj);
+                        var desc = Object.getOwnPropertyDescriptor(obj, 'a');
+                        desc.writable === false""",
+                // Test configurable is false after freeze
+                """
+                        var obj = {a: 1};
+                        Object.freeze(obj);
+                        var desc = Object.getOwnPropertyDescriptor(obj, 'a');
+                        desc.configurable === false""",
+                // Test enumerable is unchanged after freeze
+                """
+                        var obj = {a: 1};
+                        Object.freeze(obj);
+                        var desc = Object.getOwnPropertyDescriptor(obj, 'a');
+                        desc.enumerable === true""",
+                // Test accessor property configurable is false after freeze
+                """
+                        var obj = {};
+                        Object.defineProperty(obj, 'x', {
+                            get: function() { return 1; },
+                            configurable: true,
+                            enumerable: true
+                        });
+                        Object.freeze(obj);
+                        var desc = Object.getOwnPropertyDescriptor(obj, 'x');
+                        desc.configurable === false""",
+                // Test accessor property does not have writable after freeze
+                """
+                        var obj = {};
+                        Object.defineProperty(obj, 'x', {
+                            get: function() { return 1; },
+                            configurable: true
+                        });
+                        Object.freeze(obj);
+                        var desc = Object.getOwnPropertyDescriptor(obj, 'x');
+                        desc.writable === undefined""",
+                // Test accessor property getter is preserved after freeze
+                """
+                        var obj = {};
+                        Object.defineProperty(obj, 'x', {
+                            get: function() { return 42; },
+                            configurable: true
+                        });
+                        Object.freeze(obj);
+                        obj.x === 42""",
+                // Test non-enumerable property remains non-enumerable after freeze
+                """
+                        var obj = {};
+                        Object.defineProperty(obj, 'a', {value: 1, enumerable: false, writable: true, configurable: true});
+                        Object.freeze(obj);
+                        var desc = Object.getOwnPropertyDescriptor(obj, 'a');
+                        desc.enumerable === false && desc.writable === false && desc.configurable === false""",
+                // Test multiple properties all become non-writable and non-configurable
+                """
+                        var obj = {a: 1, b: 2, c: 3};
+                        Object.freeze(obj);
+                        var descA = Object.getOwnPropertyDescriptor(obj, 'a');
+                        var descB = Object.getOwnPropertyDescriptor(obj, 'b');
+                        var descC = Object.getOwnPropertyDescriptor(obj, 'c');
+                        descA.writable === false && descB.writable === false && descC.writable === false &&
+                        descA.configurable === false && descB.configurable === false && descC.configurable === false""");
     }
 
     @Test
@@ -682,6 +743,46 @@ public class ObjectConstructorTest extends BaseJavetTest {
         // Edge case: no arguments
         assertTypeError(ObjectConstructor.seal(context, JSUndefined.INSTANCE, new JSValue[]{}));
         assertPendingException(context);
+
+        // Test seal behavior with Javet comparison
+        assertBooleanWithJavet(
+                // Test seal prevents adding properties
+                """
+                        var obj = {a: 1}; Object.seal(obj);
+                        obj.b = 2;
+                        obj.b === undefined""",
+                // Test seal prevents deleting properties
+                """
+                        var obj = {a: 1}; Object.seal(obj);
+                        delete obj.a;
+                        obj.a === 1""",
+                // Test seal allows modifying properties (difference from freeze)
+                """
+                        var obj = {a: 1}; Object.seal(obj);
+                        obj.a = 999;
+                        obj.a === 999""",
+                // Test configurable is false after seal
+                """
+                        var obj = {a: 1}; Object.seal(obj);
+                        var desc = Object.getOwnPropertyDescriptor(obj, 'a');
+                        desc.configurable === false""",
+                // Test writable is still true after seal (difference from freeze)
+                """
+                        var obj = {a: 1}; Object.seal(obj);
+                        var desc = Object.getOwnPropertyDescriptor(obj, 'a');
+                        desc.writable === true""",
+                // Test isSealed returns true after seal
+                """
+                        var obj = {a: 1}; Object.seal(obj);
+                        Object.isSealed(obj)""",
+                // Test isExtensible returns false after seal
+                """
+                        var obj = {a: 1}; Object.seal(obj);
+                        !Object.isExtensible(obj)""",
+                // Test isFrozen returns false after seal (seal is not freeze)
+                """
+                        var obj = {a: 1}; Object.seal(obj);
+                        !Object.isFrozen(obj)""");
     }
 
     @Test

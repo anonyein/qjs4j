@@ -675,27 +675,24 @@ public final class VirtualMachine {
                         JSValue constructor = valueStack.pop();
                         JSValue superClass = valueStack.pop();
 
-                        if (!(constructor instanceof JSFunction)) {
+                        if (!(constructor instanceof JSFunction constructorFunc)) {
                             throw new JSVirtualMachineException("DEFINE_CLASS: constructor must be a function");
                         }
-                        JSFunction constructorFunc = (JSFunction) constructor;
 
                         // Create the class prototype object
                         JSObject prototype = new JSObject();
 
                         // Set up prototype chain
                         if (superClass != JSUndefined.INSTANCE && superClass != JSNull.INSTANCE) {
-                            if (superClass instanceof JSFunction) {
-                                JSFunction superFunc = (JSFunction) superClass;
+                            if (superClass instanceof JSFunction superFunc) {
                                 // Get super prototype
                                 JSValue superProto = superFunc.get(PropertyKey.fromString("prototype"));
-                                if (superProto instanceof JSObject) {
-                                    JSObject superProtoObj = (JSObject) superProto;
+                                if (superProto instanceof JSObject superProtoObj) {
                                     prototype.setPrototype(superProtoObj);
                                 }
                                 // Set constructor's prototype to super constructor
                                 if (constructorFunc instanceof JSObject) {
-                                    JSObject constructorObj = (JSObject) constructorFunc;
+                                    JSObject constructorObj = constructorFunc;
                                     constructorObj.setPrototype(superFunc);
                                 }
                             }
@@ -703,7 +700,7 @@ public final class VirtualMachine {
 
                         // Set constructor.prototype = prototype
                         if (constructorFunc instanceof JSObject) {
-                            JSObject constructorObj = (JSObject) constructorFunc;
+                            JSObject constructorObj = constructorFunc;
                             constructorObj.set(PropertyKey.fromString("prototype"), prototype);
                         }
 
@@ -724,8 +721,7 @@ public final class VirtualMachine {
                         JSValue method = valueStack.pop();  // Pop method
                         JSValue obj = valueStack.pop();     // Pop obj
 
-                        if (obj instanceof JSObject) {
-                            JSObject jsObj = (JSObject) obj;
+                        if (obj instanceof JSObject jsObj) {
                             jsObj.set(PropertyKey.fromString(methodName), method);
                         }
 
@@ -1442,6 +1438,12 @@ public final class VirtualMachine {
 
     // ==================== Comparison Operation Handlers ====================
 
+    private void handleIsUndefinedOrNull() {
+        JSValue value = valueStack.pop();
+        boolean result = value instanceof JSNull || value instanceof JSUndefined;
+        valueStack.push(result ? JSBoolean.TRUE : JSBoolean.FALSE);
+    }
+
     private void handleLogicalAnd() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
@@ -1512,13 +1514,13 @@ public final class VirtualMachine {
         valueStack.push(JSBoolean.valueOf(result));
     }
 
+    // ==================== Logical Operation Handlers ====================
+
     private void handleNot() {
         JSValue operand = valueStack.pop();
         int result = ~JSTypeConversions.toInt32(context, operand);
         valueStack.push(new JSNumber(result));
     }
-
-    // ==================== Logical Operation Handlers ====================
 
     private void handleNullishCoalesce() {
         JSValue right = valueStack.pop();
@@ -1544,6 +1546,8 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber(result));
     }
 
+    // ==================== Type Operation Handlers ====================
+
     private void handleSar() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
@@ -1551,8 +1555,6 @@ public final class VirtualMachine {
         int rightInt = JSTypeConversions.toInt32(context, right);
         valueStack.push(new JSNumber(leftInt >> (rightInt & 0x1F)));
     }
-
-    // ==================== Type Operation Handlers ====================
 
     private void handleShl() {
         JSValue right = valueStack.pop();
@@ -1562,6 +1564,8 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber(leftInt << (rightInt & 0x1F)));
     }
 
+    // ==================== Async Operation Handlers ====================
+
     private void handleShr() {
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
@@ -1570,7 +1574,7 @@ public final class VirtualMachine {
         valueStack.push(new JSNumber((leftInt >>> (rightInt & 0x1F)) & 0xFFFFFFFFL));
     }
 
-    // ==================== Async Operation Handlers ====================
+    // ==================== Function Call Handlers ====================
 
     private void handleStrictEq() {
         JSValue right = valueStack.pop();
@@ -1578,8 +1582,6 @@ public final class VirtualMachine {
         boolean result = JSTypeConversions.strictEquals(left, right);
         valueStack.push(JSBoolean.valueOf(result));
     }
-
-    // ==================== Function Call Handlers ====================
 
     private void handleStrictNeq() {
         JSValue right = valueStack.pop();
@@ -1599,12 +1601,6 @@ public final class VirtualMachine {
         JSValue operand = valueStack.pop();
         String type = JSTypeChecking.typeof(operand);
         valueStack.push(new JSString(type));
-    }
-
-    private void handleIsUndefinedOrNull() {
-        JSValue value = valueStack.pop();
-        boolean result = value instanceof JSNull || value instanceof JSUndefined;
-        valueStack.push(result ? JSBoolean.TRUE : JSBoolean.FALSE);
     }
 
     private void handleXor() {

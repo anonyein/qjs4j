@@ -233,152 +233,6 @@ public final class BytecodeCompiler {
         }
     }
 
-    /**
-     * Compile logical assignment operators (&&=, ||=, ??=) with short-circuit evaluation.
-     * Based on QuickJS implementation in quickjs.c (lines 27635-27690).
-     * <p>
-     * For a ??= b:
-     * 1. Load current value of a (with DUP for member expressions)
-     * 2. Duplicate it
-     * 3. Check if it's null or undefined
-     * 4. If not null/undefined, jump to end (keep current value, cleanup lvalue stack)
-     * 5. If null/undefined, drop duplicate, evaluate b, insert below lvalue, assign, jump to end2
-     * 6. At end: cleanup lvalue stack with NIP operations
-     * 7. At end2: continue
-     * <p>
-     * For a &&= b:
-     * Similar but check for falsy
-     * <p>
-     * For a ||= b:
-     * Similar but check for truthy
-     */
-    private void compileLogicalAssignment(AssignmentExpression assignExpr) {
-        Expression left = assignExpr.left();
-        AssignmentExpression.AssignmentOperator operator = assignExpr.operator();
-
-        // Determine the depth of lvalue for proper stack manipulation
-        // depth 0 = identifier, depth 1 = obj.prop, depth 2 = obj[prop]
-        int depthLvalue;
-        if (left instanceof Identifier) {
-            depthLvalue = 0;
-        } else if (left instanceof MemberExpression memberExpr) {
-            depthLvalue = memberExpr.computed() ? 2 : 1;
-        } else {
-            throw new CompilerException("Invalid left-hand side in logical assignment");
-        }
-
-        // Load the current value
-        if (left instanceof Identifier id) {
-            String name = id.name();
-            Integer localIndex = findLocalInScopes(name);
-            if (localIndex != null) {
-                emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
-            } else {
-                emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
-            }
-        } else if (left instanceof MemberExpression memberExpr) {
-            compileExpression(memberExpr.object());
-            if (memberExpr.computed()) {
-                compileExpression(memberExpr.property());
-                emitter.emitOpcode(Opcode.DUP2);  // Duplicate obj and prop
-                emitter.emitOpcode(Opcode.GET_ARRAY_EL);
-            } else if (memberExpr.property() instanceof Identifier propId) {
-                emitter.emitOpcode(Opcode.DUP);  // Duplicate object
-                emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
-            }
-        }
-
-        // Duplicate the current value for the test
-        emitter.emitOpcode(Opcode.DUP);
-
-        // Emit the test based on operator type
-        int jumpToCleanup;
-        if (operator == AssignmentExpression.AssignmentOperator.NULLISH_ASSIGN) {
-            // For ??=, check if null or undefined
-            emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
-            // Jump to cleanup if NOT null/undefined (value is on stack)
-            jumpToCleanup = emitter.emitJump(Opcode.IF_FALSE);
-        } else if (operator == AssignmentExpression.AssignmentOperator.LOGICAL_OR_ASSIGN) {
-            // For ||=, jump to cleanup if truthy
-            jumpToCleanup = emitter.emitJump(Opcode.IF_TRUE);
-        } else { // LOGICAL_AND_ASSIGN
-            // For &&=, jump to cleanup if falsy
-            jumpToCleanup = emitter.emitJump(Opcode.IF_FALSE);
-        }
-
-        // The current value didn't meet the condition, so we assign the new value
-        // The boolean was already popped by IF_FALSE
-        // Drop the old value
-        emitter.emitOpcode(Opcode.DROP);
-
-        // Compile the right-hand side expression
-        compileExpression(assignExpr.right());
-
-        // Insert the new value below the lvalue on stack for proper assignment
-        // This matches QuickJS's OP_insert2, OP_insert3, OP_insert4 pattern
-        // INSERT2: [a, b] -> [b, a, b]
-        // INSERT3: [a, b, c] -> [c, a, b, c]
-        // INSERT4: [a, b, c, d] -> [d, a, b, c, d]
-        switch (depthLvalue) {
-            case 0 -> {
-                // For identifier: stack is [newValue]
-                // We need to keep the value on stack for the result
-                emitter.emitOpcode(Opcode.DUP);
-            }
-            case 1 -> {
-                // For obj.prop: stack is [obj, newValue]
-                // We need: [newValue, obj] for PUT_FIELD
-                // PUT_FIELD pops obj, peeks newValue, leaves newValue on stack
-                emitter.emitOpcode(Opcode.SWAP);
-            }
-            case 2 -> {
-                // For obj[prop]: stack is [obj, prop, newValue]
-                // We need: [newValue, obj, prop] for PUT_ARRAY_EL
-                // ROT3R rotates right: [a, b, c] -> [c, a, b]
-                // So [obj, prop, newValue] -> [newValue, obj, prop]
-                emitter.emitOpcode(Opcode.ROT3R);
-            }
-            default -> throw new CompilerException("Invalid depth for logical assignment");
-        }
-
-        // Store the result to left side
-        if (left instanceof Identifier id) {
-            String name = id.name();
-            Integer localIndex = findLocalInScopes(name);
-            if (localIndex != null) {
-                emitter.emitOpcodeU16(Opcode.SET_LOCAL, localIndex);
-            } else {
-                emitter.emitOpcodeAtom(Opcode.SET_VAR, name);
-            }
-        } else if (left instanceof MemberExpression memberExpr) {
-            if (memberExpr.computed()) {
-                emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
-            } else if (memberExpr.property() instanceof Identifier propId) {
-                emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
-            }
-        }
-
-        // Jump over the cleanup code
-        int jumpToEnd = emitter.emitJump(Opcode.GOTO);
-
-        // Patch the jump to cleanup - if we took this branch, we need to cleanup lvalue stack
-        emitter.patchJump(jumpToCleanup, emitter.currentOffset());
-
-        // Remove the lvalue stack entries using NIP
-        // NIP removes the value below the top, keeping the top value
-        // For depth 0 (identifier): no cleanup needed
-        // For depth 1 (obj.prop): NIP removes obj, keeps the value
-        // For depth 2 (obj[prop]): NIP twice removes obj and prop, keeps the value
-        for (int i = 0; i < depthLvalue; i++) {
-            emitter.emitOpcode(Opcode.NIP);
-        }
-
-        // Patch the jump to end - both paths converge here
-        emitter.patchJump(jumpToEnd, emitter.currentOffset());
-    }
-
-    // ==================== Statement Compilation ====================
-
     private void compileAwaitExpression(AwaitExpression awaitExpr) {
         // Compile the argument expression
         compileExpression(awaitExpr.argument());
@@ -388,6 +242,8 @@ public final class BytecodeCompiler {
         // and pause execution until the promise resolves
         emitter.emitOpcode(Opcode.AWAIT);
     }
+
+    // ==================== Statement Compilation ====================
 
     private void compileBinaryExpression(BinaryExpression binExpr) {
         // Compile operands
@@ -491,6 +347,123 @@ public final class BytecodeCompiler {
 
             // Call with argument count
             emitter.emitOpcodeU16(Opcode.CALL, callExpr.arguments().size());
+        }
+    }
+
+    private void compileClassDeclaration(ClassDeclaration classDecl) {
+        // Following QuickJS implementation in quickjs.c:24700-25200
+
+        String className = classDecl.id() != null ? classDecl.id().name() : "";
+
+        // Compile superclass expression or emit undefined
+        if (classDecl.superClass() != null) {
+            compileExpression(classDecl.superClass());
+        } else {
+            emitter.emitOpcode(Opcode.UNDEFINED);
+        }
+        // Stack: superClass
+
+        // Separate class elements by type
+        List<ClassDeclaration.MethodDefinition> methods = new ArrayList<>();
+        List<ClassDeclaration.PropertyDefinition> instanceFields = new ArrayList<>();
+        List<ClassDeclaration.PropertyDefinition> staticFields = new ArrayList<>();
+        List<ClassDeclaration.StaticBlock> staticBlocks = new ArrayList<>();
+        ClassDeclaration.MethodDefinition constructor = null;
+
+        for (ClassDeclaration.ClassElement element : classDecl.body()) {
+            if (element instanceof ClassDeclaration.MethodDefinition method) {
+                // Check if it's a constructor
+                if (method.key() instanceof Identifier id && "constructor".equals(id.name()) && !method.isStatic()) {
+                    constructor = method;
+                } else {
+                    methods.add(method);
+                }
+            } else if (element instanceof ClassDeclaration.PropertyDefinition field) {
+                if (field.isStatic()) {
+                    staticFields.add(field);
+                } else {
+                    instanceFields.add(field);
+                }
+            } else if (element instanceof ClassDeclaration.StaticBlock block) {
+                staticBlocks.add(block);
+            }
+        }
+
+        // Compile constructor function (or create default)
+        JSBytecodeFunction constructorFunc;
+        if (constructor != null) {
+            constructorFunc = compileMethodAsFunction(constructor, className, classDecl.superClass() != null);
+        } else {
+            // Create default constructor
+            constructorFunc = createDefaultConstructor(className, classDecl.superClass() != null);
+        }
+
+        // Emit constructor in constant pool
+        emitter.emitOpcodeConstant(Opcode.PUSH_CONST, constructorFunc);
+        // Stack: superClass constructor
+
+        // Emit DEFINE_CLASS opcode with class name
+        emitter.emitOpcodeAtom(Opcode.DEFINE_CLASS, className);
+        // Stack: proto constructor
+
+        // Now compile methods and add them to the prototype
+        // After DEFINE_CLASS: Stack is proto constructor (constructor on TOP)
+        // For simplicity, swap so proto is on top: constructor proto
+        emitter.emitOpcode(Opcode.SWAP);
+        // Stack: constructor proto
+
+        for (ClassDeclaration.MethodDefinition method : methods) {
+            // Stack before each iteration: constructor proto
+
+            if (method.isStatic()) {
+                // TODO: Implement static method compilation
+                throw new CompilerException("Static methods not yet implemented");
+            } else {
+                // For instance methods, proto is the target
+                // Current: constructor proto
+                // Compile method
+                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false);
+                emitter.emitOpcodeConstant(Opcode.PUSH_CONST, methodFunc);
+                // Stack: constructor proto method
+
+                // DEFINE_METHOD wants: obj method -> obj
+                // We have: constructor proto method
+                // We want proto and method together: constructor proto method (already correct!)
+                // But after DEFINE_METHOD we'll have: constructor proto
+                // which is what we want!
+
+                String methodName = getMethodName(method);
+                emitter.emitOpcodeAtom(Opcode.DEFINE_METHOD, methodName);
+                // Stack: constructor proto (method added to proto)
+            }
+        }
+
+        // Swap back to original order: proto constructor
+        emitter.emitOpcode(Opcode.SWAP);
+        // Stack: proto constructor
+
+        // For now, we'll skip field and static block compilation
+        // TODO: Implement field initialization and static blocks
+
+        // Drop prototype, keep constructor
+        emitter.emitOpcode(Opcode.NIP);
+        // Stack: constructor
+
+        // Store the class constructor in a variable
+        if (classDecl.id() != null) {
+            String varName = classDecl.id().name();
+            if (!inGlobalScope) {
+                currentScope().declareLocal(varName);
+                Integer localIndex = currentScope().getLocal(varName);
+                if (localIndex != null) {
+                    emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
+                }
+            } else {
+                emitter.emitOpcodeAtom(Opcode.PUT_VAR, varName);
+            }
+        } else {
+            // Anonymous class expression - leave on stack
+            // For class declarations, we always have a name, so this shouldn't happen
         }
     }
 
@@ -858,234 +831,6 @@ public final class BytecodeCompiler {
         }
     }
 
-    private void compileClassDeclaration(ClassDeclaration classDecl) {
-        // Following QuickJS implementation in quickjs.c:24700-25200
-
-        String className = classDecl.id() != null ? classDecl.id().name() : "";
-
-        // Compile superclass expression or emit undefined
-        if (classDecl.superClass() != null) {
-            compileExpression(classDecl.superClass());
-        } else {
-            emitter.emitOpcode(Opcode.UNDEFINED);
-        }
-        // Stack: superClass
-
-        // Separate class elements by type
-        List<ClassDeclaration.MethodDefinition> methods = new ArrayList<>();
-        List<ClassDeclaration.PropertyDefinition> instanceFields = new ArrayList<>();
-        List<ClassDeclaration.PropertyDefinition> staticFields = new ArrayList<>();
-        List<ClassDeclaration.StaticBlock> staticBlocks = new ArrayList<>();
-        ClassDeclaration.MethodDefinition constructor = null;
-
-        for (ClassDeclaration.ClassElement element : classDecl.body()) {
-            if (element instanceof ClassDeclaration.MethodDefinition method) {
-                // Check if it's a constructor
-                if (method.key() instanceof Identifier id && "constructor".equals(id.name()) && !method.isStatic()) {
-                    constructor = method;
-                } else {
-                    methods.add(method);
-                }
-            } else if (element instanceof ClassDeclaration.PropertyDefinition field) {
-                if (field.isStatic()) {
-                    staticFields.add(field);
-                } else {
-                    instanceFields.add(field);
-                }
-            } else if (element instanceof ClassDeclaration.StaticBlock block) {
-                staticBlocks.add(block);
-            }
-        }
-
-        // Compile constructor function (or create default)
-        JSBytecodeFunction constructorFunc;
-        if (constructor != null) {
-            constructorFunc = compileMethodAsFunction(constructor, className, classDecl.superClass() != null);
-        } else {
-            // Create default constructor
-            constructorFunc = createDefaultConstructor(className, classDecl.superClass() != null);
-        }
-
-        // Emit constructor in constant pool
-        emitter.emitOpcodeConstant(Opcode.PUSH_CONST, constructorFunc);
-        // Stack: superClass constructor
-
-        // Emit DEFINE_CLASS opcode with class name
-        emitter.emitOpcodeAtom(Opcode.DEFINE_CLASS, className);
-        // Stack: proto constructor
-
-        // Now compile methods and add them to the prototype
-        // After DEFINE_CLASS: Stack is proto constructor (constructor on TOP)
-        // For simplicity, swap so proto is on top: constructor proto
-        emitter.emitOpcode(Opcode.SWAP);
-        // Stack: constructor proto
-
-        for (ClassDeclaration.MethodDefinition method : methods) {
-            // Stack before each iteration: constructor proto
-
-            if (method.isStatic()) {
-                // TODO: Implement static method compilation
-                throw new CompilerException("Static methods not yet implemented");
-            } else {
-                // For instance methods, proto is the target
-                // Current: constructor proto
-                // Compile method
-                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false);
-                emitter.emitOpcodeConstant(Opcode.PUSH_CONST, methodFunc);
-                // Stack: constructor proto method
-
-                // DEFINE_METHOD wants: obj method -> obj
-                // We have: constructor proto method
-                // We want proto and method together: constructor proto method (already correct!)
-                // But after DEFINE_METHOD we'll have: constructor proto
-                // which is what we want!
-
-                String methodName = getMethodName(method);
-                emitter.emitOpcodeAtom(Opcode.DEFINE_METHOD, methodName);
-                // Stack: constructor proto (method added to proto)
-            }
-        }
-
-        // Swap back to original order: proto constructor
-        emitter.emitOpcode(Opcode.SWAP);
-        // Stack: proto constructor
-
-        // For now, we'll skip field and static block compilation
-        // TODO: Implement field initialization and static blocks
-
-        // Drop prototype, keep constructor
-        emitter.emitOpcode(Opcode.NIP);
-        // Stack: constructor
-
-        // Store the class constructor in a variable
-        if (classDecl.id() != null) {
-            String varName = classDecl.id().name();
-            if (!inGlobalScope) {
-                currentScope().declareLocal(varName);
-                Integer localIndex = currentScope().getLocal(varName);
-                if (localIndex != null) {
-                    emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
-                }
-            } else {
-                emitter.emitOpcodeAtom(Opcode.PUT_VAR, varName);
-            }
-        } else {
-            // Anonymous class expression - leave on stack
-            // For class declarations, we always have a name, so this shouldn't happen
-        }
-    }
-
-    /**
-     * Compile a method definition as a function.
-     */
-    private JSBytecodeFunction compileMethodAsFunction(ClassDeclaration.MethodDefinition method, String methodName, boolean isDerivedConstructor) {
-        BytecodeCompiler methodCompiler = new BytecodeCompiler();
-
-        FunctionExpression funcExpr = method.value();
-
-        // Enter function scope and add parameters as locals
-        methodCompiler.enterScope();
-        methodCompiler.inGlobalScope = false;
-        methodCompiler.isInAsyncFunction = funcExpr.isAsync();
-
-        for (Identifier param : funcExpr.params()) {
-            methodCompiler.currentScope().declareLocal(param.name());
-        }
-
-        // If this is a generator method, emit INITIAL_YIELD at the start
-        if (funcExpr.isGenerator()) {
-            methodCompiler.emitter.emitOpcode(Opcode.INITIAL_YIELD);
-        }
-
-        // Compile method body statements
-        for (Statement stmt : funcExpr.body().body()) {
-            methodCompiler.compileStatement(stmt);
-        }
-
-        // If body doesn't end with return, add implicit return undefined
-        List<Statement> bodyStatements = funcExpr.body().body();
-        if (bodyStatements.isEmpty() || !(bodyStatements.get(bodyStatements.size() - 1) instanceof ReturnStatement)) {
-            methodCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
-            methodCompiler.emitter.emitOpcode(funcExpr.isAsync() ? Opcode.RETURN_ASYNC : Opcode.RETURN);
-        }
-
-        int localCount = methodCompiler.currentScope().getLocalCount();
-        methodCompiler.exitScope();
-
-        // Build the method bytecode
-        Bytecode methodBytecode = methodCompiler.emitter.build(localCount);
-
-        // Create JSBytecodeFunction for the method
-        return new JSBytecodeFunction(
-                methodBytecode,
-                methodName,
-                funcExpr.params().size(),
-                new JSValue[0],  // closure vars
-                null,            // prototype
-                false,           // isConstructor - methods are not constructors
-                funcExpr.isAsync(),
-                funcExpr.isGenerator(),
-                true,            // strict - classes are always strict mode
-                "method " + methodName + "() { [method body] }"  // source for toString
-        );
-    }
-
-    /**
-     * Create a default constructor for a class.
-     */
-    private JSBytecodeFunction createDefaultConstructor(String className, boolean hasSuper) {
-        BytecodeCompiler constructorCompiler = new BytecodeCompiler();
-
-        constructorCompiler.enterScope();
-        constructorCompiler.inGlobalScope = false;
-
-        // Default constructor just returns undefined (or calls super for derived classes)
-        if (hasSuper) {
-            // TODO: Implement super() call for derived class constructor
-            // For now, just return undefined
-            constructorCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
-        } else {
-            constructorCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
-        }
-        constructorCompiler.emitter.emitOpcode(Opcode.RETURN);
-
-        int localCount = constructorCompiler.currentScope().getLocalCount();
-        constructorCompiler.exitScope();
-
-        Bytecode constructorBytecode = constructorCompiler.emitter.build(localCount);
-
-        return new JSBytecodeFunction(
-                constructorBytecode,
-                className,
-                0,               // no parameters
-                new JSValue[0],  // no closure vars
-                null,            // prototype will be set by VM
-                true,            // isConstructor
-                false,           // not async
-                false,           // not generator
-                true,            // strict mode
-                "constructor() { [default] }"
-        );
-    }
-
-    /**
-     * Get the name of a method from its key.
-     */
-    private String getMethodName(ClassDeclaration.MethodDefinition method) {
-        Expression key = method.key();
-        if (key instanceof Identifier id) {
-            return id.name();
-        } else if (key instanceof Literal literal) {
-            return literal.value().toString();
-        } else if (key instanceof PrivateIdentifier privateId) {
-            // Private identifier - return name without # prefix
-            return privateId.name();
-        } else {
-            // Computed property name - for now use a placeholder
-            return "[computed]";
-        }
-    }
-
     private void compileFunctionExpression(FunctionExpression funcExpr) {
         // Create a new compiler for the function body
         BytecodeCompiler functionCompiler = new BytecodeCompiler();
@@ -1256,6 +1001,150 @@ public final class BytecodeCompiler {
         }
     }
 
+    /**
+     * Compile logical assignment operators (&&=, ||=, ??=) with short-circuit evaluation.
+     * Based on QuickJS implementation in quickjs.c (lines 27635-27690).
+     * <p>
+     * For a ??= b:
+     * 1. Load current value of a (with DUP for member expressions)
+     * 2. Duplicate it
+     * 3. Check if it's null or undefined
+     * 4. If not null/undefined, jump to end (keep current value, cleanup lvalue stack)
+     * 5. If null/undefined, drop duplicate, evaluate b, insert below lvalue, assign, jump to end2
+     * 6. At end: cleanup lvalue stack with NIP operations
+     * 7. At end2: continue
+     * <p>
+     * For a &&= b:
+     * Similar but check for falsy
+     * <p>
+     * For a ||= b:
+     * Similar but check for truthy
+     */
+    private void compileLogicalAssignment(AssignmentExpression assignExpr) {
+        Expression left = assignExpr.left();
+        AssignmentExpression.AssignmentOperator operator = assignExpr.operator();
+
+        // Determine the depth of lvalue for proper stack manipulation
+        // depth 0 = identifier, depth 1 = obj.prop, depth 2 = obj[prop]
+        int depthLvalue;
+        if (left instanceof Identifier) {
+            depthLvalue = 0;
+        } else if (left instanceof MemberExpression memberExpr) {
+            depthLvalue = memberExpr.computed() ? 2 : 1;
+        } else {
+            throw new CompilerException("Invalid left-hand side in logical assignment");
+        }
+
+        // Load the current value
+        if (left instanceof Identifier id) {
+            String name = id.name();
+            Integer localIndex = findLocalInScopes(name);
+            if (localIndex != null) {
+                emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
+            } else {
+                emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
+            }
+        } else if (left instanceof MemberExpression memberExpr) {
+            compileExpression(memberExpr.object());
+            if (memberExpr.computed()) {
+                compileExpression(memberExpr.property());
+                emitter.emitOpcode(Opcode.DUP2);  // Duplicate obj and prop
+                emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+            } else if (memberExpr.property() instanceof Identifier propId) {
+                emitter.emitOpcode(Opcode.DUP);  // Duplicate object
+                emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
+            }
+        }
+
+        // Duplicate the current value for the test
+        emitter.emitOpcode(Opcode.DUP);
+
+        // Emit the test based on operator type
+        int jumpToCleanup;
+        if (operator == AssignmentExpression.AssignmentOperator.NULLISH_ASSIGN) {
+            // For ??=, check if null or undefined
+            emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
+            // Jump to cleanup if NOT null/undefined (value is on stack)
+            jumpToCleanup = emitter.emitJump(Opcode.IF_FALSE);
+        } else if (operator == AssignmentExpression.AssignmentOperator.LOGICAL_OR_ASSIGN) {
+            // For ||=, jump to cleanup if truthy
+            jumpToCleanup = emitter.emitJump(Opcode.IF_TRUE);
+        } else { // LOGICAL_AND_ASSIGN
+            // For &&=, jump to cleanup if falsy
+            jumpToCleanup = emitter.emitJump(Opcode.IF_FALSE);
+        }
+
+        // The current value didn't meet the condition, so we assign the new value
+        // The boolean was already popped by IF_FALSE
+        // Drop the old value
+        emitter.emitOpcode(Opcode.DROP);
+
+        // Compile the right-hand side expression
+        compileExpression(assignExpr.right());
+
+        // Insert the new value below the lvalue on stack for proper assignment
+        // This matches QuickJS's OP_insert2, OP_insert3, OP_insert4 pattern
+        // INSERT2: [a, b] -> [b, a, b]
+        // INSERT3: [a, b, c] -> [c, a, b, c]
+        // INSERT4: [a, b, c, d] -> [d, a, b, c, d]
+        switch (depthLvalue) {
+            case 0 -> {
+                // For identifier: stack is [newValue]
+                // We need to keep the value on stack for the result
+                emitter.emitOpcode(Opcode.DUP);
+            }
+            case 1 -> {
+                // For obj.prop: stack is [obj, newValue]
+                // We need: [newValue, obj] for PUT_FIELD
+                // PUT_FIELD pops obj, peeks newValue, leaves newValue on stack
+                emitter.emitOpcode(Opcode.SWAP);
+            }
+            case 2 -> {
+                // For obj[prop]: stack is [obj, prop, newValue]
+                // We need: [newValue, obj, prop] for PUT_ARRAY_EL
+                // ROT3R rotates right: [a, b, c] -> [c, a, b]
+                // So [obj, prop, newValue] -> [newValue, obj, prop]
+                emitter.emitOpcode(Opcode.ROT3R);
+            }
+            default -> throw new CompilerException("Invalid depth for logical assignment");
+        }
+
+        // Store the result to left side
+        if (left instanceof Identifier id) {
+            String name = id.name();
+            Integer localIndex = findLocalInScopes(name);
+            if (localIndex != null) {
+                emitter.emitOpcodeU16(Opcode.SET_LOCAL, localIndex);
+            } else {
+                emitter.emitOpcodeAtom(Opcode.SET_VAR, name);
+            }
+        } else if (left instanceof MemberExpression memberExpr) {
+            if (memberExpr.computed()) {
+                emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+            } else if (memberExpr.property() instanceof Identifier propId) {
+                emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
+            }
+        }
+
+        // Jump over the cleanup code
+        int jumpToEnd = emitter.emitJump(Opcode.GOTO);
+
+        // Patch the jump to cleanup - if we took this branch, we need to cleanup lvalue stack
+        emitter.patchJump(jumpToCleanup, emitter.currentOffset());
+
+        // Remove the lvalue stack entries using NIP
+        // NIP removes the value below the top, keeping the top value
+        // For depth 0 (identifier): no cleanup needed
+        // For depth 1 (obj.prop): NIP removes obj, keeps the value
+        // For depth 2 (obj[prop]): NIP twice removes obj and prop, keeps the value
+        for (int i = 0; i < depthLvalue; i++) {
+            emitter.emitOpcode(Opcode.NIP);
+        }
+
+        // Patch the jump to end - both paths converge here
+        emitter.patchJump(jumpToEnd, emitter.currentOffset());
+    }
+
     private void compileMemberExpression(MemberExpression memberExpr) {
         compileExpression(memberExpr.object());
 
@@ -1267,6 +1156,61 @@ public final class BytecodeCompiler {
             // obj.prop
             emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
         }
+    }
+
+    /**
+     * Compile a method definition as a function.
+     */
+    private JSBytecodeFunction compileMethodAsFunction(ClassDeclaration.MethodDefinition method, String methodName, boolean isDerivedConstructor) {
+        BytecodeCompiler methodCompiler = new BytecodeCompiler();
+
+        FunctionExpression funcExpr = method.value();
+
+        // Enter function scope and add parameters as locals
+        methodCompiler.enterScope();
+        methodCompiler.inGlobalScope = false;
+        methodCompiler.isInAsyncFunction = funcExpr.isAsync();
+
+        for (Identifier param : funcExpr.params()) {
+            methodCompiler.currentScope().declareLocal(param.name());
+        }
+
+        // If this is a generator method, emit INITIAL_YIELD at the start
+        if (funcExpr.isGenerator()) {
+            methodCompiler.emitter.emitOpcode(Opcode.INITIAL_YIELD);
+        }
+
+        // Compile method body statements
+        for (Statement stmt : funcExpr.body().body()) {
+            methodCompiler.compileStatement(stmt);
+        }
+
+        // If body doesn't end with return, add implicit return undefined
+        List<Statement> bodyStatements = funcExpr.body().body();
+        if (bodyStatements.isEmpty() || !(bodyStatements.get(bodyStatements.size() - 1) instanceof ReturnStatement)) {
+            methodCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
+            methodCompiler.emitter.emitOpcode(funcExpr.isAsync() ? Opcode.RETURN_ASYNC : Opcode.RETURN);
+        }
+
+        int localCount = methodCompiler.currentScope().getLocalCount();
+        methodCompiler.exitScope();
+
+        // Build the method bytecode
+        Bytecode methodBytecode = methodCompiler.emitter.build(localCount);
+
+        // Create JSBytecodeFunction for the method
+        return new JSBytecodeFunction(
+                methodBytecode,
+                methodName,
+                funcExpr.params().size(),
+                new JSValue[0],  // closure vars
+                null,            // prototype
+                false,           // isConstructor - methods are not constructors
+                funcExpr.isAsync(),
+                funcExpr.isGenerator(),
+                true,            // strict - classes are always strict mode
+                "method " + methodName + "() { [method body] }"  // source for toString
+        );
     }
 
     private void compileNewExpression(NewExpression newExpr) {
@@ -1281,8 +1225,6 @@ public final class BytecodeCompiler {
         // Call constructor
         emitter.emitOpcodeU16(Opcode.CALL_CONSTRUCTOR, newExpr.arguments().size());
     }
-
-    // ==================== Expression Compilation ====================
 
     private void compileObjectExpression(ObjectExpression objExpr) {
         emitter.emitOpcode(Opcode.OBJECT_NEW);
@@ -1351,6 +1293,8 @@ public final class BytecodeCompiler {
             emitter.emitOpcode(Opcode.DROP);
         }
     }
+
+    // ==================== Expression Compilation ====================
 
     private void compileProgram(Program program) {
         inGlobalScope = true;
@@ -1868,7 +1812,43 @@ public final class BytecodeCompiler {
         }
     }
 
-    // ==================== Scope Management ====================
+    /**
+     * Create a default constructor for a class.
+     */
+    private JSBytecodeFunction createDefaultConstructor(String className, boolean hasSuper) {
+        BytecodeCompiler constructorCompiler = new BytecodeCompiler();
+
+        constructorCompiler.enterScope();
+        constructorCompiler.inGlobalScope = false;
+
+        // Default constructor just returns undefined (or calls super for derived classes)
+        if (hasSuper) {
+            // TODO: Implement super() call for derived class constructor
+            // For now, just return undefined
+            constructorCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
+        } else {
+            constructorCompiler.emitter.emitOpcode(Opcode.UNDEFINED);
+        }
+        constructorCompiler.emitter.emitOpcode(Opcode.RETURN);
+
+        int localCount = constructorCompiler.currentScope().getLocalCount();
+        constructorCompiler.exitScope();
+
+        Bytecode constructorBytecode = constructorCompiler.emitter.build(localCount);
+
+        return new JSBytecodeFunction(
+                constructorBytecode,
+                className,
+                0,               // no parameters
+                new JSValue[0],  // no closure vars
+                null,            // prototype will be set by VM
+                true,            // isConstructor
+                false,           // not async
+                false,           // not generator
+                true,            // strict mode
+                "constructor() { [default] }"
+        );
+    }
 
     private Scope currentScope() {
         if (scopes.isEmpty()) {
@@ -1876,6 +1856,8 @@ public final class BytecodeCompiler {
         }
         return scopes.peek();
     }
+
+    // ==================== Scope Management ====================
 
     private void enterScope() {
         int baseIndex = scopes.isEmpty() ? 0 : currentScope().getLocalCount();
@@ -1928,6 +1910,24 @@ public final class BytecodeCompiler {
             }
         }
         return null;
+    }
+
+    /**
+     * Get the name of a method from its key.
+     */
+    private String getMethodName(ClassDeclaration.MethodDefinition method) {
+        Expression key = method.key();
+        if (key instanceof Identifier id) {
+            return id.name();
+        } else if (key instanceof Literal literal) {
+            return literal.value().toString();
+        } else if (key instanceof PrivateIdentifier privateId) {
+            // Private identifier - return name without # prefix
+            return privateId.name();
+        } else {
+            // Computed property name - for now use a placeholder
+            return "[computed]";
+        }
     }
 
     /**

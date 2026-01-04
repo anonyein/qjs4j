@@ -47,13 +47,6 @@ public class BaseJavetTest extends BaseTest {
     protected boolean moduleMode;
     protected V8Runtime v8Runtime;
 
-    protected void printCode(String code) {
-        if (debugMode) {
-            System.out.println(code);
-            System.out.println("----------------");
-        }
-    }
-
     protected void assertBigIntegerObjectWithJavet(String... codeArray) {
         for (String code : getNormalizedCodeStrings(codeArray)) {
             printCode(code);
@@ -374,6 +367,13 @@ public class BaseJavetTest extends BaseTest {
         return Stream.of(codeArray)
                 .flatMap(code -> Stream.of(code, "'use strict';\n" + code))
                 .toList();
+    }
+
+    protected void printCode(String code) {
+        if (debugMode) {
+            System.out.println(code);
+            System.out.println("----------------");
+        }
     }
 
     @BeforeEach

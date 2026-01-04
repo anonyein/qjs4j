@@ -21,7 +21,7 @@ import com.caoccao.qjs4j.core.JSRuntime;
 import com.caoccao.qjs4j.core.JSValue;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test class declaration compilation and execution.
@@ -29,31 +29,36 @@ import static org.assertj.core.api.Assertions.*;
 public class ClassCompilerTest {
 
     @Test
-    public void testSimpleClass() throws Exception {
+    public void testClassWithConstructor() throws Exception {
         String source = """
-            class Point {
-            }
-            Point
-            """;
+                class Point {
+                    constructor(x, y) {
+                        this.x = x;
+                        this.y = y;
+                    }
+                }
+                const p = new Point(1, 2);
+                p.x + p.y
+                """;
 
         try (JSContext context = new JSContext(new JSRuntime())) {
             JSValue result = context.eval(source);
             assertThat(result).isNotNull();
-            System.out.println("Simple class test passed: " + result);
+            System.out.println("Class with constructor test result: " + result);
         }
     }
 
     @Test
     public void testClassWithMethod() throws Exception {
         String source = """
-            class Counter {
-                increment() {
-                    return 42;
+                class Counter {
+                    increment() {
+                        return 42;
+                    }
                 }
-            }
-            const c = new Counter();
-            c.increment()
-            """;
+                const c = new Counter();
+                c.increment()
+                """;
 
         try (JSContext context = new JSContext(new JSRuntime())) {
             JSValue result = context.eval(source);
@@ -63,22 +68,17 @@ public class ClassCompilerTest {
     }
 
     @Test
-    public void testClassWithConstructor() throws Exception {
+    public void testSimpleClass() throws Exception {
         String source = """
-            class Point {
-                constructor(x, y) {
-                    this.x = x;
-                    this.y = y;
+                class Point {
                 }
-            }
-            const p = new Point(1, 2);
-            p.x + p.y
-            """;
+                Point
+                """;
 
         try (JSContext context = new JSContext(new JSRuntime())) {
             JSValue result = context.eval(source);
             assertThat(result).isNotNull();
-            System.out.println("Class with constructor test result: " + result);
+            System.out.println("Simple class test passed: " + result);
         }
     }
 }

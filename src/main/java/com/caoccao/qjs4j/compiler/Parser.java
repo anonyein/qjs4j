@@ -462,6 +462,162 @@ public final class Parser {
 
     // Expression parsing with precedence
 
+    /**
+     * Parse a class declaration or expression.
+     * Syntax: class Name extends Super { body }
+     */
+    private ClassDeclaration parseClassDeclaration() {
+        SourceLocation location = getLocation();
+        expect(TokenType.CLASS);
+
+        // Parse optional class name
+        Identifier id = null;
+        if (match(TokenType.IDENTIFIER)) {
+            String name = currentToken.value();
+            advance();
+            id = new Identifier(name, location);
+        }
+
+        // Parse optional extends clause
+        Expression superClass = null;
+        if (match(TokenType.EXTENDS)) {
+            advance();
+            superClass = parseMemberExpression();
+        }
+
+        // Parse class body
+        expect(TokenType.LBRACE);
+        List<ClassDeclaration.ClassElement> body = new ArrayList<>();
+
+        while (!match(TokenType.RBRACE) && !match(TokenType.EOF)) {
+            // Skip empty semicolons
+            if (match(TokenType.SEMICOLON)) {
+                advance();
+                continue;
+            }
+
+            ClassDeclaration.ClassElement element = parseClassElement();
+            if (element != null) {
+                body.add(element);
+            }
+        }
+
+        expect(TokenType.RBRACE);
+
+        return new ClassDeclaration(id, superClass, body, location);
+    }
+
+    /**
+     * Parse a single class element (method, field, or static block).
+     */
+    private ClassDeclaration.ClassElement parseClassElement() {
+        boolean isStatic = false;
+        boolean isPrivate = false;
+        SourceLocation location = getLocation();
+
+        // Check for 'static' keyword
+        if (match(TokenType.IDENTIFIER) && "static".equals(currentToken.value())) {
+            advance();
+            isStatic = true;
+
+            // Check for static block: static { }
+            if (match(TokenType.LBRACE)) {
+                return parseStaticBlock();
+            }
+
+            // Handle 'static' as a property name (e.g., static = 42;)
+            if (match(TokenType.ASSIGN) || match(TokenType.SEMICOLON)) {
+                isStatic = false;
+                // Parse as field with name "static"
+                Expression key = new Identifier("static", location);
+                Expression value = null;
+                if (match(TokenType.ASSIGN)) {
+                    advance();
+                    value = parseAssignmentExpression();
+                }
+                consumeSemicolon();
+                return new ClassDeclaration.PropertyDefinition(key, value, false, isStatic, false);
+            }
+        }
+
+        // Check for private identifier (#name)
+        if (match(TokenType.PRIVATE_NAME)) {
+            isPrivate = true;
+            String privateName = currentToken.value();
+            // Remove the # prefix for the identifier
+            String name = privateName.substring(1);
+            advance();
+
+            Expression key = new PrivateIdentifier(name, location);
+            return parseMethodOrField(key, isStatic, isPrivate, true, location);
+        }
+
+        // Check for computed property name [expr]
+        if (match(TokenType.LBRACKET)) {
+            advance();
+            Expression key = parseAssignmentExpression();
+            expect(TokenType.RBRACKET);
+            return parseMethodOrField(key, isStatic, isPrivate, true, location);
+        }
+
+        // Check for getter/setter
+        if (match(TokenType.IDENTIFIER)) {
+            String name = currentToken.value();
+            Token nextToken = lexer.peekToken();
+            if (("get".equals(name) || "set".equals(name)) &&
+                    nextToken.type() != TokenType.LPAREN &&
+                    nextToken.type() != TokenType.ASSIGN &&
+                    nextToken.type() != TokenType.SEMICOLON) {
+                String kind = name;
+                advance(); // consume 'get' or 'set'
+
+                Expression key;
+                boolean computed = false;
+
+                // Parse property name after get/set
+                if (match(TokenType.PRIVATE_NAME)) {
+                    String privateName = currentToken.value();
+                    String keyName = privateName.substring(1);
+                    key = new PrivateIdentifier(keyName, getLocation());
+                    isPrivate = true;
+                    advance();
+                } else if (match(TokenType.LBRACKET)) {
+                    advance();
+                    key = parseAssignmentExpression();
+                    expect(TokenType.RBRACKET);
+                    computed = true;
+                } else if (match(TokenType.IDENTIFIER) || match(TokenType.STRING)) {
+                    key = new Identifier(currentToken.value(), getLocation());
+                    advance();
+                } else {
+                    throw new RuntimeException("Expected property name after '" + kind + "'");
+                }
+
+                FunctionExpression method = parseMethod(kind);
+                return new ClassDeclaration.MethodDefinition(key, method, kind, computed, isStatic, isPrivate);
+            }
+        }
+
+        // Regular property name (identifier, string, number)
+        Expression key;
+        boolean computed = false;
+
+        if (match(TokenType.IDENTIFIER)) {
+            key = new Identifier(currentToken.value(), location);
+            advance();
+        } else if (match(TokenType.STRING)) {
+            key = new Literal(currentToken.value(), location);
+            advance();
+        } else if (match(TokenType.NUMBER)) {
+            key = new Literal(Double.parseDouble(currentToken.value()), location);
+            advance();
+        } else {
+            throw new RuntimeException("Expected property name");
+        }
+
+        return parseMethodOrField(key, isStatic, isPrivate, computed, location);
+    }
+
     private Expression parseConditionalExpression() {
         Expression test = parseLogicalOrExpression();
 
@@ -831,6 +987,58 @@ public final class Parser {
         return parsePrimaryExpression();
     }
 
+    /**
+     * Parse a method (constructor, method, getter, or setter).
+     */
+    private FunctionExpression parseMethod(String kind) {
+        SourceLocation location = getLocation();
+
+        // Parse parameter list
+        expect(TokenType.LPAREN);
+        List<Identifier> params = new ArrayList<>();
+
+        while (!match(TokenType.RPAREN) && !match(TokenType.EOF)) {
+            if (!params.isEmpty()) {
+                expect(TokenType.COMMA);
+            }
+            if (match(TokenType.IDENTIFIER)) {
+                params.add(new Identifier(currentToken.value(), getLocation()));
+                advance();
+            } else {
+                break;
+            }
+        }
+
+        expect(TokenType.RPAREN);
+
+        // Parse method body
+        BlockStatement body = parseBlockStatement();
+
+        return new FunctionExpression(null, params, body, false, false, location);
+    }
+
+    /**
+     * Parse method or field after the property name.
+     */
+    private ClassDeclaration.ClassElement parseMethodOrField(Expression key, boolean isStatic,
+                                                             boolean isPrivate, boolean computed,
+                                                             SourceLocation location) {
+        // Check if it's a field (has = or semicolon)
+        if (match(TokenType.ASSIGN) || match(TokenType.SEMICOLON)) {
+            Expression value = null;
+            if (match(TokenType.ASSIGN)) {
+                advance();
+                value = parseAssignmentExpression();
+            }
+            consumeSemicolon();
+            return new ClassDeclaration.PropertyDefinition(key, value, computed, isStatic, isPrivate);
+        }
+
+        // Otherwise, it's a method
+        FunctionExpression method = parseMethod("method");
+        return new ClassDeclaration.MethodDefinition(key, method, "method", computed, isStatic, isPrivate);
+    }
+
     private Expression parseMultiplicativeExpression() {
         Expression left = parseExponentiationExpression();
 
@@ -978,6 +1186,8 @@ public final class Parser {
         return expr;
     }
 
+    // Utility methods
+
     private Expression parsePrimaryExpression() {
         SourceLocation location = getLocation();
 
@@ -989,24 +1199,24 @@ public final class Parser {
                 if (value.startsWith("0x") || value.startsWith("0X")) {
                     // Parse hex number - store as long or int
                     long longVal = Long.parseLong(value.substring(2), 16);
-                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE) 
-                        ? (int) longVal : (double) longVal;
+                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE)
+                            ? (int) longVal : (double) longVal;
                 } else if (value.startsWith("0b") || value.startsWith("0B")) {
                     // Parse binary number - store as long or int
                     long longVal = Long.parseLong(value.substring(2), 2);
-                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE) 
-                        ? (int) longVal : (double) longVal;
+                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE)
+                            ? (int) longVal : (double) longVal;
                 } else if (value.startsWith("0o") || value.startsWith("0O")) {
                     // Parse octal number - store as long or int
                     long longVal = Long.parseLong(value.substring(2), 8);
-                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE) 
-                        ? (int) longVal : (double) longVal;
+                    numValue = (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE)
+                            ? (int) longVal : (double) longVal;
                 } else {
                     // Parse decimal number - use double
                     double doubleVal = Double.parseDouble(value);
                     // Check if it's a whole number that fits in an int
                     if (doubleVal == Math.floor(doubleVal) && !Double.isInfinite(doubleVal) &&
-                        doubleVal >= Integer.MIN_VALUE && doubleVal <= Integer.MAX_VALUE) {
+                            doubleVal >= Integer.MIN_VALUE && doubleVal <= Integer.MAX_VALUE) {
                         numValue = (int) doubleVal;
                     } else {
                         numValue = doubleVal;
@@ -1073,7 +1283,7 @@ public final class Parser {
 
                 // Check for empty parameter list: () which could be arrow function
                 if (match(TokenType.RPAREN)) {
-                    // Could be () => ... 
+                    // Could be () => ...
                     // Return an empty ArrayExpression as a marker for empty parameter list
                     advance();
                     yield new ArrayExpression(new ArrayList<>(), location);
@@ -1091,22 +1301,22 @@ public final class Parser {
                     // (id, id2) => expr (arrow function with multiple params)
                     // (id = value) (grouped assignment expression)
                     // (id + value) (grouped binary expression)
-                    
+
                     // We need to look at what comes after the identifier
                     // to decide if this is arrow function params or a grouped expression
-                    
+
                     // Check if the token after identifier is an assignment operator
                     // If so, this is a grouped expression like (b = 10), not arrow params
-                    if (nextToken.type() != TokenType.COMMA && 
-                        nextToken.type() != TokenType.RPAREN &&
-                        nextToken.type() != TokenType.ARROW) {
+                    if (nextToken.type() != TokenType.COMMA &&
+                            nextToken.type() != TokenType.RPAREN &&
+                            nextToken.type() != TokenType.ARROW) {
                         // This looks like a grouped expression, not arrow function params
                         // Parse the whole thing as an expression
                         Expression expr = parseExpression();
                         expect(TokenType.RPAREN);
                         yield expr;
                     }
-                    
+
                     // Could be (id) or (id, id, ...)
                     // Parse as parameter list tentatively
                     List<Identifier> potentialParams = new ArrayList<>();
@@ -1234,8 +1444,6 @@ public final class Parser {
         return new ReturnStatement(argument, location);
     }
 
-    // Utility methods
-
     private Expression parseShiftExpression() {
         Expression left = parseAdditiveExpression();
 
@@ -1294,6 +1502,24 @@ public final class Parser {
             }
             default -> parseExpressionStatement();
         };
+    }
+
+    /**
+     * Parse a static initialization block: static { statements }
+     */
+    private ClassDeclaration.StaticBlock parseStaticBlock() {
+        expect(TokenType.LBRACE);
+        List<Statement> statements = new ArrayList<>();
+
+        while (!match(TokenType.RBRACE) && !match(TokenType.EOF)) {
+            Statement stmt = parseStatement();
+            if (stmt != null) {
+                statements.add(stmt);
+            }
+        }
+
+        expect(TokenType.RBRACE);
+        return new ClassDeclaration.StaticBlock(statements);
     }
 
     private Statement parseSwitchStatement() {
@@ -1583,231 +1809,5 @@ public final class Parser {
             }
         }
         return result.toString();
-    }
-
-    /**
-     * Parse a class declaration or expression.
-     * Syntax: class Name extends Super { body }
-     */
-    private ClassDeclaration parseClassDeclaration() {
-        SourceLocation location = getLocation();
-        expect(TokenType.CLASS);
-
-        // Parse optional class name
-        Identifier id = null;
-        if (match(TokenType.IDENTIFIER)) {
-            String name = currentToken.value();
-            advance();
-            id = new Identifier(name, location);
-        }
-
-        // Parse optional extends clause
-        Expression superClass = null;
-        if (match(TokenType.EXTENDS)) {
-            advance();
-            superClass = parseMemberExpression();
-        }
-
-        // Parse class body
-        expect(TokenType.LBRACE);
-        List<ClassDeclaration.ClassElement> body = new ArrayList<>();
-
-        while (!match(TokenType.RBRACE) && !match(TokenType.EOF)) {
-            // Skip empty semicolons
-            if (match(TokenType.SEMICOLON)) {
-                advance();
-                continue;
-            }
-
-            ClassDeclaration.ClassElement element = parseClassElement();
-            if (element != null) {
-                body.add(element);
-            }
-        }
-
-        expect(TokenType.RBRACE);
-
-        return new ClassDeclaration(id, superClass, body, location);
-    }
-
-    /**
-     * Parse a single class element (method, field, or static block).
-     */
-    private ClassDeclaration.ClassElement parseClassElement() {
-        boolean isStatic = false;
-        boolean isPrivate = false;
-        SourceLocation location = getLocation();
-
-        // Check for 'static' keyword
-        if (match(TokenType.IDENTIFIER) && "static".equals(currentToken.value())) {
-            advance();
-            isStatic = true;
-
-            // Check for static block: static { }
-            if (match(TokenType.LBRACE)) {
-                return parseStaticBlock();
-            }
-
-            // Handle 'static' as a property name (e.g., static = 42;)
-            if (match(TokenType.ASSIGN) || match(TokenType.SEMICOLON)) {
-                isStatic = false;
-                // Parse as field with name "static"
-                Expression key = new Identifier("static", location);
-                Expression value = null;
-                if (match(TokenType.ASSIGN)) {
-                    advance();
-                    value = parseAssignmentExpression();
-                }
-                consumeSemicolon();
-                return new ClassDeclaration.PropertyDefinition(key, value, false, isStatic, false);
-            }
-        }
-
-        // Check for private identifier (#name)
-        if (match(TokenType.PRIVATE_NAME)) {
-            isPrivate = true;
-            String privateName = currentToken.value();
-            // Remove the # prefix for the identifier
-            String name = privateName.substring(1);
-            advance();
-
-            Expression key = new PrivateIdentifier(name, location);
-            return parseMethodOrField(key, isStatic, isPrivate, true, location);
-        }
-
-        // Check for computed property name [expr]
-        if (match(TokenType.LBRACKET)) {
-            advance();
-            Expression key = parseAssignmentExpression();
-            expect(TokenType.RBRACKET);
-            return parseMethodOrField(key, isStatic, isPrivate, true, location);
-        }
-
-        // Check for getter/setter
-        if (match(TokenType.IDENTIFIER)) {
-            String name = currentToken.value();
-            Token nextToken = lexer.peekToken();
-            if (("get".equals(name) || "set".equals(name)) &&
-                nextToken.type() != TokenType.LPAREN &&
-                nextToken.type() != TokenType.ASSIGN &&
-                nextToken.type() != TokenType.SEMICOLON) {
-                String kind = name;
-                advance(); // consume 'get' or 'set'
-
-                Expression key;
-                boolean computed = false;
-
-                // Parse property name after get/set
-                if (match(TokenType.PRIVATE_NAME)) {
-                    String privateName = currentToken.value();
-                    String keyName = privateName.substring(1);
-                    key = new PrivateIdentifier(keyName, getLocation());
-                    isPrivate = true;
-                    advance();
-                } else if (match(TokenType.LBRACKET)) {
-                    advance();
-                    key = parseAssignmentExpression();
-                    expect(TokenType.RBRACKET);
-                    computed = true;
-                } else if (match(TokenType.IDENTIFIER) || match(TokenType.STRING)) {
-                    key = new Identifier(currentToken.value(), getLocation());
-                    advance();
-                } else {
-                    throw new RuntimeException("Expected property name after '" + kind + "'");
-                }
-
-                FunctionExpression method = parseMethod(kind);
-                return new ClassDeclaration.MethodDefinition(key, method, kind, computed, isStatic, isPrivate);
-            }
-        }
-
-        // Regular property name (identifier, string, number)
-        Expression key;
-        boolean computed = false;
-
-        if (match(TokenType.IDENTIFIER)) {
-            key = new Identifier(currentToken.value(), location);
-            advance();
-        } else if (match(TokenType.STRING)) {
-            key = new Literal(currentToken.value(), location);
-            advance();
-        } else if (match(TokenType.NUMBER)) {
-            key = new Literal(Double.parseDouble(currentToken.value()), location);
-            advance();
-        } else {
-            throw new RuntimeException("Expected property name");
-        }
-
-        return parseMethodOrField(key, isStatic, isPrivate, computed, location);
-    }
-
-    /**
-     * Parse method or field after the property name.
-     */
-    private ClassDeclaration.ClassElement parseMethodOrField(Expression key, boolean isStatic,
-                                                              boolean isPrivate, boolean computed,
-                                                              SourceLocation location) {
-        // Check if it's a field (has = or semicolon)
-        if (match(TokenType.ASSIGN) || match(TokenType.SEMICOLON)) {
-            Expression value = null;
-            if (match(TokenType.ASSIGN)) {
-                advance();
-                value = parseAssignmentExpression();
-            }
-            consumeSemicolon();
-            return new ClassDeclaration.PropertyDefinition(key, value, computed, isStatic, isPrivate);
-        }
-
-        // Otherwise, it's a method
-        FunctionExpression method = parseMethod("method");
-        return new ClassDeclaration.MethodDefinition(key, method, "method", computed, isStatic, isPrivate);
-    }
-
-    /**
-     * Parse a method (constructor, method, getter, or setter).
-     */
-    private FunctionExpression parseMethod(String kind) {
-        SourceLocation location = getLocation();
-
-        // Parse parameter list
-        expect(TokenType.LPAREN);
-        List<Identifier> params = new ArrayList<>();
-
-        while (!match(TokenType.RPAREN) && !match(TokenType.EOF)) {
-            if (!params.isEmpty()) {
-                expect(TokenType.COMMA);
-            }
-            if (match(TokenType.IDENTIFIER)) {
-                params.add(new Identifier(currentToken.value(), getLocation()));
-                advance();
-            } else {
-                break;
-            }
-        }
-
-        expect(TokenType.RPAREN);
-
-        // Parse method body
-        BlockStatement body = parseBlockStatement();
-
-        return new FunctionExpression(null, params, body, false, false, location);
-    }
-
-    /**
-     * Parse a static initialization block: static { statements }
-     */
-    private ClassDeclaration.StaticBlock parseStaticBlock() {
-        expect(TokenType.LBRACE);
-        List<Statement> statements = new ArrayList<>();
-
-        while (!match(TokenType.RBRACE) && !match(TokenType.EOF)) {
-            Statement stmt = parseStatement();
-            if (stmt != null) {
-                statements.add(stmt);
-            }
-        }
-
-        expect(TokenType.RBRACE);
-        return new ClassDeclaration.StaticBlock(statements);
     }
 }

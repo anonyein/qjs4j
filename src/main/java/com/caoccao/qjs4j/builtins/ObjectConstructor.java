@@ -329,7 +329,8 @@ public final class ObjectConstructor {
     /**
      * Object.freeze(obj)
      * ES2020 19.1.2.6
-     * Freezes an object (simplified implementation).
+     * Freezes an object.
+     * Following QuickJS js_object_seal() implementation with freeze_flag=1.
      */
     public static JSValue freeze(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
@@ -341,7 +342,36 @@ public final class ObjectConstructor {
             return arg; // Primitives are returned as-is
         }
 
+        // Step 1: Prevent extensions
+        obj.preventExtensions();
+
+        // Step 2: Get all own property keys (string, symbol, and array indices)
+        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
+
+        // Step 3: For each property, set configurable=false and (for data properties) writable=false
+        for (PropertyKey key : propertyKeys) {
+            PropertyDescriptor desc = obj.getOwnPropertyDescriptor(key);
+            if (desc == null) {
+                continue; // Skip if property doesn't exist (shouldn't happen)
+            }
+
+            // Modify the existing descriptor:
+            // - Always set configurable to false
+            // - For data properties, also set writable to false
+            desc.setConfigurable(false);
+
+            if (desc.isDataDescriptor()) {
+                // Only modify writable if it's a data property
+                desc.setWritable(false);
+            }
+
+            // Update the property with the modified descriptor
+            obj.defineProperty(key, desc);
+        }
+
+        // Step 4: Mark the object as frozen (sets frozen, sealed, and extensible flags)
         obj.freeze();
+
         return arg;
     }
 
@@ -870,7 +900,8 @@ public final class ObjectConstructor {
     /**
      * Object.seal(obj)
      * ES2020 19.1.2.17
-     * Seals an object (simplified implementation).
+     * Seals an object.
+     * Following QuickJS js_object_seal() implementation with freeze_flag=0.
      */
     public static JSValue seal(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
@@ -882,7 +913,31 @@ public final class ObjectConstructor {
             return arg; // Primitives are returned as-is
         }
 
+        // Step 1: Prevent extensions
+        obj.preventExtensions();
+
+        // Step 2: Get all own property keys (string, symbol, and array indices)
+        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
+
+        // Step 3: For each property, set configurable=false (but keep writable unchanged)
+        for (PropertyKey key : propertyKeys) {
+            PropertyDescriptor desc = obj.getOwnPropertyDescriptor(key);
+            if (desc == null) {
+                continue; // Skip if property doesn't exist (shouldn't happen)
+            }
+
+            // Modify the existing descriptor:
+            // - Set configurable to false
+            // - Do NOT modify writable (this is the difference from freeze)
+            desc.setConfigurable(false);
+
+            // Update the property with the modified descriptor
+            obj.defineProperty(key, desc);
+        }
+
+        // Step 4: Mark the object as sealed (sets sealed and extensible flags)
         obj.seal();
+
         return arg;
     }
 
