@@ -37,8 +37,19 @@ public final class BytecodeCompiler {
     private int maxLocalCount;
     private Map<String, JSSymbol> privateSymbols;  // Private field symbols for current class
     private String sourceCode;  // Original source code for extracting function sources
+    private boolean strictMode;  // Track strict mode context (inherited from parent or set by "use strict")
 
     public BytecodeCompiler() {
+        this(false);  // Default to non-strict mode
+    }
+
+    /**
+     * Create a BytecodeCompiler with inherited strict mode.
+     * Following QuickJS pattern where nested functions inherit parent's strict mode.
+     *
+     * @param inheritedStrictMode Strict mode inherited from parent function
+     */
+    public BytecodeCompiler(boolean inheritedStrictMode) {
         this.emitter = new BytecodeEmitter();
         this.scopes = new ArrayDeque<>();
         this.loopStack = new ArrayDeque<>();
@@ -47,6 +58,7 @@ public final class BytecodeCompiler {
         this.maxLocalCount = 0;
         this.sourceCode = null;
         this.privateSymbols = Map.of();  // Empty by default
+        this.strictMode = inheritedStrictMode;
     }
 
     /**
@@ -74,12 +86,18 @@ public final class BytecodeCompiler {
 
     private void compileArrowFunctionExpression(ArrowFunctionExpression arrowExpr) {
         // Create a new compiler for the function body
-        BytecodeCompiler functionCompiler = new BytecodeCompiler();
+        // Arrow functions inherit strict mode from parent (QuickJS behavior)
+        BytecodeCompiler functionCompiler = new BytecodeCompiler(this.strictMode);
 
         // Enter function scope and add parameters as locals
         functionCompiler.enterScope();
         functionCompiler.inGlobalScope = false;
         functionCompiler.isInAsyncFunction = arrowExpr.isAsync();  // Track if this is an async function
+
+        // Check for "use strict" directive if body is a block statement
+        if (arrowExpr.body() instanceof BlockStatement block && hasUseStrictDirective(block)) {
+            functionCompiler.strictMode = true;
+        }
 
         for (Identifier param : arrowExpr.params()) {
             functionCompiler.currentScope().declareLocal(param.name());
@@ -1140,12 +1158,19 @@ public final class BytecodeCompiler {
 
     private void compileFunctionDeclaration(FunctionDeclaration funcDecl) {
         // Create a new compiler for the function body
-        BytecodeCompiler functionCompiler = new BytecodeCompiler();
+        // Nested functions inherit strict mode from parent (QuickJS behavior)
+        BytecodeCompiler functionCompiler = new BytecodeCompiler(this.strictMode);
 
         // Enter function scope and add parameters as locals
         functionCompiler.enterScope();
         functionCompiler.inGlobalScope = false;
         functionCompiler.isInAsyncFunction = funcDecl.isAsync();  // Track if this is an async function
+
+        // Check for "use strict" directive early and update strict mode
+        // This ensures nested functions inherit the correct strict mode
+        if (hasUseStrictDirective(funcDecl.body())) {
+            functionCompiler.strictMode = true;
+        }
 
         for (Identifier param : funcDecl.params()) {
             functionCompiler.currentScope().declareLocal(param.name());
@@ -1179,7 +1204,8 @@ public final class BytecodeCompiler {
         String functionName = funcDecl.id().name();
 
         // Detect "use strict" directive in function body
-        boolean isStrict = hasUseStrictDirective(funcDecl.body());
+        // Combine inherited strict mode with local "use strict" directive
+        boolean isStrict = functionCompiler.strictMode || hasUseStrictDirective(funcDecl.body());
 
         // Extract function source code from original source
         String functionSource = extractSourceCode(funcDecl.getLocation());
@@ -1240,11 +1266,18 @@ public final class BytecodeCompiler {
 
     private void compileFunctionExpression(FunctionExpression funcExpr) {
         // Create a new compiler for the function body
-        BytecodeCompiler functionCompiler = new BytecodeCompiler();
+        // Nested functions inherit strict mode from parent (QuickJS behavior)
+        BytecodeCompiler functionCompiler = new BytecodeCompiler(this.strictMode);
 
         // Enter function scope and add parameters as locals
         functionCompiler.enterScope();
         functionCompiler.inGlobalScope = false;
+
+        // Check for "use strict" directive early and update strict mode
+        // This ensures nested functions inherit the correct strict mode
+        if (hasUseStrictDirective(funcExpr.body())) {
+            functionCompiler.strictMode = true;
+        }
 
         for (Identifier param : funcExpr.params()) {
             functionCompiler.currentScope().declareLocal(param.name());
@@ -1278,7 +1311,8 @@ public final class BytecodeCompiler {
         String functionName = funcExpr.id() != null ? funcExpr.id().name() : "";
 
         // Detect "use strict" directive in function body
-        boolean isStrict = hasUseStrictDirective(funcExpr.body());
+        // Combine inherited strict mode with local "use strict" directive
+        boolean isStrict = functionCompiler.strictMode || hasUseStrictDirective(funcExpr.body());
 
         // Extract function source code from original source
         String functionSource = extractSourceCode(funcExpr.getLocation());
@@ -1757,6 +1791,7 @@ public final class BytecodeCompiler {
 
     private void compileProgram(Program program) {
         inGlobalScope = true;
+        strictMode = program.strict();  // Set strict mode from program directive
         enterScope();
 
         List<Statement> body = program.body();

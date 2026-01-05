@@ -49,7 +49,6 @@ public class JSArgumentsTest extends BaseJavetTest {
                 test(1, 2, 3, 4, 5);""");
     }
 
-    @Disabled
     @Test
     public void testArgumentsCalleeInNonStrictMode() {
         // In non-strict mode, arguments.callee references the function
@@ -77,7 +76,6 @@ public class JSArgumentsTest extends BaseJavetTest {
                 test();""");
     }
 
-    @Disabled
     @Test
     public void testArgumentsCalleeIsFunction() {
         // Verify that callee is indeed the function
