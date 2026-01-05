@@ -76,7 +76,7 @@ public final class JSStringObject extends JSObject {
             strValue = JSTypeConversions.toString(context, args[0]);
         }
         JSObject jsObject = new JSStringObject(strValue);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

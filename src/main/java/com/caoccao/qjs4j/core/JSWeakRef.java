@@ -61,7 +61,7 @@ public final class JSWeakRef extends JSObject {
             return context.throwTypeError("WeakRef: invalid target");
         }
         JSObject jsObject = new JSWeakRef(targetObj);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

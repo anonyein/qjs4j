@@ -66,7 +66,7 @@ public final class JSProxy extends JSObject {
         }
         // Create Proxy object
         JSObject jsObject = new JSProxy(target, handler, context);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

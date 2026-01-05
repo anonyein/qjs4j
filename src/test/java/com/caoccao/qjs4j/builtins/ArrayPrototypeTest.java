@@ -1342,10 +1342,7 @@ public class ArrayPrototypeTest extends BaseJavetTest {
         arr.push(new JSNumber(2));
         arr.push(new JSNumber(3));
 
-        // Set prototype to Array.prototype
-        JSObject arrayObj = context.getGlobalObject().get("Array").asObject().orElseThrow();
-        JSObject arrayProto = arrayObj.get("prototype").asObject().orElseThrow();
-        arr.setPrototype(arrayProto);
+        context.transferPrototype(arr, JSArray.NAME);
 
         // Get Symbol.iterator
         PropertyKey iteratorKey = PropertyKey.fromSymbol(JSSymbol.ITERATOR);

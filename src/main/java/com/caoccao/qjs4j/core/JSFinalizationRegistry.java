@@ -109,7 +109,7 @@ public final class JSFinalizationRegistry extends JSObject {
             return context.throwTypeError("FinalizationRegistry cleanup callback must be a function");
         }
         JSObject jsObject = new JSFinalizationRegistry(context, callback);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

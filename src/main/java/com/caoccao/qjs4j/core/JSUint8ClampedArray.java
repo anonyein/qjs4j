@@ -85,7 +85,7 @@ public final class JSUint8ClampedArray extends JSTypedArray {
             }
         }
         JSObject jsObject = new JSUint8ClampedArray(length);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

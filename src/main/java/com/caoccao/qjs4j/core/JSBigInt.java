@@ -24,6 +24,8 @@ import java.math.BigInteger;
  */
 public record JSBigInt(BigInteger value) implements JSValue {
 
+    public static final String NAME = "BigInt";
+
     public JSBigInt(String value) {
         this(new BigInteger(value));
     }

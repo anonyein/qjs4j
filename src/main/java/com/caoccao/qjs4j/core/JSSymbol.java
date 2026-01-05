@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Includes well-known symbols.
  */
 public final class JSSymbol implements JSValue {
+    public static final String NAME = "Symbol";
     private static final int WELL_KNOWN_ID_START = 1000;
     // Well-known symbols (ES2015+)
     public static final JSSymbol ITERATOR = new JSSymbol("Symbol.iterator", WELL_KNOWN_ID_START);

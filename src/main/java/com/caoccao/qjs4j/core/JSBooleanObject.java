@@ -70,7 +70,7 @@ public final class JSBooleanObject extends JSObject {
         JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
         JSBoolean boolValue = JSTypeConversions.toBoolean(value);
         JSObject jsObject = new JSBooleanObject(boolValue);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

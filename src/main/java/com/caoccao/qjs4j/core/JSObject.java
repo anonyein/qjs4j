@@ -30,6 +30,7 @@ import java.util.*;
  * - Sparse properties (numeric indices) stored separately
  */
 public non-sealed class JSObject implements JSValue {
+    public static final String NAME = "Object";
     // ThreadLocal to track visited objects during prototype chain traversal
     private static final ThreadLocal<Set<JSObject>> visitedObjects = ThreadLocal.withInitial(HashSet::new);
     protected JSConstructorType constructorType; // Internal slot for [[Constructor]] type (not accessible from JS)
@@ -631,12 +632,6 @@ public non-sealed class JSObject implements JSValue {
     @Override
     public String toString() {
         return "[object Object]";
-    }
-
-    public void transferPrototypeFrom(JSObject parentObject) {
-        if (parentObject.get("prototype") instanceof JSObject proto) {
-            this.prototype = proto;
-        }
     }
 
     @Override

@@ -34,6 +34,7 @@ import java.util.stream.LongStream;
  * Automatically switches between dense and sparse based on usage patterns.
  */
 public final class JSArray extends JSObject {
+    public static final String NAME = "Array";
     public static final int INITIAL_CAPACITY = 8;
     private static final int MAX_DENSE_SIZE = 10000;
 

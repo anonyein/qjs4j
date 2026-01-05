@@ -63,7 +63,7 @@ public final class JSSuppressedError extends JSError {
             message = messageStr.value();
         }
         JSObject jsObject = new JSSuppressedError(context, error, suppressed, message);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

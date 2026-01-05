@@ -64,7 +64,7 @@ public final class JSSharedArrayBuffer extends JSObject implements JSArrayBuffer
             return context.throwRangeError("Invalid array buffer length");
         }
         JSObject jsObject = new JSSharedArrayBuffer(length);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

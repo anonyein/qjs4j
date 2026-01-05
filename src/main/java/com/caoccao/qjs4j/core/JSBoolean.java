@@ -21,6 +21,7 @@ package com.caoccao.qjs4j.core;
  */
 public record JSBoolean(boolean value) implements JSValue {
     public static final JSBoolean FALSE = new JSBoolean(false);
+    public static final String NAME = "Boolean";
     public static final JSBoolean TRUE = new JSBoolean(true);
 
     public static JSBoolean valueOf(boolean value) {

@@ -85,7 +85,7 @@ public final class JSUint8Array extends JSTypedArray {
             }
         }
         JSObject jsObject = new JSUint8Array(length);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

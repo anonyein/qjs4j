@@ -89,7 +89,7 @@ public final class JSWeakMap extends JSObject {
                 }
             }
         }
-        context.getGlobalObject().get(NAME).asObject().ifPresent(weakMapObj::transferPrototypeFrom);
+        context.transferPrototype(weakMapObj, NAME);
         return weakMapObj;
     }
 

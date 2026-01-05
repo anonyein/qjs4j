@@ -260,9 +260,9 @@ public final class PromiseConstructor {
      * Helper method to create a new Promise with the correct prototype.
      */
     private static JSPromise createPromise(JSContext context) {
-        JSPromise promise = new JSPromise();
-        context.getGlobalObject().get("Promise").asObject().ifPresent(promise::transferPrototypeFrom);
-        return promise;
+        JSPromise jsPromise = new JSPromise();
+        context.transferPrototype(jsPromise, JSPromise.NAME);
+        return jsPromise;
     }
 
     /**

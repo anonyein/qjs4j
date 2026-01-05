@@ -68,7 +68,7 @@ public final class JSSet extends JSObject {
                 }
             }
         }
-        context.getGlobalObject().get(NAME).asObject().ifPresent(setObj::transferPrototypeFrom);
+        context.transferPrototype(setObj, NAME);
         return setObj;
     }
 

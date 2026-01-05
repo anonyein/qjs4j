@@ -17,7 +17,6 @@
 package com.caoccao.qjs4j.compiler.ast;
 
 import com.caoccao.qjs4j.BaseJavetTest;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,7 +25,30 @@ import org.junit.jupiter.api.Test;
 public class ClassCompilerTest extends BaseJavetTest {
 
     @Test
-    public void testClassWithConstructor() throws Exception {
+    public void testClassToString() {
+        assertStringWithJavet(
+                """
+                        class A {
+                        }
+                        typeof A""",
+                """
+                        class A {
+                          toString() {
+                            return 'A';
+                          }
+                        }
+                        A.toString()""",
+                """
+                        class A {
+                          toString() {
+                            return 'A';
+                          }
+                        }
+                        String(A)""");
+    }
+
+    @Test
+    public void testClassWithConstructor() {
         assertIntegerWithJavet("""
                 class Point {
                     constructor(x, y) {
@@ -39,7 +61,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithFieldsAndConstructor() throws Exception {
+    public void testClassWithFieldsAndConstructor() {
         assertIntegerWithJavet("""
                 class Point {
                     z = 5;
@@ -53,7 +75,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithMethod() throws Exception {
+    public void testClassWithMethod() {
         assertIntegerWithJavet("""
                 class Counter {
                     increment() {
@@ -65,7 +87,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithMixedMethods() throws Exception {
+    public void testClassWithMixedMethods() {
         assertIntegerWithJavet("""
                 class Calculator {
                     constructor(value) {
@@ -88,7 +110,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithMultipleStaticBlocks() throws Exception {
+    public void testClassWithMultipleStaticBlocks() {
         assertIntegerWithJavet("""
                 class Test {
                     static x = 0;
@@ -103,7 +125,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithPrivateField() throws Exception {
+    public void testClassWithPrivateField() {
         assertBooleanWithJavet("""
                 class Counter {
                     #count = 1;
@@ -113,7 +135,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithPrivateFieldAccess() throws Exception {
+    public void testClassWithPrivateFieldAccess() {
         assertIntegerWithJavet("""
                 class Counter {
                     #count = 5;
@@ -130,7 +152,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithPublicField() throws Exception {
+    public void testClassWithPublicField() {
         assertIntegerWithJavet("""
                 class Counter {
                     count = 0;
@@ -140,7 +162,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithPublicFieldInitializer() throws Exception {
+    public void testClassWithPublicFieldInitializer() {
         assertIntegerWithJavet("""
                 class Point {
                     x = 10;
@@ -151,7 +173,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithStaticBlock() throws Exception {
+    public void testClassWithStaticBlock() {
         assertStringWithJavet("""
                 class Config {
                     static apiUrl;
@@ -163,7 +185,7 @@ public class ClassCompilerTest extends BaseJavetTest {
     }
 
     @Test
-    public void testClassWithStaticMethod() throws Exception {
+    public void testClassWithStaticMethod() {
         assertIntegerWithJavet("""
                 class MathUtils {
                     static add(a, b) {
@@ -171,22 +193,5 @@ public class ClassCompilerTest extends BaseJavetTest {
                     }
                 }
                 MathUtils.add(5, 3)""");
-    }
-
-    @Disabled
-    @Test
-    public void testSimpleClass() throws Exception {
-        assertStringWithJavet(
-                """
-                        class A {
-                        }
-                        typeof A""",
-                """
-                        class A {
-                          toString() {
-                            return 'A';
-                          }
-                        }
-                        String(A)""");
     }
 }

@@ -477,6 +477,17 @@ public final class BytecodeCompiler {
             constructorFunc = createDefaultConstructor(className, classDecl.superClass() != null, instanceFields, privateSymbols);
         }
 
+        // Set the source code for the constructor to be the entire class definition
+        // This matches JavaScript behavior where class.toString() returns the class source
+        if (sourceCode != null && classDecl.location() != null) {
+            int startPos = classDecl.location().offset();
+            int endPos = classDecl.location().endOffset();
+            if (startPos >= 0 && endPos <= sourceCode.length()) {
+                String classSource = sourceCode.substring(startPos, endPos);
+                constructorFunc.setSourceCode(classSource);
+            }
+        }
+
         // Emit constructor in constant pool
         emitter.emitOpcodeConstant(Opcode.PUSH_CONST, constructorFunc);
         // Stack: superClass constructor
@@ -653,6 +664,17 @@ public final class BytecodeCompiler {
             constructorFunc = compileMethodAsFunction(constructor, className, classExpr.superClass() != null, instanceFields, privateSymbols, true);
         } else {
             constructorFunc = createDefaultConstructor(className, classExpr.superClass() != null, instanceFields, privateSymbols);
+        }
+
+        // Set the source code for the constructor to be the entire class definition
+        // This matches JavaScript behavior where class.toString() returns the class source
+        if (sourceCode != null && classExpr.location() != null) {
+            int startPos = classExpr.location().offset();
+            int endPos = classExpr.location().endOffset();
+            if (startPos >= 0 && endPos <= sourceCode.length()) {
+                String classSource = sourceCode.substring(startPos, endPos);
+                constructorFunc.setSourceCode(classSource);
+            }
         }
 
         // Emit constructor in constant pool

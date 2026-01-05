@@ -44,7 +44,7 @@ public final class JSBytecodeFunction extends JSFunction {
     private final int length;
     private final String name;
     private final JSObject prototype;
-    private final String sourceCode;
+    private String sourceCode;
     private final boolean strict;
 
     /**
@@ -268,6 +268,14 @@ public final class JSBytecodeFunction extends JSFunction {
      */
     public boolean isStrict() {
         return strict;
+    }
+
+    /**
+     * Set the source code for this function.
+     * Used to override the default toString() representation.
+     */
+    public void setSourceCode(String sourceCode) {
+        this.sourceCode = sourceCode;
     }
 
     @Override

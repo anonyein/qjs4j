@@ -89,33 +89,33 @@ public final class ObjectConstructor {
 
         // Wrap primitive values in their respective object wrappers
         if (value instanceof JSNumber num) {
-            JSNumberObject wrapper = new JSNumberObject(num);
-            global.get("Number").asObject().ifPresent(wrapper::transferPrototypeFrom);
-            return wrapper;
+            JSNumberObject jsNumberObject = new JSNumberObject(num);
+            context.transferPrototype(jsNumberObject, JSNumber.NAME);
+            return jsNumberObject;
         }
 
         if (value instanceof JSString str) {
-            JSStringObject wrapper = new JSStringObject(str);
-            global.get("String").asObject().ifPresent(wrapper::transferPrototypeFrom);
-            return wrapper;
+            JSStringObject jsStringObject = new JSStringObject(str);
+            context.transferPrototype(jsStringObject, JSString.NAME);
+            return jsStringObject;
         }
 
         if (value instanceof JSBoolean bool) {
-            JSBooleanObject wrapper = new JSBooleanObject(bool);
-            global.get("Boolean").asObject().ifPresent(wrapper::transferPrototypeFrom);
-            return wrapper;
+            JSBooleanObject jsBooleanObject = new JSBooleanObject(bool);
+            context.transferPrototype(jsBooleanObject, JSBoolean.NAME);
+            return jsBooleanObject;
         }
 
-        if (value instanceof JSSymbol sym) {
-            JSSymbolObject wrapper = new JSSymbolObject(sym);
-            global.get("Symbol").asObject().ifPresent(wrapper::transferPrototypeFrom);
-            return wrapper;
+        if (value instanceof JSSymbol jsSymbol) {
+            JSSymbolObject jsSymbolObject = new JSSymbolObject(jsSymbol);
+            context.transferPrototype(jsSymbolObject, JSSymbol.NAME);
+            return jsSymbolObject;
         }
 
         if (value instanceof JSBigInt bigInt) {
-            JSBigIntObject wrapper = new JSBigIntObject(bigInt);
-            global.get("BigInt").asObject().ifPresent(wrapper::transferPrototypeFrom);
-            return wrapper;
+            JSBigIntObject jsBigIntObject = new JSBigIntObject(bigInt);
+            context.transferPrototype(jsBigIntObject, JSBigInt.NAME);
+            return jsBigIntObject;
         }
 
         // For any other value, return new empty object

@@ -84,7 +84,7 @@ public final class JSFloat64Array extends JSTypedArray {
             }
         }
         JSObject jsObject = new JSFloat64Array(length);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

@@ -52,7 +52,7 @@ public final class JSAggregateError extends JSError {
             message = JSTypeConversions.toString(context, args[0]).value();
         }
         JSObject jsObject = new JSAggregateError(context, message);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

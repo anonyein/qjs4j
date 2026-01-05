@@ -539,7 +539,7 @@ public final class GlobalObject {
     private static void initializeAsyncFunctionConstructor(JSContext context, JSObject global) {
         // Create AsyncFunction.prototype that inherits from Function.prototype
         JSObject asyncFunctionPrototype = new JSObject();
-        global.get("Function").asObject().ifPresent(asyncFunctionPrototype::transferPrototypeFrom);
+        context.transferPrototype(asyncFunctionPrototype, "Function");
 
         // Create AsyncFunction constructor
         // AsyncFunction is not normally exposed but we need it for the prototype chain
@@ -1302,7 +1302,7 @@ public final class GlobalObject {
     private static void initializeSymbolConstructor(JSContext context, JSObject global) {
         // Create Symbol.prototype that inherits from Object.prototype
         JSObject symbolPrototype = new JSObject();
-        global.get("Object").asObject().ifPresent(symbolPrototype::transferPrototypeFrom);
+        context.transferPrototype(symbolPrototype, JSObject.NAME);
 
         JSNativeFunction symbolToString = new JSNativeFunction("toString", 0, SymbolPrototype::toString);
         symbolToString.initializePrototypeChain(context);

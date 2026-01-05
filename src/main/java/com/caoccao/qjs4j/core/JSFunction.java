@@ -45,19 +45,11 @@ public abstract sealed class JSFunction extends JSObject
     public void initializePrototypeChain(JSContext context) {
         // For async functions, use AsyncFunction.prototype if available
         if (this instanceof JSBytecodeFunction bytecodeFunc && bytecodeFunc.isAsync()) {
-            JSObject asyncFunctionCtor = context.getAsyncFunctionConstructor();
-            if (asyncFunctionCtor != null) {
-                this.transferPrototypeFrom(asyncFunctionCtor);
+            if (context.transferPrototype(this, context.getAsyncFunctionConstructor())) {
                 return;
             }
         }
-
-        // Set __proto__ to Function.prototype so functions inherit apply, call, bind, etc.
-        JSObject global = context.getGlobalObject();
-        JSValue functionCtor = global.get("Function");
-        if (functionCtor instanceof JSObject ctorObj) {
-            this.transferPrototypeFrom(ctorObj);
-        }
+        context.transferPrototype(this, "Function");
     }
 
     @Override

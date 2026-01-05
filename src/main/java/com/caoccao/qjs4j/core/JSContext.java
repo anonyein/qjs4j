@@ -202,7 +202,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSArray createJSArray(long length, int capacity) {
         JSArray jsArray = new JSArray(length, capacity);
-        globalObject.get("Array").asObject().ifPresent(jsArray::transferPrototypeFrom);
+        transferPrototype(jsArray, JSArray.NAME);
         return jsArray;
     }
 
@@ -214,7 +214,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSArrayBuffer createJSArrayBuffer(int byteLength) {
         JSArrayBuffer jsArrayBuffer = new JSArrayBuffer(byteLength);
-        globalObject.get("ArrayBuffer").asObject().ifPresent(jsArrayBuffer::transferPrototypeFrom);
+        transferPrototype(jsArrayBuffer, JSArrayBuffer.NAME);
         return jsArrayBuffer;
     }
 
@@ -226,7 +226,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSBigInt64Array createJSBigInt64Array(int length) {
         JSBigInt64Array jsBigInt64Array = new JSBigInt64Array(length);
-        globalObject.get("BigInt64Array").asObject().ifPresent(jsBigInt64Array::transferPrototypeFrom);
+        transferPrototype(jsBigInt64Array, JSBigInt64Array.NAME);
         return jsBigInt64Array;
     }
 
@@ -238,7 +238,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSBigUint64Array createJSBigUint64Array(int length) {
         JSBigUint64Array jsBigUint64Array = new JSBigUint64Array(length);
-        globalObject.get("BigUint64Array").asObject().ifPresent(jsBigUint64Array::transferPrototypeFrom);
+        transferPrototype(jsBigUint64Array, "BigUint64Array");
         return jsBigUint64Array;
     }
 
@@ -252,7 +252,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSDataView createJSDataView(JSArrayBuffer buffer, int byteOffset, int byteLength) {
         JSDataView jsDataView = new JSDataView(buffer, byteOffset, byteLength);
-        globalObject.get("DataView").asObject().ifPresent(jsDataView::transferPrototypeFrom);
+        transferPrototype(jsDataView, "DataView");
         return jsDataView;
     }
 
@@ -264,7 +264,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSDate createJSDate(long timeValue) {
         JSDate jsDate = new JSDate(timeValue);
-        globalObject.get("Date").asObject().ifPresent(jsDate::transferPrototypeFrom);
+        transferPrototype(jsDate, "Date");
         return jsDate;
     }
 
@@ -276,7 +276,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSFloat16Array createJSFloat16Array(int length) {
         JSFloat16Array jsFloat16Array = new JSFloat16Array(length);
-        globalObject.get("Float16Array").asObject().ifPresent(jsFloat16Array::transferPrototypeFrom);
+        transferPrototype(jsFloat16Array, "Float16Array");
         return jsFloat16Array;
     }
 
@@ -288,7 +288,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSFloat32Array createJSFloat32Array(int length) {
         JSFloat32Array jsFloat32Array = new JSFloat32Array(length);
-        globalObject.get("Float32Array").asObject().ifPresent(jsFloat32Array::transferPrototypeFrom);
+        transferPrototype(jsFloat32Array, "Float32Array");
         return jsFloat32Array;
     }
 
@@ -300,7 +300,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSFloat64Array createJSFloat64Array(int length) {
         JSFloat64Array jsFloat64Array = new JSFloat64Array(length);
-        globalObject.get("Float64Array").asObject().ifPresent(jsFloat64Array::transferPrototypeFrom);
+        transferPrototype(jsFloat64Array, "Float64Array");
         return jsFloat64Array;
     }
 
@@ -312,7 +312,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSInt16Array createJSInt16Array(int length) {
         JSInt16Array jsInt16Array = new JSInt16Array(length);
-        globalObject.get("Int16Array").asObject().ifPresent(jsInt16Array::transferPrototypeFrom);
+        transferPrototype(jsInt16Array, "Int16Array");
         return jsInt16Array;
     }
 
@@ -324,7 +324,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSInt32Array createJSInt32Array(int length) {
         JSInt32Array jsInt32Array = new JSInt32Array(length);
-        globalObject.get("Int32Array").asObject().ifPresent(jsInt32Array::transferPrototypeFrom);
+        transferPrototype(jsInt32Array, "Int32Array");
         return jsInt32Array;
     }
 
@@ -336,7 +336,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSInt8Array createJSInt8Array(int length) {
         JSInt8Array jsInt8Array = new JSInt8Array(length);
-        globalObject.get("Int8Array").asObject().ifPresent(jsInt8Array::transferPrototypeFrom);
+        transferPrototype(jsInt8Array, JSInt8Array.NAME);
         return jsInt8Array;
     }
 
@@ -347,7 +347,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSMap createJSMap() {
         JSMap jsMap = new JSMap();
-        globalObject.get("Map").asObject().ifPresent(jsMap::transferPrototypeFrom);
+        transferPrototype(jsMap, JSMap.NAME);
         return jsMap;
     }
 
@@ -359,7 +359,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSObject createJSObject() {
         JSObject jsObject = new JSObject();
-        globalObject.get("Object").asObject().ifPresent(jsObject::transferPrototypeFrom);
+        transferPrototype(jsObject, JSObject.NAME);
         return jsObject;
     }
 
@@ -370,7 +370,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSPromise createJSPromise() {
         JSPromise jsPromise = new JSPromise();
-        globalObject.get("Promise").asObject().ifPresent(jsPromise::transferPrototypeFrom);
+        transferPrototype(jsPromise, JSPromise.NAME);
         return jsPromise;
     }
 
@@ -383,7 +383,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSRegExp createJSRegExp(String pattern, String flags) {
         JSRegExp jsRegExp = new JSRegExp(pattern, flags);
-        globalObject.get("RegExp").asObject().ifPresent(jsRegExp::transferPrototypeFrom);
+        transferPrototype(jsRegExp, JSRegExp.NAME);
         return jsRegExp;
     }
 
@@ -394,7 +394,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSSet createJSSet() {
         JSSet jsSet = new JSSet();
-        globalObject.get("Set").asObject().ifPresent(jsSet::transferPrototypeFrom);
+        transferPrototype(jsSet, JSSet.NAME);
         return jsSet;
     }
 
@@ -406,7 +406,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSUint16Array createJSUint16Array(int length) {
         JSUint16Array jsUint16Array = new JSUint16Array(length);
-        globalObject.get("Uint16Array").asObject().ifPresent(jsUint16Array::transferPrototypeFrom);
+        transferPrototype(jsUint16Array, JSUint16Array.NAME);
         return jsUint16Array;
     }
 
@@ -418,7 +418,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSUint32Array createJSUint32Array(int length) {
         JSUint32Array jsUint32Array = new JSUint32Array(length);
-        globalObject.get("Uint32Array").asObject().ifPresent(jsUint32Array::transferPrototypeFrom);
+        transferPrototype(jsUint32Array, JSUint32Array.NAME);
         return jsUint32Array;
     }
 
@@ -430,7 +430,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSUint8Array createJSUint8Array(int length) {
         JSUint8Array jsUint8Array = new JSUint8Array(length);
-        globalObject.get("Uint8Array").asObject().ifPresent(jsUint8Array::transferPrototypeFrom);
+        transferPrototype(jsUint8Array, JSUint8Array.NAME);
         return jsUint8Array;
     }
 
@@ -442,7 +442,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSUint8ClampedArray createJSUint8ClampedArray(int length) {
         JSUint8ClampedArray jsUint8ClampedArray = new JSUint8ClampedArray(length);
-        globalObject.get("Uint8ClampedArray").asObject().ifPresent(jsUint8ClampedArray::transferPrototypeFrom);
+        transferPrototype(jsUint8ClampedArray, JSUint8ClampedArray.NAME);
         return jsUint8ClampedArray;
     }
 
@@ -453,13 +453,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSWeakMap createJSWeakMap() {
         JSWeakMap jsWeakMap = new JSWeakMap();
-        JSValue weakMapCtor = globalObject.get("WeakMap");
-        if (weakMapCtor instanceof JSObject) {
-            JSValue weakMapProto = ((JSObject) weakMapCtor).get("prototype");
-            if (weakMapProto instanceof JSObject) {
-                jsWeakMap.setPrototype((JSObject) weakMapProto);
-            }
-        }
+        transferPrototype(jsWeakMap, JSWeakMap.NAME);
         return jsWeakMap;
     }
 
@@ -470,13 +464,7 @@ public final class JSContext implements AutoCloseable {
      */
     public JSWeakSet createJSWeakSet() {
         JSWeakSet jsWeakSet = new JSWeakSet();
-        JSValue weakSetCtor = globalObject.get("WeakSet");
-        if (weakSetCtor instanceof JSObject) {
-            JSValue weakSetProto = ((JSObject) weakSetCtor).get("prototype");
-            if (weakSetProto instanceof JSObject) {
-                jsWeakSet.setPrototype((JSObject) weakSetProto);
-            }
-        }
+        transferPrototype(jsWeakSet, JSWeakSet.NAME);
         return jsWeakSet;
     }
 
@@ -876,7 +864,7 @@ public final class JSContext implements AutoCloseable {
     }
 
     public JSError throwError(JSError jsError) {
-        globalObject.get(jsError.getName().value()).asObject().ifPresent(jsError::transferPrototypeFrom);
+        transferPrototype(jsError, jsError.getName().value());
         // Capture stack trace
         captureStackTrace(jsError);
         // Set as pending exception
@@ -942,6 +930,23 @@ public final class JSContext implements AutoCloseable {
      */
     public JSError throwURIError(String message) {
         return throwError(JSURIError.NAME, message);
+    }
+
+    public boolean transferPrototype(JSObject receiver, String constructorName) {
+        JSValue constructor = globalObject.get(constructorName);
+        if (constructor instanceof JSObject jsObject) {
+            return transferPrototype(receiver, jsObject);
+        }
+        return false;
+    }
+
+    public boolean transferPrototype(JSObject receiver, JSObject constructor) {
+        JSValue prototype = constructor.get("prototype");
+        if (prototype instanceof JSObject) {
+            receiver.setPrototype((JSObject) prototype);
+            return true;
+        }
+        return false;
     }
 
     /**

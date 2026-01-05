@@ -84,7 +84,7 @@ public final class JSBigUint64Array extends JSTypedArray {
             }
         }
         JSObject jsObject = new JSBigUint64Array(length);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

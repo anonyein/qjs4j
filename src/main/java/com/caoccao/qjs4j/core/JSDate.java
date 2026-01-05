@@ -64,7 +64,7 @@ public final class JSDate extends JSObject {
             timeValue = System.currentTimeMillis();
         }
         JSObject jsObject = new JSDate(timeValue);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

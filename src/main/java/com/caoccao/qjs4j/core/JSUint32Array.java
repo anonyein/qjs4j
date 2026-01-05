@@ -84,7 +84,7 @@ public final class JSUint32Array extends JSTypedArray {
             }
         }
         JSObject jsObject = new JSUint32Array(length);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

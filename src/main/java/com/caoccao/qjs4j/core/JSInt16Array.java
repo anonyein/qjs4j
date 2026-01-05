@@ -84,7 +84,7 @@ public final class JSInt16Array extends JSTypedArray {
             }
         }
         JSObject jsObject = new JSInt16Array(length);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

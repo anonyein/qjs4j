@@ -42,7 +42,7 @@ public final class JSRangeError extends JSError {
             message = JSTypeConversions.toString(context, args[0]).value();
         }
         JSObject jsObject = new JSRangeError(context, message);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 }

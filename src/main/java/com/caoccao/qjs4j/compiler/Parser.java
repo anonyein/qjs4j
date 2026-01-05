@@ -471,7 +471,8 @@ public final class Parser {
      * Syntax: class Name extends Super { body }
      */
     private ClassDeclaration parseClassDeclaration() {
-        SourceLocation location = getLocation();
+        SourceLocation startLocation = getLocation();
+        int startOffset = currentToken.offset();
         expect(TokenType.CLASS);
 
         // Parse optional class name
@@ -479,7 +480,7 @@ public final class Parser {
         if (match(TokenType.IDENTIFIER)) {
             String name = currentToken.value();
             advance();
-            id = new Identifier(name, location);
+            id = new Identifier(name, startLocation);
         }
 
         // Parse optional extends clause
@@ -506,7 +507,16 @@ public final class Parser {
             }
         }
 
+        // Capture the end position before advancing past the closing brace
+        int endOffset = currentToken.offset() + currentToken.value().length();
         expect(TokenType.RBRACE);
+        
+        SourceLocation location = new SourceLocation(
+            startLocation.line(),
+            startLocation.column(),
+            startOffset,
+            endOffset
+        );
 
         return new ClassDeclaration(id, superClass, body, location);
     }
@@ -627,7 +637,8 @@ public final class Parser {
      * Syntax: class [Name] [extends Super] { body }
      */
     private ClassExpression parseClassExpression() {
-        SourceLocation location = getLocation();
+        SourceLocation startLocation = getLocation();
+        int startOffset = currentToken.offset();
         expect(TokenType.CLASS);
 
         // Parse optional class name (class expressions can be anonymous)
@@ -635,7 +646,7 @@ public final class Parser {
         if (match(TokenType.IDENTIFIER)) {
             String name = currentToken.value();
             advance();
-            id = new Identifier(name, location);
+            id = new Identifier(name, startLocation);
         }
 
         // Parse optional extends clause
@@ -662,7 +673,16 @@ public final class Parser {
             }
         }
 
+        // Capture the end position before advancing past the closing brace
+        int endOffset = currentToken.offset() + currentToken.value().length();
         expect(TokenType.RBRACE);
+        
+        SourceLocation location = new SourceLocation(
+            startLocation.line(),
+            startLocation.column(),
+            startOffset,
+            endOffset
+        );
 
         return new ClassExpression(id, superClass, body, location);
     }

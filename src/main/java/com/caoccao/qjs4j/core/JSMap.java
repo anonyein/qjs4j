@@ -81,7 +81,7 @@ public final class JSMap extends JSObject {
                 }
             }
         }
-        context.getGlobalObject().get(NAME).asObject().ifPresent(mapObj::transferPrototypeFrom);
+        context.transferPrototype(mapObj, NAME);
         return mapObj;
     }
 

@@ -22,6 +22,8 @@ import com.caoccao.qjs4j.utils.DtoaConverter;
  * Represents a JavaScript number value (IEEE 754 double-precision).
  */
 public record JSNumber(double value) implements JSValue {
+    public static final String NAME = "number";
+
     @Override
     public Object toJavaObject() {
         return value;

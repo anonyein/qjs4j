@@ -74,7 +74,7 @@ public final class JSNumberObject extends JSObject {
             numValue = JSTypeConversions.toNumber(context, args[0]);
         }
         JSObject jsObject = new JSNumberObject(numValue);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

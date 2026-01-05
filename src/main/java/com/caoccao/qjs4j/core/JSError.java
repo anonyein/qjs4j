@@ -57,7 +57,7 @@ public sealed class JSError extends JSObject permits
             message = JSTypeConversions.toString(context, args[0]).value();
         }
         JSObject jsObject = new JSError(context, message);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 

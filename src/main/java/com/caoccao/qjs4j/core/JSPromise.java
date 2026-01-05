@@ -70,7 +70,7 @@ public final class JSPromise extends JSObject {
             // If executor throws, reject the promise
             jsPromise.reject(new JSString("Error in Promise executor: " + e.getMessage()));
         }
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsPromise::transferPrototypeFrom);
+        context.transferPrototype(jsPromise, NAME);
         return jsPromise;
     }
 

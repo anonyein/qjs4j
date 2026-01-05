@@ -43,7 +43,7 @@ public final class JSSyntaxError extends JSError {
             message = JSTypeConversions.toString(context, args[0]).value();
         }
         JSObject jsObject = new JSSyntaxError(context, message);
-        context.getGlobalObject().get(NAME).asObject().ifPresent(jsObject::transferPrototypeFrom);
+        context.transferPrototype(jsObject, NAME);
         return jsObject;
     }
 }

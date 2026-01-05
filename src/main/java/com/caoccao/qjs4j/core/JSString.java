@@ -21,6 +21,8 @@ package com.caoccao.qjs4j.core;
  * Supports atom indexing for interned strings.
  */
 public record JSString(String value, int atomIndex) implements JSValue {
+    public static final String NAME = "String";
+
     public JSString(String value) {
         this(value, -1);
     }

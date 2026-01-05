@@ -130,15 +130,14 @@ public final class VirtualMachine {
                         int constIndex = bytecode.readU32(pc + 1);
                         JSValue constValue = bytecode.getConstants()[constIndex];
 
+                        // Initialize prototype chain for functions
+                        if (constValue instanceof JSFunction func) {
+                            func.initializePrototypeChain(context);
+                        }
+
                         // Set prototype for RegExp objects created from literals
                         if (constValue instanceof JSRegExp regexp) {
-                            JSValue regexpCtor = context.getGlobalObject().get("RegExp");
-                            if (regexpCtor instanceof JSObject ctorObj) {
-                                JSValue prototypeValue = ctorObj.get("prototype");
-                                if (prototypeValue instanceof JSObject prototype) {
-                                    regexp.setPrototype(prototype);
-                                }
-                            }
+                            context.transferPrototype(regexp, JSRegExp.NAME);
                         }
 
                         valueStack.push(constValue);
@@ -708,14 +707,7 @@ public final class VirtualMachine {
                     }
                     case ARRAY_NEW -> {
                         JSArray array = context.createJSArray();
-                        // Set prototype to Array.prototype
-                        JSObject arrayPrototype = (JSObject) context.getGlobalObject().get("Array");
-                        if (arrayPrototype instanceof JSObject) {
-                            JSValue protoValue = arrayPrototype.get("prototype");
-                            if (protoValue instanceof JSObject proto) {
-                                array.setPrototype(proto);
-                            }
-                        }
+                        context.transferPrototype(array, JSArray.NAME);
                         valueStack.push(array);
                         pc += op.getSize();
                     }
@@ -756,23 +748,13 @@ public final class VirtualMachine {
                         // Set up prototype chain
                         if (superClass != JSUndefined.INSTANCE && superClass != JSNull.INSTANCE) {
                             if (superClass instanceof JSFunction superFunc) {
-                                // Get super prototype
-                                JSValue superProto = superFunc.get(PropertyKey.fromString("prototype"));
-                                if (superProto instanceof JSObject superProtoObj) {
-                                    prototype.setPrototype(superProtoObj);
-                                }
-                                // Set constructor's prototype to super constructor
-                                if (constructorFunc instanceof JSObject) {
-                                    JSObject constructorObj = constructorFunc;
-                                    constructorObj.setPrototype(superFunc);
-                                }
+                                context.transferPrototype(prototype, superFunc);
+                                context.transferPrototype(constructorFunc, superFunc);
                             }
                         }
-
                         // Set constructor.prototype = prototype
                         if (constructorFunc instanceof JSObject) {
-                            JSObject constructorObj = constructorFunc;
-                            constructorObj.set(PropertyKey.fromString("prototype"), prototype);
+                            constructorFunc.set(PropertyKey.fromString("prototype"), prototype);
                         }
 
                         // Set prototype.constructor = constructor
@@ -1227,11 +1209,7 @@ public final class VirtualMachine {
             JSConstructorType constructorType = jsFunction.getConstructorType();
             if (constructorType == null) {
                 JSObject thisObject = new JSObject();
-                // Get the prototype property from the constructor
-                JSValue prototypeValue = jsFunction.get("prototype");
-                if (prototypeValue instanceof JSObject prototypeObj) {
-                    thisObject.setPrototype(prototypeObj);
-                }
+                context.transferPrototype(thisObject, jsFunction);
                 // Call constructor with new object as this
                 JSValue result;
                 if (constructor instanceof JSNativeFunction nativeFunc) {
@@ -1273,7 +1251,7 @@ public final class VirtualMachine {
                 }
                 if (result != null) {
                     if (!result.isError()) {
-                        result.transferPrototypeFrom(jsFunction);
+                        context.transferPrototype(result, jsFunction);
                     }
                     valueStack.push(result);
                 }
@@ -1928,13 +1906,9 @@ public final class VirtualMachine {
         if (constructTrap == JSUndefined.INSTANCE || constructTrap == null) {
             // Forward to target constructor
             // Create a new instance
-            JSValue prototypeValue = null;
-            if (target instanceof JSObject targetObj) {
-                prototypeValue = targetObj.get("prototype");
-            }
             JSObject instance = new JSObject();
-            if (prototypeValue instanceof JSObject prototype) {
-                instance.setPrototype(prototype);
+            if (target instanceof JSObject targetObj) {
+                context.transferPrototype(instance, targetObj);
             }
 
             // Call the function with the new instance as 'this'

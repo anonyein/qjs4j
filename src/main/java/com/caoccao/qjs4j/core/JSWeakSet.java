@@ -80,7 +80,7 @@ public final class JSWeakSet extends JSObject {
                 }
             }
         }
-        context.getGlobalObject().get(NAME).asObject().ifPresent(weakSetObj::transferPrototypeFrom);
+        context.transferPrototype(weakSetObj, NAME);
         return weakSetObj;
     }
 
