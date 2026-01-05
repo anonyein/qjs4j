@@ -173,7 +173,6 @@ public class JSArgumentsTest extends BaseJavetTest {
                 """);
     }
 
-    @Disabled("Arrow functions need to capture outer scope's arguments")
     @Test
     public void testArgumentsNotInArrowFunction() {
         // Arrow functions don't have their own arguments object

@@ -38,6 +38,7 @@ import com.caoccao.qjs4j.vm.Bytecode;
 public final class JSBytecodeFunction extends JSFunction {
     private final Bytecode bytecode;
     private final JSValue[] closureVars;
+    private final boolean isArrow;
     private final boolean isAsync;
     private final boolean isConstructor;
     private final boolean isGenerator;
@@ -55,7 +56,7 @@ public final class JSBytecodeFunction extends JSFunction {
      * @param length   Number of formal parameters
      */
     public JSBytecodeFunction(Bytecode bytecode, String name, int length) {
-        this(bytecode, name, length, new JSValue[0], null, true, false, false, false, null);
+        this(bytecode, name, length, new JSValue[0], null, true, false, false, false, false, null);
     }
 
     /**
@@ -67,7 +68,7 @@ public final class JSBytecodeFunction extends JSFunction {
      * @param strict   Whether the function is in strict mode
      */
     public JSBytecodeFunction(Bytecode bytecode, String name, int length, boolean strict) {
-        this(bytecode, name, length, new JSValue[0], null, true, false, false, strict, null);
+        this(bytecode, name, length, new JSValue[0], null, true, false, false, false, strict, null);
     }
 
     /**
@@ -80,7 +81,7 @@ public final class JSBytecodeFunction extends JSFunction {
      * @param sourceCode The original source code of the function (for toString())
      */
     public JSBytecodeFunction(Bytecode bytecode, String name, int length, boolean strict, String sourceCode) {
-        this(bytecode, name, length, new JSValue[0], null, true, false, false, strict, sourceCode);
+        this(bytecode, name, length, new JSValue[0], null, true, false, false, false, strict, sourceCode);
     }
 
     /**
@@ -88,7 +89,8 @@ public final class JSBytecodeFunction extends JSFunction {
      */
     public JSBytecodeFunction(Bytecode bytecode, String name, int length,
                               JSValue[] closureVars, JSObject prototype,
-                              boolean isConstructor, boolean isAsync, boolean isGenerator, boolean strict,
+                              boolean isConstructor, boolean isAsync, boolean isGenerator, boolean isArrow,
+                              boolean strict,
                               String sourceCode) {
         super(); // Initialize as JSObject
         this.bytecode = bytecode;
@@ -99,6 +101,7 @@ public final class JSBytecodeFunction extends JSFunction {
         this.isConstructor = isConstructor;
         this.isAsync = isAsync;
         this.isGenerator = isGenerator;
+        this.isArrow = isArrow;
         this.strict = strict;
         this.sourceCode = sourceCode;
 
@@ -239,6 +242,13 @@ public final class JSBytecodeFunction extends JSFunction {
      */
     public JSObject getPrototype() {
         return prototype;
+    }
+
+    /**
+     * Check if this is an arrow function.
+     */
+    public boolean isArrow() {
+        return isArrow;
     }
 
     /**

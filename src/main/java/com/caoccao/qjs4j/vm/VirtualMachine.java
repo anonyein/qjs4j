@@ -66,20 +66,34 @@ public final class VirtualMachine {
     private JSValue createSpecialObject(int objectType, StackFrame currentFrame) {
         switch (objectType) {
             case 0: // SPECIAL_OBJECT_ARGUMENTS
+                // For arrow functions, walk up the call stack to find parent non-arrow function's arguments
+                // Following QuickJS: arrow functions inherit arguments from enclosing scope
+                StackFrame targetFrame = currentFrame;
+                JSFunction targetFunc = targetFrame.getFunction();
+
+                // Walk up call stack while we're in arrow functions
+                while (targetFunc instanceof JSBytecodeFunction bytecodeFunc && bytecodeFunc.isArrow()) {
+                    targetFrame = targetFrame.getCaller();
+                    if (targetFrame == null) {
+                        // No parent frame, arguments is undefined (shouldn't happen in valid code)
+                        return JSUndefined.INSTANCE;
+                    }
+                    targetFunc = targetFrame.getFunction();
+                }
+
                 // Create non-mapped arguments object (strict mode or modern)
-                JSValue[] args = currentFrame.getArguments();
-                JSFunction currentFunc = currentFrame.getFunction();
-                boolean isStrict = currentFunc instanceof JSBytecodeFunction func && func.isStrict();
-                // Pass the current function as callee for non-strict mode
-                return new JSArguments(context, args, isStrict, isStrict ? null : currentFunc);
+                JSValue[] args = targetFrame.getArguments();
+                boolean isStrict = targetFunc instanceof JSBytecodeFunction func && func.isStrict();
+                // Pass the target function as callee for non-strict mode
+                return new JSArguments(context, args, isStrict, isStrict ? null : targetFunc);
 
             case 1: // SPECIAL_OBJECT_MAPPED_ARGUMENTS
                 // Legacy mapped arguments (shares with function parameters)
                 // For now, treat same as normal arguments
                 // TODO: Implement parameter mapping for non-strict mode
-                args = currentFrame.getArguments();
-                currentFunc = currentFrame.getFunction();
-                return new JSArguments(context, args, false, currentFunc);
+                JSValue[] mappedArgs = currentFrame.getArguments();
+                JSFunction mappedFunc = currentFrame.getFunction();
+                return new JSArguments(context, mappedArgs, false, mappedFunc);
 
             case 2: // SPECIAL_OBJECT_THIS_FUNC
                 // Return the currently executing function

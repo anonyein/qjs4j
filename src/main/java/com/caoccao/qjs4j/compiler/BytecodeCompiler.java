@@ -33,6 +33,7 @@ public final class BytecodeCompiler {
     private final Deque<LoopContext> loopStack;
     private final Deque<Scope> scopes;
     private boolean inGlobalScope;
+    private boolean isInArrowFunction;  // Track if we're currently compiling an arrow function
     private boolean isInAsyncFunction;  // Track if we're currently compiling an async function
     private int maxLocalCount;
     private Map<String, JSSymbol> privateSymbols;  // Private field symbols for current class
@@ -55,6 +56,7 @@ public final class BytecodeCompiler {
         this.loopStack = new ArrayDeque<>();
         this.inGlobalScope = false;
         this.isInAsyncFunction = false;
+        this.isInArrowFunction = false;
         this.maxLocalCount = 0;
         this.sourceCode = null;
         this.privateSymbols = Map.of();  // Empty by default
@@ -93,6 +95,7 @@ public final class BytecodeCompiler {
         functionCompiler.enterScope();
         functionCompiler.inGlobalScope = false;
         functionCompiler.isInAsyncFunction = arrowExpr.isAsync();  // Track if this is an async function
+        functionCompiler.isInArrowFunction = true;  // Arrow functions don't have their own arguments
 
         // Check for "use strict" directive if body is a block statement
         if (arrowExpr.body() instanceof BlockStatement block && hasUseStrictDirective(block)) {
@@ -148,6 +151,7 @@ public final class BytecodeCompiler {
                 false,           // isConstructor - arrow functions cannot be constructors
                 arrowExpr.isAsync(),
                 false,           // Arrow functions cannot be generators
+                true,            // isArrow - this is an arrow function
                 false,           // strict - TODO: inherit from enclosing scope
                 functionSource   // source code for toString()
         );
@@ -1241,6 +1245,7 @@ public final class BytecodeCompiler {
                 true,            // isConstructor - regular functions can be constructors
                 funcDecl.isAsync(),
                 funcDecl.isGenerator(),
+                false,           // isArrow - regular function, not arrow
                 isStrict,        // strict - detected from "use strict" directive in function body
                 functionSource   // source code for toString()
         );
@@ -1327,6 +1332,7 @@ public final class BytecodeCompiler {
                 true,            // isConstructor - regular functions can be constructors
                 funcExpr.isAsync(),
                 funcExpr.isGenerator(),
+                false,           // isArrow - regular function, not arrow
                 isStrict,        // strict - detected from "use strict" directive in function body
                 functionSource   // source code for toString()
         );
@@ -1348,10 +1354,12 @@ public final class BytecodeCompiler {
         }
 
         // Handle 'arguments' keyword in function scope
-        // Arguments is available in regular functions but not in arrow functions
-        // In QuickJS, this is handled via SPECIAL_OBJECT opcode
+        // For arrow functions, SPECIAL_OBJECT will walk up to find parent's arguments
+        // For regular functions, SPECIAL_OBJECT will create the arguments object
+        // Following QuickJS: arrow functions inherit arguments from enclosing scope
         if (JSArguments.NAME.equals(name) && !inGlobalScope) {
             // Emit SPECIAL_OBJECT opcode with type 0 (SPECIAL_OBJECT_ARGUMENTS)
+            // The VM will handle differently for arrow vs regular functions
             emitter.emitOpcode(Opcode.SPECIAL_OBJECT);
             emitter.emitU8(0);  // Type 0 = arguments object
             return;
@@ -1701,6 +1709,7 @@ public final class BytecodeCompiler {
                 isConstructor,   // isConstructor - true for class constructors, false for methods
                 funcExpr.isAsync(),
                 funcExpr.isGenerator(),
+                false,           // isArrow - methods are not arrow functions
                 true,            // strict - classes are always strict mode
                 "method " + methodName + "() { [method body] }"  // source for toString
         );
@@ -1913,6 +1922,7 @@ public final class BytecodeCompiler {
                 false,                    // not a constructor
                 false,                    // not async
                 false,                    // not generator
+                false,                    // isArrow - static initializers are not arrows
                 true,                     // strict mode
                 "static { [initializer] }"
         );
@@ -2514,6 +2524,7 @@ public final class BytecodeCompiler {
                 true,            // isConstructor
                 false,           // not async
                 false,           // not generator
+                false,           // isArrow - constructors are not arrows
                 true,            // strict mode
                 "constructor() { [default] }"
         );
@@ -2600,6 +2611,31 @@ public final class BytecodeCompiler {
     }
 
     /**
+     * Check if a block statement has a "use strict" directive as its first statement.
+     * Following ECMAScript specification section 10.2.1 (Directive Prologues).
+     */
+    private boolean hasUseStrictDirective(BlockStatement block) {
+        if (block == null || block.body().isEmpty()) {
+            return false;
+        }
+
+        // Check the first statement
+        Statement firstStmt = block.body().get(0);
+        if (!(firstStmt instanceof ExpressionStatement exprStmt)) {
+            return false;
+        }
+
+        // Check if it's a string literal expression
+        if (!(exprStmt.expression() instanceof Literal literal)) {
+            return false;
+        }
+
+        // Check if the literal value is "use strict"
+        Object value = literal.value();
+        return "use strict".equals(value);
+    }
+
+    /**
      * Set the original source code (used for extracting function source in toString()).
      */
     public void setSourceCode(String sourceCode) {
@@ -2626,31 +2662,6 @@ public final class BytecodeCompiler {
         LoopContext(int startOffset) {
             this.startOffset = startOffset;
         }
-    }
-
-    /**
-     * Check if a block statement has a "use strict" directive as its first statement.
-     * Following ECMAScript specification section 10.2.1 (Directive Prologues).
-     */
-    private boolean hasUseStrictDirective(BlockStatement block) {
-        if (block == null || block.body().isEmpty()) {
-            return false;
-        }
-
-        // Check the first statement
-        Statement firstStmt = block.body().get(0);
-        if (!(firstStmt instanceof ExpressionStatement exprStmt)) {
-            return false;
-        }
-
-        // Check if it's a string literal expression
-        if (!(exprStmt.expression() instanceof Literal literal)) {
-            return false;
-        }
-
-        // Check if the literal value is "use strict"
-        Object value = literal.value();
-        return "use strict".equals(value);
     }
 
     /**
