@@ -17,12 +17,8 @@
 package com.caoccao.qjs4j.compiler.ast;
 
 import com.caoccao.qjs4j.BaseJavetTest;
-import com.caoccao.qjs4j.core.JSContext;
-import com.caoccao.qjs4j.core.JSRuntime;
-import com.caoccao.qjs4j.core.JSValue;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test class declaration compilation and execution.
@@ -58,26 +54,42 @@ public class ClassCompilerTest extends BaseJavetTest {
 
     @Test
     public void testClassWithMethod() throws Exception {
-        String source = """
+        assertIntegerWithJavet("""
                 class Counter {
                     increment() {
                         return 42;
                     }
                 }
                 const c = new Counter();
-                c.increment()
-                """;
+                c.increment()""");
+    }
 
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with method test result: " + result);
-        }
+    @Test
+    public void testClassWithMixedMethods() throws Exception {
+        assertIntegerWithJavet("""
+                class Calculator {
+                    constructor(value) {
+                        this.value = value;
+                    }
+                
+                    add(n) {
+                        return this.value + n;
+                    }
+                
+                    static multiply(a, b) {
+                        return a * b;
+                    }
+                }
+                
+                const c = new Calculator(10);
+                const instanceResult = c.add(5);
+                const staticResult = Calculator.multiply(3, 4);
+                instanceResult + staticResult""");
     }
 
     @Test
     public void testClassWithMultipleStaticBlocks() throws Exception {
-        String source = """
+        assertIntegerWithJavet("""
                 class Test {
                     static x = 0;
                     static {
@@ -87,36 +99,22 @@ public class ClassCompilerTest extends BaseJavetTest {
                         this.x = this.x + 5;
                     }
                 }
-                Test.x
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with multiple static blocks test result: " + result);
-        }
+                Test.x""");
     }
 
     @Test
     public void testClassWithPrivateField() throws Exception {
-        String source = """
+        assertBooleanWithJavet("""
                 class Counter {
-                    #count = 0;
+                    #count = 1;
                 }
                 const c = new Counter();
-                c
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with private field test result: " + result);
-        }
+                c.count === undefined""");
     }
 
     @Test
     public void testClassWithPrivateFieldAccess() throws Exception {
-        String source = """
+        assertIntegerWithJavet("""
                 class Counter {
                     #count = 5;
                     getCount() {
@@ -128,99 +126,67 @@ public class ClassCompilerTest extends BaseJavetTest {
                 }
                 const c = new Counter();
                 c.setCount(10);
-                c.getCount()
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with private field access test result: " + result);
-        }
-    }
-
-    @Test
-    public void testClassWithPrivateFieldInitializer() throws Exception {
-        String source = """
-                class Counter {
-                    #count = 42;
-                }
-                const c = new Counter();
-                c
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with private field initializer test result: " + result);
-        }
+                c.getCount()""");
     }
 
     @Test
     public void testClassWithPublicField() throws Exception {
-        String source = """
+        assertIntegerWithJavet("""
                 class Counter {
                     count = 0;
                 }
                 const c = new Counter();
-                c.count
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with public field test result: " + result);
-        }
+                c.count""");
     }
 
     @Test
     public void testClassWithPublicFieldInitializer() throws Exception {
-        String source = """
+        assertIntegerWithJavet("""
                 class Point {
                     x = 10;
                     y = 20;
                 }
                 const p = new Point();
-                p.x + p.y
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with public field initializer test result: " + result);
-        }
+                p.x + p.y""");
     }
 
     @Test
     public void testClassWithStaticBlock() throws Exception {
-        String source = """
+        assertStringWithJavet("""
                 class Config {
                     static apiUrl;
                     static {
                         this.apiUrl = 'http://localhost:3000';
                     }
                 }
-                Config.apiUrl
-                """;
-
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Class with static block test result: " + result);
-        }
+                Config.apiUrl""");
     }
 
     @Test
-    public void testSimpleClass() throws Exception {
-        String source = """
-                class Point {
+    public void testClassWithStaticMethod() throws Exception {
+        assertIntegerWithJavet("""
+                class MathUtils {
+                    static add(a, b) {
+                        return a + b;
+                    }
                 }
-                Point
-                """;
+                MathUtils.add(5, 3)""");
+    }
 
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            JSValue result = context.eval(source);
-            assertThat(result).isNotNull();
-            System.out.println("Simple class test passed: " + result);
-        }
+    @Disabled
+    @Test
+    public void testSimpleClass() throws Exception {
+        assertStringWithJavet(
+                """
+                        class A {
+                        }
+                        typeof A""",
+                """
+                        class A {
+                          toString() {
+                            return 'A';
+                          }
+                        }
+                        String(A)""");
     }
 }

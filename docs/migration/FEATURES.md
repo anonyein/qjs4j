@@ -427,22 +427,25 @@ This document provides a comprehensive list of all JavaScript features implement
   - ✅ Opcodes: GET_PRIVATE_FIELD(131), PUT_PRIVATE_FIELD(132), DEFINE_PRIVATE_FIELD(133), DEFINE_FIELD(134), PRIVATE_IN(135)
   - ✅ Parser: Full support for parsing private fields, methods, getters/setters in classes
   - ✅ Parser Tests: ClassParserTest with comprehensive test coverage
-  - ⏳ Compiler: Needs implementation for emitting private field opcodes
-  - ⏳ Runtime: Needs JSObject support for private field storage and access
+  - ✅ Compiler: Symbol creation, field initialization, and access compilation implemented
+  - ✅ Runtime: PropertyKey.fromSymbol() for symbol-based storage, all opcodes implemented in VM
+  - ✅ Tests: All private field tests passing including method access
 
 - **Static class blocks**: static { }
   - ✅ AST: StaticBlock node as ClassElement
   - ✅ Parser: Full support for parsing `static { }` blocks
   - ✅ Parser Tests: Included in ClassParserTest
-  - ⏳ Compiler: Needs implementation for generating class static init functions
-  - ⏳ Runtime: Needs support for executing static initializers
+  - ✅ Compiler: compileStaticBlock() generates initialization functions
+  - ✅ Runtime: Static blocks execute with class constructor as 'this'
+  - ✅ Tests: All static block tests passing (testClassWithStaticBlock, testClassWithMultipleStaticBlocks)
 
 - **Public class fields**:
   - ✅ AST: PropertyDefinition with isPrivate=false
   - ✅ Parser: Full support for parsing public instance and static fields
   - ✅ Parser Tests: Included in ClassParserTest
-  - ⏳ Compiler: Needs implementation for field initialization
-  - ⏳ Runtime: Needs support for field initialization in constructors
+  - ✅ Compiler: Field initialization in constructors via compileFieldInitialization()
+  - ✅ Runtime: DEFINE_FIELD opcode, fields stored as regular object properties
+  - ✅ Tests: All public field tests passing (testClassWithPublicField, testClassWithPublicFieldInitializer)
 
 ## Not Yet Implemented ⏳
 

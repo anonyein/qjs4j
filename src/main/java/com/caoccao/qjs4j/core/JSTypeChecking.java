@@ -101,8 +101,8 @@ public final class JSTypeChecking {
             return nativeFunc.isConstructor();
         } else // Other function types (bound functions) default to true
             if (value instanceof JSClass) {
-            return true;
-        } else return value instanceof JSFunction;
+                return true;
+            } else return value instanceof JSFunction;
     }
 
     /**

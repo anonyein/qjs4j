@@ -846,7 +846,7 @@ public final class VirtualMachine {
                     }
                     case PUT_PRIVATE_FIELD -> {
                         // Stack: obj value privateSymbol
-                        // Result: (pops all three, sets private field on obj)
+                        // Result: value (pops obj and privateSymbol, leaves value as assignment result)
                         JSValue privateSymbol = valueStack.pop();  // Pop private symbol
                         JSValue value = valueStack.pop();          // Pop value
                         JSValue obj = valueStack.pop();            // Pop obj
@@ -854,6 +854,9 @@ public final class VirtualMachine {
                         if (obj instanceof JSObject jsObj && privateSymbol instanceof JSSymbol symbol) {
                             jsObj.set(PropertyKey.fromSymbol(symbol), value);
                         }
+
+                        // Push value back to stack (assignment expressions return the assigned value)
+                        valueStack.push(value);
 
                         pc += op.getSize();
                     }

@@ -176,7 +176,7 @@ public final class BytecodeCompiler {
                 } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
                     // obj.#field += value
                     String fieldName = privateId.name();
-                    JSSymbol symbol = privateSymbols.get(fieldName);
+                    JSSymbol symbol = privateSymbols != null ? privateSymbols.get(fieldName) : null;
                     if (symbol != null) {
                         emitter.emitOpcode(Opcode.DUP);  // Duplicate object
                         emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
@@ -237,12 +237,15 @@ public final class BytecodeCompiler {
                     // Stack: value obj
                     // Need: obj value symbol (for PUT_PRIVATE_FIELD)
                     String fieldName = privateId.name();
-                    JSSymbol symbol = privateSymbols.get(fieldName);
+                    JSSymbol symbol = privateSymbols != null ? privateSymbols.get(fieldName) : null;
                     if (symbol != null) {
                         emitter.emitOpcode(Opcode.SWAP);  // Stack: obj value
                         emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
                         // Stack: obj value symbol
                         emitter.emitOpcode(Opcode.PUT_PRIVATE_FIELD);
+                    } else {
+                        // Error: private field not found - clean up stack and leave value
+                        emitter.emitOpcode(Opcode.DROP);  // Drop obj, leaving value
                     }
                 } else if (memberExpr.property() instanceof Identifier propId) {
                     emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
@@ -255,11 +258,14 @@ public final class BytecodeCompiler {
                     // obj.#field += value
                     // Stack: obj value (from compound operation)
                     String fieldName = privateId.name();
-                    JSSymbol symbol = privateSymbols.get(fieldName);
+                    JSSymbol symbol = privateSymbols != null ? privateSymbols.get(fieldName) : null;
                     if (symbol != null) {
                         emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
                         // Stack: obj value symbol
                         emitter.emitOpcode(Opcode.PUT_PRIVATE_FIELD);
+                    } else {
+                        // Error: private field not found - clean up stack and leave value
+                        emitter.emitOpcode(Opcode.DROP);  // Drop obj, leaving value
                     }
                 } else if (memberExpr.property() instanceof Identifier propId) {
                     emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
@@ -351,6 +357,24 @@ public final class BytecodeCompiler {
                 // obj[expr]
                 compileExpression(memberExpr.property());
                 emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+            } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
+                // obj.#privateField
+                // Stack: obj obj (obj is already duplicated)
+                // Need to get the private symbol and call GET_PRIVATE_FIELD
+                String fieldName = privateId.name();
+                JSSymbol symbol = privateSymbols != null ? privateSymbols.get(fieldName) : null;
+                if (symbol != null) {
+                    emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                    // Stack: obj obj symbol
+                    emitter.emitOpcode(Opcode.GET_PRIVATE_FIELD);
+                    // Stack: obj method (GET_PRIVATE_FIELD pops symbol and one obj, pushes method)
+                } else {
+                    // Error: private field not found
+                    // Stack: obj obj -> need to drop one obj and push undefined
+                    emitter.emitOpcode(Opcode.DROP);  // Drop the duplicated obj
+                    emitter.emitOpcode(Opcode.UNDEFINED);
+                    // Stack: obj undefined
+                }
             } else if (memberExpr.property() instanceof Identifier propId) {
                 // obj.prop
                 emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
@@ -471,14 +495,31 @@ public final class BytecodeCompiler {
             // Stack before each iteration: constructor proto
 
             if (method.isStatic()) {
-                // TODO: Implement static method compilation
-                throw new CompilerException("Static methods not yet implemented");
+                // For static methods, constructor is the target
+                // Current: constructor proto
+                // Need to add method to constructor, so swap to get constructor on top
+                emitter.emitOpcode(Opcode.SWAP);
+                // Stack: proto constructor
+
+                // Compile method (no field initialization for regular methods)
+                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false, List.of(), Map.of(), false);
+                emitter.emitOpcodeConstant(Opcode.PUSH_CONST, methodFunc);
+                // Stack: proto constructor method
+
+                // DEFINE_METHOD wants: obj method -> obj
+                String methodName = getMethodName(method);
+                emitter.emitOpcodeAtom(Opcode.DEFINE_METHOD, methodName);
+                // Stack: proto constructor (method added to constructor)
+
+                // Swap back to restore order: constructor proto
+                emitter.emitOpcode(Opcode.SWAP);
+                // Stack: constructor proto
             } else {
                 // For instance methods, proto is the target
                 // Current: constructor proto
                 // Compile method (no field initialization for regular methods)
-                // Pass empty private symbols map since methods don't initialize fields
-                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false, List.of(), Map.of(), false);
+                // Pass private symbols to methods so they can access private fields
+                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false, List.of(), privateSymbols, false);
                 emitter.emitOpcodeConstant(Opcode.PUSH_CONST, methodFunc);
                 // Stack: constructor proto method
 
@@ -630,7 +671,7 @@ public final class BytecodeCompiler {
             if (method.isStatic()) {
                 throw new CompilerException("Static methods not yet implemented");
             } else {
-                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false, List.of(), Map.of(), false);
+                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, getMethodName(method), false, List.of(), privateSymbols, false);
                 emitter.emitOpcodeConstant(Opcode.PUSH_CONST, methodFunc);
                 // Stack: constructor proto method
 
