@@ -20,7 +20,7 @@ package com.caoccao.qjs4j.compiler.ast;
  * Base sealed interface for all AST nodes.
  */
 public sealed interface ASTNode permits
-        Expression, Statement, ModuleItem, Program {
+        Expression, Statement, ModuleItem, Program, RestParameter {
 
     SourceLocation getLocation();
 }

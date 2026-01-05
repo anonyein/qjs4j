@@ -269,6 +269,29 @@ public final class VirtualMachine {
                         valueStack.push(specialObj);
                         pc += op.getSize();
                     }
+                    case REST -> {
+                        // REST creates an array from remaining arguments
+                        // Used at the start of functions with rest parameters (...args)
+                        // Opcode format: REST first (1 byte for opcode + 2 bytes for u16)
+                        // Reads the index of the first rest parameter
+                        int first = bytecode.readU16(pc + 1);
+                        JSValue[] funcArgs = currentFrame.getArguments();
+                        int argc = funcArgs.length;
+
+                        // Determine how many arguments to include in the rest array
+                        // If first >= argc, create empty array
+                        int restStart = Math.min(first, argc);
+                        int restCount = argc - restStart;
+
+                        // Create array from remaining arguments
+                        JSValue[] restArgs = new JSValue[restCount];
+                        System.arraycopy(funcArgs, restStart, restArgs, 0, restCount);
+
+                        JSArray restArray = new JSArray(restArgs);
+                        context.transferPrototype(restArray, JSArray.NAME);
+                        valueStack.push(restArray);
+                        pc += op.getSize();
+                    }
 
                     // ==================== Stack Manipulation ====================
                     case DROP -> {

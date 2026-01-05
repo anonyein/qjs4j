@@ -16,18 +16,14 @@
 
 package com.caoccao.qjs4j.compiler.ast;
 
-import java.util.List;
-
 /**
- * Represents an arrow function expression.
+ * Represents a rest parameter in a function declaration (...args).
+ * ES2015 rest parameters collect remaining arguments into an array.
  */
-public record ArrowFunctionExpression(
-        List<Identifier> params,
-        RestParameter restParameter,  // Optional rest parameter (...args)
-        ASTNode body,
-        boolean isAsync,
+public record RestParameter(
+        Identifier argument,
         SourceLocation location
-) implements Expression {
+) implements ASTNode {
     @Override
     public SourceLocation getLocation() {
         return location;

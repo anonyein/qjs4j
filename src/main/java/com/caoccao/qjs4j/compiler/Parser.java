@@ -41,7 +41,6 @@ public final class Parser {
     private final Lexer lexer;
     private Token currentToken;
     private Token nextToken; // Lookahead token
-
     public Parser(Lexer lexer) {
         this.lexer = lexer;
         this.currentToken = lexer.nextToken();
@@ -60,8 +59,6 @@ public final class Parser {
         // Otherwise, automatic semicolon insertion
     }
 
-    // Statement parsing
-
     private Token expect(TokenType type) {
         if (!match(type)) {
             throw new RuntimeException("Expected " + type + " but got " + currentToken.type() +
@@ -71,6 +68,8 @@ public final class Parser {
         advance();
         return token;
     }
+
+    // Statement parsing
 
     private SourceLocation getLocation() {
         return new SourceLocation(currentToken.line(), currentToken.column(), currentToken.offset());
@@ -252,7 +251,7 @@ public final class Parser {
                                     currentToken.offset()
                             );
 
-                            return new ArrowFunctionExpression(params, body, true, fullLocation);
+                            return new ArrowFunctionExpression(params, null, body, true, fullLocation);
                         }
                     }
                 }
@@ -319,7 +318,7 @@ public final class Parser {
                     currentToken.offset()
             );
 
-            return new ArrowFunctionExpression(params, body, false, fullLocation);
+            return new ArrowFunctionExpression(params, null, body, false, fullLocation);
         }
 
         if (isAssignmentOperator(currentToken.type())) {
@@ -463,8 +462,6 @@ public final class Parser {
 
         return expr;
     }
-
-    // Expression parsing with precedence
 
     /**
      * Parse a class declaration or expression.
@@ -631,6 +628,8 @@ public final class Parser {
 
         return parseMethodOrField(key, isStatic, isPrivate, computed, location);
     }
+
+    // Expression parsing with precedence
 
     /**
      * Parse a class expression (class used as an expression).
@@ -927,18 +926,8 @@ public final class Parser {
         Identifier id = parseIdentifier();
 
         expect(TokenType.LPAREN);
-        List<Identifier> params = new ArrayList<>();
+        FunctionParams funcParams = parseFunctionParameters();
 
-        if (!match(TokenType.RPAREN)) {
-            do {
-                if (match(TokenType.COMMA)) {
-                    advance();
-                }
-                params.add(parseIdentifier());
-            } while (match(TokenType.COMMA));
-        }
-
-        expect(TokenType.RPAREN);
         BlockStatement body = parseBlockStatement();
 
         // Update location to include end offset (current token offset after parsing body)
@@ -949,7 +938,7 @@ public final class Parser {
                 currentToken.offset()
         );
 
-        return new FunctionDeclaration(id, params, body, isAsync, isGenerator, fullLocation);
+        return new FunctionDeclaration(id, funcParams.params, funcParams.restParameter, body, isAsync, isGenerator, fullLocation);
     }
 
     private Expression parseFunctionExpression() {
@@ -970,18 +959,8 @@ public final class Parser {
         }
 
         expect(TokenType.LPAREN);
-        List<Identifier> params = new ArrayList<>();
+        FunctionParams funcParams = parseFunctionParameters();
 
-        if (!match(TokenType.RPAREN)) {
-            do {
-                if (match(TokenType.COMMA)) {
-                    advance();
-                }
-                params.add(parseIdentifier());
-            } while (match(TokenType.COMMA));
-        }
-
-        expect(TokenType.RPAREN);
         BlockStatement body = parseBlockStatement();
 
         // Update location to include end offset (current token offset after parsing body)
@@ -992,7 +971,55 @@ public final class Parser {
                 currentToken.offset()
         );
 
-        return new FunctionExpression(id, params, body, false, isGenerator, fullLocation);
+        return new FunctionExpression(id, funcParams.params, funcParams.restParameter, body, false, isGenerator, fullLocation);
+    }
+
+    /**
+     * Parse function parameters, including optional rest parameter.
+     * Expects '(' to already be consumed.
+     * Consumes up to and including ')'.
+     *
+     * @return FunctionParams containing regular params and optional rest parameter
+     */
+    private FunctionParams parseFunctionParameters() {
+        List<Identifier> params = new ArrayList<>();
+        RestParameter restParameter = null;
+
+        if (!match(TokenType.RPAREN)) {
+            while (true) {
+                // Check for rest parameter (...args)
+                if (match(TokenType.ELLIPSIS)) {
+                    SourceLocation location = getLocation();
+                    advance(); // consume '...'
+                    Identifier restArg = parseIdentifier();
+                    restParameter = new RestParameter(restArg, location);
+
+                    // Rest parameter must be last
+                    if (match(TokenType.COMMA)) {
+                        throw new RuntimeException("Rest parameter must be last formal parameter at line " +
+                                currentToken.line() + ", column " + currentToken.column());
+                    }
+                    break;
+                }
+
+                // Regular parameter
+                params.add(parseIdentifier());
+
+                // Check for comma (more parameters)
+                if (!match(TokenType.COMMA)) {
+                    break;
+                }
+                advance(); // consume comma
+
+                // Handle trailing comma before rest parameter or closing paren
+                if (match(TokenType.RPAREN) || match(TokenType.ELLIPSIS)) {
+                    continue;
+                }
+            }
+        }
+
+        expect(TokenType.RPAREN);
+        return new FunctionParams(params, restParameter);
     }
 
     private Identifier parseIdentifier() {
@@ -1082,26 +1109,12 @@ public final class Parser {
 
         // Parse parameter list
         expect(TokenType.LPAREN);
-        List<Identifier> params = new ArrayList<>();
-
-        while (!match(TokenType.RPAREN) && !match(TokenType.EOF)) {
-            if (!params.isEmpty()) {
-                expect(TokenType.COMMA);
-            }
-            if (match(TokenType.IDENTIFIER)) {
-                params.add(new Identifier(currentToken.value(), getLocation()));
-                advance();
-            } else {
-                break;
-            }
-        }
-
-        expect(TokenType.RPAREN);
+        FunctionParams funcParams = parseFunctionParameters();
 
         // Parse method body
         BlockStatement body = parseBlockStatement();
 
-        return new FunctionExpression(null, params, body, false, false, location);
+        return new FunctionExpression(null, funcParams.params, funcParams.restParameter, body, false, false, location);
     }
 
     /**
@@ -1196,7 +1209,7 @@ public final class Parser {
                 expect(TokenType.RPAREN);
                 BlockStatement body = parseBlockStatement();
 
-                Expression value = new FunctionExpression(null, params, body, isAsync, isGenerator, funcLocation);
+                Expression value = new FunctionExpression(null, params, null, body, isAsync, isGenerator, funcLocation);
                 properties.add(new ObjectExpression.Property(key, value, "init", false, false));
             } else {
                 // Regular property: key: value
@@ -1272,8 +1285,6 @@ public final class Parser {
 
         return expr;
     }
-
-    // Utility methods
 
     private Expression parsePrimaryExpression() {
         SourceLocation location = getLocation();
@@ -1454,6 +1465,8 @@ public final class Parser {
             }
         };
     }
+
+    // Utility methods
 
     private Expression parsePropertyName() {
         SourceLocation location = getLocation();
@@ -1905,5 +1918,11 @@ public final class Parser {
             }
         }
         return result.toString();
+    }
+
+    /**
+     * Helper record to hold the result of parsing function parameters.
+     */
+    private record FunctionParams(List<Identifier> params, RestParameter restParameter) {
     }
 }

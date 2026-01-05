@@ -24,6 +24,7 @@ import java.util.List;
 public record FunctionExpression(
         Identifier id,
         List<Identifier> params,
+        RestParameter restParameter,  // Optional rest parameter (...args)
         BlockStatement body,
         boolean isAsync,
         boolean isGenerator,

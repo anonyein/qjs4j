@@ -202,7 +202,6 @@ public class JSArgumentsTest extends BaseJavetTest {
                 test();""");
     }
 
-    @Disabled("Re-enable when REST opcode is fully implemented")
     @Test
     public void testArgumentsWithRestParameters() {
         assertIntegerWithJavet("""
@@ -211,5 +210,92 @@ public class JSArgumentsTest extends BaseJavetTest {
                     return arguments.length;
                 }
                 test(1, 2, 3, 4);""");
+    }
+
+    @Test
+    public void testRestParameterAccess() {
+        assertIntegerWithJavet("""
+                function test(a, ...rest) {
+                    return rest[0] + rest[1];
+                }
+                test(10, 20, 30);""");
+    }
+
+    @Test
+    public void testRestParameterAndArguments() {
+        assertBooleanWithJavet("""
+                function test(a, ...rest) {
+                    // arguments contains all args, rest contains only rest args
+                    return arguments.length === 4 && rest.length === 3;
+                }
+                test(1, 2, 3, 4);""");
+    }
+
+    @Test
+    public void testRestParameterBasic() {
+        assertIntegerWithJavet("""
+                function test(a, b, ...rest) {
+                    return rest.length;
+                }
+                test(1, 2, 3, 4, 5);""");
+    }
+
+    @Test
+    public void testRestParameterEmpty() {
+        assertIntegerWithJavet("""
+                function test(a, b, ...rest) {
+                    return rest.length;
+                }
+                test(1, 2);""");
+    }
+
+    @Test
+    public void testRestParameterIsArray() {
+        assertBooleanWithJavet("""
+                function test(...rest) {
+                    return Array.isArray(rest);
+                }
+                test(1, 2, 3);""");
+    }
+
+    @Test
+    public void testRestParameterModification() {
+        assertIntegerWithJavet("""
+                function test(...rest) {
+                    rest[0] = 100;
+                    return rest[0];
+                }
+                test(1, 2, 3);""");
+    }
+
+    @Test
+    public void testRestParameterOnlyParameter() {
+        assertIntegerWithJavet("""
+                function test(...args) {
+                    return args.length;
+                }
+                test(1, 2, 3, 4, 5);""");
+    }
+
+    @Test
+    public void testRestParameterSpread() {
+        assertIntegerWithJavet("""
+                function sum(...numbers) {
+                    let total = 0;
+                    for (let num of numbers) {
+                        total += num;
+                    }
+                    return total;
+                }
+                sum(1, 2, 3, 4, 5);""");
+    }
+
+    @Test
+    public void testRestParameterWithMethods() {
+        assertIntegerWithJavet("""
+                function test(...numbers) {
+                    return numbers.reduce((a, b) => a + b, 0);
+                }
+                test(1, 2, 3, 4, 5);""");
     }
 }

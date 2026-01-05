@@ -1180,6 +1180,25 @@ public final class BytecodeCompiler {
             functionCompiler.currentScope().declareLocal(param.name());
         }
 
+        // Handle rest parameter if present
+        // The REST opcode must be emitted early in the function to initialize the rest array
+        if (funcDecl.restParameter() != null) {
+            // Calculate the index where rest arguments start
+            int firstRestIndex = funcDecl.params().size();
+
+            // Emit REST opcode with the starting index
+            functionCompiler.emitter.emitOpcode(Opcode.REST);
+            functionCompiler.emitter.emitU16(firstRestIndex);
+
+            // Declare the rest parameter as a local and store the rest array
+            String restParamName = funcDecl.restParameter().argument().name();
+            int restLocalIndex = functionCompiler.currentScope().declareLocal(restParamName);
+
+            // Store the rest array (from stack top) to the rest parameter local
+            functionCompiler.emitter.emitOpcode(Opcode.PUT_LOCAL);
+            functionCompiler.emitter.emitU16(restLocalIndex);
+        }
+
         // If this is a generator function, emit INITIAL_YIELD at the start
         if (funcDecl.isGenerator()) {
             functionCompiler.emitter.emitOpcode(Opcode.INITIAL_YIELD);
@@ -1230,6 +1249,10 @@ public final class BytecodeCompiler {
             for (int i = 0; i < funcDecl.params().size(); i++) {
                 if (i > 0) funcSource.append(", ");
                 funcSource.append(funcDecl.params().get(i).name());
+            }
+            if (funcDecl.restParameter() != null) {
+                if (!funcDecl.params().isEmpty()) funcSource.append(", ");
+                funcSource.append("...").append(funcDecl.restParameter().argument().name());
             }
             funcSource.append(") { [function body] }");
             functionSource = funcSource.toString();
@@ -1286,6 +1309,25 @@ public final class BytecodeCompiler {
 
         for (Identifier param : funcExpr.params()) {
             functionCompiler.currentScope().declareLocal(param.name());
+        }
+
+        // Handle rest parameter if present
+        // The REST opcode must be emitted early in the function to initialize the rest array
+        if (funcExpr.restParameter() != null) {
+            // Calculate the index where rest arguments start
+            int firstRestIndex = funcExpr.params().size();
+
+            // Emit REST opcode with the starting index
+            functionCompiler.emitter.emitOpcode(Opcode.REST);
+            functionCompiler.emitter.emitU16(firstRestIndex);
+
+            // Declare the rest parameter as a local and store the rest array
+            String restParamName = funcExpr.restParameter().argument().name();
+            int restLocalIndex = functionCompiler.currentScope().declareLocal(restParamName);
+
+            // Store the rest array (from stack top) to the rest parameter local
+            functionCompiler.emitter.emitOpcode(Opcode.PUT_LOCAL);
+            functionCompiler.emitter.emitU16(restLocalIndex);
         }
 
         // If this is a generator function, emit INITIAL_YIELD at the start
