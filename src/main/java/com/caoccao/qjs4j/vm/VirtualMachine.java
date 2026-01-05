@@ -68,15 +68,18 @@ public final class VirtualMachine {
             case 0: // SPECIAL_OBJECT_ARGUMENTS
                 // Create non-mapped arguments object (strict mode or modern)
                 JSValue[] args = currentFrame.getArguments();
-                boolean isStrict = currentFrame.getFunction() instanceof JSBytecodeFunction func && func.isStrict();
-                return new JSArguments(context, args, isStrict);
+                JSFunction currentFunc = currentFrame.getFunction();
+                boolean isStrict = currentFunc instanceof JSBytecodeFunction func && func.isStrict();
+                // Pass the current function as callee for non-strict mode
+                return new JSArguments(context, args, isStrict, isStrict ? null : currentFunc);
 
             case 1: // SPECIAL_OBJECT_MAPPED_ARGUMENTS
                 // Legacy mapped arguments (shares with function parameters)
                 // For now, treat same as normal arguments
-                // TODO: Implement mapped arguments if needed for legacy code
+                // TODO: Implement parameter mapping for non-strict mode
                 args = currentFrame.getArguments();
-                return new JSArguments(context, args, false);
+                currentFunc = currentFrame.getFunction();
+                return new JSArguments(context, args, false, currentFunc);
 
             case 2: // SPECIAL_OBJECT_THIS_FUNC
                 // Return the currently executing function

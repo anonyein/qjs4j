@@ -1178,6 +1178,9 @@ public final class BytecodeCompiler {
         // Get function name
         String functionName = funcDecl.id().name();
 
+        // Detect "use strict" directive in function body
+        boolean isStrict = hasUseStrictDirective(funcDecl.body());
+
         // Extract function source code from original source
         String functionSource = extractSourceCode(funcDecl.getLocation());
 
@@ -1212,7 +1215,7 @@ public final class BytecodeCompiler {
                 true,            // isConstructor - regular functions can be constructors
                 funcDecl.isAsync(),
                 funcDecl.isGenerator(),
-                false,           // strict - TODO: parse directives in function body
+                isStrict,        // strict - detected from "use strict" directive in function body
                 functionSource   // source code for toString()
         );
 
@@ -1274,6 +1277,9 @@ public final class BytecodeCompiler {
         // Get function name (empty string for anonymous)
         String functionName = funcExpr.id() != null ? funcExpr.id().name() : "";
 
+        // Detect "use strict" directive in function body
+        boolean isStrict = hasUseStrictDirective(funcExpr.body());
+
         // Extract function source code from original source
         String functionSource = extractSourceCode(funcExpr.getLocation());
 
@@ -1287,7 +1293,7 @@ public final class BytecodeCompiler {
                 true,            // isConstructor - regular functions can be constructors
                 funcExpr.isAsync(),
                 funcExpr.isGenerator(),
-                false,           // strict - TODO: parse directives in function body
+                isStrict,        // strict - detected from "use strict" directive in function body
                 functionSource   // source code for toString()
         );
 
@@ -2585,6 +2591,31 @@ public final class BytecodeCompiler {
         LoopContext(int startOffset) {
             this.startOffset = startOffset;
         }
+    }
+
+    /**
+     * Check if a block statement has a "use strict" directive as its first statement.
+     * Following ECMAScript specification section 10.2.1 (Directive Prologues).
+     */
+    private boolean hasUseStrictDirective(BlockStatement block) {
+        if (block == null || block.body().isEmpty()) {
+            return false;
+        }
+
+        // Check the first statement
+        Statement firstStmt = block.body().get(0);
+        if (!(firstStmt instanceof ExpressionStatement exprStmt)) {
+            return false;
+        }
+
+        // Check if it's a string literal expression
+        if (!(exprStmt.expression() instanceof Literal literal)) {
+            return false;
+        }
+
+        // Check if the literal value is "use strict"
+        Object value = literal.value();
+        return "use strict".equals(value);
     }
 
     /**

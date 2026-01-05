@@ -44,22 +44,116 @@ public final class JSArguments extends JSObject {
      * @param isStrict Whether the function is in strict mode
      */
     public JSArguments(JSContext context, JSValue[] args, boolean isStrict) {
+        this(context, args, isStrict, null);
+    }
+
+    /**
+     * Create an arguments object with function reference.
+     *
+     * @param context  The execution context
+     * @param args     The argument values
+     * @param isStrict Whether the function is in strict mode
+     * @param callee   The function being called (for non-strict mode)
+     */
+    public JSArguments(JSContext context, JSValue[] args, boolean isStrict, JSFunction callee) {
         super();
         this.argumentValues = args != null ? args : new JSValue[0];
         this.isStrict = isStrict;
 
         // Set length property (writable, non-enumerable, configurable per ES spec)
-        set(PropertyKey.fromString("length"), new JSNumber(argumentValues.length));
+        PropertyDescriptor lengthDesc = PropertyDescriptor.dataDescriptor(
+                new JSNumber(argumentValues.length),
+                true,   // writable
+                false,  // enumerable
+                true    // configurable
+        );
+        defineProperty(PropertyKey.fromString("length"), lengthDesc);
 
         // Set indexed properties for each argument
         for (int i = 0; i < argumentValues.length; i++) {
-            set(PropertyKey.fromIndex(i), argumentValues[i]);
+            PropertyDescriptor argDesc = PropertyDescriptor.dataDescriptor(
+                    argumentValues[i],
+                    true,  // writable
+                    true,  // enumerable
+                    true   // configurable
+            );
+            defineProperty(PropertyKey.fromIndex(i), argDesc);
         }
 
-        // In strict mode, 'callee' and 'caller' properties throw TypeError when accessed
-        // In non-strict mode, 'callee' references the function itself
-        // For now, we don't implement callee/caller as they're deprecated
-        // and strict mode is the modern standard
+        // Handle callee and caller properties based on strict mode
+        if (isStrict) {
+            // In strict mode, callee and caller are accessor properties that throw TypeError
+            // Create a thrower function that returns TypeError when called
+            JSNativeFunction thrower = new JSNativeFunction(
+                    "ThrowTypeError",
+                    0,
+                    (ctx, thisArg, argsArray) -> ctx.throwTypeError(
+                            "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"
+                    )
+            );
+
+            // Define callee as accessor with thrower for both get and set
+            PropertyDescriptor calleeDesc = PropertyDescriptor.accessorDescriptor(
+                    thrower,  // getter throws
+                    thrower,  // setter throws
+                    false,    // non-enumerable
+                    false     // non-configurable
+            );
+            defineProperty(PropertyKey.fromString("callee"), calleeDesc);
+
+            // Define caller as accessor with thrower for both get and set
+            PropertyDescriptor callerDesc = PropertyDescriptor.accessorDescriptor(
+                    thrower,  // getter throws
+                    thrower,  // setter throws
+                    false,    // non-enumerable
+                    false     // non-configurable
+            );
+            defineProperty(PropertyKey.fromString("caller"), callerDesc);
+        } else {
+            // In non-strict mode, callee is a data property referencing the function
+            if (callee != null) {
+                PropertyDescriptor calleeDesc = PropertyDescriptor.dataDescriptor(
+                        callee,
+                        true,   // writable
+                        false,  // non-enumerable
+                        true    // configurable
+                );
+                defineProperty(PropertyKey.fromString("callee"), calleeDesc);
+            }
+
+            // caller property is deprecated and not widely implemented
+            // We leave it undefined for non-strict mode
+        }
+
+        // Add Symbol.iterator property (points to Array.prototype[Symbol.iterator])
+        // This enables for-of iteration over arguments
+        try {
+            JSValue symbolCtor = context.getGlobalObject().get(PropertyKey.fromString("Symbol"));
+            if (symbolCtor instanceof JSObject symbolObj) {
+                JSValue iteratorSymbol = symbolObj.get(PropertyKey.fromString("iterator"));
+                if (iteratorSymbol instanceof JSSymbol sym) {
+                    // Get Array.prototype
+                    JSValue arrayCtor = context.getGlobalObject().get(PropertyKey.fromString("Array"));
+                    if (arrayCtor instanceof JSObject arrayCtorObj) {
+                        JSValue arrayProto = arrayCtorObj.get(PropertyKey.fromString("prototype"));
+                        if (arrayProto instanceof JSObject arrayProtoObj) {
+                            JSValue arrayIterator = arrayProtoObj.get(PropertyKey.fromSymbol(sym));
+                            if (arrayIterator != null && !(arrayIterator instanceof JSUndefined)) {
+                                PropertyDescriptor iterDesc = PropertyDescriptor.dataDescriptor(
+                                        arrayIterator,
+                                        true,   // writable
+                                        false,  // non-enumerable
+                                        true    // configurable
+                                );
+                                defineProperty(PropertyKey.fromSymbol(sym), iterDesc);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Ignore errors setting up Symbol.iterator - not critical
+        }
     }
 
     /**

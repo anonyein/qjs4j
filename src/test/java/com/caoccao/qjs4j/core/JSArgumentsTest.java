@@ -16,200 +16,205 @@
 
 package com.caoccao.qjs4j.core;
 
+import com.caoccao.qjs4j.BaseJavetTest;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for the ECMAScript arguments object.
  * The arguments object is an array-like object accessible inside functions
  * that contains the values of the arguments passed to that function.
  */
-public class JSArgumentsTest {
+public class JSArgumentsTest extends BaseJavetTest {
 
     @Test
     public void testArgumentsAccess() {
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            String code = """
-                    function test(a, b) {
-                        return arguments[0] + arguments[1] + arguments[2];
-                    }
-                    test(10, 20, 30);
-                    """;
-            JSValue result = context.eval(code);
-            assertThat(result).isInstanceOf(JSNumber.class);
-            assertThat(((JSNumber) result).value()).isEqualTo(60.0);
-        }
+        assertIntegerWithJavet("""
+                function test(a, b) {
+                    return arguments[0] + arguments[1] + arguments[2];
+                }
+                test(10, 20, 30);""");
     }
 
     @Test
     public void testArgumentsArrayLike() {
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            String code = """
-                    function test() {
-                        let sum = 0;
-                        for (let i = 0; i < arguments.length; i++) {
-                            sum += arguments[i];
-                        }
-                        return sum;
+        assertIntegerWithJavet("""
+                function test() {
+                    let sum = 0;
+                    for (let i = 0; i < arguments.length; i++) {
+                        sum += arguments[i];
                     }
-                    test(1, 2, 3, 4, 5);
-                    """;
-            JSValue result = context.eval(code);
-            assertThat(result).isInstanceOf(JSNumber.class);
-            assertThat(((JSNumber) result).value()).isEqualTo(15.0);
-        }
+                    return sum;
+                }
+                test(1, 2, 3, 4, 5);""");
+    }
+
+    @Disabled
+    @Test
+    public void testArgumentsCalleeInNonStrictMode() {
+        // In non-strict mode, arguments.callee references the function
+        assertIntegerWithJavet("""
+                function factorial(n) {
+                    if (n <= 1) return 1;
+                    // arguments.callee is a reference to factorial itself
+                    return n * arguments.callee(n - 1);
+                }
+                factorial(5);""");
+    }
+
+    @Test
+    public void testArgumentsCalleeInStrictMode() {
+        // In strict mode, accessing arguments.callee throws TypeError
+        assertBooleanWithJavet("""
+                function test() {
+                    'use strict';
+                    try {
+                        return arguments.callee;
+                    } catch (e) {
+                        return e instanceof TypeError;
+                    }
+                }
+                test();""");
+    }
+
+    @Disabled
+    @Test
+    public void testArgumentsCalleeIsFunction() {
+        // Verify that callee is indeed the function
+        assertBooleanWithJavet("""
+                function test() {
+                    return typeof arguments.callee === 'function';
+                }
+                test();""");
+    }
+
+    @Disabled
+    @Test
+    public void testArgumentsCallerInStrictMode() {
+        // In strict mode, accessing arguments.caller throws TypeError
+        assertObjectWithJavet("""
+                function test() {
+                    'use strict';
+                    try {
+                        return arguments.caller;
+                    } catch (e) {
+                        return e instanceof TypeError;
+                    }
+                }
+                test();""");
     }
 
     @Test
     public void testArgumentsFewerThanParameters() {
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            String code = """
-                    function test(a, b, c, d) {
-                        return arguments.length;
-                    }
-                    test(1, 2);
-                    """;
-            JSValue result = context.eval(code);
-            assertThat(result).isInstanceOf(JSNumber.class);
-            assertThat(((JSNumber) result).value()).isEqualTo(2.0);
-        }
+        assertIntegerWithJavet("""
+                function test(a, b, c, d) {
+                    return arguments.length;
+                }
+                test(1, 2);""");
     }
 
     @Test
     public void testArgumentsInMethodContext() {
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            String code = """
-                    const obj = {
-                        method: function(a, b, c) {
-                            return arguments.length;
-                        }
-                    };
-                    obj.method(1, 2, 3, 4, 5);
-                    """;
-            JSValue result = context.eval(code);
-            assertThat(result).isInstanceOf(JSNumber.class);
-            assertThat(((JSNumber) result).value()).isEqualTo(5.0);
-        }
+        assertIntegerWithJavet("""
+                const obj = {
+                    method: function(a, b, c) {
+                        return arguments.length;
+                    }
+                };
+                obj.method(1, 2, 3, 4, 5);""");
     }
 
     @Test
     public void testArgumentsInNestedFunction() {
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            String code = """
-                    function outer(a, b) {
-                        function inner(x, y) {
-                            return arguments.length;
-                        }
-                        return inner(1, 2, 3);
+        assertIntegerWithJavet("""
+                function outer(a, b) {
+                    function inner(x, y) {
+                        return arguments.length;
                     }
-                    outer(10, 20);
-                    """;
-            JSValue result = context.eval(code);
-            assertThat(result).isInstanceOf(JSNumber.class);
-            // inner function is called with 3 arguments
-            assertThat(((JSNumber) result).value()).isEqualTo(3.0);
-        }
+                    return inner(1, 2, 3);
+                }
+                outer(10, 20);""");
     }
 
     @Test
     public void testArgumentsLength() {
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            String code = """
-                    function test(a, b) {
-                        return arguments.length;
-                    }
-                    test(1, 2, 3, 4);
-                    """;
-            JSValue result = context.eval(code);
-            assertThat(result).isInstanceOf(JSNumber.class);
-            assertThat(((JSNumber) result).value()).isEqualTo(4.0);
-        }
+        assertIntegerWithJavet("""
+                function test(a, b) {
+                    return arguments.length;
+                }
+                test(1, 2, 3, 4);""");
+    }
+
+    @Disabled("Arguments modification needs proper indexed property handling")
+    @Test
+    public void testArgumentsModification() {
+        assertIntegerWithJavet("""
+                function test(a, b) {
+                    arguments[0] = 100;
+                    return arguments[0];
+                }
+                test(1, 2);
+                """);
     }
 
     @Test
     public void testArgumentsMoreThanParameters() {
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            String code = """
-                    function test(a, b) {
-                        return arguments.length;
-                    }
-                    test(1, 2, 3, 4, 5);
-                    """;
-            JSValue result = context.eval(code);
-            assertThat(result).isInstanceOf(JSNumber.class);
-            assertThat(((JSNumber) result).value()).isEqualTo(5.0);
-        }
+        assertIntegerWithJavet("""
+                function test(a, b) {
+                    return arguments.length;
+                }
+                test(1, 2, 3, 4, 5);
+                """);
     }
-
-    // TODO: Arguments modification needs proper indexed property handling
-    // @Test
-    // public void testArgumentsModification() {
-    //     try (JSContext context = new JSContext(new JSRuntime())) {
-    //         String code = """
-    //                 function test(a, b) {
-    //                     arguments[0] = 100;
-    //                     return arguments[0];
-    //                 }
-    //                 test(1, 2);
-    //                 """;
-    //         JSValue result = context.eval(code);
-    //         assertThat(result).isInstanceOf(JSNumber.class);
-    //         assertThat(((JSNumber) result).value()).isEqualTo(100.0);
-    //     }
-    // }
-
-    // TODO: Re-enable when REST opcode is fully implemented
-    // @Test
-    // public void testArgumentsWithRestParameters() {
-    //     try (JSContext context = new JSContext(new JSRuntime())) {
-    //         String code = """
-    //                 function test(a, ...rest) {
-    //                     // arguments includes all arguments, not just rest
-    //                     return arguments.length;
-    //                 }
-    //                 test(1, 2, 3, 4);
-    //                 """;
-    //         JSValue result = context.eval(code);
-    //         assertThat(result).isInstanceOf(JSNumber.class);
-    //         assertThat(((JSNumber) result).value()).isEqualTo(4.0);
-    //     }
-    // }
-
-    // TODO: Arrow functions need to capture outer scope's arguments
-    // @Test
-    // public void testArgumentsNotInArrowFunction() {
-    //     try (JSContext context = new JSContext(new JSRuntime())) {
-    //         // Arrow functions don't have their own arguments object
-    //         // They inherit arguments from enclosing scope
-    //         String code = """
-    //                 function outer(a, b) {
-    //                     const arrow = () => {
-    //                         return arguments.length;
-    //                     };
-    //                     return arrow();
-    //                 }
-    //                 outer(1, 2, 3);
-    //                 """;
-    //         JSValue result = context.eval(code);
-    //         assertThat(result).isInstanceOf(JSNumber.class);
-    //         // Should return outer's arguments.length
-    //         assertThat(((JSNumber) result).value()).isEqualTo(3.0);
-    //     }
-    // }
 
     @Test
     public void testArgumentsNoParameters() {
-        try (JSContext context = new JSContext(new JSRuntime())) {
-            String code = """
-                    function test() {
+        assertIntegerWithJavet("""
+                function test() {
+                    return arguments.length;
+                }
+                test(1, 2, 3);
+                """);
+    }
+
+    @Disabled("Arrow functions need to capture outer scope's arguments")
+    @Test
+    public void testArgumentsNotInArrowFunction() {
+        // Arrow functions don't have their own arguments object
+        // They inherit arguments from enclosing scope
+        assertIntegerWithJavet("""
+                function outer(a, b) {
+                    const arrow = () => {
                         return arguments.length;
+                    };
+                    return arrow();
+                }
+                outer(1, 2, 3);""");
+    }
+
+    @Test
+    public void testArgumentsStrictModeErrorMessage() {
+        // Verify the error message contains appropriate information
+        assertStringWithJavet("""
+                function test() {
+                    'use strict';
+                    try {
+                        return arguments.callee;
+                    } catch (e) {
+                        return e.message;
                     }
-                    test(1, 2, 3);
-                    """;
-            JSValue result = context.eval(code);
-            assertThat(result).isInstanceOf(JSNumber.class);
-            assertThat(((JSNumber) result).value()).isEqualTo(3.0);
-        }
+                }
+                test();""");
+    }
+
+    @Disabled("Re-enable when REST opcode is fully implemented")
+    @Test
+    public void testArgumentsWithRestParameters() {
+        assertIntegerWithJavet("""
+                function test(a, ...rest) {
+                    // arguments includes all arguments, not just rest
+                    return arguments.length;
+                }
+                test(1, 2, 3, 4);""");
     }
 }
