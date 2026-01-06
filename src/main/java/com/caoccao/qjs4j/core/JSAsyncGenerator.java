@@ -98,8 +98,8 @@ public final class JSAsyncGenerator extends JSObject {
      * @return A promise that resolves to {value, done}
      */
     private JSPromise createIteratorResultPromise(JSValue value, boolean done) {
-        JSPromise promise = new JSPromise();
-        JSObject result = new JSObject();
+        JSPromise promise = context.createJSPromise();
+        JSObject result = context.createJSObject();
         result.set("value", value);
         result.set("done", JSBoolean.valueOf(done));
         promise.fulfill(result);
@@ -129,8 +129,8 @@ public final class JSAsyncGenerator extends JSObject {
         if (state == AsyncGeneratorState.EXECUTING) {
             // Generator is already running - queue this request
             // In a full implementation, this would queue the request
-            JSPromise promise = new JSPromise();
-            JSObject error = new JSObject();
+            JSPromise promise = context.createJSPromise();
+            JSObject error = context.createJSObject();
             error.set("name", new JSString("TypeError"));
             error.set("message", new JSString("Generator is already executing"));
             promise.reject(error);

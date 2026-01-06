@@ -534,7 +534,7 @@ public final class StringPrototype {
             matches.push(matchArray);
         }
 
-        return JSIterator.arrayIterator(matches);
+        return JSIterator.arrayIterator(context, matches);
     }
 
     /**

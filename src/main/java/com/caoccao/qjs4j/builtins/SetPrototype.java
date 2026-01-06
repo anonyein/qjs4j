@@ -156,6 +156,6 @@ public final class SetPrototype {
             return context.throwTypeError("Set.prototype.values called on non-Set");
         }
 
-        return JSIterator.setValuesIterator(set);
+        return JSIterator.setValuesIterator(context, set);
     }
 }

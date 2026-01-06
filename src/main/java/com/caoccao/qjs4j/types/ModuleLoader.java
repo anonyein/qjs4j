@@ -139,7 +139,7 @@ public final class ModuleLoader implements JSModule.ModuleResolver {
         }
 
         // Create module record
-        JSModule module = new JSModule(absoluteUrl, moduleFunction);
+        JSModule module = new JSModule(context, absoluteUrl, moduleFunction);
 
         // Cache immediately to handle circular dependencies
         moduleCache.put(specifier, module);

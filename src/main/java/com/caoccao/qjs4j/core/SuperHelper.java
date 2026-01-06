@@ -53,13 +53,13 @@ public final class SuperHelper {
      * Create a super reference object for use in bytecode.
      * This object provides access to super constructor and methods.
      *
+     * @param context      The execution context
      * @param derivedClass The derived class
      * @param instance     The current instance
-     * @param context      The execution context
      * @return A super reference object
      */
-    public static JSObject createSuperReference(JSClass derivedClass, JSObject instance, JSContext context) {
-        JSObject superRef = new JSObject();
+    public static JSObject createSuperReference(JSContext context, JSClass derivedClass, JSObject instance) {
+        JSObject superRef = context.createJSObject();
 
         // Add __call__ for super() constructor calls
         superRef.set("__call__", new JSNativeFunction(

@@ -26,13 +26,13 @@ public final class JSIteratorHelper {
      * Execute a for...of loop over an iterable.
      * This is a helper for bytecode that implements for...of loops.
      *
+     * @param context  The execution context
      * @param iterable The iterable to loop over
      * @param callback Function to call for each value
-     * @param context  The execution context
      */
-    public static void forOf(JSValue iterable, IterationCallback callback, JSContext context) {
+    public static void forOf(JSContext context, JSValue iterable, IterationCallback callback) {
         // Get the iterator
-        JSValue iterator = getIterator(iterable, context);
+        JSValue iterator = getIterator(context, iterable);
         if (iterator == null) {
             context.throwTypeError("Object is not iterable");
             return;
@@ -66,14 +66,14 @@ public final class JSIteratorHelper {
      * Get an iterator from an iterable object.
      * Calls the object's [Symbol.iterator] method to get an iterator.
      *
-     * @param iterable The iterable object
      * @param context  The execution context
+     * @param iterable The iterable object
      * @return An iterator, or null if the object is not iterable
      */
-    public static JSValue getIterator(JSValue iterable, JSContext context) {
+    public static JSValue getIterator(JSContext context, JSValue iterable) {
         // Handle string primitives specially
         if (iterable instanceof JSString jsString) {
-            return JSIterator.stringIterator(jsString);
+            return JSIterator.stringIterator(context, jsString);
         }
 
         if (!(iterable instanceof JSObject iterableObj)) {
@@ -169,10 +169,10 @@ public final class JSIteratorHelper {
     public static JSArray toArray(JSContext context, JSValue iterable) {
         JSArray result = context.createJSArray();
 
-        forOf(iterable, (value) -> {
+        forOf(context, iterable, (value) -> {
             result.push(value);
             return true;
-        }, context);
+        });
 
         return result;
     }

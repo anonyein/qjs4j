@@ -17,7 +17,9 @@
 package com.caoccao.qjs4j.core;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Enumerator for for-in loops.
@@ -33,11 +35,11 @@ public class JSForInEnumerator {
 
         // Collect all enumerable property keys
         if (obj instanceof JSObject jsObj) {
-            collectKeys(jsObj);
+            collectKeys(jsObj, new HashSet<>());
         }
     }
 
-    private void collectKeys(JSObject obj) {
+    private void collectKeys(JSObject obj, Set<JSObject> visited) {
         // Get own enumerable property keys using the enumerableKeys() method
         var ownKeys = obj.enumerableKeys();
         for (PropertyKey key : ownKeys) {
@@ -49,8 +51,8 @@ public class JSForInEnumerator {
 
         // Walk up the prototype chain
         JSObject proto = obj.getPrototype();
-        if (proto != null) {
-            collectKeys(proto);
+        if (proto != null && visited.add(proto)) {
+            collectKeys(proto, visited);
         }
     }
 

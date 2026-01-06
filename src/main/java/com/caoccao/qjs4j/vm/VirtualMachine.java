@@ -812,7 +812,7 @@ public final class VirtualMachine {
 
                     // ==================== Object/Array Creation ====================
                     case OBJECT, OBJECT_NEW -> {
-                        valueStack.push(new JSObject());
+                        valueStack.push(context.createJSObject());
                         pc += op.getSize();
                     }
                     case ARRAY_NEW -> {
@@ -903,7 +903,7 @@ public final class VirtualMachine {
 
                         // Get iterator from enumobj
                         try {
-                            JSValue iterator = JSIteratorHelper.getIterator(enumobj, context);
+                            JSValue iterator = JSIteratorHelper.getIterator(context, enumobj);
 
                             if (iterator == null) {
                                 // Not iterable, throw TypeError
@@ -987,7 +987,7 @@ public final class VirtualMachine {
                         }
 
                         // Create the class prototype object
-                        JSObject prototype = new JSObject();
+                        JSObject prototype = context.createJSObject();
 
                         // Set up prototype chain
                         if (superClass != JSUndefined.INSTANCE && superClass != JSNull.INSTANCE) {
@@ -1391,6 +1391,16 @@ public final class VirtualMachine {
                 // Call through the function's call method to handle async wrapping
                 JSValue result = bytecodeFunc.call(context, receiver, args);
                 valueStack.push(result);
+            } else if (function instanceof JSBoundFunction boundFunc) {
+                // Call bound function - the receiver is ignored for bound functions
+                JSValue result = boundFunc.call(context, receiver, args);
+                // Check for pending exception after bound function call
+                if (context.hasPendingException()) {
+                    pendingException = context.getPendingException();
+                    valueStack.push(JSUndefined.INSTANCE);
+                } else {
+                    valueStack.push(result);
+                }
             } else {
                 valueStack.push(JSUndefined.INSTANCE);
             }

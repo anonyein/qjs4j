@@ -248,7 +248,7 @@ public class IteratorPrototypeTest extends BaseTest {
         JSArray array = new JSArray();
         array.push(new JSNumber(1));
         array.push(new JSNumber(2));
-        JSIterator iterator = JSIterator.arrayIterator(array);
+        JSIterator iterator = JSIterator.arrayIterator(context, array);
 
         // Normal case: next() on iterator
         JSValue result = IteratorPrototype.next(context, iterator, new JSValue[]{});

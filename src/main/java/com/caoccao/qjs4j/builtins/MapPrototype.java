@@ -147,7 +147,7 @@ public final class MapPrototype {
             return context.throwTypeError("Map.prototype.keys called on non-Map");
         }
 
-        return JSIterator.mapKeysIterator(map);
+        return JSIterator.mapKeysIterator(context, map);
     }
 
     /**
@@ -177,6 +177,6 @@ public final class MapPrototype {
             return context.throwTypeError("Map.prototype.values called on non-Map");
         }
 
-        return JSIterator.mapValuesIterator(map);
+        return JSIterator.mapValuesIterator(context, map);
     }
 }

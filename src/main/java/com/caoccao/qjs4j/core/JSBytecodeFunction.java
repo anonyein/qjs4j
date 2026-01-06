@@ -87,11 +87,18 @@ public final class JSBytecodeFunction extends JSFunction {
     /**
      * Create a bytecode function with full configuration.
      */
-    public JSBytecodeFunction(Bytecode bytecode, String name, int length,
-                              JSValue[] closureVars, JSObject prototype,
-                              boolean isConstructor, boolean isAsync, boolean isGenerator, boolean isArrow,
-                              boolean strict,
-                              String sourceCode) {
+    public JSBytecodeFunction(
+            Bytecode bytecode,
+            String name,
+            int length,
+            JSValue[] closureVars,
+            JSObject prototype,
+            boolean isConstructor,
+            boolean isAsync,
+            boolean isGenerator,
+            boolean isArrow,
+            boolean strict,
+            String sourceCode) {
         super(); // Initialize as JSObject
         this.bytecode = bytecode;
         this.name = name != null ? name : "";
@@ -133,7 +140,7 @@ public final class JSBytecodeFunction extends JSFunction {
 
                 // Check if generator is completed
                 if (generatorState.isCompleted()) {
-                    JSObject result = new JSObject();
+                    JSObject result = context.createJSObject();
                     result.set("value", JSUndefined.INSTANCE);
                     result.set("done", JSBoolean.TRUE);
                     promise.fulfill(result);
@@ -148,20 +155,20 @@ public final class JSBytecodeFunction extends JSFunction {
                     // Check if this was a yield or completion
                     if (generatorState.isCompleted()) {
                         // Generator completed - return final value with done: true
-                        JSObject iterResult = new JSObject();
+                        JSObject iterResult = context.createJSObject();
                         iterResult.set("value", result);
                         iterResult.set("done", JSBoolean.TRUE);
                         promise.fulfill(iterResult);
                     } else {
                         // Generator yielded - return value with done: false  
-                        JSObject iterResult = new JSObject();
+                        JSObject iterResult = context.createJSObject();
                         iterResult.set("value", result);
                         iterResult.set("done", JSBoolean.FALSE);
                         promise.fulfill(iterResult);
                     }
                 } catch (Exception e) {
                     String errorMessage = e.getMessage() != null ? e.getMessage() : e.toString();
-                    JSObject errorObj = new JSObject();
+                    JSObject errorObj = context.createJSObject();
                     errorObj.set("message", new JSString(errorMessage));
                     promise.reject(errorObj);
                 }
@@ -178,13 +185,13 @@ public final class JSBytecodeFunction extends JSFunction {
 
             // Create a sync generator object
             // The generator object is both an iterator and an iterable
-            JSObject generatorObj = new JSObject();
-            
+            JSObject generatorObj = context.createJSObject();
+
             // Set up the `next` method
             generatorObj.set("next", new JSNativeFunction("next", 0, (ctx, thisValue, arguments) -> {
                 // Check if generator is completed
                 if (generatorState.isCompleted()) {
-                    JSObject result = new JSObject();
+                    JSObject result = context.createJSObject();
                     result.set("value", JSUndefined.INSTANCE);
                     result.set("done", JSBoolean.TRUE);
                     return result;
@@ -196,7 +203,7 @@ public final class JSBytecodeFunction extends JSFunction {
                     JSValue yieldValue = ctx.getVirtualMachine().executeGenerator(generatorState, ctx);
 
                     // Create iterator result object
-                    JSObject result = new JSObject();
+                    JSObject result = context.createJSObject();
                     result.set("value", yieldValue);
                     result.set("done", generatorState.isCompleted() ? JSBoolean.TRUE : JSBoolean.FALSE);
                     return result;
@@ -208,12 +215,12 @@ public final class JSBytecodeFunction extends JSFunction {
             // Set up the `return` method
             generatorObj.set("return", new JSNativeFunction("return", 1, (ctx, thisValue, arguments) -> {
                 JSValue value = arguments.length > 0 ? arguments[0] : JSUndefined.INSTANCE;
-                
+
                 // Mark generator as completed
                 generatorState.setCompleted(true);
-                
+
                 // Return the value with done: true
-                JSObject result = new JSObject();
+                JSObject result = context.createJSObject();
                 result.set("value", value);
                 result.set("done", JSBoolean.TRUE);
                 return result;
@@ -222,18 +229,18 @@ public final class JSBytecodeFunction extends JSFunction {
             // Set up the `throw` method
             generatorObj.set("throw", new JSNativeFunction("throw", 1, (ctx, thisValue, arguments) -> {
                 JSValue exception = arguments.length > 0 ? arguments[0] : JSUndefined.INSTANCE;
-                
+
                 // Mark generator as completed
                 generatorState.setCompleted(true);
-                
+
                 // Throw the exception
                 throw new RuntimeException("Exception thrown into generator: " + exception);
             }));
 
             // Make the generator iterable by adding Symbol.iterator
             // According to ES spec, generators return `this` when Symbol.iterator is called
-            generatorObj.set(PropertyKey.fromSymbol(JSSymbol.ITERATOR), 
-                new JSNativeFunction("[Symbol.iterator]", 0, (ctx, thisValue, arguments) -> thisValue));
+            generatorObj.set(PropertyKey.fromSymbol(JSSymbol.ITERATOR),
+                    new JSNativeFunction("[Symbol.iterator]", 0, (ctx, thisValue, arguments) -> thisValue));
 
             return generatorObj;
         }
@@ -262,7 +269,7 @@ public final class JSBytecodeFunction extends JSFunction {
                 } else {
                     // Create error object from exception message
                     String errorMessage = e.getMessage() != null ? e.getMessage() : e.toString();
-                    JSObject errorObj = new JSObject();
+                    JSObject errorObj = context.createJSObject();
                     errorObj.set("message", new JSString(errorMessage));
                     promise.reject(errorObj);
                 }
@@ -270,7 +277,7 @@ public final class JSBytecodeFunction extends JSFunction {
                 // Any other exception in an async function should be caught
                 // and wrapped in a rejected promise
                 String errorMessage = e.getMessage() != null ? e.getMessage() : e.toString();
-                JSObject errorObj = new JSObject();
+                JSObject errorObj = context.createJSObject();
                 errorObj.set("message", new JSString(errorMessage));
                 promise.reject(errorObj);
             }

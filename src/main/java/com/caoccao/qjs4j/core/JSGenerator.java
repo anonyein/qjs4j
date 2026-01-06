@@ -28,6 +28,7 @@ package com.caoccao.qjs4j.core;
  * and maintain execution state across calls.
  */
 public final class JSGenerator extends JSObject {
+    private final JSContext context;
     private final JSIterator.IteratorFunction iteratorFunction;
     private boolean done;
     private JSValue returnValue;
@@ -37,8 +38,9 @@ public final class JSGenerator extends JSObject {
      * Create a generator with the given iteration logic.
      * Simplified: uses an iterator function rather than bytecode with yield.
      */
-    public JSGenerator(JSIterator.IteratorFunction iteratorFunction) {
+    public JSGenerator(JSContext context, JSIterator.IteratorFunction iteratorFunction) {
         super();
+        this.context = context;
         this.iteratorFunction = iteratorFunction;
         this.done = false;
         this.returnValue = JSUndefined.INSTANCE;
@@ -48,29 +50,29 @@ public final class JSGenerator extends JSObject {
     /**
      * Helper to create a generator from an array.
      */
-    public static JSGenerator fromArray(JSArray array) {
+    public static JSGenerator fromArray(JSContext context, JSArray array) {
         final int[] index = {0};
-        return new JSGenerator(() -> {
+        return new JSGenerator(context, () -> {
             if (index[0] < array.getLength()) {
                 JSValue value = array.get(index[0]++);
-                return JSIterator.IteratorResult.of(value);
+                return JSIterator.IteratorResult.of(context, value);
             }
-            return JSIterator.IteratorResult.done();
+            return JSIterator.IteratorResult.done(context);
         });
     }
 
     /**
      * Helper to create a simple generator from an iterator function.
      */
-    public static JSGenerator fromIteratorFunction(JSIterator.IteratorFunction iteratorFunction) {
-        return new JSGenerator(iteratorFunction);
+    public static JSGenerator fromIteratorFunction(JSContext context, JSIterator.IteratorFunction iteratorFunction) {
+        return new JSGenerator(context, iteratorFunction);
     }
 
     /**
      * Create an iterator result object: { value: any, done: boolean }
      */
     private JSObject createIteratorResult(JSValue value, boolean isDone) {
-        JSObject result = new JSObject();
+        JSObject result = context.createJSObject();
         result.set("value", value);
         result.set("done", JSBoolean.valueOf(isDone));
         return result;

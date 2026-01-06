@@ -102,7 +102,7 @@ public final class ArrayConstructor {
         // Try to use Symbol.iterator for general iterables
         if (JSIteratorHelper.isIterable(arrayLike)) {
             final int[] index = {0};
-            JSIteratorHelper.forOf(arrayLike, (value) -> {
+            JSIteratorHelper.forOf(context, arrayLike, (value) -> {
                 JSValue itemValue = value;
 
                 // Apply mapping function if provided
@@ -114,7 +114,7 @@ public final class ArrayConstructor {
                 result.push(itemValue);
                 index[0]++;
                 return true;
-            }, context);
+            });
             return result;
         }
 
@@ -151,7 +151,7 @@ public final class ArrayConstructor {
         JSAsyncIterator asyncIterator = JSAsyncIteratorHelper.getAsyncIterator(arrayLike, context);
         if (asyncIterator != null) {
             // Use async iteration
-            JSPromise arrayPromise = JSAsyncIteratorHelper.toArray(arrayLike, context);
+            JSPromise arrayPromise = JSAsyncIteratorHelper.toArray(context, arrayLike);
 
             arrayPromise.addReactions(
                     new JSPromise.ReactionRecord(
@@ -248,7 +248,7 @@ public final class ArrayConstructor {
         if (JSIteratorHelper.isIterable(arrayLike)) {
             JSArray result = context.createJSArray();
             final int[] index = {0};
-            JSIteratorHelper.forOf(arrayLike, (value) -> {
+            JSIteratorHelper.forOf(context, arrayLike, (value) -> {
                 JSValue itemValue = value;
                 if (mapFn instanceof JSFunction mappingFunc) {
                     JSValue[] mapArgs = new JSValue[]{value, new JSNumber(index[0])};
@@ -257,7 +257,7 @@ public final class ArrayConstructor {
                 result.push(itemValue);
                 index[0]++;
                 return true;
-            }, context);
+            });
             resultPromise.fulfill(result);
             return resultPromise;
         }

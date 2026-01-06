@@ -42,6 +42,7 @@ public final class JSModule {
     private final JSObject namespace;
     private final List<JSModule> requestedModules;
     private final String url;
+    private final JSContext context;
     private JSValue defaultExport;
     private ModuleStatus status;
 
@@ -51,7 +52,8 @@ public final class JSModule {
      * @param url            Module URL or identifier
      * @param moduleFunction The compiled module code as a function
      */
-    public JSModule(String url, JSBytecodeFunction moduleFunction) {
+    public JSModule(JSContext context, String url, JSBytecodeFunction moduleFunction) {
+        this.context = context;
         this.url = url;
         this.moduleFunction = moduleFunction;
         this.namedExports = new HashMap<>();
@@ -59,7 +61,7 @@ public final class JSModule {
         this.defaultExport = null;
         this.requestedModules = new ArrayList<>();
         this.status = ModuleStatus.UNLINKED;
-        this.namespace = new JSObject();
+        this.namespace = context.createJSObject();
         this.dfsIndex = -1;
         this.dfsAncestorIndex = -1;
     }

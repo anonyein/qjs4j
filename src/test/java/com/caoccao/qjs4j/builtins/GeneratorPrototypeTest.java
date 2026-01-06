@@ -31,14 +31,14 @@ public class GeneratorPrototypeTest extends BaseTest {
     public void testCustomGenerator() {
         // Create a custom generator that yields specific values
         final int[] counter = {0};
-        JSGenerator generator = JSGenerator.fromIteratorFunction(() -> {
+        JSGenerator generator = JSGenerator.fromIteratorFunction(context, () -> {
             counter[0]++;
             if (counter[0] == 1) {
-                return JSIterator.IteratorResult.of(new JSString("first"));
+                return JSIterator.IteratorResult.of(context, new JSString("first"));
             } else if (counter[0] == 2) {
-                return JSIterator.IteratorResult.of(new JSString("second"));
+                return JSIterator.IteratorResult.of(context, new JSString("second"));
             } else {
-                return JSIterator.IteratorResult.done();
+                return JSIterator.IteratorResult.done(context);
             }
         });
 
@@ -63,7 +63,7 @@ public class GeneratorPrototypeTest extends BaseTest {
     public void testEmptyGenerator() {
         // Create an empty generator
         JSArray emptyArray = new JSArray();
-        JSGenerator generator = JSGenerator.fromArray(emptyArray);
+        JSGenerator generator = JSGenerator.fromArray(context, emptyArray);
 
         // Normal case: next() on empty generator
         JSValue result = GeneratorPrototype.next(context, generator, new JSValue[]{});
@@ -72,7 +72,7 @@ public class GeneratorPrototypeTest extends BaseTest {
         assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: return on empty generator
-        JSGenerator generator2 = JSGenerator.fromArray(emptyArray);
+        JSGenerator generator2 = JSGenerator.fromArray(context, emptyArray);
         result = GeneratorPrototype.returnMethod(context, generator2, new JSValue[]{new JSString("done")});
         iteratorResult = result.asObject().orElseThrow();
         assertThat(iteratorResult.get("value")).isInstanceOfSatisfying(JSString.class, str -> assertThat(str.value()).isEqualTo("done"));
@@ -86,7 +86,7 @@ public class GeneratorPrototypeTest extends BaseTest {
         array.push(new JSNumber(1));
         array.push(new JSNumber(2));
         array.push(new JSNumber(3));
-        JSGenerator generator = JSGenerator.fromArray(array);
+        JSGenerator generator = JSGenerator.fromArray(context, array);
 
         // Normal case: first next() call
         JSValue result = GeneratorPrototype.next(context, generator, new JSValue[]{});
@@ -148,7 +148,7 @@ public class GeneratorPrototypeTest extends BaseTest {
         array.push(new JSNumber(1));
         array.push(new JSNumber(2));
         array.push(new JSNumber(3));
-        JSGenerator generator = JSGenerator.fromArray(array);
+        JSGenerator generator = JSGenerator.fromArray(context, array);
 
         // Normal case: return with value
         JSValue result = GeneratorPrototype.returnMethod(context, generator, new JSValue[]{new JSString("returned")});
@@ -163,7 +163,7 @@ public class GeneratorPrototypeTest extends BaseTest {
         assertThat(iteratorResult.get("done")).isEqualTo(JSBoolean.TRUE);
 
         // Normal case: return without value (undefined)
-        JSGenerator generator2 = JSGenerator.fromArray(array);
+        JSGenerator generator2 = JSGenerator.fromArray(context, array);
         result = GeneratorPrototype.returnMethod(context, generator2, new JSValue[]{});
         iteratorResult = result.asObject().orElseThrow();
         assertThat(iteratorResult.get("value")).isEqualTo(JSUndefined.INSTANCE);
@@ -192,7 +192,7 @@ public class GeneratorPrototypeTest extends BaseTest {
         JSArray array = new JSArray();
         array.push(new JSNumber(1));
         array.push(new JSNumber(2));
-        JSGenerator generator = JSGenerator.fromArray(array);
+        JSGenerator generator = JSGenerator.fromArray(context, array);
 
         // Normal case: throw with exception
         JSValue result = GeneratorPrototype.throwMethod(context, generator, new JSValue[]{new JSString("test exception")});
@@ -204,7 +204,7 @@ public class GeneratorPrototypeTest extends BaseTest {
         assertThat(context.getPendingException()).isNotNull();
 
         // Normal case: throw without exception (undefined)
-        JSGenerator generator2 = JSGenerator.fromArray(array);
+        JSGenerator generator2 = JSGenerator.fromArray(context, array);
         result = GeneratorPrototype.throwMethod(context, generator2, new JSValue[]{});
         assertThat(result).isInstanceOfSatisfying(JSObject.class, error -> {
             assertThat(error.get("name")).isNotNull();

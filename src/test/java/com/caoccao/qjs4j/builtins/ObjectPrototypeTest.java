@@ -238,6 +238,33 @@ public class ObjectPrototypeTest extends BaseJavetTest {
         // Edge case: called on non-object
         result = ObjectPrototype.hasOwnProperty(context, new JSString("string"), new JSValue[]{new JSString("length")});
         assertThat(result).isEqualTo(JSBoolean.FALSE);
+
+        assertBooleanWithJavet(
+                "var obj = {foo: 'bar'}; obj.hasOwnProperty('foo')",
+                "var obj = {a: 1}; Object.getPrototypeOf(obj) === Object.prototype;",
+                """
+                        var outer = {
+                            inner: {
+                                value: 42
+                            }
+                        };
+                        outer.hasOwnProperty('inner') && outer.inner.hasOwnProperty('value');
+                        """,
+                """
+                        var obj = {};
+                        Object.getPrototypeOf(obj) === Object.prototype;
+                        """);
+        assertStringWithJavet(
+                """
+                        var obj = {x: 10};
+                        var results = {
+                            hasOwnProperty: obj.hasOwnProperty('x'),
+                            toString: typeof obj.toString === 'function',
+                            valueOf: typeof obj.valueOf === 'function',
+                            isPrototypeOf: typeof obj.isPrototypeOf === 'function'
+                        };
+                        JSON.stringify(results);
+                        """);
     }
 
     @Test
