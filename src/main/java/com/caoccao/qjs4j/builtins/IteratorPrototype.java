@@ -34,15 +34,15 @@ public final class IteratorPrototype {
         }
 
         final int[] index = {0};
-        return new JSIterator(() -> {
+        return new JSIterator(context, () -> {
             if (index[0] < array.getLength()) {
                 JSArray pair = context.createJSArray();
                 pair.push(new JSNumber(index[0]));
                 pair.push(array.get(index[0]));
                 index[0]++;
-                return JSIterator.IteratorResult.of(pair);
+                return JSIterator.IteratorResult.of(context, pair);
             }
-            return JSIterator.IteratorResult.done();
+            return JSIterator.IteratorResult.done(context);
         });
     }
 
@@ -56,11 +56,11 @@ public final class IteratorPrototype {
         }
 
         final int[] index = {0};
-        return new JSIterator(() -> {
+        return new JSIterator(context, () -> {
             if (index[0] < array.getLength()) {
-                return JSIterator.IteratorResult.of(new JSNumber(index[0]++));
+                return JSIterator.IteratorResult.of(context, new JSNumber(index[0]++));
             }
-            return JSIterator.IteratorResult.done();
+            return JSIterator.IteratorResult.done(context);
         });
     }
 
@@ -73,7 +73,7 @@ public final class IteratorPrototype {
             return context.throwTypeError("Array.prototype.values called on non-array");
         }
 
-        return JSIterator.arrayIterator(array);
+        return JSIterator.arrayIterator(context, array);
     }
 
     /**
@@ -163,7 +163,7 @@ public final class IteratorPrototype {
             return context.throwTypeError("Map.prototype.keys called on non-Map");
         }
 
-        return JSIterator.mapKeysIterator(map);
+        return JSIterator.mapKeysIterator(context, map);
     }
 
     /**
@@ -175,7 +175,7 @@ public final class IteratorPrototype {
             return context.throwTypeError("Map.prototype.values called on non-Map");
         }
 
-        return JSIterator.mapValuesIterator(map);
+        return JSIterator.mapValuesIterator(context, map);
     }
 
     /**
@@ -208,15 +208,15 @@ public final class IteratorPrototype {
         }
 
         final java.util.Iterator<JSMap.KeyWrapper> iter = set.values().iterator();
-        return new JSIterator(() -> {
+        return new JSIterator(context, () -> {
             if (iter.hasNext()) {
                 JSValue value = iter.next().value();
                 JSArray pair = context.createJSArray();
                 pair.push(value);
                 pair.push(value); // In Set, both elements are the same
-                return JSIterator.IteratorResult.of(pair);
+                return JSIterator.IteratorResult.of(context, pair);
             }
-            return JSIterator.IteratorResult.done();
+            return JSIterator.IteratorResult.done(context);
         });
     }
 
@@ -237,7 +237,7 @@ public final class IteratorPrototype {
             return context.throwTypeError("Set.prototype.values called on non-Set");
         }
 
-        return JSIterator.setValuesIterator(set);
+        return JSIterator.setValuesIterator(context, set);
     }
 
     /**
@@ -258,13 +258,13 @@ public final class IteratorPrototype {
             if (thisArg instanceof JSObject obj) {
                 JSValue primitiveValue = obj.getPrimitiveValue();
                 if (primitiveValue instanceof JSString boxedStr) {
-                    return JSIterator.stringIterator(boxedStr);
+                    return JSIterator.stringIterator(context, boxedStr);
                 }
             }
             return context.throwTypeError("String iterator called on non-string");
         }
 
-        return JSIterator.stringIterator(str);
+        return JSIterator.stringIterator(context, str);
     }
 
     /**

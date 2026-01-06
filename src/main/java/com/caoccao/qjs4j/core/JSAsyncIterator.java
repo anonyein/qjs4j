@@ -61,13 +61,14 @@ public class JSAsyncIterator extends JSObject {
     /**
      * Create an IteratorResult object that resolves in a promise.
      *
+     * @param context The execution context
      * @param value The iterator value
      * @param done  Whether iteration is complete
      * @return A promise that resolves to the iterator result
      */
-    public static JSPromise createIteratorResultPromise(JSValue value, boolean done) {
-        JSPromise promise = new JSPromise();
-        JSObject result = new JSObject();
+    public static JSPromise createIteratorResultPromise(JSContext context, JSValue value, boolean done) {
+        JSPromise promise = context.createJSPromise();
+        JSObject result = context.createJSObject();
         result.set("value", value);
         result.set("done", JSBoolean.valueOf(done));
         promise.fulfill(result);
@@ -89,10 +90,10 @@ public class JSAsyncIterator extends JSObject {
             @Override
             public JSPromise next() {
                 if (index >= array.getLength()) {
-                    return createIteratorResultPromise(JSUndefined.INSTANCE, true);
+                    return createIteratorResultPromise(context, JSUndefined.INSTANCE, true);
                 }
                 JSValue value = array.get(index++);
-                return createIteratorResultPromise(value, false);
+                return createIteratorResultPromise(context, value, false);
             }
         }, context);
     }
@@ -109,10 +110,10 @@ public class JSAsyncIterator extends JSObject {
         Iterator<JSValue> javaIterator = iterable.iterator();
         return new JSAsyncIterator(() -> {
             if (!javaIterator.hasNext()) {
-                return createIteratorResultPromise(JSUndefined.INSTANCE, true);
+                return createIteratorResultPromise(context, JSUndefined.INSTANCE, true);
             }
             JSValue value = javaIterator.next();
-            return createIteratorResultPromise(value, false);
+            return createIteratorResultPromise(context, value, false);
         }, context);
     }
 
@@ -130,7 +131,7 @@ public class JSAsyncIterator extends JSObject {
             JSValue value = result.get("value");
             JSValue doneValue = result.get("done");
             boolean done = doneValue instanceof JSBoolean && ((JSBoolean) doneValue).value();
-            return createIteratorResultPromise(value, done);
+            return createIteratorResultPromise(context, value, done);
         }, context);
     }
 
@@ -138,18 +139,18 @@ public class JSAsyncIterator extends JSObject {
      * Create an async iterator that produces values from a promise.
      * When the promise resolves, yields the value once and then completes.
      *
-     * @param promise The promise to await
      * @param context The execution context
+     * @param promise The promise to await
      * @return An async iterator
      */
-    public static JSAsyncIterator fromPromise(JSPromise promise, JSContext context) {
+    public static JSAsyncIterator fromPromise(JSContext context, JSPromise promise) {
         return new JSAsyncIterator(new AsyncIteratorFunction() {
             private boolean consumed = false;
 
             @Override
             public JSPromise next() {
                 if (consumed) {
-                    return createIteratorResultPromise(JSUndefined.INSTANCE, true);
+                    return createIteratorResultPromise(context, JSUndefined.INSTANCE, true);
                 }
                 consumed = true;
 
@@ -159,7 +160,7 @@ public class JSAsyncIterator extends JSObject {
                         new JSPromise.ReactionRecord(
                                 new JSNativeFunction("onFulfilled", 1, (childContext, thisArg, args) -> {
                                     JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-                                    JSObject result = new JSObject();
+                                    JSObject result = childContext.createJSObject();
                                     result.set("value", value);
                                     result.set("done", JSBoolean.FALSE);
                                     resultPromise.fulfill(result);

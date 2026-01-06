@@ -31,18 +31,18 @@ public final class JSAsyncIteratorHelper {
      * Execute a for-await-of loop.
      * Iterates asynchronously, waiting for each promise to resolve.
      *
+     * @param context  The execution context
      * @param iterable The iterable to loop over
      * @param callback The callback to execute for each value
-     * @param context  The execution context
      * @return A promise that resolves when iteration is complete
      */
-    public static JSPromise forAwaitOf(JSValue iterable, AsyncIterationCallback callback, JSContext context) {
+    public static JSPromise forAwaitOf(JSContext context, JSValue iterable, AsyncIterationCallback callback) {
         JSPromise completionPromise = new JSPromise();
 
         // Get async iterator
         JSAsyncIterator iterator = getAsyncIterator(iterable, context);
         if (iterator == null) {
-            JSObject error = new JSObject();
+            JSObject error = context.createJSObject();
             error.set("name", new JSString("TypeError"));
             error.set("message", new JSString("Object is not async iterable"));
             completionPromise.reject(error);
@@ -202,22 +202,22 @@ public final class JSAsyncIteratorHelper {
      * Convert an async iterable to an array.
      * Waits for all values to be produced asynchronously.
      *
-     * @param iterable The async iterable
      * @param context  The execution context
+     * @param iterable The async iterable
      * @return A promise that resolves to an array of all values
      */
-    public static JSPromise toArray(JSValue iterable, JSContext context) {
+    public static JSPromise toArray(JSContext context, JSValue iterable) {
         JSPromise resultPromise = new JSPromise();
         JSArray array = context.createJSArray();
 
         // Use for-await-of to collect all values
-        forAwaitOf(iterable, (value) -> {
+        forAwaitOf(context, iterable, (value) -> {
             array.push(value);
             // Return immediately resolved promise
             JSPromise resolved = new JSPromise();
             resolved.fulfill(JSUndefined.INSTANCE);
             return resolved;
-        }, context).addReactions(
+        }).addReactions(
                 new JSPromise.ReactionRecord(
                         new JSNativeFunction("onComplete", 1, (childContext, thisArg, args) -> {
                             resultPromise.fulfill(array);

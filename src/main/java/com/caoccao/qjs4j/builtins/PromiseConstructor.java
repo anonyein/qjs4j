@@ -141,7 +141,7 @@ public final class PromiseConstructor {
                 elementPromise.addReactions(
                         new JSPromise.ReactionRecord(
                                 new JSNativeFunction("onFulfill", 1, (childContext, thisValue, funcArgs) -> {
-                                    JSObject result = new JSObject();
+                                    JSObject result = context.createJSObject();
                                     result.set("status", new JSString("fulfilled"));
                                     result.set("value", funcArgs[0]);
                                     results.set(index, result);
@@ -156,7 +156,7 @@ public final class PromiseConstructor {
                         ),
                         new JSPromise.ReactionRecord(
                                 new JSNativeFunction("onReject", 1, (childContext, thisValue, funcArgs) -> {
-                                    JSObject result = new JSObject();
+                                    JSObject result = context.createJSObject();
                                     result.set("status", new JSString("rejected"));
                                     result.set("reason", funcArgs[0]);
                                     results.set(index, result);
@@ -172,7 +172,7 @@ public final class PromiseConstructor {
                 );
             } else {
                 // Not a promise, treat as already fulfilled
-                JSObject result = new JSObject();
+                JSObject result = context.createJSObject();
                 result.set("status", new JSString("fulfilled"));
                 result.set("value", element);
                 results.set(index, result);
@@ -368,7 +368,7 @@ public final class PromiseConstructor {
         });
 
         // Create result object
-        JSObject result = new JSObject();
+        JSObject result = context.createJSObject();
         result.set("promise", promise);
         result.set("resolve", resolveFn);
         result.set("reject", rejectFn);

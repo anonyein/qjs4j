@@ -74,7 +74,7 @@ public final class ObjectConstructor {
     public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
         // If no argument or undefined/null, return new empty object
         if (args.length == 0 || args[0].isNullOrUndefined()) {
-            return new JSObject();
+            return context.createJSObject();
         }
 
         JSValue value = args[0];
@@ -119,7 +119,7 @@ public final class ObjectConstructor {
         }
 
         // For any other value, return new empty object
-        return new JSObject();
+        return context.createJSObject();
     }
 
     /**
@@ -129,20 +129,20 @@ public final class ObjectConstructor {
      */
     public static JSValue create(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
-            return context.throwTypeError("Object prototype may only be an Object or null");
+            return context.throwTypeError("Object prototype may only be an Object or null: undefined");
         }
-
-        JSValue proto = args[0];
-
+        JSValue firstArg = args[0];
+        JSObject proto = null;
+        if (!firstArg.isNull()) {
+            if (firstArg instanceof JSObject jsObject) {
+                proto = jsObject;
+            } else {
+                return context.throwTypeError("Object prototype may only be an Object or null: " + JSTypeConversions.toString(context, firstArg).value());
+            }
+        }
         // Create new object
         JSObject newObj = new JSObject();
-
-        // Set prototype
-        if (proto instanceof JSObject protoObj) {
-            newObj.setPrototype(protoObj);
-        } else if (!(proto instanceof JSNull)) {
-            return context.throwTypeError("Object prototype may only be an Object or null");
-        }
+        newObj.setPrototype(proto);
         // null prototype is allowed - object stays with null prototype
 
         // Handle propertiesObject parameter (args[1]) if present
@@ -389,7 +389,7 @@ public final class ObjectConstructor {
 
         // Special case: if it's a JSArray, iterate directly for efficiency
         if (iterable instanceof JSArray arr) {
-            JSObject result = new JSObject();
+            JSObject result = context.createJSObject();
 
             for (int i = 0; i < arr.getLength(); i++) {
                 JSValue entry = arr.get(i);
@@ -443,7 +443,7 @@ public final class ObjectConstructor {
         }
 
         // Create result object
-        JSObject result = new JSObject();
+        JSObject result = context.createJSObject();
 
         // Iterate over entries
         while (true) {
@@ -510,7 +510,7 @@ public final class ObjectConstructor {
         }
 
         // Convert PropertyDescriptor to a descriptor object
-        JSObject descObj = new JSObject();
+        JSObject descObj = context.createJSObject();
 
         if (desc.isDataDescriptor()) {
             descObj.set("value", desc.getValue() != null ? desc.getValue() : JSUndefined.INSTANCE);
@@ -541,13 +541,13 @@ public final class ObjectConstructor {
             return context.throwTypeError("Object.getOwnPropertyDescriptors called on non-object");
         }
 
-        JSObject result = new JSObject();
+        JSObject result = context.createJSObject();
         List<PropertyKey> keys = obj.getOwnPropertyKeys();
 
         for (PropertyKey key : keys) {
             PropertyDescriptor desc = obj.getOwnPropertyDescriptor(key);
             if (desc != null) {
-                JSObject descObj = new JSObject();
+                JSObject descObj = context.createJSObject();
 
                 if (desc.isDataDescriptor()) {
                     descObj.set("value", desc.getValue() != null ? desc.getValue() : JSUndefined.INSTANCE);
@@ -665,7 +665,7 @@ public final class ObjectConstructor {
             return context.throwTypeError("Second argument must be a function");
         }
 
-        JSObject result = new JSObject();
+        JSObject result = context.createJSObject();
 
         long length = arr.getLength();
         for (long i = 0; i < length; i++) {

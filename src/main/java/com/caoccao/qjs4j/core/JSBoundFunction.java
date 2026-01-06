@@ -31,9 +31,28 @@ public final class JSBoundFunction extends JSFunction {
         this.boundArgs = boundArgs;
 
         // Set up function properties on the object
-        // Functions are objects in JavaScript and have these standard properties
-        this.set("name", new JSString(getName()));
-        this.set("length", new JSNumber(getLength()));
+        // Per ECMAScript spec, bound functions have "name" and "length" properties
+        // with attributes: { [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true }
+        // Following QuickJS implementation: use defineProperty with only configurable=true
+        this.defineProperty(
+                PropertyKey.fromString("name"),
+                PropertyDescriptor.dataDescriptor(
+                        new JSString(getName()),
+                        false, // writable
+                        false, // enumerable
+                        true   // configurable
+                )
+        );
+
+        this.defineProperty(
+                PropertyKey.fromString("length"),
+                PropertyDescriptor.dataDescriptor(
+                        new JSNumber(getLength()),
+                        false, // writable
+                        false, // enumerable
+                        true   // configurable
+                )
+        );
     }
 
     @Override

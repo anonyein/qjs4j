@@ -253,7 +253,7 @@ public final class JSONObject {
 
         // If reviver function is provided, apply it
         if (args.length > 1 && args[1] instanceof JSFunction reviver) {
-            JSObject root = new JSObject();
+            JSObject root = context.createJSObject();
             root.set("", obj);
             return internalizeJSONProperty(context, root, "", reviver);
         }
@@ -373,7 +373,7 @@ public final class JSONObject {
             throw new JSONParseException("Expected '{' " + parseContext.getPositionInfo(start));
         }
 
-        JSObject obj = new JSObject();
+        JSObject obj = context.createJSObject();
         int propertyCount = 0;
         int i = skipWhitespace(parseContext.text, start + 1);
 
@@ -643,7 +643,7 @@ public final class JSONObject {
         ctx.gap = indent;
 
         // Create wrapper object to hold the value
-        JSObject wrapper = new JSObject();
+        JSObject wrapper = context.createJSObject();
         wrapper.set("", value);
 
         // Apply initial check (handles toJSON and replacer)

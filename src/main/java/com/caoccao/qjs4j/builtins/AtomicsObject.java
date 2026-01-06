@@ -525,7 +525,7 @@ public final class AtomicsObject {
 
         if (currentValue != expectedValue) {
             // Return {async: false, value: "not-equal"}
-            JSObject result = new JSObject();
+            JSObject result = context.createJSObject();
             result.set("async", JSBoolean.FALSE);
             result.set("value", new JSString("not-equal"));
             return result;
@@ -538,7 +538,7 @@ public final class AtomicsObject {
 
         // For now, return a simplified version without actual Promise support
         // A full implementation would require Promise support in the runtime
-        JSObject result = new JSObject();
+        JSObject result = context.createJSObject();
         result.set("async", JSBoolean.TRUE);
 
         // TODO: Implement Promise-based async waiting when Promise support is available

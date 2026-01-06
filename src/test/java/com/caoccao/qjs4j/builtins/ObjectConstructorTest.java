@@ -102,6 +102,17 @@ public class ObjectConstructorTest extends BaseJavetTest {
         result = context.eval("var newObj = Object.create(proto); newObj.x");
         assertThat(result).isNotNull();
         assertThat(result.toJavaObject()).isEqualTo(10.0);
+
+        assertBooleanWithJavet(
+                "Object.create(null).prototype === null",
+                "Object.getPrototypeOf(Object.create(null)) === null",
+                "Object.create({}).prototype === {}.prototype",
+                "Object.create({a:1}).prototype === {b:2}.prototype");
+
+        assertErrorWithJavet(
+                "Object.create()",
+                "Object.create(123)",
+                "Object.create(undefined)");
     }
 
     @Test
@@ -458,6 +469,9 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertErrorWithJavet(
                 "Object.getOwnPropertyNames(undefined)",
                 "Object.getOwnPropertyNames()");
+
+        assertStringWithJavet(
+                "JSON.stringify(Object.getOwnPropertyNames(Object).sort())");
     }
 
     @Test
@@ -511,9 +525,18 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertTypeError(ObjectConstructor.getPrototypeOf(context, JSUndefined.INSTANCE, new JSValue[]{new JSString("not object")}));
         assertPendingException(context);
 
-        assertBooleanWithJavet("""
-                var proto = {x: 10}; var newObj = Object.create(proto);
-                Object.getPrototypeOf(newObj) === proto""");
+        assertBooleanWithJavet(
+                """
+                        var proto = {x: 10}; var newObj = Object.create(proto);
+                        Object.getPrototypeOf(newObj) === proto""",
+                """
+                        class A {};
+                        var a = new A();
+                        Object.getPrototypeOf(a) === A.prototype""",
+                """
+                        class A {};
+                        var a = new A();
+                        typeof Object.getPrototypeOf(a) === 'Function'""");
     }
 
     @Test

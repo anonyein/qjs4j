@@ -48,8 +48,8 @@ public final class AsyncGeneratorPrototype {
             int currentIndex = index[0]++;
 
             if (currentIndex >= values.length) {
-                JSPromise promise = new JSPromise();
-                JSObject result = new JSObject();
+                JSPromise promise = context.createJSPromise();
+                JSObject result = context.createJSObject();
                 result.set("value", JSUndefined.INSTANCE);
                 result.set("done", JSBoolean.TRUE);
                 promise.fulfill(result);
@@ -62,7 +62,7 @@ public final class AsyncGeneratorPrototype {
             // In a real implementation, this would use setTimeout or similar
             // For now, we enqueue as a microtask to simulate async behavior
             context.enqueueMicrotask(() -> {
-                JSObject result = new JSObject();
+                JSObject result = context.createJSObject();
                 result.set("value", values[currentIndex]);
                 result.set("done", JSBoolean.FALSE);
                 promise.fulfill(result);
@@ -86,7 +86,7 @@ public final class AsyncGeneratorPrototype {
             final int[] index = {0};
 
             if (isThrow) {
-                JSPromise promise = new JSPromise();
+                JSPromise promise = context.createJSPromise();
                 promise.reject(inputValue);
                 return promise;
             }
@@ -95,8 +95,8 @@ public final class AsyncGeneratorPrototype {
 
             if (currentIndex >= promises.length) {
                 // All promises processed
-                JSPromise promise = new JSPromise();
-                JSObject result = new JSObject();
+                JSPromise promise = context.createJSPromise();
+                JSObject result = context.createJSObject();
                 result.set("value", JSUndefined.INSTANCE);
                 result.set("done", JSBoolean.TRUE);
                 promise.fulfill(result);
@@ -105,13 +105,13 @@ public final class AsyncGeneratorPrototype {
 
             // Wait for the current promise and yield its value
             JSPromise currentPromise = promises[currentIndex];
-            JSPromise resultPromise = new JSPromise();
+            JSPromise resultPromise = context.createJSPromise();
 
             currentPromise.addReactions(
                     new JSPromise.ReactionRecord(
                             new JSNativeFunction("onFulfilled", 1, (childContext, thisArg, args) -> {
                                 JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-                                JSObject result = new JSObject();
+                                JSObject result = context.createJSObject();
                                 result.set("value", value);
                                 result.set("done", JSBoolean.FALSE);
                                 resultPromise.fulfill(result);
@@ -159,8 +159,8 @@ public final class AsyncGeneratorPrototype {
 
             if (currentIndex >= values.length) {
                 // All values yielded
-                JSPromise promise = new JSPromise();
-                JSObject result = new JSObject();
+                JSPromise promise = context.createJSPromise();
+                JSObject result = context.createJSObject();
                 result.set("value", JSUndefined.INSTANCE);
                 result.set("done", JSBoolean.TRUE);
                 promise.fulfill(result);
@@ -168,8 +168,8 @@ public final class AsyncGeneratorPrototype {
             }
 
             // Yield next value
-            JSPromise promise = new JSPromise();
-            JSObject result = new JSObject();
+            JSPromise promise = context.createJSPromise();
+            JSObject result = context.createJSObject();
             result.set("value", values[currentIndex]);
             result.set("done", JSBoolean.FALSE);
             promise.fulfill(result);

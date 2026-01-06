@@ -470,7 +470,7 @@ public final class ArrayPrototype {
      * These are methods added in ES2015 and later that should not be included in with statements.
      */
     public static JSValue getSymbolUnscopables(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSObject unscopables = new JSObject();
+        JSObject unscopables = context.createJSObject();
 
         // ES2015 methods
         unscopables.set("copyWithin", JSBoolean.TRUE);

@@ -51,7 +51,7 @@ public final class ProxyConstructor {
         JSProxy proxy = new JSProxy(target, handler, context);
 
         // Create result object with proxy and revoke function
-        JSObject result = new JSObject();
+        JSObject result = context.createJSObject();
         result.set("proxy", proxy);
 
         // Create revoke function that invalidates the proxy

@@ -58,7 +58,7 @@ public final class JSWeakSet extends JSObject {
                 }
             } else if (iterableArg instanceof JSObject) {
                 // Try to get iterator
-                JSValue iterator = JSIteratorHelper.getIterator(iterableArg, context);
+                JSValue iterator = JSIteratorHelper.getIterator(context, iterableArg);
                 if (iterator instanceof JSIterator iter) {
                     // Iterate and populate
                     while (true) {

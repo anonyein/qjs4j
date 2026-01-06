@@ -84,7 +84,7 @@ public final class ReflectObject {
         }
 
         // Simplified: Create a new object and call the constructor with it
-        JSObject newObj = new JSObject();
+        JSObject newObj = context.createJSObject();
         target.call(context, newObj, constructorArgs);
         return newObj;
     }

@@ -72,7 +72,7 @@ public final class DynamicImport {
                 promise.fulfill(namespace);
             } catch (JSModule.ModuleLinkingException e) {
                 // Reject with a TypeError for linking errors
-                JSObject error = new JSObject();
+                JSObject error = context.createJSObject();
                 error.set("name", new JSString("TypeError"));
                 error.set("message", new JSString("Cannot import module: " + e.getMessage()));
                 promise.reject(error);
@@ -82,14 +82,14 @@ public final class DynamicImport {
                 if (jsException != null) {
                     promise.reject(jsException);
                 } else {
-                    JSObject error = new JSObject();
+                    JSObject error = context.createJSObject();
                     error.set("name", new JSString("Error"));
                     error.set("message", new JSString("Module evaluation failed: " + e.getMessage()));
                     promise.reject(error);
                 }
             } catch (Exception e) {
                 // Reject with a generic error
-                JSObject error = new JSObject();
+                JSObject error = context.createJSObject();
                 error.set("name", new JSString("Error"));
                 error.set("message", new JSString("Import failed: " + e.getMessage()));
                 promise.reject(error);
