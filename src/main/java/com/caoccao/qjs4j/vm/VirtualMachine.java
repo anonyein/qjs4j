@@ -1500,7 +1500,9 @@ public final class VirtualMachine {
                     case BOOLEAN_OBJECT, NUMBER_OBJECT, STRING_OBJECT, BIG_INT_OBJECT, SYMBOL_OBJECT,
                          TYPED_ARRAY_INT8, TYPED_ARRAY_INT16, TYPED_ARRAY_UINT8_CLAMPED, TYPED_ARRAY_UINT8,
                          TYPED_ARRAY_UINT16, TYPED_ARRAY_INT32, TYPED_ARRAY_UINT32, TYPED_ARRAY_FLOAT16,
-                         TYPED_ARRAY_FLOAT32, TYPED_ARRAY_FLOAT64, TYPED_ARRAY_BIGINT64, TYPED_ARRAY_BIGUINT64 ->
+                         TYPED_ARRAY_FLOAT32, TYPED_ARRAY_FLOAT64, TYPED_ARRAY_BIGINT64, TYPED_ARRAY_BIGUINT64,
+                         ERROR, TYPE_ERROR, RANGE_ERROR, REFERENCE_ERROR, SYNTAX_ERROR,
+                         URI_ERROR, EVAL_ERROR, AGGREGATE_ERROR, SUPPRESSED_ERROR ->
                             result = constructorType.create(context, args);
                 }
                 if (result != null) {

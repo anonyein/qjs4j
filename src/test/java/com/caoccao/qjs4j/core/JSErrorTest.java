@@ -1,23 +1,32 @@
 package com.caoccao.qjs4j.core;
 
 import com.caoccao.qjs4j.BaseJavetTest;
+import com.caoccao.qjs4j.exceptions.JSErrorType;
 import org.junit.jupiter.api.Test;
+
+import java.util.stream.Stream;
 
 public class JSErrorTest extends BaseJavetTest {
     @Test
+    public void testFunctionLength() {
+        assertIntegerWithJavet(
+                Stream.of(JSErrorType.values())
+                        .map(error -> error.name() + ".length")
+                        .toArray(String[]::new));
+    }
+
+    @Test
     public void testInstanceof() {
         assertBooleanWithJavet(
+                "new AggregateError('AggregateError') instanceof AggregateError",
                 "new Error('Error') instanceof Error",
                 "new EvalError('EvalError') instanceof EvalError",
-                "new Error('Error') instanceof Error",
                 "new RangeError('RangeError') instanceof RangeError",
                 "new ReferenceError('ReferenceError') instanceof ReferenceError",
+                "new SuppressedError(new Error('a'), new Error('b'), 'msg') instanceof SuppressedError",
                 "new SyntaxError('SyntaxError') instanceof SyntaxError",
                 "new TypeError('TypeError') instanceof TypeError",
-                "new URIError('URIError') instanceof URIError",
-                "new Error('Error') instanceof Error",
-                "new AggregateError('AggregateError') instanceof AggregateError",
-                "new SuppressedError(new Error('a'), new Error('b'), 'msg') instanceof SuppressedError");
+                "new URIError('URIError') instanceof URIError");
     }
 
     @Test
@@ -33,5 +42,13 @@ public class JSErrorTest extends BaseJavetTest {
     @Test
     public void testTryCatchTypeError() {
         assertStringWithJavet("try { throw new TypeError('I am a TypeError'); } catch (e) { e.name + ': ' + e.message; }");
+    }
+
+    @Test
+    public void testTypeof() {
+        assertStringWithJavet(
+                Stream.of(JSErrorType.values())
+                        .map(error -> "typeof " + error.name())
+                        .toArray(String[]::new));
     }
 }

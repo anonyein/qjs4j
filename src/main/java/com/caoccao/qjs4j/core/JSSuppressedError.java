@@ -67,6 +67,56 @@ public final class JSSuppressedError extends JSError {
         return jsObject;
     }
 
+    public static JSObject createPrototype(JSContext context, JSValue... args) {
+        // Create Error prototype using the proper error class
+        JSError errorPrototype = new JSSuppressedError(context);
+
+        errorPrototype.set("toString", new JSNativeFunction("toString", 0, JSError::errorToString));
+
+        // SuppressedError(error, suppressed, message)
+        int length = 3;
+
+        // Create Error constructor as a function (following QuickJS pattern)
+        // QuickJS uses JS_NewCConstructor for error constructors
+        JSNativeFunction errorConstructor = new JSNativeFunction(
+                NAME,
+                length,
+                (childContext, thisObj, childArgs) -> {
+                    // The VM has already created thisObj with the correct prototype
+                    // We just need to initialize the error properties on thisObj
+                    if (!(thisObj instanceof JSObject obj)) {
+                        return JSUndefined.INSTANCE;
+                    }
+
+                    // Set name property
+                    obj.set("name", new JSString(NAME));
+
+                    // SuppressedError: new SuppressedError(error, suppressed, message)
+                    JSValue error = childArgs.length > 0 ? childArgs[0] : JSUndefined.INSTANCE;
+                    JSValue suppressed = childArgs.length > 1 ? childArgs[1] : JSUndefined.INSTANCE;
+                    String message = "";
+                    if (childArgs.length > 2 && !(childArgs[2] instanceof JSUndefined)) {
+                        message = JSTypeConversions.toString(childContext, childArgs[2]).value();
+                    }
+                    obj.set("error", error);
+                    obj.set("suppressed", suppressed);
+                    obj.set("message", new JSString(message));
+
+                    // Return undefined to use the thisObj created by the VM
+                    return JSUndefined.INSTANCE;
+                });
+        errorConstructor.set("prototype", errorPrototype);
+
+        // Don't set constructor type - let the JSNativeFunction lambda handle construction
+        // Store error name for potential future use
+        errorConstructor.set("[[ErrorName]]", new JSString(NAME));
+
+        // Set constructor property on prototype
+        errorPrototype.set("constructor", errorConstructor);
+
+        return errorConstructor;
+    }
+
     /**
      * Get the main error.
      */

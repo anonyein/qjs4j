@@ -18,10 +18,8 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,15 +64,25 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertStringWithJavet("var target = {a: 1}; Object.assign(target, {b: 2}, {c: 3}); JSON.stringify(target)");
     }
 
+    @Disabled
+    @Test
+    public void testBuiltInFunctions() {
+        assertStringWithJavet(
+                """
+                        JSON.stringify(Object.getOwnPropertyNames(globalThis)
+                            .sort()
+                            .filter(name => !['AsyncDisposableStack', 'DisposableStack', 'WebAssembly'].includes(name))
+                            .filter(name => typeof globalThis[name] === 'function')
+                            .map(name => [name, globalThis[name].length]));""");
+    }
+
     @Test
     public void testBuiltInObjects() {
-        Set<String> ignoredProperties = Set.of("AsyncDisposableStack", "DisposableStack", "WebAssembly");
-        String code = "Object.getOwnPropertyNames(globalThis).sort()";
-        assertWithJavet(
-                () -> ((List<?>) v8Runtime.getExecutor(code).setModule(moduleMode).executeObject()).stream()
-                        .filter(property -> !ignoredProperties.contains(property.toString()))
-                        .toList(),
-                () -> context.eval(code).toJavaObject());
+        assertStringWithJavet(
+                """
+                        JSON.stringify(Object.getOwnPropertyNames(globalThis)
+                            .sort()
+                            .filter(name => !['AsyncDisposableStack', 'DisposableStack', 'WebAssembly'].includes(name)));""");
     }
 
     @Test
