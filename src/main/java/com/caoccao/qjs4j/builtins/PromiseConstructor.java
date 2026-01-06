@@ -48,12 +48,12 @@ public final class PromiseConstructor {
 
         // Empty array resolves immediately
         if (length == 0) {
-            JSPromise promise = createPromise(context);
+            JSPromise promise = context.createJSPromise();
             promise.fulfill(context.createJSArray());
             return promise;
         }
 
-        JSPromise resultPromise = createPromise(context);
+        JSPromise resultPromise = context.createJSPromise();
         JSArray results = context.createJSArray();
         final int[] remaining = {length}; // How many promises left to resolve
 
@@ -123,12 +123,12 @@ public final class PromiseConstructor {
 
         // Empty array resolves immediately
         if (length == 0) {
-            JSPromise promise = createPromise(context);
+            JSPromise promise = context.createJSPromise();
             promise.fulfill(context.createJSArray());
             return promise;
         }
 
-        JSPromise resultPromise = createPromise(context);
+        JSPromise resultPromise = context.createJSPromise();
         JSArray results = context.createJSArray();
         final int[] remaining = {length};
 
@@ -210,12 +210,12 @@ public final class PromiseConstructor {
 
         // Empty array rejects with AggregateError
         if (length == 0) {
-            JSPromise promise = createPromise(context);
+            JSPromise promise = context.createJSPromise();
             promise.reject(new JSString("AggregateError: All promises were rejected"));
             return promise;
         }
 
-        JSPromise resultPromise = createPromise(context);
+        JSPromise resultPromise = context.createJSPromise();
         JSArray errors = context.createJSArray();
         final int[] remaining = {length};
 
@@ -257,15 +257,6 @@ public final class PromiseConstructor {
     }
 
     /**
-     * Helper method to create a new Promise with the correct prototype.
-     */
-    private static JSPromise createPromise(JSContext context) {
-        JSPromise jsPromise = new JSPromise();
-        context.transferPrototype(jsPromise, JSPromise.NAME);
-        return jsPromise;
-    }
-
-    /**
      * Promise.race(iterable)
      * ES2020 25.6.4.5
      * Returns a Promise that settles as soon as any promise in the iterable settles.
@@ -286,7 +277,7 @@ public final class PromiseConstructor {
         }
 
         int length = (int) array.getLength();
-        JSPromise resultPromise = createPromise(context);
+        JSPromise resultPromise = context.createJSPromise();
 
         for (int i = 0; i < length; i++) {
             JSValue element = array.get(i);
@@ -330,7 +321,7 @@ public final class PromiseConstructor {
         JSValue reason = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
 
         // Create a new promise and reject it
-        JSPromise promise = createPromise(context);
+        JSPromise promise = context.createJSPromise();
         promise.reject(reason);
         return promise;
     }
@@ -349,7 +340,7 @@ public final class PromiseConstructor {
         }
 
         // Create a new promise and fulfill it
-        JSPromise promise = createPromise(context);
+        JSPromise promise = context.createJSPromise();
         promise.fulfill(value);
         return promise;
     }
@@ -360,7 +351,7 @@ public final class PromiseConstructor {
      * Returns an object with a new promise and its resolve/reject functions.
      */
     public static JSValue withResolvers(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSPromise promise = createPromise(context);
+        JSPromise promise = context.createJSPromise();
 
         // Create resolve function
         JSNativeFunction resolveFn = new JSNativeFunction("resolve", 1, (childContext, thisValue, funcArgs) -> {

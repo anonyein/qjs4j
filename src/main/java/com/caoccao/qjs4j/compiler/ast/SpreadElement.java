@@ -17,13 +17,12 @@
 package com.caoccao.qjs4j.compiler.ast;
 
 /**
- * Base sealed interface for all expression nodes.
+ * Represents a spread element in an array literal or function call.
+ * Example: [...array] or func(...args)
  */
-public sealed interface Expression extends ASTNode permits
-        Literal, Identifier, PrivateIdentifier, BinaryExpression, UnaryExpression,
-        AssignmentExpression, ConditionalExpression, CallExpression,
-        MemberExpression, NewExpression, FunctionExpression,
-        ArrowFunctionExpression, ArrayExpression, ObjectExpression, AwaitExpression,
-        YieldExpression, TemplateLiteral, TaggedTemplateExpression, ClassExpression,
-        SpreadElement {
+public record SpreadElement(Expression argument, SourceLocation location) implements Expression {
+    @Override
+    public SourceLocation getLocation() {
+        return location;
+    }
 }

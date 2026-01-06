@@ -207,6 +207,19 @@ public final class JSContext implements AutoCloseable {
     }
 
     /**
+     * Create a new JSArray with specified values and proper prototype chain.
+     * Sets the array's prototype to Array.prototype from the global object.
+     *
+     * @param values Initial values of the array
+     * @return A new JSArray instance with prototype set
+     */
+    public JSArray createJSArray(JSValue... values) {
+        JSArray jsArray = new JSArray(values);
+        transferPrototype(jsArray, JSArray.NAME);
+        return jsArray;
+    }
+
+    /**
      * Create a new JSArrayBuffer with proper prototype chain.
      *
      * @param byteLength The length in bytes

@@ -78,10 +78,60 @@ public final class BytecodeCompiler {
     private void compileArrayExpression(ArrayExpression arrayExpr) {
         emitter.emitOpcode(Opcode.ARRAY_NEW);
 
-        for (Expression element : arrayExpr.elements()) {
-            if (element != null) {
-                compileExpression(element);
-                emitter.emitOpcode(Opcode.PUSH_ARRAY);
+        // Check if we have any spread elements
+        boolean hasSpread = arrayExpr.elements().stream()
+                .anyMatch(e -> e instanceof SpreadElement);
+
+        if (!hasSpread) {
+            // Simple case: no spread elements
+            for (Expression element : arrayExpr.elements()) {
+                if (element != null) {
+                    compileExpression(element);
+                    emitter.emitOpcode(Opcode.PUSH_ARRAY);
+                }
+                // null elements (holes) are skipped
+            }
+        } else {
+            // Complex case: has spread elements
+            // Following QuickJS: emit position tracking
+            // Stack starts with: array
+            int idx = 0;
+            boolean needsIndex = false;
+
+            for (Expression element : arrayExpr.elements()) {
+                if (element instanceof SpreadElement spreadElement) {
+                    // Emit index if not already on stack
+                    if (!needsIndex) {
+                        emitter.emitOpcodeU32(Opcode.PUSH_I32, idx);
+                        needsIndex = true;
+                    }
+                    // Compile the iterable expression
+                    compileExpression(spreadElement.argument());
+                    // Emit APPEND to spread elements into the array
+                    // Stack: array pos iterable -> array pos
+                    emitter.emitOpcode(Opcode.APPEND);
+                    // After APPEND, index is updated on stack
+                } else if (element != null) {
+                    if (needsIndex) {
+                        // We have index on stack, use DEFINE_ARRAY_EL
+                        compileExpression(element);
+                        emitter.emitOpcode(Opcode.DEFINE_ARRAY_EL);
+                        emitter.emitOpcode(Opcode.INC);
+                    } else {
+                        // No index on stack yet, use simple PUSH_ARRAY
+                        compileExpression(element);
+                        emitter.emitOpcode(Opcode.PUSH_ARRAY);
+                        idx++;
+                    }
+                } else {
+                    // Hole in array
+                    idx++;
+                }
+            }
+
+            // Drop the index if it's on the stack
+            if (needsIndex) {
+                emitter.emitOpcode(Opcode.DROP);
             }
         }
     }
@@ -363,6 +413,20 @@ public final class BytecodeCompiler {
     }
 
     private void compileCallExpression(CallExpression callExpr) {
+        // Check if any arguments contain spread
+        boolean hasSpread = callExpr.arguments().stream()
+                .anyMatch(arg -> arg instanceof SpreadElement);
+
+        if (hasSpread) {
+            // Use APPLY for calls with spread arguments
+            compileCallExpressionWithSpread(callExpr);
+        } else {
+            // Use regular CALL for calls without spread
+            compileCallExpressionRegular(callExpr);
+        }
+    }
+
+    private void compileCallExpressionRegular(CallExpression callExpr) {
         // Check if this is a method call (callee is a member expression)
         if (callExpr.callee() instanceof MemberExpression memberExpr) {
             // For method calls: obj.method()
@@ -429,6 +493,109 @@ public final class BytecodeCompiler {
             // Call with argument count
             emitter.emitOpcodeU16(Opcode.CALL, callExpr.arguments().size());
         }
+    }
+
+    private void compileCallExpressionWithSpread(CallExpression callExpr) {
+        // For calls with spread: func(...args) or obj.method(...args)
+        // Strategy: Build an arguments array and use APPLY
+
+        // Determine thisArg and function
+        if (callExpr.callee() instanceof MemberExpression memberExpr) {
+            // Method call: obj.method(...args)
+            // Stack should be: thisArg function argsArray
+
+            // Push object (will be thisArg)
+            compileExpression(memberExpr.object());
+
+            // Duplicate it for getting the method
+            emitter.emitOpcode(Opcode.DUP);
+
+            // Get the method
+            if (memberExpr.computed()) {
+                compileExpression(memberExpr.property());
+                emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+            } else if (memberExpr.property() instanceof Identifier propId) {
+                emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
+            } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
+                String fieldName = privateId.name();
+                JSSymbol symbol = privateSymbols != null ? privateSymbols.get(fieldName) : null;
+                if (symbol != null) {
+                    emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                    emitter.emitOpcode(Opcode.GET_PRIVATE_FIELD);
+                } else {
+                    emitter.emitOpcode(Opcode.DROP);
+                    emitter.emitOpcode(Opcode.UNDEFINED);
+                }
+            }
+
+            // Stack: thisArg function
+        } else {
+            // Regular function call: func(...args)
+            // Push undefined as thisArg
+            emitter.emitOpcode(Opcode.UNDEFINED);
+
+            // Push function
+            compileExpression(callExpr.callee());
+
+            // Stack: thisArg function
+        }
+
+        // Build arguments array with spread handling
+        // Create empty array
+        emitter.emitOpcode(Opcode.ARRAY_NEW);
+
+        // Check if we have any spread elements
+        boolean hasSpread = callExpr.arguments().stream()
+                .anyMatch(arg -> arg instanceof SpreadElement);
+
+        if (!hasSpread) {
+            // Simple case: no spread (shouldn't reach here, but handle it)
+            for (Expression arg : callExpr.arguments()) {
+                compileExpression(arg);
+                emitter.emitOpcode(Opcode.PUSH_ARRAY);
+            }
+        } else {
+            // Complex case: has spread elements
+            // Following QuickJS: emit position tracking
+            int idx = 0;
+            boolean needsIndex = false;
+
+            for (Expression arg : callExpr.arguments()) {
+                if (arg instanceof SpreadElement spreadElement) {
+                    // Emit index if not already on stack
+                    if (!needsIndex) {
+                        emitter.emitOpcodeU32(Opcode.PUSH_I32, idx);
+                        needsIndex = true;
+                    }
+                    // Spread: ...expr
+                    compileExpression(spreadElement.argument());
+                    emitter.emitOpcode(Opcode.APPEND);
+                } else {
+                    // Normal argument
+                    if (needsIndex) {
+                        // We have index on stack, use DEFINE_ARRAY_EL
+                        compileExpression(arg);
+                        emitter.emitOpcode(Opcode.DEFINE_ARRAY_EL);
+                        emitter.emitOpcode(Opcode.INC);
+                    } else {
+                        // No index on stack yet, use simple PUSH_ARRAY
+                        compileExpression(arg);
+                        emitter.emitOpcode(Opcode.PUSH_ARRAY);
+                        idx++;
+                    }
+                }
+            }
+
+            // Drop the index if it's on the stack
+            if (needsIndex) {
+                emitter.emitOpcode(Opcode.DROP);
+            }
+        }
+
+        // Stack: thisArg function argsArray
+        // Use APPLY to call with the array
+        // Parameter: isConstructorCall (0 for regular call, 1 for new)
+        emitter.emitOpcodeU16(Opcode.APPLY, 0);
     }
 
     private void compileClassDeclaration(ClassDeclaration classDecl) {

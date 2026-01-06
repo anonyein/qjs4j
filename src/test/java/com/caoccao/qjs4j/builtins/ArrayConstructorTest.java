@@ -16,7 +16,7 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for Array constructor static methods.
  */
-public class ArrayConstructorTest extends BaseTest {
+public class ArrayConstructorTest extends BaseJavetTest {
 
     @Test
     public void testFrom() {
@@ -282,5 +282,8 @@ public class ArrayConstructorTest extends BaseTest {
         });
         arr = result.asArray().orElseThrow();
         assertThat(arr.getLength()).isEqualTo(3);
+
+        assertStringWithJavet(
+                "JSON.stringify(Array.of(...[1,2,3]))");
     }
 }

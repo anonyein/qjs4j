@@ -395,13 +395,13 @@ public final class ObjectPrototype {
         JSValue[] entries = new JSValue[enumerableKeys.length];
 
         for (int i = 0; i < enumerableKeys.length; i++) {
-            JSArray entry = new JSArray(2);
+            JSArray entry = context.createJSArray(2);
             entry.set(0, new JSString(enumerableKeys[i].toPropertyString()));
             entry.set(1, obj.get(enumerableKeys[i]));
             entries[i] = entry;
         }
 
-        return new JSArray(entries);
+        return context.createJSArray(entries);
     }
 
     /**
@@ -483,7 +483,7 @@ public final class ObjectPrototype {
             keyStrings[i] = new JSString(enumerableKeys[i].toPropertyString());
         }
 
-        return new JSArray(keyStrings);
+        return context.createJSArray(keyStrings);
     }
 
     /**
@@ -670,6 +670,6 @@ public final class ObjectPrototype {
             values[i] = obj.get(enumerableKeys[i]);
         }
 
-        return new JSArray(values);
+        return context.createJSArray(values);
     }
 }

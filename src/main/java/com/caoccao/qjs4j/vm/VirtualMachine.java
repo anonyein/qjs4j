@@ -287,8 +287,7 @@ public final class VirtualMachine {
                         JSValue[] restArgs = new JSValue[restCount];
                         System.arraycopy(funcArgs, restStart, restArgs, 0, restCount);
 
-                        JSArray restArray = new JSArray(restArgs);
-                        context.transferPrototype(restArray, JSArray.NAME);
+                        JSArray restArray = context.createJSArray(restArgs);
                         valueStack.push(restArray);
                         pc += op.getSize();
                     }
@@ -810,8 +809,62 @@ public final class VirtualMachine {
                     }
                     case ARRAY_NEW -> {
                         JSArray array = context.createJSArray();
-                        context.transferPrototype(array, JSArray.NAME);
                         valueStack.push(array);
+                        pc += op.getSize();
+                    }
+                    case ARRAY_FROM -> {
+                        // Create array from N elements on stack
+                        // Stack: elem0 elem1 ... elemN-1 -> array
+                        int count = bytecode.readU16(pc + 1);
+                        JSArray array = context.createJSArray();
+
+                        // Pop elements in reverse order and add to array
+                        JSValue[] elements = new JSValue[count];
+                        for (int i = count - 1; i >= 0; i--) {
+                            elements[i] = valueStack.pop();
+                        }
+                        for (JSValue element : elements) {
+                            array.push(element);
+                        }
+
+                        valueStack.push(array);
+                        pc += op.getSize();
+                    }
+                    case APPLY -> {
+                        // Apply function with arguments from array
+                        // Stack: thisArg function argsArray -> result
+                        // Parameter: isConstructorCall (0=regular, 1=constructor)
+                        int isConstructorCall = bytecode.readU16(pc + 1);
+                        
+                        JSValue argsArrayValue = valueStack.pop();
+                        JSValue functionValue = valueStack.pop();
+                        JSValue thisArgValue = valueStack.pop();
+
+                        if (!(functionValue instanceof JSFunction applyFunction)) {
+                            throw new JSVirtualMachineException("APPLY: not a function");
+                        }
+
+                        if (!(argsArrayValue instanceof JSArray argsArray)) {
+                            throw new JSVirtualMachineException("APPLY: arguments must be an array");
+                        }
+
+                        // Convert array to arguments
+                        int argCount = (int) argsArray.getLength();
+                        JSValue[] applyArgs = new JSValue[argCount];
+                        for (int i = 0; i < argCount; i++) {
+                            applyArgs[i] = argsArray.get(i);
+                        }
+
+                        // Call the function (constructor call if isConstructorCall == 1)
+                        JSValue result;
+                        if (isConstructorCall != 0) {
+                            // TODO: Implement constructor call via APPLY (new with spread)
+                            // For now, use handleCallConstructor logic
+                            throw new JSVirtualMachineException("APPLY with constructor call not yet implemented");
+                        } else {
+                            result = applyFunction.call(context, thisArgValue, applyArgs);
+                        }
+                        valueStack.push(result);
                         pc += op.getSize();
                     }
                     case PUSH_ARRAY -> {
@@ -820,6 +873,86 @@ public final class VirtualMachine {
                         if (array instanceof JSArray jsArray) {
                             jsArray.push(element);
                         }
+                        pc += op.getSize();
+                    }
+                    case APPEND -> {
+                        // Append enumerated object elements to array
+                        // Stack: array pos enumobj -> array pos
+                        // Based on QuickJS OP_append (quickjs.c js_append_enumerate)
+                        JSValue enumobj = valueStack.pop();
+                        JSValue posValue = valueStack.pop();
+                        JSValue arrayValue = valueStack.pop();
+
+                        if (!(arrayValue instanceof JSArray array)) {
+                            throw new JSVirtualMachineException("APPEND: first argument must be an array");
+                        }
+
+                        if (!(posValue instanceof JSNumber posNum)) {
+                            throw new JSVirtualMachineException("APPEND: second argument must be a number");
+                        }
+
+                        int pos = (int) posNum.value();
+
+                        // Get iterator from enumobj
+                        try {
+                            JSValue iterator = JSIteratorHelper.getIterator(enumobj, context);
+
+                            if (iterator == null) {
+                                // Not iterable, throw TypeError
+                                context.throwError("TypeError", "Value is not iterable");
+                                throw new JSVirtualMachineException("APPEND: value is not iterable");
+                            }
+
+                            // Iterate and append all elements
+                            while (true) {
+                                JSObject resultObj = JSIteratorHelper.iteratorNext(iterator, context);
+                                if (resultObj == null) {
+                                    break;
+                                }
+
+                                // Check if done
+                                JSValue doneValue = resultObj.get("done");
+                                if (JSTypeConversions.toBoolean(doneValue) == JSBoolean.TRUE) {
+                                    break;
+                                }
+
+                                // Get value and append to array at position
+                                JSValue value = resultObj.get("value");
+                                // Set array element (this will update length automatically)
+                                array.set(pos++, value, context);
+                            }
+
+                            // Push array and updated position back onto stack
+                            valueStack.push(array);
+                            valueStack.push(new JSNumber(pos));
+
+                        } catch (Exception e) {
+                            throw new JSVirtualMachineException("APPEND: error iterating: " + e.getMessage(), e);
+                        }
+
+                        pc += op.getSize();
+                    }
+                    case DEFINE_ARRAY_EL -> {
+                        // Define array element
+                        // Stack: array idx val -> array idx
+                        // Based on QuickJS OP_define_array_el
+                        JSValue value = valueStack.pop();
+                        JSValue idxValue = valueStack.peek(0);  // Keep idx on stack
+                        JSValue arrayValue = valueStack.peek(1); // Keep array on stack
+
+                        if (!(arrayValue instanceof JSArray array)) {
+                            throw new JSVirtualMachineException("DEFINE_ARRAY_EL: first argument must be an array");
+                        }
+
+                        if (!(idxValue instanceof JSNumber idxNum)) {
+                            throw new JSVirtualMachineException("DEFINE_ARRAY_EL: second argument must be a number");
+                        }
+
+                        int idx = (int) idxNum.value();
+
+                        // Set array element (this will update length automatically)
+                        array.set(idx, value, context);
+
                         pc += op.getSize();
                     }
                     case DEFINE_PROP -> {

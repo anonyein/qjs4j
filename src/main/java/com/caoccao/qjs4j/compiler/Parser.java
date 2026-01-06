@@ -151,6 +151,15 @@ public final class Parser {
                 if (match(TokenType.COMMA)) {
                     advance();
                     elements.add(null); // hole in array
+                } else if (match(TokenType.ELLIPSIS)) {
+                    // Spread element: ...expr
+                    SourceLocation spreadLocation = getLocation();
+                    advance(); // consume ELLIPSIS
+                    Expression argument = parseExpression();
+                    elements.add(new SpreadElement(argument, spreadLocation));
+                    if (match(TokenType.COMMA)) {
+                        advance();
+                    }
                 } else {
                     elements.add(parseExpression());
                     if (match(TokenType.COMMA)) {
@@ -438,7 +447,15 @@ public final class Parser {
                                 break;
                             }
                         }
-                        args.add(parseExpression());
+                        if (match(TokenType.ELLIPSIS)) {
+                            // Spread argument: ...expr
+                            SourceLocation spreadLocation = getLocation();
+                            advance(); // consume ELLIPSIS
+                            Expression argument = parseExpression();
+                            args.add(new SpreadElement(argument, spreadLocation));
+                        } else {
+                            args.add(parseExpression());
+                        }
                     } while (match(TokenType.COMMA));
                 }
 
