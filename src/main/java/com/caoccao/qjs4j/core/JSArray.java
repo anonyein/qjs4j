@@ -293,6 +293,11 @@ public final class JSArray extends JSObject {
         // If it's an index, use dense/sparse array storage
         if (key.isIndex()) {
             set(key.asIndex(), value, context);
+        } else if (key.isString() && "length".equals(key.asString())) {
+            // Special handling for length property
+            if (value instanceof JSNumber num) {
+                setLength((long) num.value());
+            }
         } else {
             // Otherwise, use the shape-based storage from JSObject
             super.set(key, value, context);

@@ -78,25 +78,25 @@ public final class BytecodeCompiler {
     private void compileArrayExpression(ArrayExpression arrayExpr) {
         emitter.emitOpcode(Opcode.ARRAY_NEW);
 
-        // Check if we have any spread elements
+        // Check if we have any spread elements or holes
         boolean hasSpread = arrayExpr.elements().stream()
                 .anyMatch(e -> e instanceof SpreadElement);
+        boolean hasHoles = arrayExpr.elements().stream()
+                .anyMatch(e -> e == null);
 
-        if (!hasSpread) {
-            // Simple case: no spread elements
+        if (!hasSpread && !hasHoles) {
+            // Simple case: no spread elements, no holes - use PUSH_ARRAY
             for (Expression element : arrayExpr.elements()) {
-                if (element != null) {
-                    compileExpression(element);
-                    emitter.emitOpcode(Opcode.PUSH_ARRAY);
-                }
-                // null elements (holes) are skipped
+                compileExpression(element);
+                emitter.emitOpcode(Opcode.PUSH_ARRAY);
             }
         } else {
-            // Complex case: has spread elements
+            // Complex case: has spread elements or holes
             // Following QuickJS: emit position tracking
             // Stack starts with: array
             int idx = 0;
             boolean needsIndex = false;
+            boolean needsLength = false;
 
             for (Expression element : arrayExpr.elements()) {
                 if (element instanceof SpreadElement spreadElement) {
@@ -111,26 +111,57 @@ public final class BytecodeCompiler {
                     // Stack: array pos iterable -> array pos
                     emitter.emitOpcode(Opcode.APPEND);
                     // After APPEND, index is updated on stack
+                    needsLength = false;
                 } else if (element != null) {
                     if (needsIndex) {
                         // We have index on stack, use DEFINE_ARRAY_EL
                         compileExpression(element);
                         emitter.emitOpcode(Opcode.DEFINE_ARRAY_EL);
                         emitter.emitOpcode(Opcode.INC);
+                        needsLength = false;
                     } else {
-                        // No index on stack yet, use simple PUSH_ARRAY
+                        // No index on stack yet
+                        // Start using index-based assignment since we have holes or spread
+                        emitter.emitOpcodeU32(Opcode.PUSH_I32, idx);
+                        needsIndex = true;
                         compileExpression(element);
-                        emitter.emitOpcode(Opcode.PUSH_ARRAY);
-                        idx++;
+                        emitter.emitOpcode(Opcode.DEFINE_ARRAY_EL);
+                        emitter.emitOpcode(Opcode.INC);
+                        needsLength = false;
                     }
                 } else {
                     // Hole in array
-                    idx++;
+                    if (needsIndex) {
+                        // We have position on stack, just increment it
+                        emitter.emitOpcode(Opcode.INC);
+                    } else {
+                        idx++;
+                    }
+                    needsLength = true;
                 }
             }
 
-            // Drop the index if it's on the stack
-            if (needsIndex) {
+            // If we have a trailing hole, set the array length explicitly
+            // This handles cases like [1, 2, ,] where we need length=3 but only 2 elements
+            if (needsLength) {
+                if (needsIndex) {
+                    // Stack: array idx
+                    // QuickJS pattern: dup1 (duplicate array), put_field "length"
+                    // dup1: array idx -> array array idx
+                    emitter.emitOpcode(Opcode.DUP1);  // array array idx
+                    emitter.emitOpcodeAtom(Opcode.PUT_FIELD, "length");  // array idx (PUT_FIELD leaves value)
+                    emitter.emitOpcode(Opcode.DROP);  // array
+                } else {
+                    // Stack: array (idx is compile-time constant)
+                    // QuickJS pattern: dup, push idx, swap, put_field "length", drop
+                    emitter.emitOpcode(Opcode.DUP);  // array array
+                    emitter.emitOpcodeU32(Opcode.PUSH_I32, idx);  // array array idx
+                    emitter.emitOpcode(Opcode.SWAP);  // array idx array
+                    emitter.emitOpcodeAtom(Opcode.PUT_FIELD, "length");  // array idx
+                    emitter.emitOpcode(Opcode.DROP);  // array
+                }
+            } else if (needsIndex) {
+                // No trailing hole, just drop the index
                 emitter.emitOpcode(Opcode.DROP);
             }
         }

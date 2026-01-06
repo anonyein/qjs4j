@@ -71,6 +71,11 @@ public final class JSIteratorHelper {
      * @return An iterator, or null if the object is not iterable
      */
     public static JSValue getIterator(JSValue iterable, JSContext context) {
+        // Handle string primitives specially
+        if (iterable instanceof JSString jsString) {
+            return JSIterator.stringIterator(jsString);
+        }
+
         if (!(iterable instanceof JSObject iterableObj)) {
             return null;
         }
@@ -103,6 +108,11 @@ public final class JSIteratorHelper {
      * @return true if iterable, false otherwise
      */
     public static boolean isIterable(JSValue value) {
+        // Strings are always iterable
+        if (value instanceof JSString) {
+            return true;
+        }
+
         if (!(value instanceof JSObject obj)) {
             return false;
         }

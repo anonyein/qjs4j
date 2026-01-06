@@ -307,6 +307,11 @@ public final class VirtualMachine {
                         valueStack.push(valueStack.peek(0));
                         pc += op.getSize();
                     }
+                    case DUP1 -> {
+                        // a b -> a a b (duplicate the value at offset 1)
+                        valueStack.push(valueStack.peek(1));
+                        pc += op.getSize();
+                    }
                     case DUP2 -> {
                         valueStack.push(valueStack.peek(1));
                         valueStack.push(valueStack.peek(1));
