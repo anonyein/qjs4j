@@ -20,7 +20,10 @@ import java.util.stream.Stream;
 
 /**
  * Enumeration of all JavaScript bytecode opcodes.
- * Total: 244 opcodes from QuickJS.
+ * Total: 262 opcodes (144 original + 118 newly added from QuickJS).
+ *
+ * Note: This implementation uses custom opcode numbers that differ from QuickJS.
+ * Comments indicate the corresponding QuickJS opcode number for reference.
  */
 public enum Opcode {
     INVALID(0, 1, 0, 0),
@@ -193,18 +196,146 @@ public enum Opcode {
     DEFINE_FIELD(134, 5, 2, 1),          // Define regular field: obj value -> obj (takes atom parameter)
     PRIVATE_IN(135, 1, 2, 1),            // Check if object has private field: obj prop -> boolean
 
+    // Missing QuickJS opcodes - added for completeness (139-173, 175-211, 216-244)
+
+    // Additional opcodes (139-173)
+    DUP1(139, 1, 2, 3),                  // a b -> a a b (QuickJS opcode 18)
+    INIT_CTOR(140, 1, 0, 1),             // Initialize constructor (QuickJS opcode 44)
+    GET_VAR_UNDEF(141, 3, 0, 1),         // Push undefined if variable doesn't exist (QuickJS opcode 55)
+    PUT_VAR_INIT(142, 3, 1, 0),          // Initialize global lexical variable (QuickJS opcode 58)
+    GET_REF_VALUE(143, 1, 2, 3),         // Get reference value (QuickJS opcode 59)
+    PUT_REF_VALUE(144, 1, 3, 0),         // Put reference value (QuickJS opcode 60)
+    GET_ARRAY_EL2(145, 1, 2, 2),         // obj prop -> obj value (QuickJS opcode 68)
+    GET_ARRAY_EL3(146, 1, 2, 3),         // obj prop -> obj prop1 value (QuickJS opcode 69)
+    SET_NAME(147, 5, 1, 1),              // Set function name (QuickJS opcode 74)
+    SET_NAME_COMPUTED(148, 1, 2, 2),     // Set computed function name (QuickJS opcode 75)
+    SET_PROTO(149, 1, 2, 1),             // Set prototype (QuickJS opcode 76)
+    SET_HOME_OBJECT(150, 1, 2, 2),       // Set home object for super (QuickJS opcode 77)
+    DEFINE_ARRAY_EL(151, 1, 3, 2),       // Define array element (QuickJS opcode 78)
+    APPEND(152, 1, 3, 2),                // Append enumerated object, update length (QuickJS opcode 79)
+    COPY_DATA_PROPERTIES(153, 2, 3, 3),  // Copy data properties (QuickJS opcode 80)
+    DEFINE_METHOD_COMPUTED(154, 2, 3, 1), // Define method with computed name (QuickJS opcode 82)
+    DEFINE_CLASS_COMPUTED(155, 6, 3, 3),  // Define class with computed name (QuickJS opcode 84)
+    GET_LOC(156, 3, 0, 1),               // Get local variable (QuickJS opcode 85)
+    PUT_LOC(157, 3, 1, 0),               // Put local variable (QuickJS opcode 86)
+    SET_LOC(158, 3, 1, 1),               // Set local variable (QuickJS opcode 87)
+    GET_VAR_REF(159, 3, 0, 1),           // Get variable reference (QuickJS opcode 91)
+    PUT_VAR_REF(160, 3, 1, 0),           // Put variable reference (QuickJS opcode 92)
+    SET_VAR_REF(161, 3, 1, 1),           // Set variable reference (QuickJS opcode 93)
+    SET_LOC_UNINITIALIZED(162, 3, 0, 0), // Set local uninitialized (QuickJS opcode 94)
+    GET_LOC_CHECK(163, 3, 0, 1),         // Get local with check (QuickJS opcode 95)
+    PUT_LOC_CHECK(164, 3, 1, 0),         // Put local with check (QuickJS opcode 96)
+    SET_LOC_CHECK(165, 3, 1, 1),         // Set local with check (QuickJS opcode 97)
+    PUT_LOC_CHECK_INIT(166, 3, 1, 0),    // Put local check init (QuickJS opcode 98)
+    GET_LOC_CHECKTHIS(167, 3, 0, 1),     // Get local check this (QuickJS opcode 99)
+    GET_VAR_REF_CHECK(168, 3, 0, 1),     // Get var ref with check (QuickJS opcode 100)
+    PUT_VAR_REF_CHECK(169, 3, 1, 0),     // Put var ref with check (QuickJS opcode 101)
+    PUT_VAR_REF_CHECK_INIT(170, 3, 1, 0), // Put var ref check init (QuickJS opcode 102)
+    CLOSE_LOC(171, 3, 0, 0),             // Close local variable (QuickJS opcode 103)
+    NIP_CATCH(172, 1, 2, 1),             // catch ... a -> a (QuickJS opcode 110)
+    TO_STRING(173, 1, 1, 1),             // Convert to string (QuickJS opcode commented out in QuickJS)
+
     // Type checking operations
     IS_UNDEFINED_OR_NULL(174, 1, 1, 1),  // Check if value is null or undefined - replaces value with boolean
+
+    // More missing opcodes (175-211)
+    PUSH_BIGINT_I32(175, 5, 0, 1),       // Push BigInt from i32 (QuickJS opcode 176)
+    NOP(176, 1, 0, 0),                   // No operation (QuickJS opcode 177)
+    MAKE_LOC_REF(177, 7, 0, 2),          // Make local reference (QuickJS opcode 118)
+    MAKE_ARG_REF(178, 7, 0, 2),          // Make argument reference (QuickJS opcode 119)
+    MAKE_VAR_REF_REF(179, 7, 0, 2),      // Make var ref reference (QuickJS opcode 120)
+    MAKE_VAR_REF(180, 5, 0, 2),          // Make var reference (QuickJS opcode 121)
+    ITERATOR_CHECK_OBJECT(181, 1, 1, 1), // Check if object is iterable (QuickJS opcode 128)
+    ITERATOR_GET_VALUE_DONE(182, 1, 2, 3), // Get value and done from iterator result (QuickJS opcode 129)
+    ITERATOR_CLOSE(183, 1, 3, 0),        // Close iterator (QuickJS opcode 130)
+    ITERATOR_NEXT(184, 1, 4, 4),         // Get next from iterator (QuickJS opcode 131)
+    ITERATOR_CALL(185, 2, 4, 5),         // Call iterator (QuickJS opcode 132)
+    DEC_LOC(186, 2, 0, 0),               // Decrement local (QuickJS opcode 144)
+    INC_LOC(187, 2, 0, 0),               // Increment local (QuickJS opcode 145)
+    ADD_LOC(188, 2, 1, 0),               // Add to local (QuickJS opcode 146)
+    LNOT(189, 1, 1, 1),                  // Logical not (QuickJS opcode 148)
+    DELETE_VAR(190, 5, 0, 1),            // Delete variable (QuickJS opcode 151)
+    POW(191, 1, 2, 1),                   // Power operation (QuickJS opcode 157)
+
+    // SHORT_OPCODES (192-211)
+    PUSH_MINUS1(192, 1, 0, 1),           // Push -1 (QuickJS opcode 178)
+    PUSH_0(193, 1, 0, 1),                // Push 0 (QuickJS opcode 179)
+    PUSH_1(194, 1, 0, 1),                // Push 1 (QuickJS opcode 180)
+    PUSH_2(195, 1, 0, 1),                // Push 2 (QuickJS opcode 181)
+    PUSH_3(196, 1, 0, 1),                // Push 3 (QuickJS opcode 182)
+    PUSH_4(197, 1, 0, 1),                // Push 4 (QuickJS opcode 183)
+    PUSH_5(198, 1, 0, 1),                // Push 5 (QuickJS opcode 184)
+    PUSH_6(199, 1, 0, 1),                // Push 6 (QuickJS opcode 185)
+    PUSH_7(200, 1, 0, 1),                // Push 7 (QuickJS opcode 186)
+    PUSH_I8(201, 2, 0, 1),               // Push i8 (QuickJS opcode 187)
+    PUSH_I16(202, 3, 0, 1),              // Push i16 (QuickJS opcode 188)
+    PUSH_CONST8(203, 2, 0, 1),           // Push const8 (QuickJS opcode 189)
+    FCLOSURE8(204, 2, 0, 1),             // Function closure 8-bit (QuickJS opcode 190)
+    PUSH_EMPTY_STRING(205, 1, 0, 1),     // Push empty string (QuickJS opcode 191)
+    GET_LOC8(206, 2, 0, 1),              // Get local 8-bit (QuickJS opcode 192)
+    PUT_LOC8(207, 2, 1, 0),              // Put local 8-bit (QuickJS opcode 193)
+    SET_LOC8(208, 2, 1, 1),              // Set local 8-bit (QuickJS opcode 194)
+    GET_LOC0(209, 1, 0, 1),              // Get local 0 (QuickJS opcode 195)
+    GET_LOC1(210, 1, 0, 1),              // Get local 1 (QuickJS opcode 196)
+    GET_LOC2(211, 1, 0, 1),              // Get local 2 (QuickJS opcode 197)
 
     // Generator operations (following QuickJS opcode numbers)
     INITIAL_YIELD(212, 1, 0, 0),  // Initial yield in generator - suspends generator at start
     YIELD(213, 1, 1, 2),          // Yield value from generator - pops value, yields it
     YIELD_STAR(214, 1, 1, 2),     // Yield* delegating to another generator
-    ASYNC_YIELD_STAR(215, 1, 1, 2);  // Async yield* for async generators
+    ASYNC_YIELD_STAR(215, 1, 1, 2),  // Async yield* for async generators
 
-    // This is a subset of QuickJS opcodes - full implementation would have ~244 opcodes
+    // More SHORT_OPCODES (216-244)
+    GET_LOC3(216, 1, 0, 1),              // Get local 3 (QuickJS opcode 198)
+    PUT_LOC0(217, 1, 1, 0),              // Put local 0 (QuickJS opcode 199)
+    PUT_LOC1(218, 1, 1, 0),              // Put local 1 (QuickJS opcode 200)
+    PUT_LOC2(219, 1, 1, 0),              // Put local 2 (QuickJS opcode 201)
+    PUT_LOC3(220, 1, 1, 0),              // Put local 3 (QuickJS opcode 202)
+    SET_LOC0(221, 1, 1, 1),              // Set local 0 (QuickJS opcode 203)
+    SET_LOC1(222, 1, 1, 1),              // Set local 1 (QuickJS opcode 204)
+    SET_LOC2(223, 1, 1, 1),              // Set local 2 (QuickJS opcode 205)
+    SET_LOC3(224, 1, 1, 1),              // Set local 3 (QuickJS opcode 206)
+    GET_ARG0(225, 1, 0, 1),              // Get arg 0 (QuickJS opcode 207)
+    GET_ARG1(226, 1, 0, 1),              // Get arg 1 (QuickJS opcode 208)
+    GET_ARG2(227, 1, 0, 1),              // Get arg 2 (QuickJS opcode 209)
+    GET_ARG3(228, 1, 0, 1),              // Get arg 3 (QuickJS opcode 210)
+    PUT_ARG0(229, 1, 1, 0),              // Put arg 0 (QuickJS opcode 211)
+    PUT_ARG1(230, 1, 1, 0),              // Put arg 1 (QuickJS opcode 212)
+    PUT_ARG2(231, 1, 1, 0),              // Put arg 2 (QuickJS opcode 213)
+    PUT_ARG3(232, 1, 1, 0),              // Put arg 3 (QuickJS opcode 214)
+    SET_ARG0(233, 1, 1, 1),              // Set arg 0 (QuickJS opcode 215)
+    SET_ARG1(234, 1, 1, 1),              // Set arg 1 (QuickJS opcode 216)
+    SET_ARG2(235, 1, 1, 1),              // Set arg 2 (QuickJS opcode 217)
+    SET_ARG3(236, 1, 1, 1),              // Set arg 3 (QuickJS opcode 218)
+    GET_VAR_REF0(237, 1, 0, 1),          // Get var ref 0 (QuickJS opcode 219)
+    GET_VAR_REF1(238, 1, 0, 1),          // Get var ref 1 (QuickJS opcode 220)
+    GET_VAR_REF2(239, 1, 0, 1),          // Get var ref 2 (QuickJS opcode 221)
+    GET_VAR_REF3(240, 1, 0, 1),          // Get var ref 3 (QuickJS opcode 222)
+    PUT_VAR_REF0(241, 1, 1, 0),          // Put var ref 0 (QuickJS opcode 223)
+    PUT_VAR_REF1(242, 1, 1, 0),          // Put var ref 1 (QuickJS opcode 224)
+    PUT_VAR_REF2(243, 1, 1, 0),          // Put var ref 2 (QuickJS opcode 225)
+    PUT_VAR_REF3(244, 1, 1, 0),          // Put var ref 3 (QuickJS opcode 226)
+    SET_VAR_REF0(245, 1, 1, 1),          // Set var ref 0 (QuickJS opcode 227)
+    SET_VAR_REF1(246, 1, 1, 1),          // Set var ref 1 (QuickJS opcode 228)
+    SET_VAR_REF2(247, 1, 1, 1),          // Set var ref 2 (QuickJS opcode 229)
+    SET_VAR_REF3(248, 1, 1, 1),          // Set var ref 3 (QuickJS opcode 230)
+    GET_LENGTH(249, 1, 1, 1),            // Get length (QuickJS opcode 231)
+    IF_FALSE8(250, 2, 1, 0),             // If false 8-bit (QuickJS opcode 232)
+    IF_TRUE8(251, 2, 1, 0),              // If true 8-bit (QuickJS opcode 233)
+    GOTO8(252, 2, 0, 0),                 // Goto 8-bit (QuickJS opcode 234)
+    GOTO16(253, 3, 0, 0),                // Goto 16-bit (QuickJS opcode 235)
+    CALL0(254, 1, 1, 1),                 // Call with 0 args (QuickJS opcode 236)
+    CALL1(255, 1, 1, 1),                 // Call with 1 arg (QuickJS opcode 237)
+    CALL2(256, 1, 1, 1),                 // Call with 2 args (QuickJS opcode 238)
+    CALL3(257, 1, 1, 1),                 // Call with 3 args (QuickJS opcode 239)
+    IS_UNDEFINED(258, 1, 1, 1),          // Is undefined (QuickJS opcode 240)
+    IS_NULL(259, 1, 1, 1),               // Is null (QuickJS opcode 241)
+    TYPEOF_IS_UNDEFINED(260, 1, 1, 1),   // Typeof is undefined (QuickJS opcode 242)
+    TYPEOF_IS_FUNCTION(261, 1, 1, 1);    // Typeof is function (QuickJS opcode 243)
 
-    private static final Opcode[] opcodes = new Opcode[256];  // Use fixed size to accommodate all opcode numbers
+    // Total: 262 opcodes (144 original + 118 missing = 262 total)
+
+    private static final Opcode[] opcodes = new Opcode[262];  // Use fixed size to accommodate all opcode numbers
 
     static {
         Stream.of(values()).forEach(opcode -> opcodes[opcode.code] = opcode);
