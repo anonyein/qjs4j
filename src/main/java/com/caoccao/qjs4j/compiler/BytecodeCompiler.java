@@ -187,6 +187,25 @@ public final class BytecodeCompiler {
             functionCompiler.currentScope().declareLocal(param.name());
         }
 
+        // Handle rest parameter if present
+        // The REST opcode must be emitted early in the function to initialize the rest array
+        if (arrowExpr.restParameter() != null) {
+            // Calculate the index where rest arguments start
+            int firstRestIndex = arrowExpr.params().size();
+
+            // Emit REST opcode with the starting index
+            functionCompiler.emitter.emitOpcode(Opcode.REST);
+            functionCompiler.emitter.emitU16(firstRestIndex);
+
+            // Declare the rest parameter as a local and store the rest array
+            String restParamName = arrowExpr.restParameter().argument().name();
+            int restLocalIndex = functionCompiler.currentScope().declareLocal(restParamName);
+
+            // Store the rest array (from stack top) to the rest parameter local
+            functionCompiler.emitter.emitOpcode(Opcode.PUT_LOCAL);
+            functionCompiler.emitter.emitU16(restLocalIndex);
+        }
+
         // Compile function body
         // Arrow functions can have expression body or block statement body
         if (arrowExpr.body() instanceof BlockStatement block) {

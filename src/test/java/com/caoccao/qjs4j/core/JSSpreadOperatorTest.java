@@ -130,7 +130,13 @@ public class JSSpreadOperatorTest extends BaseJavetTest {
                         JSON.stringify(arr)""");
     }
 
-    // ==================== Built-in Function Tests ====================
+    @Test
+    public void testComplexRestParameterUsage() {
+        assertIntegerWithJavet(
+                """
+                        const fn = (a, b, ...rest) => a + b + rest.reduce((acc, v) => acc + v, 0);
+                        fn(1, 2, 3, 4, 5)""");
+    }
 
     @Test
     public void testFunctionCallSpreadBasic() {
@@ -226,6 +232,99 @@ public class JSSpreadOperatorTest extends BaseJavetTest {
     }
 
     @Test
+    public void testRestParameterAfterRegularInArrowFunction() {
+        assertIntegerWithJavet(
+                """
+                        const fn = (first, ...rest) => first + rest.length;
+                        fn(10, 1, 2, 3)""");
+    }
+
+    @Test
+    public void testRestParameterAfterRegularParam() {
+        assertIntegerWithJavet(
+                """
+                        const fn = (first, ...rest) => first + rest.length;
+                        fn(10, 1, 2, 3)""");
+    }
+
+    @Test
+    public void testRestParameterEmpty() {
+        assertIntegerWithJavet(
+                """
+                        const fn = (...args) => args.length;
+                        fn()""");
+    }
+
+    @Test
+    public void testRestParameterEmptyInArrowFunction() {
+        assertIntegerWithJavet(
+                """
+                        const fn = (...args) => args.length;
+                        fn()""");
+    }
+
+    @Test
+    public void testRestParameterOnlyInArrowFunction() {
+        assertIntegerWithJavet(
+                """
+                        const sum = (...nums) => nums.reduce((a, b) => a + b, 0);
+                        sum(1, 2, 3, 4, 5)""");
+    }
+
+    @Test
+    public void testRestParameterWithArrayMethods() {
+        assertStringWithJavet(
+                """
+                        const join = (...args) => args.join('-');
+                        join('a', 'b', 'c', 'd')""");
+    }
+
+    @Test
+    public void testRestParameterWithArrowFunction() {
+        assertIntegerWithJavet(
+                """
+                        const sum = (...args) => args.reduce((a, b) => a + b, 0);
+                        sum(1, 2, 3)""");
+    }
+
+    @Test
+    public void testRestParameterWithDestructuring() {
+        assertIntegerWithJavet(
+                """
+                        const fn = (a, ...rest) => {
+                            const [b, c] = rest;
+                            return a + b + c;
+                        };
+                        fn(1, 2, 3)""");
+    }
+
+    @Test
+    public void testRestParameterWithSpreadInCall() {
+        assertStringWithJavet(
+                """
+                        const fn = (...args) => JSON.stringify(args);
+                        fn(...[1, 2], 3, ...[4, 5])""");
+    }
+
+    @Test
+    public void testSimpleRestParameter() {
+        assertIntegerWithJavet(
+                """
+                        function sum(...args) {
+                            return args.reduce((a, b) => a + b, 0);
+                        }
+                        sum(1, 2, 3)""");
+    }
+
+    @Test
+    public void testSpreadInFunctionCallWithRestParameter() {
+        assertIntegerWithJavet(
+                """
+                        const sum = (...args) => args.reduce((a, b) => a + b, 0);
+                        sum(...[1, 2, 3, 4, 5])""");
+    }
+
+    @Test
     public void testSpreadInNestedFunctionCalls() {
         assertIntegerWithJavet(
                 """
@@ -238,15 +337,17 @@ public class JSSpreadOperatorTest extends BaseJavetTest {
                         multiply(...[add(...[2, 3]), add(...[4, 6])])""");
     }
 
-    @Disabled
     @Test
     public void testSpreadPreservesArrayHoles() {
-        // Note: Spread operator does NOT preserve holes - it converts them to undefined
-        assertStringWithJavet(
+        assertBooleanWithJavet(
                 """
                         const arr = [1, , 3];
                         const spread = [...arr];
-                        spread.length === 3""");
+                        spread.length === 3""",
+                """
+                        const arr = [1, , 3];
+                        const spread = [...arr];
+                        spread[1] === undefined""");
     }
 
     @Test
@@ -257,10 +358,8 @@ public class JSSpreadOperatorTest extends BaseJavetTest {
                         JSON.stringify([...Array.from(arrayLike)])""");
     }
 
-    @Disabled
     @Test
     public void testSpreadWithArrowFunction() {
-        // TODO: Enable when reduce is fully implemented
         assertIntegerWithJavet(
                 """
                         const sum = (...args) => args.reduce((a, b) => a + b, 0);

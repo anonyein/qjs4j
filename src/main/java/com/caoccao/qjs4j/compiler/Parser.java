@@ -224,20 +224,8 @@ public final class Parser {
                     if (match(TokenType.LPAREN)) {
                         advance(); // consume '('
 
-                        // Parse parameters
-                        List<Identifier> params = new ArrayList<>();
-                        if (!match(TokenType.RPAREN)) {
-                            do {
-                                if (match(TokenType.COMMA)) {
-                                    advance();
-                                }
-                                if (match(TokenType.IDENTIFIER)) {
-                                    params.add(parseIdentifier());
-                                }
-                            } while (match(TokenType.COMMA));
-                        }
-
-                        expect(TokenType.RPAREN);
+                        // Parse parameters using the same function parameter parser
+                        FunctionParams funcParams = parseFunctionParameters();
 
                         // Check for arrow
                         if (match(TokenType.ARROW)) {
@@ -260,7 +248,7 @@ public final class Parser {
                                     currentToken.offset()
                             );
 
-                            return new ArrowFunctionExpression(params, null, body, true, fullLocation);
+                            return new ArrowFunctionExpression(funcParams.params, funcParams.restParameter, body, true, fullLocation);
                         }
                     }
                 }
@@ -279,21 +267,39 @@ public final class Parser {
         if (match(TokenType.ARROW)) {
             // Convert the parsed expression to arrow function parameters
             List<Identifier> params = new ArrayList<>();
+            RestParameter restParameter = null;
 
             if (left instanceof Identifier) {
-                // Single parameter without or with parentheses: x => x + 1  OR  (x) => x + 1
+                // Single parameter without parentheses: x => x + 1
                 params.add((Identifier) left);
             } else if (left instanceof ArrayExpression arrayExpr) {
                 // ArrayExpression is used as a marker for:
                 // 1. Empty parameter list: () => expr
                 // 2. Multiple parameters: (x, y, z) => expr
+                // 3. Parameters with rest: (x, ...rest) => expr
                 if (arrayExpr.elements().isEmpty()) {
                     // Empty parameter list
                     // params stays empty
                 } else {
-                    // Multiple parameters
-                    for (Expression expr : arrayExpr.elements()) {
-                        if (expr instanceof Identifier) {
+                    // Extract parameters and check for rest parameter
+                    for (int i = 0; i < arrayExpr.elements().size(); i++) {
+                        Expression expr = arrayExpr.elements().get(i);
+                        
+                        if (expr instanceof SpreadElement spreadElem) {
+                            // Rest parameter
+                            if (spreadElem.argument() instanceof Identifier restId) {
+                                restParameter = new RestParameter(restId, spreadElem.getLocation());
+                                
+                                // Rest parameter must be last
+                                if (i != arrayExpr.elements().size() - 1) {
+                                    throw new RuntimeException("Rest parameter must be last at line " +
+                                            currentToken.line() + ", column " + currentToken.column());
+                                }
+                            } else {
+                                throw new RuntimeException("Invalid rest parameter at line " +
+                                        currentToken.line() + ", column " + currentToken.column());
+                            }
+                        } else if (expr instanceof Identifier) {
                             params.add((Identifier) expr);
                         } else {
                             throw new RuntimeException("Invalid arrow function parameter at line " +
@@ -327,7 +333,7 @@ public final class Parser {
                     currentToken.offset()
             );
 
-            return new ArrowFunctionExpression(params, null, body, false, fullLocation);
+            return new ArrowFunctionExpression(params, restParameter, body, false, fullLocation);
         }
 
         if (isAssignmentOperator(currentToken.type())) {
@@ -1410,7 +1416,26 @@ public final class Parser {
                 // Otherwise parse as expression
 
                 // Check if next token is identifier - could be arrow function param
-                if (match(TokenType.IDENTIFIER)) {
+                if (match(TokenType.IDENTIFIER) || match(TokenType.ELLIPSIS)) {
+                    // Check for rest parameter (...args)
+                    if (match(TokenType.ELLIPSIS)) {
+                        // This must be an arrow function with rest parameter: (...args) => expr
+                        // We cannot parse this as a regular expression, so parse as arrow function params
+                        SourceLocation restLocation = getLocation();
+                        advance(); // consume '...'
+                        Identifier restArg = parseIdentifier();
+                        RestParameter restParam = new RestParameter(restArg, restLocation);
+                        
+                        expect(TokenType.RPAREN);
+                        
+                        // Mark this as arrow function parameters with rest
+                        // We'll use a special marker - an ArrayExpression with a SpreadElement
+                        yield new ArrayExpression(
+                                List.of(new SpreadElement(restArg, restLocation)),
+                                location
+                        );
+                    }
+                    
                     // Peek ahead to distinguish between:
                     // (id) => expr (arrow function with single param)
                     // (id, id2) => expr (arrow function with multiple params)
@@ -1432,14 +1457,29 @@ public final class Parser {
                         yield expr;
                     }
 
-                    // Could be (id) or (id, id, ...)
+                    // Could be (id) or (id, id, ...) or (id, ...rest)
                     // Parse as parameter list tentatively
-                    List<Identifier> potentialParams = new ArrayList<>();
+                    List<Expression> potentialParams = new ArrayList<>();
                     potentialParams.add(parseIdentifier());
 
-                    // Check for more parameters
+                    // Check for more parameters or rest parameter
                     while (match(TokenType.COMMA)) {
                         advance(); // consume comma
+                        
+                        // Check for rest parameter at end
+                        if (match(TokenType.ELLIPSIS)) {
+                            SourceLocation restLocation = getLocation();
+                            advance(); // consume '...'
+                            Identifier restArg = parseIdentifier();
+                            RestParameter restParam = new RestParameter(restArg, restLocation);
+                            
+                            // Add SpreadElement as marker for rest parameter
+                            potentialParams.add(new SpreadElement(restArg, restLocation));
+                            
+                            // Rest must be last, so break
+                            break;
+                        }
+                        
                         if (!match(TokenType.IDENTIFIER)) {
                             // Not a simple parameter list, might be complex expression
                             // For now, throw error
@@ -1456,13 +1496,12 @@ public final class Parser {
                     // If no, this was a grouped identifier (or sequence)
                     // For now, we'll create a custom marker for this case
 
-                    // Return first param if single, or create a marker for multiple
-                    if (potentialParams.size() == 1) {
+                    // Return first param if single (and not a spread), or create a marker for multiple
+                    if (potentialParams.size() == 1 && !(potentialParams.get(0) instanceof SpreadElement)) {
                         yield potentialParams.get(0);
                     } else {
-                        // Multiple parameters - create an ArrayExpression with identifiers as marker
-                        List<Expression> paramExprs = new ArrayList<>(potentialParams);
-                        yield new ArrayExpression(paramExprs, location);
+                        // Multiple parameters or rest parameter - create an ArrayExpression as marker
+                        yield new ArrayExpression(potentialParams, location);
                     }
                 } else {
                     // Not starting with identifier, parse as expression
