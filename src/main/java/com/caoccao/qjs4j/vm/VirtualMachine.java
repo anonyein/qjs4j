@@ -646,7 +646,7 @@ public final class VirtualMachine {
                             } else {
                                 // Track property access for better error messages (unless locked)
                                 if (!propertyAccessLock) {
-                                    if (!propertyAccessChain.isEmpty()) {
+                                    if (!propertyAccessChain.toString().isEmpty()) {
                                         propertyAccessChain.append('.');
                                     }
                                     propertyAccessChain.append(fieldName);
@@ -694,13 +694,13 @@ public final class VirtualMachine {
                                 if (!propertyAccessLock) {
                                     if (index instanceof JSString jsString) {
                                         String propertyName = jsString.value();
-                                        if (!propertyAccessChain.isEmpty()) {
+                                        if (!propertyAccessChain.toString().isEmpty()) {
                                             propertyAccessChain.append('.');
                                         }
                                         propertyAccessChain.append(propertyName);
                                     } else if (index instanceof JSNumber jsNumber) {
                                         String propertyName = JSTypeConversions.toString(context, jsNumber).value();
-                                        if (!propertyAccessChain.isEmpty()) {
+                                        if (!propertyAccessChain.toString().isEmpty()) {
                                             propertyAccessChain.append('.');
                                         }
                                         propertyAccessChain.append(propertyName);
@@ -1400,7 +1400,7 @@ public final class VirtualMachine {
             // Not a function - throw TypeError
             // Generate a descriptive error message similar to V8/QuickJS
             String message;
-            if (!propertyAccessChain.isEmpty()) {
+            if (!propertyAccessChain.toString().isEmpty()) {
                 // Use the tracked property access for better error messages
                 message = propertyAccessChain + " is not a function";
             } else if (callee instanceof JSUndefined) {
