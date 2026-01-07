@@ -131,9 +131,9 @@ dependencies {
 }
 
 // 添加 sourcesJar 任务
-task sourcesJar(type: Jar) {
-    from sourceSets.main.allJava
-    archiveClassifier = 'sources'
+tasks.register<Jar>("sourcesJar") {
+    from(sourceSets.main.get().allJava)
+    archiveClassifier.set("sources")
 }
 
 tasks.test {
