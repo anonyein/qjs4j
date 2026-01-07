@@ -102,4 +102,52 @@ public class PromiseConstructorTest extends BaseJavetTest {
                 var p3 = Promise.resolve(3);
                 Promise.all([p1, p2, p3]).then(arr => JSON.stringify(arr))""");
     }
+
+    @Test
+    void testPromiseConstructorBehavior() {
+        assertBooleanWithJavet("""
+                let value = null;
+                const p = new Promise((resolve) => {
+                    value = 'resolved';
+                    resolve(42);
+                });
+                value === 'resolved'
+                """);
+    }
+
+    @Test
+    void testPromiseStaticMethods() {
+        // Promise static methods should still exist and work
+        assertStringWithJavet(
+                "typeof Promise.resolve",
+                "typeof Promise.reject",
+                "typeof Promise.all",
+                "typeof Promise.race",
+                "typeof Promise.allSettled",
+                "typeof Promise.any");
+
+        // Test Promise.resolve
+        assertStringWithJavet("""
+                let result = 'pending';
+                Promise.resolve('test').then(x => { result = x; });
+                result""");
+    }
+
+    @Test
+    void testPromiseTypeof() {
+        // Promise should be a function
+        assertStringWithJavet("typeof Promise");
+
+        // Promise.length should be 1 (executor function parameter)
+        assertIntegerWithJavet("Promise.length");
+
+        // Promise.name should be "Promise"
+        assertStringWithJavet("Promise.name");
+
+        // new Promise() should work
+        assertBooleanWithJavet("new Promise((resolve) => resolve()) instanceof Promise");
+
+        // Promise() without new should throw TypeError (requires new)
+        assertErrorWithJavet("Promise(() => {})");
+    }
 }

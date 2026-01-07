@@ -16,8 +16,9 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for Map constructor static methods.
  */
-public class MapConstructorTest extends BaseTest {
+public class MapConstructorTest extends BaseJavetTest {
 
     @Test
     public void testGroupBy() {
@@ -76,5 +77,48 @@ public class MapConstructorTest extends BaseTest {
         // Edge case: non-function callback
         assertTypeError(MapConstructor.groupBy(context, JSUndefined.INSTANCE, new JSValue[]{items, new JSString("not function")}));
         assertPendingException(context);
+    }
+
+    @Test
+    void testMapConstructorBehavior() throws Exception {
+        // Map with iterable
+        String code = """
+                const map = new Map([['a', 1], ['b', 2]]);
+                map.size === 2 && map.get('a') === 1 && map.get('b') === 2""";
+        assertBooleanWithJavet(code);
+
+        // Empty Map
+        assertIntegerWithJavet("new Map().size");
+    }
+
+    @Test
+    void testMapStaticMethods() throws Exception {
+        // Map.groupBy should still work
+        assertStringWithJavet("typeof Map.groupBy");
+        assertIntegerWithJavet("Map.groupBy.length");
+
+        // Test Map.groupBy functionality
+        assertBooleanWithJavet("""
+                const arr = [1, 2, 3, 4, 5];
+                const grouped = Map.groupBy(arr, (x) => x % 2 === 0 ? 'even' : 'odd');
+                grouped.get('even').length === 2 && grouped.get('odd').length === 3""");
+    }
+
+    @Test
+    void testMapTypeof() throws Exception {
+        // Map should be a function
+        assertStringWithJavet("typeof Map");
+
+        // Map.length should be 0
+        assertIntegerWithJavet("Map.length");
+
+        // Map.name should be "Map"
+        assertStringWithJavet("Map.name");
+
+        // new Map() should work
+        assertBooleanWithJavet("new Map() instanceof Map");
+
+        // Map() without new should throw TypeError (requires new)
+        assertErrorWithJavet("Map()");
     }
 }

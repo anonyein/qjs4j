@@ -25,6 +25,19 @@ import com.caoccao.qjs4j.core.*;
 public final class MapConstructor {
 
     /**
+     * Map constructor call handler.
+     * Creates a new Map object.
+     *
+     * @param context The execution context
+     * @param thisArg The this value (unused for constructor)
+     * @param args    The arguments array (optional iterable)
+     * @return New Map object
+     */
+    public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
+        return JSMap.create(context, args);
+    }
+
+    /**
      * Map.groupBy(items, callbackFn)
      * ES2024 24.1.2.2
      * Groups array elements by a key returned from the callback function,
@@ -36,36 +49,39 @@ public final class MapConstructor {
         }
 
         JSValue items = args[0];
-        if (!(items instanceof JSArray arr)) {
-            return context.throwTypeError("First argument must be an array");
-        }
-
         if (!(args[1] instanceof JSFunction callback)) {
             return context.throwTypeError("Second argument must be a function");
         }
 
-        JSMap result = new JSMap();
+        // Get iterator from items
+        if (!(items instanceof JSArray arr)) {
+            return context.throwTypeError("First argument must be an array");
+        }
+
+        // Create a new Map to store groups using JSMap.create to get proper prototype
+        JSMap groups = context.createJSMap();
 
         long length = arr.getLength();
         for (long i = 0; i < length; i++) {
             JSValue element = arr.get(i);
             JSValue[] callbackArgs = {element, new JSNumber(i)};
-            JSValue keyValue = callback.call(context, JSUndefined.INSTANCE, callbackArgs);
+            JSValue key = callback.call(context, JSUndefined.INSTANCE, callbackArgs);
 
-            // Get or create array for this key
-            JSValue existingGroup = result.mapGet(keyValue);
+            // Get existing group for this key from the Map
+            JSValue existingGroup = groups.mapGet(key);
             JSArray group;
             if (existingGroup instanceof JSArray) {
                 group = (JSArray) existingGroup;
             } else {
+                // Create new array for this key
                 group = context.createJSArray();
-                result.mapSet(keyValue, group);
+                groups.mapSet(key, group);
             }
 
             // Add element to group
             group.push(element);
         }
 
-        return result;
+        return groups;
     }
 }

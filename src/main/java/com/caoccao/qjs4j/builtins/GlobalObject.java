@@ -846,8 +846,8 @@ public final class GlobalObject {
         mapPrototype.defineProperty(PropertyKey.fromString("size"),
                 PropertyDescriptor.accessorDescriptor(mapSizeGetter, null, false, true));
 
-        // Create Map constructor
-        JSObject mapConstructor = context.createJSObject();
+        // Create Map constructor as JSNativeFunction
+        JSNativeFunction mapConstructor = new JSNativeFunction("Map", 0, MapConstructor::call, true, true);
         mapConstructor.set("prototype", mapPrototype);
         mapConstructor.setConstructorType(JSConstructorType.MAP); // Mark as Map constructor
         mapPrototype.set("constructor", mapConstructor);
@@ -1015,8 +1015,8 @@ public final class GlobalObject {
         promisePrototype.set("catch", new JSNativeFunction("catch", 1, PromisePrototype::catchMethod));
         promisePrototype.set("finally", new JSNativeFunction("finally", 1, PromisePrototype::finallyMethod));
 
-        // Create Promise constructor
-        JSObject promiseConstructor = context.createJSObject();
+        // Create Promise constructor as JSNativeFunction
+        JSNativeFunction promiseConstructor = new JSNativeFunction("Promise", 1, PromiseConstructor::call, true, true);
         promiseConstructor.set("prototype", promisePrototype);
         promiseConstructor.setConstructorType(JSConstructorType.PROMISE); // Mark as Promise constructor
         promisePrototype.set("constructor", promiseConstructor);
