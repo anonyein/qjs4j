@@ -1521,6 +1521,40 @@ public final class VirtualMachine {
         } else if (constructor instanceof JSObject jsObject) {
             JSConstructorType constructorType = jsObject.getConstructorType();
             JSObject resultObject = null;
+            if (constructorType == null) {
+                // Debug: print JS-level information to help trace the origin
+                System.err.println("[qjs4j-debug] constructorType == null for JSObject");
+                System.err.println("[qjs4j-debug] propertyAccessChain: " + propertyAccessChain);
+                try {
+                    System.err.println("[qjs4j-debug] constructor: " + jsObject.toString());
+                } catch (Exception ignored) {
+                    System.err.println("[qjs4j-debug] constructor: <toString() failed>");
+                }
+                // Print current frame function source (if available)
+                if (currentFrame != null) {
+                    JSFunction frameFunc = currentFrame.getFunction();
+                    if (frameFunc != null) {
+                        try {
+                            System.err.println("[qjs4j-debug] current function: " + frameFunc.toString());
+                        } catch (Exception ignored) {
+                            System.err.println("[qjs4j-debug] current function: <toString() failed>");
+                        }
+                    }
+                }
+                // Print call stack (up to 20 frames)
+                StackFrame sf = currentFrame;
+                int depth = 0;
+                while (sf != null && depth < 20) {
+                    JSFunction fn = sf.getFunction();
+                    System.err.println("[qjs4j-debug] callstack[" + depth + "]: " + (fn != null ? fn.toString() : "<null>"));
+                    sf = sf.getCaller();
+                    depth++;
+                }
+
+                context.throwTypeError("object is not a constructor");
+                valueStack.push(JSUndefined.INSTANCE);
+                return;
+            }
             if (constructorType == JSConstructorType.ARRAY) {
                 // Handle Array constructor: new Array(...args) or new Array(length)
                 // Use context.createJSArray which accepts JSValue... varargs
