@@ -986,6 +986,10 @@ public final class BytecodeCompiler {
     }
 
     private void compileExpression(Expression expr) {
+        if (expr instanceof SequenceExpression seqExpr) {
+            compileSequenceExpression(seqExpr);
+            return;
+        }
         if (expr instanceof Literal literal) {
             compileLiteral(literal);
         } else if (expr instanceof Identifier id) {
@@ -1022,6 +1026,17 @@ public final class BytecodeCompiler {
             compileTaggedTemplateExpression(taggedTemplate);
         } else if (expr instanceof ClassExpression classExpr) {
             compileClassExpression(classExpr);
+        }
+    }
+
+    private void compileSequenceExpression(SequenceExpression seq) {
+        List<Expression> exps = seq.expressions();
+        for (int i = 0; i < exps.size(); i++) {
+            compileExpression(exps.get(i));
+            // For all but the last expression, drop the result
+            if (i != exps.size() - 1) {
+                emitter.emitOpcode(Opcode.DROP);
+            }
         }
     }
 
