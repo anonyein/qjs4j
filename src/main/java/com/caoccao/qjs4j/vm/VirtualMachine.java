@@ -599,11 +599,6 @@ public final class VirtualMachine {
                     case PUT_VAR -> {
                         int putVarAtom = bytecode.readU32(pc + 1);
                         String putVarName = bytecode.getAtoms()[putVarAtom];
-                        int stackTop = valueStack.getStackTop();
-                        if (stackTop <= 0) {
-                            throw new JSVirtualMachineException(
-                                    "Stack underflow at PUT_VAR (pc=" + pc + ", var=\"" + putVarName + "\", stackTop=" + stackTop + ")");
-                        }
                         JSValue putValue = valueStack.pop();
                         context.getGlobalObject().set(PropertyKey.fromString(putVarName), putValue);
                         pc += op.getSize();
@@ -1442,7 +1437,6 @@ public final class VirtualMachine {
         }
         // Pop constructor
         JSValue constructor = valueStack.pop();
-        
         // Handle proxy construct trap (QuickJS: js_proxy_call_constructor)
         if (constructor instanceof JSProxy jsProxy) {
             // Following QuickJS JS_CallConstructorInternal:
@@ -1521,22 +1515,12 @@ public final class VirtualMachine {
         } else if (constructor instanceof JSObject jsObject) {
             JSConstructorType constructorType = jsObject.getConstructorType();
             JSObject resultObject = null;
-            if (constructorType == JSConstructorType.ARRAY) {
-                // Handle Array constructor: new Array(...args) or new Array(length)
-                // Use context.createJSArray which accepts JSValue... varargs
-                try {
-                    resultObject = context.createJSArray(args);
-                } catch (Exception ignore) {
-                    // Fall through to null and let it be handled as missing implementation
-                }
-            } else {
-                switch (constructorType) {
-                    case DATE, SYMBOL_OBJECT, BIG_INT_OBJECT, PROXY, PROMISE, SHARED_ARRAY_BUFFER,
-                         REGEXP, MAP, SET, FINALIZATION_REGISTRY, WEAK_MAP, WEAK_SET, WEAK_REF,
-                         ERROR, TYPE_ERROR, RANGE_ERROR, REFERENCE_ERROR, SYNTAX_ERROR,
-                         URI_ERROR, EVAL_ERROR, AGGREGATE_ERROR, SUPPRESSED_ERROR ->
-                            resultObject = constructorType.create(context, args);
-                }
+            switch (constructorType) {
+                case DATE, SYMBOL_OBJECT, BIG_INT_OBJECT, PROXY, PROMISE, SHARED_ARRAY_BUFFER,
+                     REGEXP, MAP, SET, FINALIZATION_REGISTRY, WEAK_MAP, WEAK_SET, WEAK_REF,
+                     ERROR, TYPE_ERROR, RANGE_ERROR, REFERENCE_ERROR, SYNTAX_ERROR,
+                     URI_ERROR, EVAL_ERROR, AGGREGATE_ERROR, SUPPRESSED_ERROR ->
+                        resultObject = constructorType.create(context, args);
             }
             if (resultObject != null) {
                 valueStack.push(resultObject);
