@@ -69,22 +69,52 @@ public final class PropertyKey {
      * Converts the value to an appropriate key.
      */
     public static PropertyKey fromValue(JSContext context, JSValue value) {
+        
+
+        PropertyKey result = null;
         if (value instanceof JSString s) {
-            return fromString(s.value());
-        }
-        if (value instanceof JSSymbol s) {
-            return fromSymbol(s);
-        }
-        if (value instanceof JSNumber n) {
+            // Treat numeric strings as array indices as well (e.g. "0" -> index 0)
+            String str = s.value();
+            if (str != null && !str.isEmpty()) {
+                boolean isDigits = true;
+                for (int i = 0; i < str.length(); ++i) {
+                    char ch = str.charAt(i);
+                    if (ch < '0' || ch > '9') {
+                        isDigits = false;
+                        break;
+                    }
+                }
+                if (isDigits) {
+                    try {
+                        long v = Long.parseLong(str);
+                        if (v >= 0 && v <= 0xFFFFFFFFL) {
+                            result = fromIndex((int) v);
+                        }
+                    } catch (NumberFormatException ignored) {
+                        // fall back to string
+                    }
+                }
+            }
+            if (result == null) result = fromString(s.value());
+        } else if (value instanceof JSSymbol s) {
+            result = fromSymbol(s);
+        } else if (value instanceof JSNumber n) {
             // Check if it's an array index
             double d = n.value();
             if (d >= 0 && d < 0xFFFFFFFFL && d == Math.floor(d)) {
-                return fromIndex((int) d);
+                result = fromIndex((int) d);
             }
         }
-        // Convert to string for other types
-        JSString str = JSTypeConversions.toString(context, value);
-        return fromString(str.value());
+
+        if (result == null) {
+            // Convert to string for other types
+            JSString str = JSTypeConversions.toString(context, value);
+            result = fromString(str.value());
+        }
+
+        
+
+        return result;
     }
 
     /**

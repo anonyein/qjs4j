@@ -31,6 +31,7 @@ import java.util.*;
  */
 public non-sealed class JSObject implements JSValue {
     public static final String NAME = "Object";
+    private static final boolean DEBUG_JSOBJECT_SET = false;
     // ThreadLocal to track visited objects during prototype chain traversal
     private static final ThreadLocal<Set<JSObject>> visitedObjects = ThreadLocal.withInitial(HashSet::new);
     protected JSConstructorType constructorType; // Internal slot for [[Constructor]] type (not accessible from JS)
@@ -548,6 +549,16 @@ public non-sealed class JSObject implements JSValue {
      * Set a property value by property key with context for setter functions.
      */
     public void set(PropertyKey key, JSValue value, JSContext context) {
+        try {
+            if (DEBUG_JSOBJECT_SET) {
+                String keyClass = key == null ? "null" : key.getClass().getSimpleName();
+                System.out.println("[debug] JSObject.set: keyClass=" + keyClass + " isIndex=" + (key == null ? "null" : String.valueOf(key.isIndex())) +
+                        " asIndex=" + (key == null ? "null" : String.valueOf(key.asIndex())) + " asString=" + (key == null ? "null" : key.asString()) +
+                        " objectClass=" + this.getClass().getSimpleName());
+            }
+        } catch (Throwable t) {
+            // ignore diagnostics
+        }
         // Check if property already exists
         int offset = shape.getPropertyOffset(key);
         if (offset >= 0) {

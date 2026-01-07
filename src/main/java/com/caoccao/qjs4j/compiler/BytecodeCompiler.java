@@ -332,8 +332,12 @@ public final class BytecodeCompiler {
                 default -> throw new CompilerException("Unknown assignment operator: " + operator);
             }
         } else {
-            // Simple assignment: compile right side
-            compileExpression(assignExpr.right());
+            // Simple assignment: compile right side now, unless left is a member expression
+            // In that case we'll postpone compiling RHS until after object/property
+            // are prepared so we can reorder the stack for PUT_ARRAY_EL.
+            if (!(left instanceof MemberExpression)) {
+                compileExpression(assignExpr.right());
+            }
         }
 
         // Store the result to left side
@@ -348,28 +352,73 @@ public final class BytecodeCompiler {
             }
         } else if (left instanceof MemberExpression memberExpr) {
             // obj[prop] = value or obj.prop = value or obj.#field = value
-            if (operator == AssignmentExpression.AssignmentOperator.ASSIGN) {
+                if (operator == AssignmentExpression.AssignmentOperator.ASSIGN) {
                 // For simple assignment, compile object and property now
                 compileExpression(memberExpr.object());
                 if (memberExpr.computed()) {
-                    compileExpression(memberExpr.property());
-                    emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+                    // Special-case: property expression is a postfix INC/DEC on an identifier,
+                    // e.g. arr[rr++] = value; We must ensure stack layout becomes
+                    // [value, obj, oldProp] and that the variable is updated with newProp.
+                    Expression propExpr = memberExpr.property();
+                    boolean handled = false;
+                    if (propExpr instanceof UnaryExpression ue && !ue.prefix()) {
+                        UnaryExpression.UnaryOperator op = ue.operator();
+                        Expression operand = ue.operand();
+                        if ((op == UnaryExpression.UnaryOperator.INC || op == UnaryExpression.UnaryOperator.DEC)
+                                && operand instanceof Identifier propId) {
+                            String name = ((Identifier) operand).name();
+                            Integer localIndex = findLocalInScopes(name);
+                            // Push the variable, perform POST_INC/POST_DEC (produces old,new),
+                            // then PUT back the new value to the variable (consumes new),
+                            // leaving old on stack as the property.
+                            if (localIndex != null) {
+                                emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
+                                emitter.emitOpcode(op == UnaryExpression.UnaryOperator.INC ? Opcode.POST_INC : Opcode.POST_DEC);
+                                emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
+                            } else {
+                                emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
+                                emitter.emitOpcode(op == UnaryExpression.UnaryOperator.INC ? Opcode.POST_INC : Opcode.POST_DEC);
+                                emitter.emitOpcodeAtom(Opcode.PUT_VAR, name);
+                            }
+                            // Diagnostic: log compiler-side handling of postfix property expression
+                            System.out.println("Compiler: handled postfix property expression for '" + name + "' localIndex=" + localIndex);
+                            // Now compile right side so stack is: obj, old, value
+                            compileExpression(assignExpr.right());
+                            // Rotate [obj, old, value] -> [value, obj, old]
+                            emitter.emitOpcode(Opcode.ROT3R);
+                            // Emit the array element set
+                            emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+                            handled = true;
+                        }
+                    }
+                    if (!handled) {
+                        compileExpression(memberExpr.property());
+                        // Now compile right side and rotate to [value, obj, prop]
+                        compileExpression(assignExpr.right());
+                        emitter.emitOpcode(Opcode.ROT3R);
+                        emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+                    }
                 } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
                     // obj.#field = value
-                    // Stack: value obj
-                    // Need: obj value symbol (for PUT_PRIVATE_FIELD)
+                    // Compile RHS then emit PUT_PRIVATE_FIELD expecting: obj value privateSymbol
                     String fieldName = privateId.name();
                     JSSymbol symbol = privateSymbols != null ? privateSymbols.get(fieldName) : null;
                     if (symbol != null) {
-                        emitter.emitOpcode(Opcode.SWAP);  // Stack: obj value
+                        // Compile RHS value
+                        compileExpression(assignExpr.right());
+                        // Now stack: obj value -> push private symbol to make: obj value symbol
                         emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
-                        // Stack: obj value symbol
                         emitter.emitOpcode(Opcode.PUT_PRIVATE_FIELD);
                     } else {
-                        // Error: private field not found - clean up stack and leave value
-                        emitter.emitOpcode(Opcode.DROP);  // Drop obj, leaving value
+                        // Error: private field not found - compile RHS to keep stack balanced, then drop
+                        compileExpression(assignExpr.right());
+                        emitter.emitOpcode(Opcode.DROP);  // Drop RHS
                     }
                 } else if (memberExpr.property() instanceof Identifier propId) {
+                    // Compile RHS then swap to match PUT_FIELD expected stack order
+                    compileExpression(assignExpr.right());
+                    // Stack: obj value -> swap to value obj for PUT_FIELD implementation
+                    emitter.emitOpcode(Opcode.SWAP);
                     emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
                 }
             } else {
@@ -789,6 +838,9 @@ public final class BytecodeCompiler {
         emitter.emitOpcode(Opcode.SWAP);
         // Stack: proto constructor
 
+        // If we have static blocks, we'll duplicate the constructor for calls
+        // (original approach used DUP without temporary locals)
+
         // Execute static blocks
         // Following QuickJS pattern: compile each static block as a function,
         // then call it with the constructor as 'this'
@@ -797,7 +849,7 @@ public final class BytecodeCompiler {
             JSBytecodeFunction staticBlockFunc = compileStaticBlock(staticBlock, className);
 
             // Stack: proto constructor
-            // DUP the constructor to use as 'this'
+            // Push the constructor to use as 'this' (duplicate top)
             emitter.emitOpcode(Opcode.DUP);
             // Stack: proto constructor constructor
 
@@ -819,24 +871,22 @@ public final class BytecodeCompiler {
         }
 
         // Drop prototype, keep constructor
+        // Use NIP to remove the prototype (pop second-from-top)
         emitter.emitOpcode(Opcode.NIP);
         // Stack: constructor
 
-        // Store the class constructor in a variable
+        // Store the class constructor in a variable (class bindings are lexical)
         if (classDecl.id() != null) {
             String varName = classDecl.id().name();
-            if (!inGlobalScope) {
-                currentScope().declareLocal(varName);
-                Integer localIndex = currentScope().getLocal(varName);
-                if (localIndex != null) {
-                    emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
-                }
-            } else {
-                emitter.emitOpcodeAtom(Opcode.PUT_VAR, varName);
+            // Ensure a local binding exists in the current scope (class declarations are lexical)
+            Integer localIndex = currentScope().getLocal(varName);
+            if (localIndex == null) {
+                localIndex = currentScope().declareLocal(varName);
             }
+            // Initialize the class binding with constructor on stack
+            emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
         } else {
             // Anonymous class expression - leave on stack
-            // For class declarations, we always have a name, so this shouldn't happen
         }
     }
 
@@ -947,6 +997,8 @@ public final class BytecodeCompiler {
         // Stack: proto constructor
 
         // Drop prototype, keep constructor on stack
+        // Use SWAP + DROP to avoid ordering issues with static block calls
+        // Use NIP to drop the prototype and keep constructor
         emitter.emitOpcode(Opcode.NIP);
         // Stack: constructor
 
@@ -1338,7 +1390,22 @@ public final class BytecodeCompiler {
             if (forStmt.init() instanceof VariableDeclaration varDecl) {
                 compileVariableDeclaration(varDecl);
             } else if (forStmt.init() instanceof Expression expr) {
+                // Diagnostic: log the init expression kind to help debug missing init emissions
+                try {
+                    System.out.println("Compiler: for-init expr class=" + expr.getClass().getSimpleName() + " repr=" + expr);
+                } catch (Throwable t) {
+                    // ignore
+                }
                 compileExpression(expr);
+                emitter.emitOpcode(Opcode.DROP);
+            } else if (forStmt.init() instanceof com.caoccao.qjs4j.compiler.ast.ExpressionStatement exprStmt) {
+                // For cases where parser wraps the expression in an ExpressionStatement
+                try {
+                    System.out.println("Compiler: for-init ExpressionStatement wrapping=" + exprStmt.expression().getClass().getSimpleName() + " repr=" + exprStmt.expression());
+                } catch (Throwable t) {
+                    // ignore
+                }
+                compileExpression(exprStmt.expression());
                 emitter.emitOpcode(Opcode.DROP);
             }
         }
@@ -1639,27 +1706,21 @@ public final class BytecodeCompiler {
             return;
         }
 
-        if (inGlobalScope) {
-            // In global scope, always use GET_VAR
-            emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
-        } else {
-            // In function scope, check locals first
-            // Search from innermost scope (most recently pushed) to outermost
-            // ArrayDeque.push() adds to front, iterator() iterates from front to back
-            Integer localIndex = null;
-            for (Scope scope : scopes) {
-                localIndex = scope.getLocal(name);
-                if (localIndex != null) {
-                    break;
-                }
-            }
-
+        // Always prefer local bindings if present (class declarations create lexical bindings
+        // even at top-level). Search from innermost scope to outermost.
+        Integer localIndex = null;
+        for (Scope scope : scopes) {
+            localIndex = scope.getLocal(name);
             if (localIndex != null) {
-                emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
-            } else {
-                // Try outer scopes or global
-                emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
+                break;
             }
+        }
+
+        if (localIndex != null) {
+            emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
+        } else {
+            // Fallback to global variable access
+            emitter.emitOpcodeAtom(Opcode.GET_VAR, name);
         }
     }
 

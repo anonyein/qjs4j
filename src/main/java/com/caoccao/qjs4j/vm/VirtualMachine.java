@@ -50,6 +50,24 @@ public final class VirtualMachine {
         this.yieldSkipCount = 0;
     }
 
+    // Debug helper: dump top N values from the VM value stack
+    private void debugDumpStack(String tag, int pc, int n) {
+        int top = valueStack.getStackTop();
+        StringBuilder sb = new StringBuilder();
+        sb.append("STACK_DUMP ").append(tag).append(" PC=").append(pc).append(" top=").append(top).append("\n");
+        for (int i = 0; i < n; i++) {
+            int idx = i;
+            try {
+                JSValue v = valueStack.peek(i);
+                String cls = v == null ? "null" : v.getClass().getSimpleName();
+                sb.append("  [+").append(i).append("] ").append(cls).append(" -> ").append(String.valueOf(v)).append("\n");
+            } catch (Exception e) {
+                sb.append("  [+").append(i).append("] <no-value>\n");
+            }
+        }
+        System.out.print(sb.toString());
+    }
+
     /**
      * Clear the pending exception in the VM.
      * This is needed when an async function catches an exception.
@@ -151,6 +169,32 @@ public final class VirtualMachine {
 
         try {
             Bytecode bytecode = function.getBytecode();
+            // Disassemble bytecode for diagnostics
+            try {
+                System.out.println("=== DISASSEMBLY for function: " + function + " length=" + bytecode.getLength() + " locals=" + bytecode.getLocalCount());
+                int dpc = 0;
+                while (dpc < bytecode.getLength()) {
+                    int code = bytecode.readOpcode(dpc);
+                    Opcode dop = Opcode.fromInt(code);
+                    String extra = "";
+                    int size = dop.getSize();
+                    if (size == 5) {
+                        int u32 = bytecode.readU32(dpc + 1);
+                        extra = " " + u32;
+                    } else if (size == 3) {
+                        int u16 = bytecode.readU16(dpc + 1);
+                        extra = " " + u16;
+                    } else if (size == 2) {
+                        int u8 = bytecode.readU8(dpc + 1);
+                        extra = " " + u8;
+                    }
+                    System.out.println(String.format("%04d: %s%s", dpc, dop.name(), extra));
+                    dpc += size;
+                }
+                System.out.println("=== END DISASSEMBLY");
+            } catch (Throwable t) {
+                // ignore disassembly errors
+            }
             int pc = 0;
 
             // Main execution loop
@@ -194,6 +238,9 @@ public final class VirtualMachine {
                 int opcode = bytecode.readOpcode(pc);
                 Opcode op = Opcode.fromInt(opcode);
 
+                // Verbose diagnostic: print every opcode and current stack top size
+                System.out.println("VM EXEC PC=" + pc + " OP=" + op.name() + " stackTop=" + valueStack.getStackTop());
+
                 switch (op) {
                     // ==================== Constants and Literals ====================
                     case INVALID -> throw new JSVirtualMachineException("Invalid opcode at PC " + pc);
@@ -216,6 +263,7 @@ public final class VirtualMachine {
                         }
 
                         valueStack.push(constValue);
+                        debugDumpStack("AFTER_PUSH_CONST", pc, 6);
                         pc += op.getSize();
                     }
                     case PRIVATE_SYMBOL -> {
@@ -298,12 +346,14 @@ public final class VirtualMachine {
                     // ==================== Stack Manipulation ====================
                     case DROP -> {
                         valueStack.pop();
+                        debugDumpStack("AFTER_DROP", pc, 6);
                         pc += op.getSize();
                     }
                     case NIP -> {
                         JSValue top = valueStack.pop();
                         valueStack.pop();
                         valueStack.push(top);
+                        debugDumpStack("AFTER_NIP", pc, 6);
                         pc += op.getSize();
                     }
                     case DUP -> {
@@ -593,6 +643,8 @@ public final class VirtualMachine {
                             resetPropertyAccessTracking();
                             propertyAccessChain.append(getVarName);
                         }
+                        // Diagnostic: log GET_VAR name and value
+                        System.out.println("GET_VAR " + getVarName + " -> " + (varValue == null ? "null" : varValue.getClass().getSimpleName() + "(" + varValue + ")"));
                         valueStack.push(varValue);
                         pc += op.getSize();
                     }
@@ -601,6 +653,8 @@ public final class VirtualMachine {
                         String putVarName = bytecode.getAtoms()[putVarAtom];
                         JSValue putValue = valueStack.pop();
                         context.getGlobalObject().set(PropertyKey.fromString(putVarName), putValue);
+                        // Diagnostic: log PUT_VAR name and value class for debugging
+                        System.out.println("PUT_VAR " + putVarName + " <- " + (putValue == null ? "null" : putValue.getClass().getSimpleName() + "(" + putValue + ")"));
                         pc += op.getSize();
                     }
                     case SET_VAR -> {
@@ -608,6 +662,7 @@ public final class VirtualMachine {
                         String setVarName = bytecode.getAtoms()[setVarAtom];
                         JSValue setValue = valueStack.peek(0);
                         context.getGlobalObject().set(PropertyKey.fromString(setVarName), setValue);
+                        System.out.println("SET_VAR " + setVarName + " <- " + (setValue == null ? "null" : setValue.getClass().getSimpleName() + "(" + setValue + ")"));
                         pc += op.getSize();
                     }
                     case GET_LOCAL -> {
@@ -618,8 +673,12 @@ public final class VirtualMachine {
                     }
                     case PUT_LOCAL -> {
                         int putLocalIndex = bytecode.readU16(pc + 1);
+                        debugDumpStack("BEFORE_PUT_LOCAL", pc, 8);
                         JSValue value = valueStack.pop();
                         currentFrame.getLocals()[putLocalIndex] = value;
+                        // Diagnostic: log local write for debugging
+                        System.out.println("PUT_LOCAL idx=" + putLocalIndex + " <- " + (value == null ? "null" : value.getClass().getSimpleName() + "(" + value + ")"));
+                        debugDumpStack("AFTER_PUT_LOCAL", pc, 8);
                         pc += op.getSize();
                     }
                     case SET_LOCAL -> {
@@ -638,6 +697,14 @@ public final class VirtualMachine {
                         JSObject targetObj = toObject(obj);
                         if (targetObj != null) {
                             JSValue result = targetObj.get(PropertyKey.fromString(fieldName), context);
+                            if ("x".equals(fieldName)) {
+                                try {
+                                    boolean own = targetObj.hasOwnProperty(fieldName);
+                                    System.out.println("DEBUG_GET_FIELD field='x' targetObjClass=" + targetObj.getClass().getSimpleName() + " own=" + own + " value=" + result);
+                                } catch (Throwable t) {
+                                    // ignore diagnostics
+                                }
+                            }
                             // Check if getter threw an exception
                             if (context.hasPendingException()) {
                                 pendingException = context.getPendingException();
@@ -666,7 +733,16 @@ public final class VirtualMachine {
                         // The value should be on top of the stack.
                         JSValue putFieldValue = valueStack.peek(0);
                         if (putFieldObj instanceof JSObject jsObj) {
-                            jsObj.set(PropertyKey.fromString(putFieldName), putFieldValue, context);
+                            try {
+                                JSValue before = jsObj.get(putFieldName);
+                                jsObj.set(PropertyKey.fromString(putFieldName), putFieldValue, context);
+                                JSValue after = jsObj.get(putFieldName);
+                                if ("x".equals(putFieldName)) {
+                                    System.out.println("DEBUG_PUT_FIELD field='x' objClass=" + jsObj.getClass().getSimpleName() + " before=" + before + " after=" + after + " valueSet=" + putFieldValue);
+                                }
+                            } catch (Throwable t) {
+                                // ignore diagnostics
+                            }
                             // Check if setter threw an exception
                             if (context.hasPendingException()) {
                                 pendingException = context.getPendingException();
@@ -802,6 +878,7 @@ public final class VirtualMachine {
                     case CALL -> {
                         int argCount = bytecode.readU16(pc + 1);
                         handleCall(argCount);
+                        debugDumpStack("AFTER_CALL", pc, 8);
                         pc += op.getSize();
                     }
                     case CALL_CONSTRUCTOR -> {
@@ -1007,6 +1084,7 @@ public final class VirtualMachine {
                         // Push prototype and constructor onto stack
                         valueStack.push(prototype);
                         valueStack.push(constructor);
+                        debugDumpStack("AFTER_DEFINE_CLASS", pc, 8);
                         pc += op.getSize();
                     }
                     case DEFINE_METHOD -> {
@@ -2010,6 +2088,9 @@ public final class VirtualMachine {
         JSValue operand = valueStack.pop();
         double oldValue = JSTypeConversions.toNumber(context, operand).value();
         double newValue = oldValue + 1;
+        // Diagnostic: log POST_INC operand and produced values
+        System.out.println("POST_INC operand=" + (operand == null ? "null" : operand.getClass().getName() + "(" + operand + ")") +
+                " old=" + oldValue + " new=" + newValue);
         valueStack.push(new JSNumber(oldValue));
         valueStack.push(new JSNumber(newValue));
     }

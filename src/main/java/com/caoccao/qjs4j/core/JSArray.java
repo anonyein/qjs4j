@@ -262,6 +262,8 @@ public final class JSArray extends JSObject {
      * Set element at index with context for strict mode checking.
      */
     public void set(long index, JSValue value, JSContext context) {
+        
+
         if (index < 0) {
             // Negative indices are treated as string properties
             super.set(PropertyKey.fromString(Long.toString(index)), value, context);
@@ -297,15 +299,17 @@ public final class JSArray extends JSObject {
         }
 
         // Use dense array if index is within reasonable range
-        if (index < MAX_DENSE_SIZE) {
+                if (index < MAX_DENSE_SIZE) {
             ensureDenseCapacity((int) index + 1);
             denseArray[(int) index] = value;
+            
         } else {
             // Use sparse storage for large indices
             if (sparseProperties == null) {
                 sparseProperties = new HashMap<>();
             }
             sparseProperties.put((int) index, value);
+            
         }
     }
 
