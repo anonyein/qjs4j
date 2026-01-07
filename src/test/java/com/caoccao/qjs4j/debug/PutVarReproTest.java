@@ -6,6 +6,8 @@ import com.caoccao.qjs4j.compiler.Compiler;
 import com.caoccao.qjs4j.core.JSBytecodeFunction;
 import com.caoccao.qjs4j.vm.Bytecode;
 import com.caoccao.qjs4j.vm.Opcode;
+import com.caoccao.qjs4j.core.JSValue;
+import com.caoccao.qjs4j.core.JSNumber;
 import org.junit.jupiter.api.Test;
 
 public class PutVarReproTest {
@@ -39,6 +41,20 @@ public class PutVarReproTest {
                 }
 
                 context.eval(code);
+
+                // Verify mappings: '0' -> 0, 'a' -> 10, 'A' -> 10 via intAt helper
+                JSValue r0 = context.eval("intAt('0', 0);");
+                JSValue ra = context.eval("intAt('a', 0);");
+                JSValue rA = context.eval("intAt('A', 0);");
+
+                org.assertj.core.api.Assertions.assertThat(r0).isInstanceOf(JSNumber.class);
+                org.assertj.core.api.Assertions.assertThat(((JSNumber) r0).value()).isEqualTo(0.0);
+
+                org.assertj.core.api.Assertions.assertThat(ra).isInstanceOf(JSNumber.class);
+                org.assertj.core.api.Assertions.assertThat(((JSNumber) ra).value()).isEqualTo(10.0);
+
+                org.assertj.core.api.Assertions.assertThat(rA).isInstanceOf(JSNumber.class);
+                org.assertj.core.api.Assertions.assertThat(((JSNumber) rA).value()).isEqualTo(10.0);
             } catch (Exception e) {
                 e.printStackTrace();
                 throw e;
