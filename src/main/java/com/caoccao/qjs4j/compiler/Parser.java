@@ -840,22 +840,7 @@ public final class Parser {
     }
 
     private Expression parseExpression() {
-        SourceLocation location = getLocation();
-        Expression expr = parseAssignmentExpression();
-
-        if (match(TokenType.COMMA)) {
-            List<Expression> expressions = new ArrayList<>();
-            expressions.add(expr);
-
-            while (match(TokenType.COMMA)) {
-                advance(); // consume comma
-                expressions.add(parseAssignmentExpression());
-            }
-
-            return new SequenceExpression(expressions, location);
-        }
-
-        return expr;
+        return parseAssignmentExpression();
     }
 
     private Statement parseExpressionStatement() {
