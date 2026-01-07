@@ -24,11 +24,11 @@ import com.caoccao.qjs4j.exceptions.JSException;
  */
 public enum JSConstructorType {
     AGGREGATE_ERROR(JSAggregateError::create),
-    ARRAY(null),
-    ARRAY_BUFFER(null),
+    ARRAY(JSArray::create),
+    ARRAY_BUFFER(JSArrayBuffer::create),
     BIG_INT_OBJECT(JSBigIntObject::create),
     BOOLEAN_OBJECT(JSBooleanObject::create),
-    DATA_VIEW(null),
+    DATA_VIEW(JSDataView::create),
     DATE(JSDate::create),
     ERROR(JSError::create),
     EVAL_ERROR(JSEvalError::create),

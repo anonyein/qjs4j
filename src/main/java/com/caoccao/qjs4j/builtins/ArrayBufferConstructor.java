@@ -25,6 +25,16 @@ import com.caoccao.qjs4j.core.*;
 public final class ArrayBufferConstructor {
 
     /**
+     * ArrayBuffer constructor call/new.
+     * Delegates to JSArrayBuffer.create().
+     * <p>
+     * Based on ES2020 24.1.1.1
+     */
+    public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
+        return JSArrayBuffer.create(context, args);
+    }
+
+    /**
      * get ArrayBuffer[@@species]
      * ES2020 24.1.3.3
      * Returns the ArrayBuffer constructor.

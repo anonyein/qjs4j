@@ -286,4 +286,12 @@ public class ArrayConstructorTest extends BaseJavetTest {
         assertStringWithJavet(
                 "JSON.stringify(Array.of(...[1,2,3]))");
     }
+
+    @Test
+    public void testTypeof() {
+        assertStringWithJavet(
+                "typeof Array;");
+        assertIntegerWithJavet(
+                "Array.length;");
+    }
 }

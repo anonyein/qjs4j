@@ -24,6 +24,16 @@ import com.caoccao.qjs4j.core.*;
  */
 public final class ArrayConstructor {
     /**
+     * Array constructor call/new.
+     * Delegates to JSArray.create().
+     * <p>
+     * Based on ES2020 22.1.1.1
+     */
+    public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
+        return JSArray.create(context, args);
+    }
+
+    /**
      * Array.from(arrayLike, mapFn, thisArg)
      * ES2020 22.1.2.1
      * Creates a new Array instance from an array-like or iterable object.

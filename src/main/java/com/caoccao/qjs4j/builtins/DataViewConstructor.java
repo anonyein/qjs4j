@@ -17,28 +17,25 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.JSContext;
-import com.caoccao.qjs4j.core.JSFinalizationRegistry;
+import com.caoccao.qjs4j.core.JSDataView;
 import com.caoccao.qjs4j.core.JSValue;
 
 /**
- * FinalizationRegistry constructor implementation.
- * Based on ES2021 FinalizationRegistry specification.
- * <p>
- * FinalizationRegistry(cleanupCallback) creates a registry for cleanup callbacks.
+ * Implementation of DataView constructor.
+ * Based on ES2020 DataView specification.
  */
-public final class FinalizationRegistryConstructor {
-    private FinalizationRegistryConstructor() {}
+public final class DataViewConstructor {
+
+    private DataViewConstructor() {
+    }
 
     /**
-     * FinalizationRegistry constructor function.
-     * Delegates to JSFinalizationRegistry.create().
-     *
-     * @param context The execution context
-     * @param thisArg The this value
-     * @param args    Constructor arguments [cleanupCallback]
-     * @return FinalizationRegistry instance
+     * DataView constructor call/new.
+     * Delegates to JSDataView.create().
+     * <p>
+     * Based on ES2020 24.3.2.1
      */
     public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
-        return JSFinalizationRegistry.create(context, args);
+        return JSDataView.create(context, args);
     }
 }

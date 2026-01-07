@@ -17,28 +17,18 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.JSContext;
-import com.caoccao.qjs4j.core.JSFinalizationRegistry;
+import com.caoccao.qjs4j.core.JSInt8Array;
 import com.caoccao.qjs4j.core.JSValue;
 
 /**
- * FinalizationRegistry constructor implementation.
- * Based on ES2021 FinalizationRegistry specification.
- * <p>
- * FinalizationRegistry(cleanupCallback) creates a registry for cleanup callbacks.
+ * Implementation of Int8Array constructor.
  */
-public final class FinalizationRegistryConstructor {
-    private FinalizationRegistryConstructor() {}
+public final class Int8ArrayConstructor {
 
-    /**
-     * FinalizationRegistry constructor function.
-     * Delegates to JSFinalizationRegistry.create().
-     *
-     * @param context The execution context
-     * @param thisArg The this value
-     * @param args    Constructor arguments [cleanupCallback]
-     * @return FinalizationRegistry instance
-     */
+    private Int8ArrayConstructor() {
+    }
+
     public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
-        return JSFinalizationRegistry.create(context, args);
+        return JSInt8Array.create(context, args);
     }
 }

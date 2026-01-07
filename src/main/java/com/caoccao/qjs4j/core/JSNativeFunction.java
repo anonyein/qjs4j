@@ -24,17 +24,23 @@ public final class JSNativeFunction extends JSFunction {
     private final boolean isConstructor;
     private final int length;
     private final String name;
+    private final boolean requiresNew;
 
     public JSNativeFunction(String name, int length, NativeCallback callback) {
-        this(name, length, callback, true);
+        this(name, length, callback, true, false);
     }
 
     public JSNativeFunction(String name, int length, NativeCallback callback, boolean isConstructor) {
+        this(name, length, callback, isConstructor, false);
+    }
+
+    public JSNativeFunction(String name, int length, NativeCallback callback, boolean isConstructor, boolean requiresNew) {
         super(); // Initialize as JSObject
         this.name = name;
         this.length = length;
         this.callback = callback;
         this.isConstructor = isConstructor;
+        this.requiresNew = requiresNew;
 
         // Set up function properties on the object
         // Functions are objects in JavaScript and have these standard properties
@@ -89,6 +95,10 @@ public final class JSNativeFunction extends JSFunction {
 
     public boolean isConstructor() {
         return isConstructor;
+    }
+
+    public boolean requiresNew() {
+        return requiresNew;
     }
 
     @Override

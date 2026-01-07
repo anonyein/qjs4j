@@ -1376,6 +1376,16 @@ public final class VirtualMachine {
 
         if (callee instanceof JSFunction function) {
             if (function instanceof JSNativeFunction nativeFunc) {
+                // Check if this function requires 'new'
+                if (nativeFunc.requiresNew()) {
+                    String constructorName = nativeFunc.getName() != null ? nativeFunc.getName() : "constructor";
+                    resetPropertyAccessTracking();
+                    String errorMessage = switch (constructorName) {
+                        case JSPromise.NAME -> "Promise constructor cannot be invoked without 'new'";
+                        default -> "Constructor " + constructorName + " requires 'new'";
+                    };
+                    throw new JSVirtualMachineException(context.throwTypeError(errorMessage));
+                }
                 // Call native function with receiver as thisArg
                 JSValue result = nativeFunc.call(context, receiver, args);
                 // Check for pending exception after native function call
@@ -1497,7 +1507,9 @@ public final class VirtualMachine {
             } else {
                 JSObject result = null;
                 switch (jsFunction.getConstructorType()) {
-                    case BOOLEAN_OBJECT, NUMBER_OBJECT, STRING_OBJECT, BIG_INT_OBJECT, SYMBOL_OBJECT,
+                    case ARRAY, ARRAY_BUFFER, DATA_VIEW, DATE, FINALIZATION_REGISTRY, MAP, PROMISE, BOOLEAN_OBJECT,
+                         NUMBER_OBJECT, STRING_OBJECT, BIG_INT_OBJECT,
+                         SYMBOL_OBJECT,
                          TYPED_ARRAY_INT8, TYPED_ARRAY_INT16, TYPED_ARRAY_UINT8_CLAMPED, TYPED_ARRAY_UINT8,
                          TYPED_ARRAY_UINT16, TYPED_ARRAY_INT32, TYPED_ARRAY_UINT32, TYPED_ARRAY_FLOAT16,
                          TYPED_ARRAY_FLOAT32, TYPED_ARRAY_FLOAT64, TYPED_ARRAY_BIGINT64, TYPED_ARRAY_BIGUINT64,
@@ -1516,8 +1528,8 @@ public final class VirtualMachine {
             JSConstructorType constructorType = jsObject.getConstructorType();
             JSObject resultObject = null;
             switch (constructorType) {
-                case DATE, SYMBOL_OBJECT, BIG_INT_OBJECT, PROXY, PROMISE, SHARED_ARRAY_BUFFER,
-                     REGEXP, MAP, SET, FINALIZATION_REGISTRY, WEAK_MAP, WEAK_SET, WEAK_REF,
+                case DATE, SYMBOL_OBJECT, BIG_INT_OBJECT, PROXY, SHARED_ARRAY_BUFFER,
+                     REGEXP, SET, FINALIZATION_REGISTRY, WEAK_MAP, WEAK_SET, WEAK_REF,
                      ERROR, TYPE_ERROR, RANGE_ERROR, REFERENCE_ERROR, SYNTAX_ERROR,
                      URI_ERROR, EVAL_ERROR, AGGREGATE_ERROR, SUPPRESSED_ERROR ->
                         resultObject = constructorType.create(context, args);

@@ -16,6 +16,8 @@
 
 package com.caoccao.qjs4j.core;
 
+import com.caoccao.qjs4j.exceptions.JSException;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -76,6 +78,47 @@ public final class JSArrayBuffer extends JSObject implements JSArrayBufferable {
         this.detached = false;
         this.resizable = false;
         this.maxByteLength = bytes.length;
+    }
+
+    /**
+     * ArrayBuffer constructor implementation.
+     * new ArrayBuffer(byteLength)
+     * new ArrayBuffer(byteLength, options)
+     * <p>
+     * Based on ES2020 24.1.1.1
+     */
+    public static JSArrayBuffer create(JSContext context, JSValue... args) {
+        if (args.length == 0) {
+            throw new JSException(context.throwTypeError("ArrayBuffer constructor requires at least 1 argument"));
+        }
+
+        // Get byteLength
+        JSValue byteLengthArg = args[0];
+        int byteLength = JSTypeConversions.toInt32(context, byteLengthArg);
+
+        if (byteLength < 0) {
+            throw new JSException(context.throwRangeError("Invalid array buffer length"));
+        }
+
+        // Check for options (maxByteLength for resizable buffers)
+        Integer maxByteLength = null;
+        if (args.length >= 2 && args[1] instanceof JSObject options) {
+            JSValue maxByteLengthValue = options.get("maxByteLength");
+            if (!(maxByteLengthValue instanceof JSUndefined)) {
+                int maxLen = JSTypeConversions.toInt32(context, maxByteLengthValue);
+                if (maxLen < byteLength) {
+                    throw new JSException(context.throwRangeError("maxByteLength must be greater than or equal to byteLength"));
+                }
+                maxByteLength = maxLen;
+            }
+        }
+
+        // Create the ArrayBuffer
+        if (maxByteLength != null) {
+            return new JSArrayBuffer(byteLength, maxByteLength);
+        } else {
+            return new JSArrayBuffer(byteLength);
+        }
     }
 
     /**

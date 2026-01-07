@@ -16,6 +16,8 @@
 
 package com.caoccao.qjs4j.core;
 
+import com.caoccao.qjs4j.exceptions.JSException;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -74,6 +76,41 @@ public final class JSArray extends JSObject {
         this.length = values.length;
         this.denseArray = Arrays.copyOf(values, Math.max(values.length, INITIAL_CAPACITY));
         initializeLengthProperty();
+    }
+
+    /**
+     * Array constructor implementation.
+     * new Array() - creates an empty array
+     * new Array(len) - creates an array with specified length (if len is a number)
+     * new Array(element0, element1, ..., elementN) - creates an array with the given elements
+     * <p>
+     * Based on ES2020 22.1.1.1
+     */
+    public static JSArray create(JSContext context, JSValue... args) {
+        JSArray array = context.createJSArray();
+
+        // Special case: single numeric argument sets array length
+        if (args.length == 1 && args[0] instanceof JSNumber num) {
+            double value = num.value();
+            // Check if it's an integer value
+            if (value >= 0 && value == Math.floor(value) && value <= 0xFFFFFFFFL) {
+                // Set array length
+                int length = (int) value;
+                // In JavaScript, setting length creates an array with that many undefined slots
+                // We just set the length property
+                array.setLength(length);
+                return array;
+            }
+            // If not a valid length, throw RangeError
+            throw new JSException(context.throwRangeError("Invalid array length"));
+        }
+
+        // Multiple arguments or non-numeric single argument: create array with elements
+        for (JSValue arg : args) {
+            array.push(arg);
+        }
+
+        return array;
     }
 
     /**

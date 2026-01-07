@@ -17,28 +17,14 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.JSContext;
-import com.caoccao.qjs4j.core.JSFinalizationRegistry;
+import com.caoccao.qjs4j.core.JSFloat16Array;
 import com.caoccao.qjs4j.core.JSValue;
 
-/**
- * FinalizationRegistry constructor implementation.
- * Based on ES2021 FinalizationRegistry specification.
- * <p>
- * FinalizationRegistry(cleanupCallback) creates a registry for cleanup callbacks.
- */
-public final class FinalizationRegistryConstructor {
-    private FinalizationRegistryConstructor() {}
+public final class Float16ArrayConstructor {
+    private Float16ArrayConstructor() {
+    }
 
-    /**
-     * FinalizationRegistry constructor function.
-     * Delegates to JSFinalizationRegistry.create().
-     *
-     * @param context The execution context
-     * @param thisArg The this value
-     * @param args    Constructor arguments [cleanupCallback]
-     * @return FinalizationRegistry instance
-     */
     public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
-        return JSFinalizationRegistry.create(context, args);
+        return JSFloat16Array.create(context, args);
     }
 }
