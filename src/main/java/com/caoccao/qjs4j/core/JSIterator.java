@@ -24,9 +24,9 @@ package com.caoccao.qjs4j.core;
  * that returns an object with two properties: value and done.
  */
 public class JSIterator extends JSObject {
+    private final JSContext context;
     private final IteratorFunction iteratorFunction;
     private boolean exhausted;
-    private final JSContext context;
 
     /**
      * Create an iterator with the given iteration logic.

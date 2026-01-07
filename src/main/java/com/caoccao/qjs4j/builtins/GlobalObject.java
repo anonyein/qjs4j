@@ -17,6 +17,7 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.exceptions.JSErrorType;
 import com.caoccao.qjs4j.exceptions.JSException;
 
 import java.net.URLDecoder;
@@ -25,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * The global object with built-in functions.
@@ -76,52 +78,6 @@ public final class GlobalObject {
         }
         System.err.println();
         return JSUndefined.INSTANCE;
-    }
-
-    /**
-     * Create an Error constructor.
-     */
-    private static JSObject createErrorConstructor(JSContext context, String errorName) {
-        // Create Error prototype using the proper error class
-        JSError errorPrototype = switch (errorName) {
-            case JSTypeError.NAME -> new JSTypeError(context);
-            case JSRangeError.NAME -> new JSRangeError(context);
-            case JSReferenceError.NAME -> new JSReferenceError(context);
-            case JSSyntaxError.NAME -> new JSSyntaxError(context);
-            case JSURIError.NAME -> new JSURIError(context);
-            case JSEvalError.NAME -> new JSEvalError(context);
-            case JSAggregateError.NAME -> new JSAggregateError(context);
-            case JSSuppressedError.NAME -> new JSSuppressedError(context);
-            default -> new JSError(context);
-        };
-
-        errorPrototype.set("toString", new JSNativeFunction("toString", 0, GlobalObject::errorToString));
-
-        // For now, Error constructor is a placeholder (like Array, String, etc.)
-        JSObject errorConstructor = context.createJSObject();
-        errorConstructor.set("prototype", errorPrototype);
-
-        // Set constructor type based on error name
-        JSConstructorType constructorType = switch (errorName) {
-            case JSTypeError.NAME -> JSConstructorType.TYPE_ERROR;
-            case JSRangeError.NAME -> JSConstructorType.RANGE_ERROR;
-            case JSReferenceError.NAME -> JSConstructorType.REFERENCE_ERROR;
-            case JSSyntaxError.NAME -> JSConstructorType.SYNTAX_ERROR;
-            case JSURIError.NAME -> JSConstructorType.URI_ERROR;
-            case JSEvalError.NAME -> JSConstructorType.EVAL_ERROR;
-            case JSAggregateError.NAME -> JSConstructorType.AGGREGATE_ERROR;
-            case JSSuppressedError.NAME -> JSConstructorType.SUPPRESSED_ERROR;
-            default -> JSConstructorType.ERROR;
-        };
-        errorConstructor.setConstructorType(constructorType);
-
-        // Store error name for constructor use
-        errorConstructor.set("[[ErrorName]]", new JSString(errorName));
-
-        // Set constructor property on prototype
-        errorPrototype.set("constructor", errorConstructor);
-
-        return errorConstructor;
     }
 
     /**
@@ -220,28 +176,6 @@ public final class GlobalObject {
         } catch (Exception e) {
             return context.throwURIError("URI malformed");
         }
-    }
-
-    /**
-     * Error.prototype.toString()
-     * Converts an Error object to a string.
-     */
-    public static JSValue errorToString(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (!(thisArg instanceof JSObject error)) {
-            return new JSString("[object Object]");
-        }
-
-        JSValue nameValue = error.get("name");
-        JSValue messageValue = error.get("message");
-
-        String name = nameValue instanceof JSString ? ((JSString) nameValue).value() : "Error";
-        String message = messageValue instanceof JSString ? ((JSString) messageValue).value() : "";
-
-        if (message.isEmpty()) {
-            return new JSString(name);
-        }
-
-        return new JSString(name + ": " + message);
     }
 
     /**
@@ -723,18 +657,7 @@ public final class GlobalObject {
      * Initialize Error constructors.
      */
     private static void initializeErrorConstructors(JSContext context, JSObject global) {
-        // Base Error constructor
-        global.set("Error", createErrorConstructor(context, "Error"));
-
-        // Derived Error types
-        global.set("TypeError", createErrorConstructor(context, "TypeError"));
-        global.set("ReferenceError", createErrorConstructor(context, "ReferenceError"));
-        global.set("RangeError", createErrorConstructor(context, "RangeError"));
-        global.set("SyntaxError", createErrorConstructor(context, "SyntaxError"));
-        global.set("URIError", createErrorConstructor(context, "URIError"));
-        global.set("EvalError", createErrorConstructor(context, "EvalError"));
-        global.set("AggregateError", createErrorConstructor(context, "AggregateError"));
-        global.set("SuppressedError", createErrorConstructor(context, "SuppressedError"));
+        Stream.of(JSErrorType.values()).forEach(type -> global.set(type.name(), type.create(context)));
     }
 
     /**
@@ -774,9 +697,12 @@ public final class GlobalObject {
 
         // Add 'arguments' and 'caller' as accessor properties that throw TypeError
         // These properties exist for backwards compatibility but throw when accessed
-        JSNativeFunction throwTypeError = new JSNativeFunction("throwTypeError", 0, (ctx, thisObj, args) -> {
-            return ctx.throwTypeError("'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them");
-        });
+        JSNativeFunction throwTypeError = new JSNativeFunction(
+                "throwTypeError",
+                0,
+                (childContext, thisObj, args) ->
+                        childContext.throwTypeError(
+                                "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"));
 
         functionPrototype.defineProperty(PropertyKey.fromString("arguments"),
                 PropertyDescriptor.accessorDescriptor(throwTypeError, throwTypeError, false, true));

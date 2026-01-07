@@ -16,14 +16,30 @@
 
 package com.caoccao.qjs4j.exceptions;
 
+import com.caoccao.qjs4j.core.*;
+
 public enum JSErrorType {
-    AggregateError,
-    EvalError,
-    Error,
-    RangeError,
-    ReferenceError,
-    SuppressedError,
-    SyntaxError,
-    TypeError,
-    URIError,
+    AggregateError(JSAggregateError::createPrototype),
+    EvalError(JSEvalError::createPrototype),
+    Error(JSError::createPrototype),
+    RangeError(JSRangeError::createPrototype),
+    ReferenceError(JSReferenceError::createPrototype),
+    SuppressedError(JSSuppressedError::createPrototype),
+    SyntaxError(JSSyntaxError::createPrototype),
+    TypeError(JSTypeError::createPrototype),
+    URIError(JSURIError::createPrototype),
+    ;
+
+    private final JSConstructor prototypeConstructor;
+
+    JSErrorType(JSConstructor prototypeConstructor) {
+        this.prototypeConstructor = prototypeConstructor;
+    }
+
+    public JSObject create(JSContext context, JSValue... args) {
+        if (prototypeConstructor == null) {
+            throw new JSException(context.throwTypeError("Constructor for " + this.name() + " is not implemented"));
+        }
+        return prototypeConstructor.construct(context, args);
+    }
 }

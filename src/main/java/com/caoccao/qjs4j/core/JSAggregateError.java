@@ -47,13 +47,64 @@ public final class JSAggregateError extends JSError {
     }
 
     public static JSObject create(JSContext context, JSValue... args) {
+        // AggregateError: new AggregateError(errors, message)
+        JSValue errors = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
         String message = "";
-        if (args.length > 0 && !args[0].isUndefined()) {
-            message = JSTypeConversions.toString(context, args[0]).value();
+        if (args.length > 1 && !(args[1] instanceof JSUndefined)) {
+            message = JSTypeConversions.toString(context, args[1]).value();
         }
         JSObject jsObject = new JSAggregateError(context, message);
+        jsObject.set("errors", errors);
         context.transferPrototype(jsObject, NAME);
         return jsObject;
+    }
+
+    public static JSObject createPrototype(JSContext context, JSValue... args) {
+        // Create Error prototype using the proper error class
+        JSError errorPrototype = new JSAggregateError(context);
+
+        errorPrototype.set("toString", new JSNativeFunction("toString", 0, JSError::errorToString));
+
+        // AggregateError(errors, message)
+        int length = 2;
+
+        // Create Error constructor as a function (following QuickJS pattern)
+        // QuickJS uses JS_NewCConstructor for error constructors
+        JSNativeFunction errorConstructor = new JSNativeFunction(
+                NAME,
+                length,
+                (childContext, thisObj, childArgs) -> {
+                    // The VM has already created thisObj with the correct prototype
+                    // We just need to initialize the error properties on thisObj
+                    if (!(thisObj instanceof JSObject obj)) {
+                        return JSUndefined.INSTANCE;
+                    }
+
+                    // Set name property
+                    obj.set("name", new JSString(NAME));
+
+                    // AggregateError: new AggregateError(errors, message)
+                    JSValue errors = childArgs.length > 0 ? childArgs[0] : JSUndefined.INSTANCE;
+                    String message = "";
+                    if (childArgs.length > 1 && !(childArgs[1] instanceof JSUndefined)) {
+                        message = JSTypeConversions.toString(childContext, childArgs[1]).value();
+                    }
+                    obj.set("errors", errors);
+                    obj.set("message", new JSString(message));
+
+                    // Return undefined to use the thisObj created by the VM
+                    return JSUndefined.INSTANCE;
+                });
+        errorConstructor.set("prototype", errorPrototype);
+
+        // Don't set constructor type - let the JSNativeFunction lambda handle construction
+        // Store error name for potential future use
+        errorConstructor.set("[[ErrorName]]", new JSString(NAME));
+
+        // Set constructor property on prototype
+        errorPrototype.set("constructor", errorConstructor);
+
+        return errorConstructor;
     }
 
     /**

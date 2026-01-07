@@ -62,8 +62,8 @@ public class JSAsyncIterator extends JSObject {
      * Create an IteratorResult object that resolves in a promise.
      *
      * @param context The execution context
-     * @param value The iterator value
-     * @param done  Whether iteration is complete
+     * @param value   The iterator value
+     * @param done    Whether iteration is complete
      * @return A promise that resolves to the iterator result
      */
     public static JSPromise createIteratorResultPromise(JSContext context, JSValue value, boolean done) {

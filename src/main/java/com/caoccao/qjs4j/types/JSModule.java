@@ -33,6 +33,7 @@ import java.util.*;
  * - Evaluation state (unlinked, linking, linked, evaluating, evaluated)
  */
 public final class JSModule {
+    private final JSContext context;
     private final int dfsAncestorIndex;
     // For circular dependency detection
     private final int dfsIndex;
@@ -42,7 +43,6 @@ public final class JSModule {
     private final JSObject namespace;
     private final List<JSModule> requestedModules;
     private final String url;
-    private final JSContext context;
     private JSValue defaultExport;
     private ModuleStatus status;
 

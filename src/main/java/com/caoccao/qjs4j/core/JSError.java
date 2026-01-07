@@ -61,6 +61,70 @@ public sealed class JSError extends JSObject permits
         return jsObject;
     }
 
+    public static JSObject createPrototype(JSContext context, JSValue... args) {
+        // Create Error prototype using the proper error class
+        JSError errorPrototype = new JSError(context);
+
+        errorPrototype.set("toString", new JSNativeFunction("toString", 0, JSError::errorToString));
+
+        // Standard Error(message)
+        int length = 1;
+
+        // Create Error constructor as a function (following QuickJS pattern)
+        // QuickJS uses JS_NewCConstructor for error constructors
+        JSNativeFunction errorConstructor = new JSNativeFunction(
+                NAME,
+                length,
+                (childContext, thisObj, childArgs) -> {
+                    // The VM has already created thisObj with the correct prototype
+                    // We just need to initialize the error properties on thisObj
+                    if (!(thisObj instanceof JSObject obj)) {
+                        return JSUndefined.INSTANCE;
+                    }
+
+                    // Set name property
+                    obj.set("name", new JSString(NAME));
+
+                    // Standard error: new Error(message)
+                    if (childArgs.length > 0 && !(childArgs[0] instanceof JSUndefined)) {
+                        obj.set("message", childArgs[0]);
+                    } else {
+                        obj.set("message", new JSString(""));
+                    }
+
+                    // Return undefined to use the thisObj created by the VM
+                    return JSUndefined.INSTANCE;
+                });
+        errorConstructor.set("prototype", errorPrototype);
+
+        // Don't set constructor type - let the JSNativeFunction lambda handle construction
+        // Store error name for potential future use
+        errorConstructor.set("[[ErrorName]]", new JSString(NAME));
+
+        // Set constructor property on prototype
+        errorPrototype.set("constructor", errorConstructor);
+
+        return errorConstructor;
+    }
+
+    public static JSValue errorToString(JSContext context, JSValue thisArg, JSValue[] args) {
+        if (!(thisArg instanceof JSObject error)) {
+            return new JSString("[object Object]");
+        }
+
+        JSValue nameValue = error.get("name");
+        JSValue messageValue = error.get("message");
+
+        String name = nameValue instanceof JSString ? ((JSString) nameValue).value() : "Error";
+        String message = messageValue instanceof JSString ? ((JSString) messageValue).value() : "";
+
+        if (message.isEmpty()) {
+            return new JSString(name);
+        }
+
+        return new JSString(name + ": " + message);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
