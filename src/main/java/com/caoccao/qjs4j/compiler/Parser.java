@@ -840,7 +840,22 @@ public final class Parser {
     }
 
     private Expression parseExpression() {
-        return parseAssignmentExpression();
+        SourceLocation location = getLocation();
+        Expression expr = parseAssignmentExpression();
+
+        if (match(TokenType.COMMA)) {
+            List<Expression> expressions = new ArrayList<>();
+            expressions.add(expr);
+
+            while (match(TokenType.COMMA)) {
+                advance(); // consume comma
+                expressions.add(parseAssignmentExpression());
+            }
+
+            return new SequenceExpression(expressions, location);
+        }
+
+        return expr;
     }
 
     private Statement parseExpressionStatement() {
@@ -932,21 +947,10 @@ public final class Parser {
         }
         expect(TokenType.SEMICOLON);
 
-        // Update (allow comma-separated expressions e.g. i++, j++)
+        // Update
         Expression update = null;
         if (!match(TokenType.RPAREN)) {
-            SourceLocation updatesLocation = getLocation();
-            List<Expression> updates = new ArrayList<>();
-            updates.add(parseExpression());
-            while (match(TokenType.COMMA)) {
-                advance();
-                updates.add(parseExpression());
-            }
-            if (updates.size() == 1) {
-                update = updates.get(0);
-            } else {
-                update = new SequenceExpression(updates, updatesLocation);
-            }
+            update = parseExpression();
         }
         expect(TokenType.RPAREN);
 
