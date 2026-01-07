@@ -1022,26 +1022,7 @@ public final class BytecodeCompiler {
             compileTaggedTemplateExpression(taggedTemplate);
         } else if (expr instanceof ClassExpression classExpr) {
             compileClassExpression(classExpr);
-        } else if (expr instanceof SequenceExpression seqExpr) {
-            compileSequenceExpression(seqExpr);
         }
-    }
-
-    private void compileSequenceExpression(SequenceExpression seqExpr) {
-        List<Expression> exprs = seqExpr.expressions();
-        if (exprs == null || exprs.isEmpty()) {
-            emitter.emitOpcode(Opcode.UNDEFINED);
-            return;
-        }
-
-        int last = exprs.size() - 1;
-        for (int i = 0; i < last; i++) {
-            compileExpression(exprs.get(i));
-            emitter.emitOpcode(Opcode.DROP);
-        }
-
-        // Compile last expression, its value remains on stack
-        compileExpression(exprs.get(last));
     }
 
     /**
