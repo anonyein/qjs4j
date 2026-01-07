@@ -16,7 +16,7 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for ArrayBuffer constructor static methods.
  */
-public class ArrayBufferConstructorTest extends BaseTest {
+public class ArrayBufferConstructorTest extends BaseJavetTest {
 
     @Test
     public void testGetSpecies() {
@@ -95,5 +95,13 @@ public class ArrayBufferConstructorTest extends BaseTest {
         // Edge case: no arguments
         result = ArrayBufferConstructor.isView(context, JSUndefined.INSTANCE, new JSValue[]{});
         assertThat(result.isBooleanFalse()).isTrue();
+    }
+
+    @Test
+    public void testTypeof() {
+        assertStringWithJavet(
+                "typeof ArrayBuffer;");
+        assertIntegerWithJavet(
+                "ArrayBuffer.length;");
     }
 }

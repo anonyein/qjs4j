@@ -373,8 +373,8 @@ public final class GlobalObject {
         arrayBufferPrototype.defineProperty(PropertyKey.fromSymbol(JSSymbol.TO_STRING_TAG),
                 PropertyDescriptor.accessorDescriptor(toStringTagGetter, null, false, true));
 
-        // Create ArrayBuffer constructor
-        JSObject arrayBufferConstructor = context.createJSObject();
+        // Create ArrayBuffer constructor as a function
+        JSNativeFunction arrayBufferConstructor = new JSNativeFunction("ArrayBuffer", 1, ArrayBufferConstructor::call);
         arrayBufferConstructor.set("prototype", arrayBufferPrototype);
         arrayBufferConstructor.setConstructorType(JSConstructorType.ARRAY_BUFFER);
         arrayBufferPrototype.set("constructor", arrayBufferConstructor);
@@ -446,8 +446,8 @@ public final class GlobalObject {
         arrayPrototype.defineProperty(PropertyKey.fromSymbol(JSSymbol.UNSCOPABLES),
                 PropertyDescriptor.accessorDescriptor(unscopablesGetter, null, false, true));
 
-        // Create Array constructor with static methods
-        JSObject arrayConstructor = context.createJSObject();
+        // Create Array constructor as a function
+        JSNativeFunction arrayConstructor = new JSNativeFunction("Array", 1, ArrayConstructor::call);
         arrayConstructor.set("prototype", arrayPrototype);
         arrayConstructor.setConstructorType(JSConstructorType.ARRAY);
         arrayPrototype.set("constructor", arrayConstructor);
@@ -606,8 +606,8 @@ public final class GlobalObject {
         dataViewPrototype.set("getFloat64", new JSNativeFunction("getFloat64", 2, DataViewPrototype::getFloat64));
         dataViewPrototype.set("setFloat64", new JSNativeFunction("setFloat64", 3, DataViewPrototype::setFloat64));
 
-        // Create DataView constructor
-        JSObject dataViewConstructor = context.createJSObject();
+        // Create DataView constructor as a function that requires 'new'
+        JSNativeFunction dataViewConstructor = new JSNativeFunction("DataView", 1, DataViewConstructor::call, true, true);
         dataViewConstructor.set("prototype", dataViewPrototype);
         dataViewConstructor.setConstructorType(JSConstructorType.DATA_VIEW);
         dataViewPrototype.set("constructor", dataViewConstructor);
@@ -1287,7 +1287,7 @@ public final class GlobalObject {
         // Int8Array
         JSObject int8ArrayPrototype = context.createJSObject();
         int8ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction int8ArrayConstructor = new JSNativeFunction("Int8Array", 0, TypedArrayPrototype::createInt8ArrayWithoutNew);
+        JSNativeFunction int8ArrayConstructor = new JSNativeFunction("Int8Array", 3, TypedArrayPrototype::createInt8ArrayWithoutNew);
         int8ArrayConstructor.set("prototype", int8ArrayPrototype);
         int8ArrayPrototype.set("constructor", int8ArrayConstructor);
         int8ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_INT8);
@@ -1298,7 +1298,7 @@ public final class GlobalObject {
         // Uint8Array
         JSObject uint8ArrayPrototype = context.createJSObject();
         uint8ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction uint8ArrayConstructor = new JSNativeFunction("Uint8Array", 0, TypedArrayPrototype::createUint8ArrayWithoutNew);
+        JSNativeFunction uint8ArrayConstructor = new JSNativeFunction("Uint8Array", 3, TypedArrayPrototype::createUint8ArrayWithoutNew);
         uint8ArrayConstructor.set("prototype", uint8ArrayPrototype);
         uint8ArrayPrototype.set("constructor", uint8ArrayConstructor);
         uint8ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_UINT8);
@@ -1309,7 +1309,7 @@ public final class GlobalObject {
         // Uint8ClampedArray
         JSObject uint8ClampedArrayPrototype = context.createJSObject();
         uint8ClampedArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction uint8ClampedArrayConstructor = new JSNativeFunction("Uint8ClampedArray", 0, TypedArrayPrototype::createUint8ClampedArrayWithoutNew);
+        JSNativeFunction uint8ClampedArrayConstructor = new JSNativeFunction("Uint8ClampedArray", 3, TypedArrayPrototype::createUint8ClampedArrayWithoutNew);
         uint8ClampedArrayConstructor.set("prototype", uint8ClampedArrayPrototype);
         uint8ClampedArrayPrototype.set("constructor", uint8ClampedArrayConstructor);
         uint8ClampedArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_UINT8_CLAMPED);
@@ -1320,7 +1320,7 @@ public final class GlobalObject {
         // Int16Array
         JSObject int16ArrayPrototype = context.createJSObject();
         int16ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction int16ArrayConstructor = new JSNativeFunction("Int16Array", 0, TypedArrayPrototype::createInt16ArrayWithoutNew);
+        JSNativeFunction int16ArrayConstructor = new JSNativeFunction("Int16Array", 3, TypedArrayPrototype::createInt16ArrayWithoutNew);
         int16ArrayConstructor.set("prototype", int16ArrayPrototype);
         int16ArrayPrototype.set("constructor", int16ArrayConstructor);
         int16ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_INT16);
@@ -1331,7 +1331,7 @@ public final class GlobalObject {
         // Uint16Array
         JSObject uint16ArrayPrototype = context.createJSObject();
         uint16ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction uint16ArrayConstructor = new JSNativeFunction("Uint16Array", 0, TypedArrayPrototype::createUint16ArrayWithoutNew);
+        JSNativeFunction uint16ArrayConstructor = new JSNativeFunction("Uint16Array", 3, TypedArrayPrototype::createUint16ArrayWithoutNew);
         uint16ArrayConstructor.set("prototype", uint16ArrayPrototype);
         uint16ArrayPrototype.set("constructor", uint16ArrayConstructor);
         uint16ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_UINT16);
@@ -1342,7 +1342,7 @@ public final class GlobalObject {
         // Int32Array
         JSObject int32ArrayPrototype = context.createJSObject();
         int32ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction int32ArrayConstructor = new JSNativeFunction("Int32Array", 0, TypedArrayPrototype::createInt32ArrayWithoutNew);
+        JSNativeFunction int32ArrayConstructor = new JSNativeFunction("Int32Array", 3, TypedArrayPrototype::createInt32ArrayWithoutNew);
         int32ArrayConstructor.set("prototype", int32ArrayPrototype);
         int32ArrayPrototype.set("constructor", int32ArrayConstructor);
         int32ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_INT32);
@@ -1353,7 +1353,7 @@ public final class GlobalObject {
         // Uint32Array
         JSObject uint32ArrayPrototype = context.createJSObject();
         uint32ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction uint32ArrayConstructor = new JSNativeFunction("Uint32Array", 0, TypedArrayPrototype::createUint32ArrayWithoutNew);
+        JSNativeFunction uint32ArrayConstructor = new JSNativeFunction("Uint32Array", 3, TypedArrayPrototype::createUint32ArrayWithoutNew);
         uint32ArrayConstructor.set("prototype", uint32ArrayPrototype);
         uint32ArrayPrototype.set("constructor", uint32ArrayConstructor);
         uint32ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_UINT32);
@@ -1364,7 +1364,7 @@ public final class GlobalObject {
         // Float16Array
         JSObject float16ArrayPrototype = context.createJSObject();
         float16ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction float16ArrayConstructor = new JSNativeFunction("Float16Array", 0, TypedArrayPrototype::createFloat16ArrayWithoutNew);
+        JSNativeFunction float16ArrayConstructor = new JSNativeFunction("Float16Array", 3, TypedArrayPrototype::createFloat16ArrayWithoutNew);
         float16ArrayConstructor.set("prototype", float16ArrayPrototype);
         float16ArrayPrototype.set("constructor", float16ArrayConstructor);
         float16ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_FLOAT16);
@@ -1375,7 +1375,7 @@ public final class GlobalObject {
         // Float32Array
         JSObject float32ArrayPrototype = context.createJSObject();
         float32ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction float32ArrayConstructor = new JSNativeFunction("Float32Array", 0, TypedArrayPrototype::createFloat32ArrayWithoutNew);
+        JSNativeFunction float32ArrayConstructor = new JSNativeFunction("Float32Array", 3, TypedArrayPrototype::createFloat32ArrayWithoutNew);
         float32ArrayConstructor.set("prototype", float32ArrayPrototype);
         float32ArrayPrototype.set("constructor", float32ArrayConstructor);
         float32ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_FLOAT32);
@@ -1386,7 +1386,7 @@ public final class GlobalObject {
         // Float64Array
         JSObject float64ArrayPrototype = context.createJSObject();
         float64ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction float64ArrayConstructor = new JSNativeFunction("Float64Array", 0, TypedArrayPrototype::createFloat64ArrayWithoutNew);
+        JSNativeFunction float64ArrayConstructor = new JSNativeFunction("Float64Array", 3, TypedArrayPrototype::createFloat64ArrayWithoutNew);
         float64ArrayConstructor.set("prototype", float64ArrayPrototype);
         float64ArrayPrototype.set("constructor", float64ArrayConstructor);
         float64ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_FLOAT64);
@@ -1397,7 +1397,7 @@ public final class GlobalObject {
         // BigInt64Array
         JSObject bigInt64ArrayPrototype = context.createJSObject();
         bigInt64ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction bigInt64ArrayConstructor = new JSNativeFunction("BigInt64Array", 0, TypedArrayPrototype::createBigInt64ArrayWithoutNew);
+        JSNativeFunction bigInt64ArrayConstructor = new JSNativeFunction("BigInt64Array", 3, TypedArrayPrototype::createBigInt64ArrayWithoutNew);
         bigInt64ArrayConstructor.set("prototype", bigInt64ArrayPrototype);
         bigInt64ArrayPrototype.set("constructor", bigInt64ArrayConstructor);
         bigInt64ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_BIGINT64);
@@ -1408,7 +1408,7 @@ public final class GlobalObject {
         // BigUint64Array
         JSObject bigUint64ArrayPrototype = context.createJSObject();
         bigUint64ArrayPrototype.set("toString", new JSNativeFunction("toString", 0, TypedArrayPrototype::toString));
-        JSNativeFunction bigUint64ArrayConstructor = new JSNativeFunction("BigUint64Array", 0, TypedArrayPrototype::createBigUint64ArrayWithoutNew);
+        JSNativeFunction bigUint64ArrayConstructor = new JSNativeFunction("BigUint64Array", 3, TypedArrayPrototype::createBigUint64ArrayWithoutNew);
         bigUint64ArrayConstructor.set("prototype", bigUint64ArrayPrototype);
         bigUint64ArrayPrototype.set("constructor", bigUint64ArrayConstructor);
         bigUint64ArrayConstructor.setConstructorType(JSConstructorType.TYPED_ARRAY_BIGUINT64);

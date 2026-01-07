@@ -1376,6 +1376,13 @@ public final class VirtualMachine {
 
         if (callee instanceof JSFunction function) {
             if (function instanceof JSNativeFunction nativeFunc) {
+                // Check if this function requires 'new'
+                if (nativeFunc.requiresNew()) {
+                    String constructorName = nativeFunc.getName() != null ? nativeFunc.getName() : "constructor";
+                    resetPropertyAccessTracking();
+                    throw new JSVirtualMachineException(context.throwTypeError(
+                        "Constructor " + constructorName + " requires 'new'"));
+                }
                 // Call native function with receiver as thisArg
                 JSValue result = nativeFunc.call(context, receiver, args);
                 // Check for pending exception after native function call
@@ -1497,7 +1504,8 @@ public final class VirtualMachine {
             } else {
                 JSObject result = null;
                 switch (jsFunction.getConstructorType()) {
-                    case BOOLEAN_OBJECT, NUMBER_OBJECT, STRING_OBJECT, BIG_INT_OBJECT, SYMBOL_OBJECT,
+                    case ARRAY, ARRAY_BUFFER, DATA_VIEW, BOOLEAN_OBJECT, NUMBER_OBJECT, STRING_OBJECT, BIG_INT_OBJECT,
+                         SYMBOL_OBJECT,
                          TYPED_ARRAY_INT8, TYPED_ARRAY_INT16, TYPED_ARRAY_UINT8_CLAMPED, TYPED_ARRAY_UINT8,
                          TYPED_ARRAY_UINT16, TYPED_ARRAY_INT32, TYPED_ARRAY_UINT32, TYPED_ARRAY_FLOAT16,
                          TYPED_ARRAY_FLOAT32, TYPED_ARRAY_FLOAT64, TYPED_ARRAY_BIGINT64, TYPED_ARRAY_BIGUINT64,

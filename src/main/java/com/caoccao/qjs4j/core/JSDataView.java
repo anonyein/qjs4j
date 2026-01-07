@@ -60,6 +60,57 @@ public final class JSDataView extends JSObject {
         this.byteLength = byteLength;
     }
 
+    /**
+     * DataView constructor implementation.
+     * new DataView(buffer [, byteOffset [, byteLength]])
+     * <p>
+     * Based on ES2020 24.3.2.1
+     */
+    public static JSObject create(JSContext context, JSValue... args) {
+        if (args.length == 0) {
+            return context.throwTypeError("DataView constructor requires at least 1 argument");
+        }
+
+        // Get buffer argument
+        JSValue bufferArg = args[0];
+        if (!(bufferArg instanceof JSArrayBuffer buffer)) {
+            return context.throwTypeError("First argument to DataView constructor must be an ArrayBuffer");
+        }
+
+        if (buffer.isDetached()) {
+            return context.throwTypeError("ArrayBuffer is detached");
+        }
+
+        // Get byteOffset (optional, default 0)
+        int byteOffset = 0;
+        if (args.length > 1) {
+            byteOffset = JSTypeConversions.toInt32(context, args[1]);
+            if (byteOffset < 0) {
+                return context.throwRangeError("Invalid byteOffset");
+            }
+        }
+
+        if (byteOffset > buffer.getByteLength()) {
+            return context.throwRangeError("byteOffset out of range");
+        }
+
+        // Get byteLength (optional, default to remaining buffer)
+        int byteLength;
+        if (args.length > 2 && !(args[2] instanceof JSUndefined)) {
+            byteLength = JSTypeConversions.toInt32(context, args[2]);
+            if (byteLength < 0) {
+                return context.throwRangeError("Invalid byteLength");
+            }
+            if (byteOffset + byteLength > buffer.getByteLength()) {
+                return context.throwRangeError("byteOffset + byteLength out of range");
+            }
+        } else {
+            byteLength = buffer.getByteLength() - byteOffset;
+        }
+
+        return new JSDataView(buffer, byteOffset, byteLength);
+    }
+
     private void checkOffset(int offset, int size) {
         if (buffer.isDetached()) {
             throw new IllegalStateException("DataView buffer is detached");
