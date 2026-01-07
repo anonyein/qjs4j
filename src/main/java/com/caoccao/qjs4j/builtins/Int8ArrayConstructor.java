@@ -16,16 +16,19 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
-import com.caoccao.qjs4j.exceptions.JSException;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSInt8Array;
+import com.caoccao.qjs4j.core.JSValue;
 
-public final class TypedArrayPrototype {
-    public static JSValue toString(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (thisArg.isNullOrUndefined()) {
-            throw new JSException(context.throwTypeError("Cannot convert undefined or null to object"));
-        } else if (thisArg instanceof JSTypedArray jsTypedArray) {
-            return new JSString(jsTypedArray.toString());
-        }
-        return JSTypeConversions.toString(context, thisArg);
+/**
+ * Implementation of Int8Array constructor.
+ */
+public final class Int8ArrayConstructor {
+
+    private Int8ArrayConstructor() {
+    }
+
+    public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
+        return JSInt8Array.create(context, args);
     }
 }

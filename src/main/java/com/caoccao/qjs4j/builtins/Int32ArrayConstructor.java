@@ -16,16 +16,15 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
-import com.caoccao.qjs4j.exceptions.JSException;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSInt32Array;
+import com.caoccao.qjs4j.core.JSValue;
 
-public final class TypedArrayPrototype {
-    public static JSValue toString(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (thisArg.isNullOrUndefined()) {
-            throw new JSException(context.throwTypeError("Cannot convert undefined or null to object"));
-        } else if (thisArg instanceof JSTypedArray jsTypedArray) {
-            return new JSString(jsTypedArray.toString());
-        }
-        return JSTypeConversions.toString(context, thisArg);
+public final class Int32ArrayConstructor {
+    private Int32ArrayConstructor() {
+    }
+
+    public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
+        return JSInt32Array.create(context, args);
     }
 }

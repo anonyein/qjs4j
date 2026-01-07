@@ -17,7 +17,9 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.BaseJavetTest;
-import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.core.JSArrayBuffer;
+import com.caoccao.qjs4j.core.JSDataView;
+import com.caoccao.qjs4j.core.JSNumber;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

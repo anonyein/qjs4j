@@ -22,9 +22,9 @@ package com.caoccao.qjs4j.core;
 public final class JSNativeFunction extends JSFunction {
     private final NativeCallback callback;
     private final boolean isConstructor;
-    private final boolean requiresNew;
     private final int length;
     private final String name;
+    private final boolean requiresNew;
 
     public JSNativeFunction(String name, int length, NativeCallback callback) {
         this(name, length, callback, true, false);

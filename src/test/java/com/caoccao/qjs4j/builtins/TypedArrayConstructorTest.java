@@ -3,7 +3,7 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
 
-public class TypedArrayPrototypeTest extends BaseJavetTest {
+public class TypedArrayConstructorTest extends BaseJavetTest {
 
     @Test
     public void testConstructor() {

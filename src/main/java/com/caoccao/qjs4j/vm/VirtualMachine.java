@@ -1381,7 +1381,7 @@ public final class VirtualMachine {
                     String constructorName = nativeFunc.getName() != null ? nativeFunc.getName() : "constructor";
                     resetPropertyAccessTracking();
                     throw new JSVirtualMachineException(context.throwTypeError(
-                        "Constructor " + constructorName + " requires 'new'"));
+                            "Constructor " + constructorName + " requires 'new'"));
                 }
                 // Call native function with receiver as thisArg
                 JSValue result = nativeFunc.call(context, receiver, args);
