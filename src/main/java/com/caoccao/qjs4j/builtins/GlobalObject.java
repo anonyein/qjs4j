@@ -685,6 +685,16 @@ public final class GlobalObject {
         // According to ECMAScript spec, Function.prototype is itself a function
         // Use null name so toString() shows "function () {}" not "function anonymous() {}"
         JSNativeFunction functionPrototype = new JSNativeFunction(null, 0, (ctx, thisObj, args) -> JSUndefined.INSTANCE);
+        // Ensure Function.prototype inherits from Object.prototype so functions
+        // can see methods defined on Object.prototype (e.g., Object.prototype.inheritsFrom)
+        // Use direct prototype assignment to avoid any lookup ordering issues.
+        JSValue objectCtor = global.get(JSObject.NAME);
+        if (objectCtor instanceof JSObject objCtor) {
+            JSValue objProto = objCtor.get("prototype");
+            if (objProto instanceof JSObject protoObj) {
+                functionPrototype.setPrototype(protoObj);
+            }
+        }
         // Remove the auto-created properties - Function.prototype has custom property descriptors
         functionPrototype.delete(PropertyKey.fromString("prototype"));
         functionPrototype.delete(PropertyKey.fromString("length"));
