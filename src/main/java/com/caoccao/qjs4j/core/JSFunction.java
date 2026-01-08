@@ -22,6 +22,7 @@ package com.caoccao.qjs4j.core;
  */
 public abstract sealed class JSFunction extends JSObject
         permits JSBytecodeFunction, JSNativeFunction, JSBoundFunction, JSClass {
+    public static final String NAME = "Function";
 
     /**
      * Call this function with the given context, this value, and arguments.
@@ -51,7 +52,7 @@ public abstract sealed class JSFunction extends JSObject
         }
         // Avoid setting prototype for the Function.prototype object itself,
         // otherwise Function.prototype.__proto__ may be set to itself.
-        JSValue funcCtor = context.getGlobalObject().get("Function");
+        JSValue funcCtor = context.getGlobalObject().get(NAME);
         if (funcCtor instanceof JSObject funcCtorObj) {
             JSValue funcProto = funcCtorObj.get("prototype");
             if (funcProto == this) {
@@ -59,7 +60,7 @@ public abstract sealed class JSFunction extends JSObject
             }
         }
 
-        context.transferPrototype(this, "Function");
+        context.transferPrototype(this, NAME);
     }
 
     @Override
