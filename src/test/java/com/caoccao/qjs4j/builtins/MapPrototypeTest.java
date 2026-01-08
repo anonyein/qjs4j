@@ -173,6 +173,159 @@ public class MapPrototypeTest extends BaseJavetTest {
     }
 
     @Test
+    void testForEachAddsDifferentTypes() {
+        // Test adding different types of keys during iteration
+        assertIntegerWithJavet("""
+                var count = 0;
+                var m = new Map([[1, 'num']]);
+                m.forEach(function(v, k) {
+                  if(count === 0) {
+                    m.set('string', 's');
+                    m.set(true, 't');
+                  }
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testForEachBasic() {
+        // Basic forEach test
+        assertIntegerWithJavet("""
+                var count = 0;
+                new Map([[1, 'a'], [2, 'b'], [3, 'c']]).forEach(function(v, k, m) { count++; });
+                count""");
+    }
+
+    @Test
+    void testForEachChainedAdds() {
+        // Test where each iteration adds the next entry
+        assertIntegerWithJavet("""
+                var m = new Map([[1, 'a']]);
+                var count = 0;
+                m.forEach(function(v, k) {
+                  if(k < 5) m.set(k + 1, 'x');
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testForEachComplexDynamicGrowth() {
+        // Complex test: each iteration adds multiple entries if under limit
+        assertIntegerWithJavet("""
+                var count = 0;
+                var m = new Map([[0, 'start']]);
+                m.forEach(function(v, k) {
+                  if(count < 3) {
+                    m.set(count * 10 + 1, 'a');
+                    m.set(count * 10 + 2, 'b');
+                  }
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testForEachDuplicateKeyDoesNotIncreaseVisits() {
+        // Setting an existing key should not cause additional visits
+        assertIntegerWithJavet("""
+                var count = 0;
+                var m = new Map([[1, 'a'], [2, 'b']]);
+                m.forEach(function(v, k) {
+                  m.set(1, 'updated');
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testForEachEmptyMap() {
+        // Empty map should not invoke callback
+        assertIntegerWithJavet("""
+                var count = 0;
+                var m = new Map();
+                m.forEach(function() { count++; });
+                count""");
+    }
+
+    @Test
+    void testForEachInsertionOrder() {
+        // Entries should be visited in insertion order
+        assertStringWithJavet("""
+                var result = '';
+                var m = new Map([[3, 'c'], [1, 'a'], [2, 'b']]);
+                m.forEach(function(v) { result += v; });
+                result""");
+    }
+
+    @Test
+    void testForEachNewEntriesInOrder() {
+        // Newly added entries should be visited in insertion order
+        assertStringWithJavet("""
+                var result = '';
+                var m = new Map([['a', 1]]);
+                m.forEach(function(v, k) {
+                  result += k;
+                  if(k === 'a') { m.set('b', 2); m.set('c', 3); }
+                  if(k === 'b') { m.set('d', 4); }
+                });
+                result""");
+    }
+
+    @Test
+    void testForEachReceivesMapAsThirdArg() {
+        // Third argument should be the Map itself
+        assertBooleanWithJavet("""
+                var isMap = false;
+                var m = new Map([[1, 'a']]);
+                m.forEach(function(v, k, map) {
+                  isMap = (map === m);
+                });
+                isMap""");
+    }
+
+    @Test
+    void testForEachReturnsUndefined() {
+        // forEach should always return undefined
+        assertUndefinedWithJavet("""
+                var m = new Map([[1, 'a'], [2, 'b']]);
+                m.forEach(function() {})""");
+    }
+
+    @Test
+    void testForEachValueKeyOrder() {
+        // Verify that callback receives (value, key, map) not (key, value, map)
+        assertStringWithJavet("""
+                var result = '';
+                new Map([[1, 'a'], [2, 'b']]).forEach(function(v, k) { result += v + k; });
+                result""");
+    }
+
+    @Test
+    void testForEachVisitsNewlyAddedEntries() {
+        // QuickJS behavior: forEach continues to visit entries added during iteration
+        assertIntegerWithJavet("""
+                var count = 0;
+                var m = new Map([[1, 'a']]);
+                m.forEach(function(v, k) {
+                  if(count < 5) m.set(count + 10, 'x');
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testForEachWithThisArg() {
+        // Test that thisArg is properly passed
+        assertIntegerWithJavet("""
+                var obj = {count: 0};
+                var m = new Map([[1, 'a'], [2, 'b'], [3, 'c']]);
+                m.forEach(function() { this.count++; }, obj);
+                obj.count""");
+    }
+
+    @Test
     public void testGet() {
         JSMap map = new JSMap();
         map.mapSet(new JSString("key1"), new JSString("value1"));

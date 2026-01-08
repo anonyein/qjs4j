@@ -71,6 +71,8 @@ public final class MapPrototype {
      * Map.prototype.forEach(callbackFn, thisArg)
      * ES2020 23.1.3.4
      * Executes a provided function once per each key/value pair in the Map, in insertion order.
+     * Note: The map can be modified while traversing it. Newly added entries
+     * during iteration will be visited (matching QuickJS behavior).
      */
     public static JSValue forEach(JSContext context, JSValue thisArg, JSValue[] args) {
         if (!(thisArg instanceof JSMap map)) {
@@ -83,14 +85,45 @@ public final class MapPrototype {
 
         JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
-        // Iterate over entries in insertion order
+        // Convert to ArrayList to allow index-based iteration
+        // This allows us to see entries added during iteration
+        java.util.ArrayList<Map.Entry<JSMap.KeyWrapper, JSValue>> list = new java.util.ArrayList<>();
         for (Map.Entry<JSMap.KeyWrapper, JSValue> entry : map.entries()) {
+            list.add(entry);
+        }
+        
+        // Iterate using index, checking size dynamically to visit newly added entries
+        int index = 0;
+        while (index < list.size()) {
+            Map.Entry<JSMap.KeyWrapper, JSValue> entry = list.get(index);
             JSValue key = entry.getKey().value();
             JSValue value = entry.getValue();
 
             // Call callback with (value, key, map)
             JSValue[] callbackArgs = new JSValue[]{value, key, map};
-            callback.call(context, callbackThisArg, callbackArgs);
+            JSValue result = callback.call(context, callbackThisArg, callbackArgs);
+            
+            // Check for exceptions
+            if (result instanceof JSError) {
+                return result;
+            }
+            
+            // Check if new entries were added during the callback
+            // If map size grew, add the new entries to our list
+            int currentMapSize = map.size();
+            if (currentMapSize > list.size()) {
+                // Add newly added entries to our iteration list
+                java.util.ArrayList<Map.Entry<JSMap.KeyWrapper, JSValue>> newList = new java.util.ArrayList<>();
+                for (Map.Entry<JSMap.KeyWrapper, JSValue> e : map.entries()) {
+                    newList.add(e);
+                }
+                // Add only the new entries (those beyond our current list size)
+                for (int i = list.size(); i < newList.size(); i++) {
+                    list.add(newList.get(i));
+                }
+            }
+            
+            index++;
         }
 
         return JSUndefined.INSTANCE;

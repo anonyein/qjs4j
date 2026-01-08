@@ -18,7 +18,6 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.*;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +26,64 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Unit tests for Set.prototype methods.
  */
 public class SetPrototypeTest extends BaseJavetTest {
+
+    @Test
+    void demonstrateBugFix() {
+        // This is the exact test case from SetPrototypeTest.testForEachEdgeCases()
+        // that was failing before the fix
+
+        // Before fix: returned 1 (only visited the original element)
+        // After fix: returns 6 (visited original + 5 newly added elements)
+        assertIntegerWithJavet(
+                """
+                        var count = 0;
+                        var s = new Set([1]);
+                        s.forEach(function(v) {
+                          if(count < 5) s.add(count + 10);
+                          count++;
+                        });
+                        count""");
+
+        // The test expects 6 because:
+        // 1. First iteration: visits 1, adds 10, count becomes 1
+        // 2. Second iteration: visits 10, adds 11, count becomes 2
+        // 3. Third iteration: visits 11, adds 12, count becomes 3
+        // 4. Fourth iteration: visits 12, adds 13, count becomes 4
+        // 5. Fifth iteration: visits 13, adds 14, count becomes 5
+        // 6. Sixth iteration: visits 14, count becomes 6 (condition fails, no add)
+    }
+
+    @Test
+    void demonstrateDuplicatesNotRevisited() {
+        // Adding a duplicate element should not cause it to be visited again
+        // Always add 1 (which is already in the set)
+        assertIntegerWithJavet(
+                """
+                        var count = 0;
+                        var s = new Set([1, 2, 3]);
+                        s.forEach(function(v) {
+                          s.add(1);
+                          count++;
+                        });
+                        count""");
+        // Result should be 3 (not more), showing duplicates don't add visits
+    }
+
+    @Test
+    void demonstrateInsertionOrderPreserved() {
+        // Verify that newly added elements are visited in insertion order
+        assertStringWithJavet(
+                """
+                        var result = '';
+                        var s = new Set(['a']);
+                        s.forEach(function(v) {
+                          result += v;
+                          if(v === 'a') { s.add('b'); s.add('c'); }
+                          if(v === 'b') { s.add('d'); }
+                        });
+                        result""");
+        // Result should be 'abcd' showing all elements were visited in order
+    }
 
     @Test
     public void testAdd() {
@@ -282,7 +339,86 @@ public class SetPrototypeTest extends BaseJavetTest {
         assertPendingException(context);
     }
 
-    @Disabled
+    @Test
+    void testForEachAddAtEnd() {
+        // Test adding elements at the end during iteration
+        assertStringWithJavet("var result = ''; var s = new Set([1,2]); s.forEach(function(v) { result += v; if(v < 3) s.add(v + 2); }); result");
+    }
+
+    @Test
+    void testForEachAddDuringFirstIteration() {
+        // Test that element added in first iteration is visited
+        assertStringWithJavet("var result = ''; var s = new Set(['a']); s.forEach(function(v) { if(v === 'a') s.add('b'); result += v; }); result");
+    }
+
+    @Test
+    void testForEachAddsDifferentTypes() {
+        // Test adding different types during iteration
+        assertIntegerWithJavet("var count = 0; var s = new Set([1]); s.forEach(function(v) { if(count === 0) { s.add('string'); s.add(true); } count++; }); count");
+    }
+
+    @Test
+    void testForEachBasic() {
+        // Basic forEach test
+        assertIntegerWithJavet("var count = 0; new Set([1,2,3]).forEach(function(v, k, s) { count++; }); count");
+    }
+
+    @Test
+    void testForEachCanModifySetDuringIteration() {
+        // Test that we can both add and the set reflects changes
+        assertIntegerWithJavet(
+                """
+                        var s = new Set([1, 2]);
+                        s.forEach(function(v) {
+                          if(v === 1) s.add(3);
+                        });
+                        s.size""");
+    }
+
+    @Test
+    void testForEachChainedAdds() {
+        // Test where each iteration adds the next element
+        assertIntegerWithJavet("var s = new Set([1]); var count = 0; s.forEach(function(v) { if(v < 5) s.add(v + 1); count++; }); count");
+    }
+
+    @Test
+    void testForEachComplexDynamicGrowth() {
+        // Complex test: each iteration adds multiple elements if under limit
+        assertIntegerWithJavet(
+                """
+                        var count = 0;
+                        var s = new Set([0]);
+                        s.forEach(function(v) {
+                          if(count < 3) {
+                            s.add(count * 10 + 1);
+                            s.add(count * 10 + 2);
+                          }
+                          count++;
+                        });
+                        count""");
+    }
+
+    @Test
+    void testForEachDuplicateAddDoesNotIncreaseVisits() {
+        // Adding a duplicate should not cause additional visits
+        // Always add 1 (duplicate)
+        assertIntegerWithJavet(
+                """
+                        var count = 0;
+                        var s = new Set([1, 2]);
+                        s.forEach(function(v) {
+                          s.add(1);
+                          count++;
+                        });
+                        count""");
+    }
+
+    @Test
+    void testForEachDynamicAddition() {
+        // Basic test from the original failing case
+        assertIntegerWithJavet("var count = 0; var s = new Set([1]); s.forEach(function(v) { if(count < 5) s.add(count + 10); count++; }); count");
+    }
+
     @Test
     void testForEachEdgeCases() {
         // forEach with empty set - returns undefined
@@ -304,6 +440,145 @@ public class SetPrototypeTest extends BaseJavetTest {
 
         // forEach visits values in insertion order
         assertStringWithJavet("var result = ''; new Set([3,1,2]).forEach(function(v) { result += v; }); result");
+    }
+
+    @Test
+    void testForEachEmptySet() {
+        // Test with empty set
+        assertIntegerWithJavet("var count = 0; var s = new Set(); s.forEach(function() { count++; }); count");
+    }
+
+    @Test
+    void testForEachEmptySetDoesNotInvokeCallback() {
+        // Empty set should not invoke the callback at all
+        assertIntegerWithJavet(
+                """
+                        var count = 0;
+                        var s = new Set();
+                        s.forEach(function() { count++; });
+                        count""");
+    }
+
+    @Test
+    void testForEachMultipleAdds() {
+        // Test multiple adds in single iteration
+        assertIntegerWithJavet("var count = 0; var s = new Set([1]); s.forEach(function(v) { if(count === 0) { s.add(2); s.add(3); } count++; }); count");
+    }
+
+    @Test
+    void testForEachNewElementsVisitedInOrder() {
+        // Newly added elements should also be visited in insertion order
+        assertStringWithJavet(
+                """
+                        var result = '';
+                        var s = new Set(['a']);
+                        s.forEach(function(v) {
+                          result += v;
+                          if(v === 'a') { s.add('b'); s.add('c'); }
+                          if(v === 'b') { s.add('d'); }
+                        });
+                        result""");
+    }
+
+    @Test
+    void testForEachNoAddition() {
+        // Test that normal forEach still works
+        assertIntegerWithJavet("var count = 0; new Set([1,2,3]).forEach(function() { count++; }); count");
+    }
+
+    @Test
+    void testForEachReceivesSetAsThirdArg() {
+        // The third argument should be the Set itself
+        assertBooleanWithJavet(
+                """
+                        var isSet = false;
+                        var s = new Set([1]);
+                        s.forEach(function(v, k, set) {
+                          isSet = (set === s);
+                        });
+                        isSet""");
+    }
+
+    @Test
+    void testForEachReturnsUndefined() {
+        // forEach should return undefined
+        assertUndefinedWithJavet("new Set([1,2,3]).forEach(function() {})");
+    }
+
+    @Test
+    void testForEachThisArg() {
+        // Test that thisArg is properly passed - use increment which works
+        assertIntegerWithJavet("var obj = {count: 0}; var s = new Set([1,2,3]); s.forEach(function(v) { this.count++; }, obj); obj.count");
+    }
+
+    @Test
+    void testForEachValueAndKeyAreSame() {
+        // In Set.forEach, the first and second arguments are both the value
+        assertBooleanWithJavet(
+                """
+                        var same = true;
+                        var s = new Set([1, 2, 3]);
+                        s.forEach(function(value, key) {
+                          if(value !== key) same = false;
+                        });
+                        same""");
+    }
+
+    @Test
+    void testForEachValueEquality() {
+        // Verify value and key are the same
+        assertBooleanWithJavet("var same = true; var s = new Set([1,2,3]); s.forEach(function(v, k) { if(v !== k) same = false; }); same");
+    }
+
+    @Test
+    void testForEachVisitsElementsInInsertionOrder() {
+        // Elements should be visited in the order they were inserted
+        assertStringWithJavet(
+                """
+                        var result = '';
+                        var s = new Set([3, 1, 2]);
+                        s.forEach(function(v) { result += v; });
+                        result""");
+    }
+
+    @Test
+    void testForEachVisitsNewlyAddedElements() {
+        // QuickJS behavior: forEach continues to visit elements added during iteration
+        // This is the core bug that was fixed
+        assertIntegerWithJavet(
+                """
+                        var count = 0; var s = new Set([1]);
+                        s.forEach(function(v) {
+                          if(count < 5) s.add(count + 10);
+                          count++;
+                        });
+                        count""");
+    }
+
+    @Test
+    void testForEachWithDuplicateAdd() {
+        // Test adding duplicate values (should not increase count)
+        assertIntegerWithJavet("var count = 0; var s = new Set([1,2]); s.forEach(function(v) { s.add(1); count++; }); count");
+    }
+
+    @Test
+    void testForEachWithDynamicAddition() {
+        // This test verifies that forEach continues to visit elements added during iteration
+        // Expected: count = 6 (visits original element + 5 newly added elements)
+        // The callback adds elements when count < 5:
+        // - iteration 0: count=0, visits value=1, adds 10, count becomes 1
+        // - iteration 1: count=1, visits value=10, adds 11, count becomes 2
+        // - iteration 2: count=2, visits value=11, adds 12, count becomes 3
+        // - iteration 3: count=3, visits value=12, adds 13, count becomes 4
+        // - iteration 4: count=4, visits value=13, adds 14, count becomes 5
+        // - iteration 5: count=5, visits value=14, doesn't add, count becomes 6
+        assertIntegerWithJavet("var count = 0; var s = new Set([1]); s.forEach(function(v) { if(count < 5) s.add(count + 10); count++; }); count");
+    }
+
+    @Test
+    void testForEachWithValueKeyCheck() {
+        // Verify that value and key are the same in Set.forEach
+        assertBooleanWithJavet("var result = true; new Set([1,2,3]).forEach(function(v, k) { result = result && (v === k); }); result");
     }
 
     @Test
