@@ -225,31 +225,7 @@ public final class DatePrototype {
             return context.throwTypeError("Date.prototype.toString called on non-Date");
         }
         ZonedDateTime zdt = date.getLocalZonedDateTime();
-        // Try to obtain V8's exact string when Javet is available on the test runtime classpath.
-        try {
-            long epoch = date.getTimeValue();
-            Class<?> v8HostClass = Class.forName("com.caoccao.javet.interop.V8Host");
-            Object v8Host = v8HostClass.getMethod("getV8Instance").invoke(null);
-            Object v8Runtime = v8Host.getClass().getMethod("createV8Runtime").invoke(v8Host);
-            try {
-                Object executor = v8Runtime.getClass().getMethod("getExecutor", String.class)
-                        .invoke(v8Runtime, "new Date(" + epoch + ").toString()");
-                Object v8Value = executor.getClass().getMethod("execute").invoke(executor);
-                if (v8Value != null) {
-                    java.lang.reflect.Method getValue = v8Value.getClass().getMethod("getValue");
-                    Object val = getValue.invoke(v8Value);
-                    if (val instanceof String) {
-                        return new JSString((String) val);
-                    }
-                }
-            } finally {
-                try {
-                    v8Runtime.getClass().getMethod("close").invoke(v8Runtime);
-                } catch (Throwable ignored) {
-                }
-            }
-        } catch (Throwable ignored) {
-        }
+        // Use internal formatting for Date.prototype.toString; avoid using Javet/V8 reflection.
         // Format date/time using English day/month names then append localized zone name
         DateTimeFormatter baseFormatter = DateTimeFormatter.ofPattern("EEE MMM dd yyyy HH:mm:ss 'GMT'Z", Locale.ENGLISH);
         String base = zdt.format(baseFormatter);

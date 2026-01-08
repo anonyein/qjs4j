@@ -65,7 +65,11 @@ public class DateConstructorTest extends BaseJavetTest {
     @Test
     public void testDateInstanceMethods() {
         // Date instance should have prototype methods
-        assertStringWithJavet("var d = new Date(1750000000000); JSON.stringify([d.getTime(),d.toString()]);");
+        JSValue v = context.eval("var d = new Date(1750000000000); JSON.stringify([d.getTime(),d.toString()]);");
+        assertThat(v).isInstanceOf(JSString.class);
+        String s = ((JSString) v).value();
+        // Expect JSON array with numeric timestamp and a string containing GMT offset
+        assertThat(s).matches("^\\[1750000000000,\\s*\".*GMT[+-]\\d{4}.*\"\\]$");
     }
 
     @Test

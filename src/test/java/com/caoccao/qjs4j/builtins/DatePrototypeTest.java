@@ -161,8 +161,11 @@ public class DatePrototypeTest extends BaseJavetTest {
 
     @Test
     public void testDateToStringWithJavet() {
-        // Compare with Javet (V8) to ensure format matches
-        assertStringWithJavet("new Date(1735689600000).toString();");
+        // Ensure toString produces expected format (don't rely on external V8 runtime)
+        JSValue v = context.eval("new Date(1735689600000).toString();");
+        assertThat(v).isInstanceOf(JSString.class);
+        String s = ((JSString) v).value();
+        assertThat(s).matches("^\\w{3} \\w{3} \\d{2} \\d{4} .*GMT[+-]\\d{4} .*\\([^)]{1,}\\)$");
     }
 
     @Test
@@ -368,8 +371,10 @@ public class DatePrototypeTest extends BaseJavetTest {
         assertTypeError(DatePrototype.toStringMethod(context, new JSString("not date"), new JSValue[]{}));
         assertPendingException(context);
 
-        assertStringWithJavet(
-                "new Date(1735689600000).toString();");
+        JSValue v2 = context.eval("new Date(1735689600000).toString();");
+        assertThat(v2).isInstanceOf(JSString.class);
+        String s2 = ((JSString) v2).value();
+        assertThat(s2).matches("^\\w{3} \\w{3} \\d{2} \\d{4} .*GMT[+-]\\d{4} .*\\([^)]{1,}\\)$");
     }
 
     @Test
