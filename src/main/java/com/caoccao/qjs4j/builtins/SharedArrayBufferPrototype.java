@@ -16,10 +16,7 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.JSContext;
-import com.caoccao.qjs4j.core.JSNumber;
-import com.caoccao.qjs4j.core.JSSharedArrayBuffer;
-import com.caoccao.qjs4j.core.JSValue;
+import com.caoccao.qjs4j.core.*;
 
 /**
  * SharedArrayBuffer.prototype methods implementation.
@@ -38,6 +35,15 @@ public final class SharedArrayBufferPrototype {
         }
 
         return new JSNumber(buffer.getByteLength());
+    }
+
+    /**
+     * get SharedArrayBuffer.prototype[@@toStringTag]
+     * ES2017 24.2.4.2
+     * Returns "SharedArrayBuffer".
+     */
+    public static JSValue getToStringTag(JSContext context, JSValue thisArg, JSValue[] args) {
+        return new JSString("SharedArrayBuffer");
     }
 
     /**

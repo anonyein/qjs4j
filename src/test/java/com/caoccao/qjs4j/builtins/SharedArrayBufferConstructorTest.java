@@ -26,18 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Unit tests for SharedArrayBuffer constructor methods.
  */
 public class SharedArrayBufferConstructorTest extends BaseJavetTest {
-
-    @Test
-    public void testConstruct() {
-        // SharedArrayBuffer constructor must be called with 'new', so direct call should throw error
-        assertTypeError(SharedArrayBufferConstructor.construct(context, JSUndefined.INSTANCE, new JSValue[]{new JSNumber(16)}));
-        assertPendingException(context);
-
-        // Edge case: no arguments
-        assertTypeError(SharedArrayBufferConstructor.construct(context, JSUndefined.INSTANCE, new JSValue[]{}));
-        assertPendingException(context);
-    }
-
     @Test
     public void testCreateSharedArrayBuffer() {
         // Normal case: create with valid length
@@ -54,5 +42,20 @@ public class SharedArrayBufferConstructorTest extends BaseJavetTest {
         // Edge case: non-numeric length
         result = JSSharedArrayBuffer.create(context, new JSString("32"));
         assertThat(result).isInstanceOfSatisfying(JSSharedArrayBuffer.class, jsSab -> assertThat(jsSab.getByteLength()).isEqualTo(32));
+    }
+
+    @Test
+    void testTypeof() {
+        assertStringWithJavet("typeof SharedArrayBuffer");
+
+        assertIntegerWithJavet("SharedArrayBuffer.length");
+
+        assertStringWithJavet("SharedArrayBuffer.name");
+
+        assertStringWithJavet(
+                "new SharedArrayBuffer().toString()",
+                "new SharedArrayBuffer(10).toString()");
+
+        assertErrorWithJavet("SharedArrayBuffer()");
     }
 }

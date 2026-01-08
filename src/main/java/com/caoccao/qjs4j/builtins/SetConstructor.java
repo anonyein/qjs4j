@@ -16,7 +16,9 @@
 
 package com.caoccao.qjs4j.builtins;
 
-import com.caoccao.qjs4j.core.*;
+import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSSet;
+import com.caoccao.qjs4j.core.JSValue;
 
 /**
  * Implementation of Set constructor and static methods.
