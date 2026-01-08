@@ -158,12 +158,16 @@ public final class JSONObject {
 
         // Handle objects and arrays
         if (val instanceof JSObject && !(val instanceof JSFunction)) {
-            // Check for circular reference
-            if (stringifyContext.stack.contains(val)) {
-                // Circular reference - throw error
-                // Find where this object appears in the stack
-                int circularIndex = stringifyContext.stack.indexOf(val);
-
+            // Check for circular reference using reference equality to avoid
+            // calling JSValue.equals(), which may recurse into the structure
+            int circularIndex = -1;
+            for (int i = 0; i < stringifyContext.stack.size(); i++) {
+                if (stringifyContext.stack.get(i) == val) {
+                    circularIndex = i;
+                    break;
+                }
+            }
+            if (circularIndex != -1) {
                 StringBuilder errorMessage = new StringBuilder("Converting circular structure to JSON\n");
                 errorMessage.append("    --> starting at object with constructor '")
                         .append((val instanceof JSArray) ? "Array" : "Object")
@@ -604,9 +608,7 @@ public final class JSONObject {
                         propName = ((JSString) item).value();
                     } else if (item instanceof JSNumber) {
                         propName = String.valueOf((long) ((JSNumber) item).value());
-                    } else if (item instanceof JSObject obj) {
-                        // Handle String/Number objects
-                        // Simplified: just convert to string
+                    } else if (item instanceof JSObject) {
                         propName = JSTypeConversions.toString(context, item).value();
                     }
 
@@ -627,7 +629,7 @@ public final class JSONObject {
             if (space instanceof JSObject && !(space instanceof JSFunction)) {
                 // Simplified: convert to primitive
                 if (space instanceof JSNumber) {
-                    space = space; // already a number
+                    // already a number
                 } else {
                     space = JSTypeConversions.toString(context, space);
                 }
@@ -662,7 +664,7 @@ public final class JSONObject {
             }
             return JSUndefined.INSTANCE;
         } catch (CircularReferenceException e) {
-            return context.throwTypeError(e.getMessage());
+            throw new com.caoccao.qjs4j.exceptions.JSException(context.throwTypeError(e.getMessage()));
         } catch (Exception e) {
             return JSUndefined.INSTANCE;
         }
@@ -739,7 +741,28 @@ public final class JSONObject {
         }
 
         for (String key : keys) {
+            // Use string-based lookup here. Replacer array entries are converted to strings
+            // per the specification, so looking up by the string name preserves
+            // properties that were defined as string keys like "0".
             JSValue propValue = obj.get(key);
+            // If not found, and the key looks like an integer index, try index lookup
+            if (propValue instanceof JSUndefined) {
+                boolean isDigits = true;
+                for (int i = 0; i < key.length(); ++i) {
+                    char ch = key.charAt(i);
+                    if (ch < '0' || ch > '9') {
+                        isDigits = false;
+                        break;
+                    }
+                }
+                if (isDigits) {
+                    try {
+                        int idx = Integer.parseInt(key);
+                        propValue = obj.get(idx);
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
             JSValue processedValue = jsonCheck(context, ctx, obj, propValue, new JSString(key));
 
             if (!(processedValue instanceof JSUndefined)) {

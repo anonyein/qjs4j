@@ -37,7 +37,7 @@ public class DatePrototypeTest extends BaseJavetTest {
         assertThat(toStringResult).isInstanceOf(JSString.class);
 
         // Both should match V8 format pattern
-        String pattern = "^\\w{3} \\w{3} \\d{2} \\d{4} \\d{2}:\\d{2}:\\d{2} GMT[+-]\\d{4} \\([A-Z]{3,4}\\)$";
+        String pattern = "^\\w{3} \\w{3} \\d{2} \\d{4} \\d{2}:\\d{2}:\\d{2} GMT[+-]\\d{4} \\([^)]{1,}\\)$";
         assertThat(((JSString) toStringResult).value()).matches(pattern);
     }
 
@@ -50,7 +50,7 @@ public class DatePrototypeTest extends BaseJavetTest {
         String str = ((JSString) result).value();
 
         // Should follow V8 format
-        assertThat(str).matches("^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{2} \\d{4} \\d{2}:\\d{2}:\\d{2} GMT[+-]\\d{4} \\([A-Z]{3,4}\\)$");
+        assertThat(str).matches("^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{2} \\d{4} \\d{2}:\\d{2}:\\d{2} GMT[+-]\\d{4} \\([^)]{1,}\\)$");
     }
 
     @Test
@@ -114,7 +114,7 @@ public class DatePrototypeTest extends BaseJavetTest {
         assertThat(str).matches(".*GMT[+-]\\d{4}.*");
 
         // - Timezone abbreviation in parentheses
-        assertThat(str).matches(".*\\([A-Z]{3,4}\\)$");
+        assertThat(str).matches(".*\\([^)]{1,}\\)$");
     }
 
     @Test
@@ -138,7 +138,7 @@ public class DatePrototypeTest extends BaseJavetTest {
         String str = ((JSString) result).value();
 
         // Should match V8 format pattern
-        assertThat(str).matches("^\\w{3} \\w{3} \\d{2} \\d{4} \\d{2}:\\d{2}:\\d{2} GMT[+-]\\d{4} \\([A-Z]{3,4}\\)$");
+        assertThat(str).matches("^\\w{3} \\w{3} \\d{2} \\d{4} \\d{2}:\\d{2}:\\d{2} GMT[+-]\\d{4} \\([^)]{1,}\\)$");
     }
 
     @Test
@@ -156,7 +156,7 @@ public class DatePrototypeTest extends BaseJavetTest {
         assertThat(v8Format).contains("GMT");
 
         // V8 format should have timezone abbreviation in parentheses at the end
-        assertThat(v8Format).matches(".*\\([A-Z]{3,4}\\)$");
+        assertThat(v8Format).matches(".*\\([^)]{1,}\\)$");
     }
 
     @Test

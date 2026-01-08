@@ -30,7 +30,8 @@ public final class ObjectConstructor {
     /**
      * Object.assign(target, ...sources)
      * ES2020 19.1.2.1
-     * Copies all enumerable own properties from one or more source objects to a target object.
+     * Copies all enumerable own properties from one or more source objects to a
+     * target object.
      */
     public static JSValue assign(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
@@ -68,7 +69,8 @@ public final class ObjectConstructor {
      * ES2020 19.1.1.1
      * When called as a function, creates a wrapper object for the given value.
      * - For null/undefined, returns a new empty object
-     * - For primitives (number, string, boolean, symbol, bigint), returns a wrapper object
+     * - For primitives (number, string, boolean, symbol, bigint), returns a wrapper
+     * object
      * - For objects, returns the object itself
      */
     public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
@@ -137,7 +139,8 @@ public final class ObjectConstructor {
             if (firstArg instanceof JSObject jsObject) {
                 proto = jsObject;
             } else {
-                return context.throwTypeError("Object prototype may only be an Object or null: " + JSTypeConversions.toString(context, firstArg).value());
+                return context.throwTypeError("Object prototype may only be an Object or null: "
+                        + JSTypeConversions.toString(context, firstArg).value());
             }
         }
         // Create new object
@@ -217,7 +220,8 @@ public final class ObjectConstructor {
     /**
      * Object.defineProperties(obj, props)
      * ES5.1 15.2.3.7
-     * Defines new or modifies existing properties directly on an object, returning the object.
+     * Defines new or modifies existing properties directly on an object, returning
+     * the object.
      */
     public static JSValue defineProperties(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length < 2) {
@@ -300,7 +304,8 @@ public final class ObjectConstructor {
     /**
      * Object.entries(obj)
      * ES2020 19.1.2.5
-     * Returns an array of a given object's own enumerable property [key, value] pairs.
+     * Returns an array of a given object's own enumerable property [key, value]
+     * pairs.
      */
     public static JSValue entries(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
@@ -348,7 +353,8 @@ public final class ObjectConstructor {
         // Step 2: Get all own property keys (string, symbol, and array indices)
         List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
 
-        // Step 3: For each property, set configurable=false and (for data properties) writable=false
+        // Step 3: For each property, set configurable=false and (for data properties)
+        // writable=false
         for (PropertyKey key : propertyKeys) {
             PropertyDescriptor desc = obj.getOwnPropertyDescriptor(key);
             if (desc == null) {
@@ -670,7 +676,7 @@ public final class ObjectConstructor {
         long length = arr.getLength();
         for (long i = 0; i < length; i++) {
             JSValue element = arr.get(i);
-            JSValue[] callbackArgs = {element, new JSNumber(i)};
+            JSValue[] callbackArgs = { element, new JSNumber(i) };
             JSValue keyValue = callback.call(context, JSUndefined.INSTANCE, callbackArgs);
 
             // Convert key to string
@@ -787,7 +793,8 @@ public final class ObjectConstructor {
     /**
      * Object.isExtensible(obj)
      * ES5.1 15.2.3.13
-     * Determines if an object is extensible (whether new properties can be added to it).
+     * Determines if an object is extensible (whether new properties can be added to
+     * it).
      */
     public static JSValue isExtensible(JSContext context, JSValue thisArg, JSValue[] args) {
         if (args.length == 0) {
@@ -919,7 +926,8 @@ public final class ObjectConstructor {
         // Step 2: Get all own property keys (string, symbol, and array indices)
         List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
 
-        // Step 3: For each property, set configurable=false (but keep writable unchanged)
+        // Step 3: For each property, set configurable=false (but keep writable
+        // unchanged)
         for (PropertyKey key : propertyKeys) {
             PropertyDescriptor desc = obj.getOwnPropertyDescriptor(key);
             if (desc == null) {

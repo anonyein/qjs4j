@@ -1706,16 +1706,9 @@ public final class BytecodeCompiler {
             return;
         }
 
-        // Always prefer local bindings if present (class declarations create lexical bindings
-        // even at top-level). Search from innermost scope to outermost.
-        Integer localIndex = null;
-        for (Scope scope : scopes) {
-            localIndex = scope.getLocal(name);
-            if (localIndex != null) {
-                break;
-            }
-        }
-
+    // Always check local scopes first, even in global scope (for nested blocks/loops)
+        // Search from innermost scope (most recently pushed) to outermost
+        Integer localIndex = findLocalInScopes(name);
         if (localIndex != null) {
             emitter.emitOpcodeU16(Opcode.GET_LOCAL, localIndex);
         } else {

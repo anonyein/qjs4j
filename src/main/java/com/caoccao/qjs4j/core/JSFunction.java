@@ -52,7 +52,7 @@ public abstract sealed class JSFunction extends JSObject
         }
         // Avoid setting prototype for the Function.prototype object itself,
         // otherwise Function.prototype.__proto__ may be set to itself.
-        JSValue funcCtor = context.getGlobalObject().get(NAME);
+        JSValue funcCtor = context.getGlobalObject().get("Function");
         if (funcCtor instanceof JSObject funcCtorObj) {
             JSValue funcProto = funcCtorObj.get("prototype");
             if (funcProto == this) {
@@ -60,7 +60,7 @@ public abstract sealed class JSFunction extends JSObject
             }
         }
 
-        context.transferPrototype(this, NAME);
+        context.transferPrototype(this, "Function");
     }
 
     @Override

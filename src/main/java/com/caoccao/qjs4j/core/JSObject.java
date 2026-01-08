@@ -549,16 +549,7 @@ public non-sealed class JSObject implements JSValue {
      * Set a property value by property key with context for setter functions.
      */
     public void set(PropertyKey key, JSValue value, JSContext context) {
-        try {
-            if (DEBUG_JSOBJECT_SET) {
-                String keyClass = key == null ? "null" : key.getClass().getSimpleName();
-                System.out.println("[debug] JSObject.set: keyClass=" + keyClass + " isIndex=" + (key == null ? "null" : String.valueOf(key.isIndex())) +
-                        " asIndex=" + (key == null ? "null" : String.valueOf(key.asIndex())) + " asString=" + (key == null ? "null" : key.asString()) +
-                        " objectClass=" + this.getClass().getSimpleName());
-            }
-        } catch (Throwable t) {
-            // ignore diagnostics
-        }
+        // Debugging hook removed: avoid printing diagnostics in tests
         // Check if property already exists
         int offset = shape.getPropertyOffset(key);
         if (offset >= 0) {

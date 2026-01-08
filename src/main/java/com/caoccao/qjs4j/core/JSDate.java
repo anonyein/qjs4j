@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /**
  * Represents a JavaScript Date object.
@@ -32,8 +33,8 @@ public final class JSDate extends JSObject {
      * V8-compatible toString format: "EEE MMM dd yyyy HH:mm:ss 'GMT'Z (z)"
      * Example: "Wed Jan 01 2025 01:00:00 GMT+0100 (CET)"
      */
-    public static final DateTimeFormatter TO_STRING_FORMATTER =
-            DateTimeFormatter.ofPattern("EEE MMM dd yyyy HH:mm:ss 'GMT'Z (z)");
+        public static final DateTimeFormatter TO_STRING_FORMATTER =
+            DateTimeFormatter.ofPattern("EEE MMM dd yyyy HH:mm:ss 'GMT'Z (z)", Locale.ENGLISH);
 
     private final long timeValue; // milliseconds since 1970-01-01T00:00:00.000Z
 

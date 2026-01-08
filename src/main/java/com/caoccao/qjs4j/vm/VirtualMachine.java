@@ -30,6 +30,7 @@ import java.util.List;
  * Executes compiled bytecode using a stack-based architecture.
  */
 public final class VirtualMachine {
+    private static final boolean DEBUG = false;
     private final JSContext context;
     private final StringBuilder propertyAccessChain;  // Track last property access for better error messages
     private final CallStack valueStack;
@@ -52,11 +53,14 @@ public final class VirtualMachine {
 
     // Debug helper: dump top N values from the VM value stack
     private void debugDumpStack(String tag, int pc, int n) {
+        if (!DEBUG) {
+            return;
+        }
+
         int top = valueStack.getStackTop();
         StringBuilder sb = new StringBuilder();
         sb.append("STACK_DUMP ").append(tag).append(" PC=").append(pc).append(" top=").append(top).append("\n");
         for (int i = 0; i < n; i++) {
-            int idx = i;
             try {
                 JSValue v = valueStack.peek(i);
                 String cls = v == null ? "null" : v.getClass().getSimpleName();
@@ -171,27 +175,29 @@ public final class VirtualMachine {
             Bytecode bytecode = function.getBytecode();
             // Disassemble bytecode for diagnostics
             try {
-                System.out.println("=== DISASSEMBLY for function: " + function + " length=" + bytecode.getLength() + " locals=" + bytecode.getLocalCount());
-                int dpc = 0;
-                while (dpc < bytecode.getLength()) {
-                    int code = bytecode.readOpcode(dpc);
-                    Opcode dop = Opcode.fromInt(code);
-                    String extra = "";
-                    int size = dop.getSize();
-                    if (size == 5) {
-                        int u32 = bytecode.readU32(dpc + 1);
-                        extra = " " + u32;
-                    } else if (size == 3) {
-                        int u16 = bytecode.readU16(dpc + 1);
-                        extra = " " + u16;
-                    } else if (size == 2) {
-                        int u8 = bytecode.readU8(dpc + 1);
-                        extra = " " + u8;
+                if (DEBUG) {
+                    System.out.println("=== DISASSEMBLY for function: " + function + " length=" + bytecode.getLength() + " locals=" + bytecode.getLocalCount());
+                    int dpc = 0;
+                    while (dpc < bytecode.getLength()) {
+                        int code = bytecode.readOpcode(dpc);
+                        Opcode dop = Opcode.fromInt(code);
+                        String extra = "";
+                        int size = dop.getSize();
+                        if (size == 5) {
+                            int u32 = bytecode.readU32(dpc + 1);
+                            extra = " " + u32;
+                        } else if (size == 3) {
+                            int u16 = bytecode.readU16(dpc + 1);
+                            extra = " " + u16;
+                        } else if (size == 2) {
+                            int u8 = bytecode.readU8(dpc + 1);
+                            extra = " " + u8;
+                        }
+                        System.out.println(String.format("%04d: %s%s", dpc, dop.name(), extra));
+                        dpc += size;
                     }
-                    System.out.println(String.format("%04d: %s%s", dpc, dop.name(), extra));
-                    dpc += size;
+                    System.out.println("=== END DISASSEMBLY");
                 }
-                System.out.println("=== END DISASSEMBLY");
             } catch (Throwable t) {
                 // ignore disassembly errors
             }
@@ -237,10 +243,6 @@ public final class VirtualMachine {
 
                 int opcode = bytecode.readOpcode(pc);
                 Opcode op = Opcode.fromInt(opcode);
-
-                // Verbose diagnostic: print every opcode and current stack top size
-                System.out.println("VM EXEC PC=" + pc + " OP=" + op.name() + " stackTop=" + valueStack.getStackTop());
-
                 switch (op) {
                     // ==================== Constants and Literals ====================
                     case INVALID -> throw new JSVirtualMachineException("Invalid opcode at PC " + pc);
@@ -644,7 +646,9 @@ public final class VirtualMachine {
                             propertyAccessChain.append(getVarName);
                         }
                         // Diagnostic: log GET_VAR name and value
-                        System.out.println("GET_VAR " + getVarName + " -> " + (varValue == null ? "null" : varValue.getClass().getSimpleName() + "(" + varValue + ")"));
+                        if (DEBUG) {
+                            System.out.println("GET_VAR " + getVarName + " -> " + (varValue == null ? "null" : varValue.getClass().getSimpleName() + "(" + varValue + ")"));
+                        }
                         valueStack.push(varValue);
                         pc += op.getSize();
                     }
@@ -654,7 +658,9 @@ public final class VirtualMachine {
                         JSValue putValue = valueStack.pop();
                         context.getGlobalObject().set(PropertyKey.fromString(putVarName), putValue);
                         // Diagnostic: log PUT_VAR name and value class for debugging
-                        System.out.println("PUT_VAR " + putVarName + " <- " + (putValue == null ? "null" : putValue.getClass().getSimpleName() + "(" + putValue + ")"));
+                        if (DEBUG) {
+                            System.out.println("PUT_VAR " + putVarName + " <- " + (putValue == null ? "null" : putValue.getClass().getSimpleName() + "(" + putValue + ")"));
+                        }
                         pc += op.getSize();
                     }
                     case SET_VAR -> {
@@ -662,7 +668,9 @@ public final class VirtualMachine {
                         String setVarName = bytecode.getAtoms()[setVarAtom];
                         JSValue setValue = valueStack.peek(0);
                         context.getGlobalObject().set(PropertyKey.fromString(setVarName), setValue);
-                        System.out.println("SET_VAR " + setVarName + " <- " + (setValue == null ? "null" : setValue.getClass().getSimpleName() + "(" + setValue + ")"));
+                        if (DEBUG) {
+                            System.out.println("SET_VAR " + setVarName + " <- " + (setValue == null ? "null" : setValue.getClass().getSimpleName() + "(" + setValue + ")"));
+                        }
                         pc += op.getSize();
                     }
                     case GET_LOCAL -> {
@@ -677,7 +685,9 @@ public final class VirtualMachine {
                         JSValue value = valueStack.pop();
                         currentFrame.getLocals()[putLocalIndex] = value;
                         // Diagnostic: log local write for debugging
-                        System.out.println("PUT_LOCAL idx=" + putLocalIndex + " <- " + (value == null ? "null" : value.getClass().getSimpleName() + "(" + value + ")"));
+                        if (DEBUG) {
+                            System.out.println("PUT_LOCAL idx=" + putLocalIndex + " <- " + (value == null ? "null" : value.getClass().getSimpleName() + "(" + value + ")"));
+                        }
                         debugDumpStack("AFTER_PUT_LOCAL", pc, 8);
                         pc += op.getSize();
                     }
@@ -1601,6 +1611,8 @@ public final class VirtualMachine {
                          PROXY,
                          RANGE_ERROR,
                          REFERENCE_ERROR,
+                         REGEXP,
+                         SET,
                          STRING_OBJECT,
                          SUPPRESSED_ERROR,
                          SYMBOL_OBJECT,
@@ -1631,7 +1643,7 @@ public final class VirtualMachine {
             JSConstructorType constructorType = jsObject.getConstructorType();
             JSObject resultObject = null;
             switch (constructorType) {
-                case SHARED_ARRAY_BUFFER, REGEXP, SET, WEAK_MAP, WEAK_SET, WEAK_REF ->
+                case SHARED_ARRAY_BUFFER, WEAK_MAP, WEAK_SET, WEAK_REF ->
                         resultObject = constructorType.create(context, args);
             }
             if (resultObject != null) {
@@ -1803,18 +1815,20 @@ public final class VirtualMachine {
         // Stack layout: ... iter next catch_offset [depth values] (bottom to top)
         // The depth parameter tells us how many values are between catch_offset and top
         // Following QuickJS: offset = -3 - depth
-        // iter is at peek(3 + depth), next is at peek(2 + depth), catch_offset is at peek(1 + depth)
+        // iter is at sp[offset] = sp[-3-depth], next is at sp[offset+1] = sp[-2-depth]
 
-        // Pop catch offset (after skipping depth values)
+        // Pop depth values temporarily
         List<JSValue> tempValues = new ArrayList<>(depth);
         for (int i = 0; i < depth; i++) {
             tempValues.add(valueStack.pop());
         }
+        // Now top of stack is catch_offset
         JSValue catchOffset = valueStack.pop();
 
-        // Peek next method and iterator (don't pop - they stay for next iteration)
-        JSValue nextMethod = valueStack.peek(0);  // next method
-        JSValue iterator = valueStack.peek(1);    // iterator object
+        // Now peek next method and iterator (don't pop - they stay for next iteration)
+        // Stack is now: ... iter next (top)
+        JSValue nextMethod = valueStack.peek(0);  // next method (top)
+        JSValue iterator = valueStack.peek(1);    // iterator object (below next)
 
         // Call iterator.next()
         if (!(nextMethod instanceof JSFunction nextFunc)) {

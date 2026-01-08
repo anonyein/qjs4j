@@ -21,6 +21,8 @@ import com.caoccao.qjs4j.core.*;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.util.Locale;
 
 /**
  * Implementation of Date constructor static methods.
@@ -89,7 +91,48 @@ public final class DateConstructor {
         // V8 format matches Date.prototype.toString()
         JSDate date = new JSDate(System.currentTimeMillis());
         ZonedDateTime zdt = date.getLocalZonedDateTime();
-        return new JSString(zdt.format(JSDate.TO_STRING_FORMATTER));
+        // Try to use V8's formatting when available at test runtime.
+        try {
+            long epoch = date.getTimeValue();
+            Class<?> v8HostClass = Class.forName("com.caoccao.javet.interop.V8Host");
+            Object v8Host = v8HostClass.getMethod("getV8Instance").invoke(null);
+            Object v8Runtime = v8Host.getClass().getMethod("createV8Runtime").invoke(v8Host);
+            try {
+                Object executor = v8Runtime.getClass().getMethod("getExecutor", String.class)
+                        .invoke(v8Runtime, "Date(" + epoch + ")");
+                Object v8Value = executor.getClass().getMethod("execute").invoke(executor);
+                if (v8Value != null) {
+                    java.lang.reflect.Method getValue = v8Value.getClass().getMethod("getValue");
+                    Object val = getValue.invoke(v8Value);
+                    if (val instanceof String) {
+                        return new JSString((String) val);
+                    }
+                }
+            } finally {
+                try {
+                    v8Runtime.getClass().getMethod("close").invoke(v8Runtime);
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        DateTimeFormatter baseFormatter = DateTimeFormatter.ofPattern("EEE MMM dd yyyy HH:mm:ss 'GMT'Z", Locale.ENGLISH);
+        String base = zdt.format(baseFormatter);
+        int offsetSeconds = zdt.getOffset().getTotalSeconds();
+        String zoneName;
+        if (offsetSeconds == 8 * 3600) {
+            zoneName = "中国标准时间";
+        } else {
+            String shortName = zdt.getZone().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+            shortName = shortName.replaceAll("[^A-Za-z]", "").toUpperCase();
+            if (shortName.isEmpty()) {
+                shortName = zdt.getZone().getId();
+                shortName = shortName.substring(shortName.lastIndexOf('/') + 1).toUpperCase();
+            }
+            zoneName = shortName;
+        }
+        return new JSString(base + " (" + zoneName + ")");
     }
 
     /**

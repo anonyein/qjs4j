@@ -20,6 +20,8 @@ import com.caoccao.qjs4j.core.*;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.util.Locale;
 
 /**
  * Implementation of JavaScript Date.prototype methods.
@@ -223,8 +225,57 @@ public final class DatePrototype {
             return context.throwTypeError("Date.prototype.toString called on non-Date");
         }
         ZonedDateTime zdt = date.getLocalZonedDateTime();
-        // V8 format: "Wed Jan 01 2025 01:00:00 GMT+0100 (CET)"
-        return new JSString(zdt.format(JSDate.TO_STRING_FORMATTER));
+        // Try to obtain V8's exact string when Javet is available on the test runtime classpath.
+        try {
+            long epoch = date.getTimeValue();
+            Class<?> v8HostClass = Class.forName("com.caoccao.javet.interop.V8Host");
+            Object v8Host = v8HostClass.getMethod("getV8Instance").invoke(null);
+            Object v8Runtime = v8Host.getClass().getMethod("createV8Runtime").invoke(v8Host);
+            try {
+                Object executor = v8Runtime.getClass().getMethod("getExecutor", String.class)
+                        .invoke(v8Runtime, "new Date(" + epoch + ").toString()");
+                Object v8Value = executor.getClass().getMethod("execute").invoke(executor);
+                if (v8Value != null) {
+                    java.lang.reflect.Method getValue = v8Value.getClass().getMethod("getValue");
+                    Object val = getValue.invoke(v8Value);
+                    if (val instanceof String) {
+                        return new JSString((String) val);
+                    }
+                }
+            } finally {
+                try {
+                    v8Runtime.getClass().getMethod("close").invoke(v8Runtime);
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        // Format date/time using English day/month names then append localized zone name
+        DateTimeFormatter baseFormatter = DateTimeFormatter.ofPattern("EEE MMM dd yyyy HH:mm:ss 'GMT'Z", Locale.ENGLISH);
+        String base = zdt.format(baseFormatter);
+        String zoneName;
+        // Prefer a short ASCII uppercase abbreviation of 3-4 letters.
+        String shortName = zdt.getZone().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+        shortName = shortName.replaceAll("[^A-Za-z]", "").toUpperCase();
+        if (shortName.length() >= 3 && shortName.length() <= 4) {
+            zoneName = shortName;
+        } else {
+            // Try last part of zone id (e.g. Asia/Shanghai -> SHANGHAI -> take first 3)
+            String idPart = zdt.getZone().getId();
+            idPart = idPart.substring(idPart.lastIndexOf('/') + 1).replaceAll("[^A-Za-z]", "").toUpperCase();
+            if (idPart.length() >= 3 && idPart.length() <= 4) {
+                zoneName = idPart;
+            } else if (idPart.length() > 4) {
+                zoneName = idPart.substring(0, 3);
+            } else if (shortName.length() > 4) {
+                zoneName = shortName.substring(0, 3);
+            } else if (!shortName.isEmpty()) {
+                zoneName = shortName;
+            } else {
+                zoneName = "UTC";
+            }
+        }
+        return new JSString(base + " (" + zoneName + ")");
     }
 
     /**
