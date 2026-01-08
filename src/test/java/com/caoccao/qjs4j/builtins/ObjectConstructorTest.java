@@ -64,7 +64,6 @@ public class ObjectConstructorTest extends BaseJavetTest {
         assertStringWithJavet("var target = {a: 1}; Object.assign(target, {b: 2}, {c: 3}); JSON.stringify(target)");
     }
 
-    @Disabled
     @Test
     public void testBuiltInFunctions() {
         assertStringWithJavet(

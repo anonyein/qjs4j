@@ -1277,7 +1277,7 @@ public final class GlobalObject {
         // Create Symbol constructor
         // Note: Symbol cannot be called with 'new' in JavaScript (throws TypeError)
         // Symbol objects are created using Object(symbolValue) for use with Proxy
-        JSNativeFunction symbolConstructor = new JSNativeFunction("Symbol", 1, SymbolConstructor::call);
+        JSNativeFunction symbolConstructor = new JSNativeFunction(JSSymbol.NAME, 0, SymbolConstructor::call);
         symbolConstructor.set("prototype", symbolPrototype);
         symbolConstructor.setConstructorType(JSConstructorType.SYMBOL_OBJECT); // Mark as Symbol constructor
         symbolPrototype.set("constructor", symbolConstructor);
