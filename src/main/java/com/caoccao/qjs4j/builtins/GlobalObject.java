@@ -1103,7 +1103,7 @@ public final class GlobalObject {
         setPrototype.set("clear", new JSNativeFunction("clear", 0, SetPrototype::clear));
         setPrototype.set("forEach", new JSNativeFunction("forEach", 1, SetPrototype::forEach));
         setPrototype.set("entries", new JSNativeFunction("entries", 0, IteratorPrototype::setEntriesIterator));
-        
+
         // Create values function - keys and Symbol.iterator will alias to this
         JSNativeFunction valuesFunction = new JSNativeFunction("values", 0, IteratorPrototype::setValuesIterator);
         setPrototype.set("values", valuesFunction);
@@ -1144,10 +1144,21 @@ public final class GlobalObject {
         );
         sharedArrayBufferPrototype.defineProperty(PropertyKey.fromString("byteLength"), byteLengthDesc);
 
-        // Create SharedArrayBuffer constructor
-        JSObject sharedArrayBufferConstructor = context.createJSObject();
+        // Symbol.toStringTag
+        JSNativeFunction toStringTagGetter = new JSNativeFunction("get [Symbol.toStringTag]", 0, SharedArrayBufferPrototype::getToStringTag);
+        sharedArrayBufferPrototype.defineProperty(PropertyKey.fromSymbol(JSSymbol.TO_STRING_TAG),
+                PropertyDescriptor.accessorDescriptor(toStringTagGetter, null, false, true));
+
+        // Create SharedArrayBuffer constructor as a function
+        JSNativeFunction sharedArrayBufferConstructor = new JSNativeFunction(
+                "SharedArrayBuffer",
+                1,
+                SharedArrayBufferConstructor::call,
+                true,  // isConstructor
+                true   // requiresNew - SharedArrayBuffer() must be called with new
+        );
         sharedArrayBufferConstructor.set("prototype", sharedArrayBufferPrototype);
-        sharedArrayBufferConstructor.setConstructorType(JSConstructorType.SHARED_ARRAY_BUFFER); // Mark as SharedArrayBuffer constructor
+        sharedArrayBufferConstructor.setConstructorType(JSConstructorType.SHARED_ARRAY_BUFFER);
         sharedArrayBufferPrototype.set("constructor", sharedArrayBufferConstructor);
 
         global.set("SharedArrayBuffer", sharedArrayBufferConstructor);

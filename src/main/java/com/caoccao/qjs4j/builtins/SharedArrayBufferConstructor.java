@@ -17,6 +17,7 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSSharedArrayBuffer;
 import com.caoccao.qjs4j.core.JSValue;
 
 /**
@@ -26,17 +27,12 @@ import com.caoccao.qjs4j.core.JSValue;
 public final class SharedArrayBufferConstructor {
 
     /**
-     * SharedArrayBuffer constructor function.
-     * Cannot be called without 'new'.
-     *
-     * @param context The execution context
-     * @param thisArg The this value
-     * @param args    Constructor arguments [byteLength]
-     * @return TypeError (SharedArrayBuffer must be called with 'new')
+     * SharedArrayBuffer constructor call/new.
+     * Delegates to JSSharedArrayBuffer.create().
+     * <p>
+     * Based on ES2017 24.2.1.1
      */
-    public static JSValue construct(JSContext context, JSValue thisArg, JSValue[] args) {
-        // This should be called via VM's handleCallConstructor
-        // If called directly, it's an error
-        return context.throwTypeError("SharedArrayBuffer constructor must be called with 'new'");
+    public static JSValue call(JSContext context, JSValue thisArg, JSValue[] args) {
+        return JSSharedArrayBuffer.create(context, args);
     }
 }

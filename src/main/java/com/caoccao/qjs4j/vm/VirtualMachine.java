@@ -193,7 +193,7 @@ public final class VirtualMachine {
 
                 int opcode = bytecode.readOpcode(pc);
                 Opcode op = Opcode.fromInt(opcode);
-                
+
                 switch (op) {
                     // ==================== Constants and Literals ====================
                     case INVALID -> throw new JSVirtualMachineException("Invalid opcode at PC " + pc);
@@ -1525,6 +1525,7 @@ public final class VirtualMachine {
                          REFERENCE_ERROR,
                          REGEXP,
                          SET,
+                         SHARED_ARRAY_BUFFER,
                          STRING_OBJECT,
                          SUPPRESSED_ERROR,
                          SYMBOL_OBJECT,
@@ -1555,8 +1556,7 @@ public final class VirtualMachine {
             JSConstructorType constructorType = jsObject.getConstructorType();
             JSObject resultObject = null;
             switch (constructorType) {
-                case SHARED_ARRAY_BUFFER, WEAK_MAP, WEAK_SET, WEAK_REF ->
-                        resultObject = constructorType.create(context, args);
+                case WEAK_MAP, WEAK_SET, WEAK_REF -> resultObject = constructorType.create(context, args);
             }
             if (resultObject != null) {
                 valueStack.push(resultObject);

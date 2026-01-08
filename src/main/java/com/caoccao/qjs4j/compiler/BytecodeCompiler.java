@@ -1992,38 +1992,6 @@ public final class BytecodeCompiler {
         }
     }
 
-    /**
-     * Declare all variables in a pattern (used for for-of loops with destructuring).
-     * This recursively declares variables for Identifier, ArrayPattern, and ObjectPattern.
-     */
-    private void declarePatternVariables(Pattern pattern) {
-        if (pattern instanceof Identifier id) {
-            // Simple identifier: declare it as a local variable
-            currentScope().declareLocal(id.name());
-        } else if (pattern instanceof ArrayPattern arrPattern) {
-            // Array destructuring: declare all element variables
-            for (Pattern element : arrPattern.elements()) {
-                if (element != null) {
-                    if (element instanceof RestElement restElement) {
-                        // Rest element: declare the argument pattern
-                        declarePatternVariables(restElement.argument());
-                    } else {
-                        // Regular element: recursively declare
-                        declarePatternVariables(element);
-                    }
-                }
-            }
-        } else if (pattern instanceof ObjectPattern objPattern) {
-            // Object destructuring: declare all property variables
-            for (ObjectPattern.Property prop : objPattern.properties()) {
-                declarePatternVariables(prop.value());
-            }
-        } else if (pattern instanceof RestElement restElement) {
-            // Rest element at top level (shouldn't normally happen, but handle it)
-            declarePatternVariables(restElement.argument());
-        }
-    }
-
     private void compilePatternAssignment(Pattern pattern) {
         if (pattern instanceof Identifier id) {
             // Simple identifier: value is on stack, just assign it
@@ -2165,8 +2133,6 @@ public final class BytecodeCompiler {
         }
     }
 
-    // ==================== Expression Compilation ====================
-
     private void compileProgram(Program program) {
         inGlobalScope = true;
         strictMode = program.strict();  // Set strict mode from program directive
@@ -2203,6 +2169,8 @@ public final class BytecodeCompiler {
         exitScope();
         inGlobalScope = false;
     }
+
+    // ==================== Expression Compilation ====================
 
     private void compileReturnStatement(ReturnStatement retStmt) {
         if (retStmt.argument() != null) {
@@ -2904,6 +2872,38 @@ public final class BytecodeCompiler {
             throw new CompilerException("No scope available");
         }
         return scopes.peek();
+    }
+
+    /**
+     * Declare all variables in a pattern (used for for-of loops with destructuring).
+     * This recursively declares variables for Identifier, ArrayPattern, and ObjectPattern.
+     */
+    private void declarePatternVariables(Pattern pattern) {
+        if (pattern instanceof Identifier id) {
+            // Simple identifier: declare it as a local variable
+            currentScope().declareLocal(id.name());
+        } else if (pattern instanceof ArrayPattern arrPattern) {
+            // Array destructuring: declare all element variables
+            for (Pattern element : arrPattern.elements()) {
+                if (element != null) {
+                    if (element instanceof RestElement restElement) {
+                        // Rest element: declare the argument pattern
+                        declarePatternVariables(restElement.argument());
+                    } else {
+                        // Regular element: recursively declare
+                        declarePatternVariables(element);
+                    }
+                }
+            }
+        } else if (pattern instanceof ObjectPattern objPattern) {
+            // Object destructuring: declare all property variables
+            for (ObjectPattern.Property prop : objPattern.properties()) {
+                declarePatternVariables(prop.value());
+            }
+        } else if (pattern instanceof RestElement restElement) {
+            // Rest element at top level (shouldn't normally happen, but handle it)
+            declarePatternVariables(restElement.argument());
+        }
     }
 
     // ==================== Scope Management ====================
