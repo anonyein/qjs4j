@@ -145,6 +145,13 @@ public class WeakMapPrototypeTest extends BaseJavetTest {
                 """);
     }
 
+        @Test
+        void debugWeakMapChaining() {
+                String code = "const wm = new WeakMap(); const k1 = {}, k2 = {}; const result = wm.set(k1,1).set(k2,2); [ result === wm, typeof result ];";
+                // Print qjs4j eval result for debugging
+                System.out.println("qjs4j eval: " + resetContext().eval(code));
+        }
+
     @Test
     void testWeakMapDelete() {
         assertBooleanWithJavet("""

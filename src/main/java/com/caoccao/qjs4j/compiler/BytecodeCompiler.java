@@ -29,6 +29,7 @@ import java.util.*;
  * Implements visitor pattern for traversing AST nodes and emitting appropriate bytecode.
  */
 public final class BytecodeCompiler {
+    private static final boolean EMIT_DEBUG = true; // temporary compiler emit diagnostics
     private final BytecodeEmitter emitter;
     private final Deque<LoopContext> loopStack;
     private final Deque<Scope> scopes;
@@ -576,6 +577,10 @@ public final class BytecodeCompiler {
 
             // Call with argument count (will use receiver as thisArg)
             emitter.emitOpcodeU16(Opcode.CALL, callExpr.arguments().size());
+            if (EMIT_DEBUG) {
+                System.out.println("EMIT DIAG: emit CALL (method) at offset=" + emitter.currentOffset());
+                emitter.debugDumpLast(96);
+            }
         } else {
             // Regular function call: func()
             // Push callee
@@ -591,6 +596,10 @@ public final class BytecodeCompiler {
 
             // Call with argument count
             emitter.emitOpcodeU16(Opcode.CALL, callExpr.arguments().size());
+            if (EMIT_DEBUG) {
+                System.out.println("EMIT DIAG: emit CALL (regular) at offset=" + emitter.currentOffset());
+                emitter.debugDumpLast(96);
+            }
         }
     }
 
@@ -1958,6 +1967,10 @@ public final class BytecodeCompiler {
             }
         } else if (memberExpr.property() instanceof Identifier propId) {
             // obj.prop
+            if (EMIT_DEBUG && "extend".equals(propId.name())) {
+                System.out.println("EMIT DIAG: emitting GET_FIELD 'extend' at offset=" + emitter.currentOffset());
+                emitter.debugDumpLast(128);
+            }
             emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
         }
     }
@@ -2042,7 +2055,30 @@ public final class BytecodeCompiler {
 
     private void compileNewExpression(NewExpression newExpr) {
         // Push constructor
-        compileExpression(newExpr.callee());
+        Expression callee = newExpr.callee();
+        if (callee instanceof MemberExpression memberExpr) {
+            // For "new obj.prop(...)" we only need the property value (the constructor),
+            // do NOT preserve the receiver. Emit object then GET_FIELD/GET_ARRAY_EL
+            compileExpression(memberExpr.object());
+            if (memberExpr.computed()) {
+                compileExpression(memberExpr.property());
+                emitter.emitOpcode(Opcode.GET_ARRAY_EL);
+            } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
+                String fieldName = privateId.name();
+                JSSymbol symbol = privateSymbols != null ? privateSymbols.get(fieldName) : null;
+                if (symbol != null) {
+                    emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                    emitter.emitOpcode(Opcode.GET_PRIVATE_FIELD);
+                } else {
+                    emitter.emitOpcode(Opcode.DROP);
+                    emitter.emitOpcode(Opcode.UNDEFINED);
+                }
+            } else if (memberExpr.property() instanceof Identifier propId) {
+                emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.name());
+            }
+        } else {
+            compileExpression(callee);
+        }
 
         // Push arguments
         for (Expression arg : newExpr.arguments()) {
@@ -2051,6 +2087,10 @@ public final class BytecodeCompiler {
 
         // Call constructor
         emitter.emitOpcodeU16(Opcode.CALL_CONSTRUCTOR, newExpr.arguments().size());
+        if (EMIT_DEBUG) {
+            System.out.println("EMIT DIAG: emit CALL_CONSTRUCTOR at offset=" + emitter.currentOffset());
+            emitter.debugDumpLast(96);
+        }
     }
 
     private void compileObjectExpression(ObjectExpression objExpr) {

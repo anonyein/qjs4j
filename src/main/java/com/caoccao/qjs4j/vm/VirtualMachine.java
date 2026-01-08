@@ -205,6 +205,14 @@ public final class VirtualMachine {
 
             // Main execution loop
             while (true) {
+                // Keep current frame program counter updated for diagnostics
+                if (currentFrame != null) {
+                    try {
+                        currentFrame.setProgramCounter(pc);
+                    } catch (Throwable ignored) {
+                        // ignore
+                    }
+                }
                 if (pendingException != null) {
                     // QuickJS-style exception handling: unwind stack looking for catch offset
                     JSValue exception = pendingException;
@@ -1436,6 +1444,24 @@ public final class VirtualMachine {
         // Pop callee (method)
         JSValue callee = valueStack.pop();
 
+        // Diagnostic: record stack snapshot before performing call logic
+        if (DEBUG) {
+            try {
+                System.out.println("VM DIAG: handleCall ENTRY argCount=" + argCount + " stackTop=" + valueStack.getStackTop());
+                int top = valueStack.getStackTop();
+                for (int i = 0; i < Math.min(6, top + 1); i++) {
+                    try {
+                        JSValue v = valueStack.peek(i);
+                        String cls = v == null ? "null" : v.getClass().getSimpleName();
+                        System.out.println("  [+" + i + "] " + cls + " -> " + String.valueOf(v));
+                    } catch (Throwable t) {
+                        System.out.println("  [+" + i + "] <no-value>");
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
         // Handle proxy apply trap (QuickJS: js_proxy_call)
         if (callee instanceof JSProxy proxy) {
             JSValue result = proxyApply(proxy, receiver, args);
@@ -1507,6 +1533,50 @@ public final class VirtualMachine {
         } else {
             // Not a function - throw TypeError
             // Generate a descriptive error message similar to V8/QuickJS
+            // Enhanced diagnostics for non-function call
+            try {
+                System.out.println("VM DIAG: CALL attempted on non-function - class=" + (callee == null ? "null" : callee.getClass().getSimpleName()) + " value=" + String.valueOf(callee) + " propChain=" + propertyAccessChain + " framePC=" + (currentFrame == null ? "null" : currentFrame.getProgramCounter()));
+                // If current frame is bytecode function, dump surrounding bytecode
+                if (currentFrame != null && currentFrame.getFunction() instanceof JSBytecodeFunction bfunc) {
+                    try {
+                        Bytecode bc = bfunc.getBytecode();
+                        int fpc = currentFrame.getProgramCounter();
+                        System.out.println("VM DIAG: Bytecode context around PC=" + fpc);
+                        int start = Math.max(0, fpc - 32);
+                        int end = Math.min(bc.getLength(), fpc + 32);
+                        int dpc = start;
+                        while (dpc < end) {
+                            int code = bc.readOpcode(dpc);
+                            Opcode dop = Opcode.fromInt(code);
+                            String extra = "";
+                            int size = dop.getSize();
+                            if (size == 5) {
+                                int u32 = bc.readU32(dpc + 1);
+                                String atomName = "";
+                                try {
+                                    String[] atoms = bc.getAtoms();
+                                    if (atoms != null && u32 >= 0 && u32 < atoms.length) {
+                                        atomName = "('" + atoms[u32] + "')";
+                                    }
+                                } catch (Throwable ignored) {
+                                }
+                                extra = " " + u32 + atomName;
+                            } else if (size == 3) {
+                                int u16 = bc.readU16(dpc + 1);
+                                extra = " " + u16;
+                            } else if (size == 2) {
+                                int u8 = bc.readU8(dpc + 1);
+                                extra = " " + u8;
+                            }
+                            System.out.println(String.format(" %04d: %s%s", dpc, dop.name(), extra));
+                            dpc += size;
+                        }
+                    } catch (Throwable t) {
+                        // ignore diagnostic failure
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
             String message;
             if (!(propertyAccessChain.length() == 0)) {
                 // Use the tracked property access for better error messages
@@ -1644,6 +1714,49 @@ public final class VirtualMachine {
                 }
             }
         } else {
+            // Enhanced diagnostics for invalid constructor
+            try {
+                System.out.println("VM DIAG: CONSTRUCT attempted on non-function - value=" + String.valueOf(constructor) + " class=" + (constructor == null ? "null" : constructor.getClass().getSimpleName()) + " framePC=" + (currentFrame == null ? "null" : currentFrame.getProgramCounter()));
+                if (currentFrame != null && currentFrame.getFunction() instanceof JSBytecodeFunction bfunc) {
+                    try {
+                        Bytecode bc = bfunc.getBytecode();
+                        int fpc = currentFrame.getProgramCounter();
+                        System.out.println("VM DIAG: Bytecode context around PC=" + fpc);
+                        int start = Math.max(0, fpc - 32);
+                        int end = Math.min(bc.getLength(), fpc + 32);
+                        int dpc = start;
+                        while (dpc < end) {
+                            int code = bc.readOpcode(dpc);
+                            Opcode dop = Opcode.fromInt(code);
+                            String extra = "";
+                            int size = dop.getSize();
+                            if (size == 5) {
+                                int u32 = bc.readU32(dpc + 1);
+                                String atomName = "";
+                                try {
+                                    String[] atoms = bc.getAtoms();
+                                    if (atoms != null && u32 >= 0 && u32 < atoms.length) {
+                                        atomName = "('" + atoms[u32] + "')";
+                                    }
+                                } catch (Throwable ignored) {
+                                }
+                                extra = " " + u32 + atomName;
+                            } else if (size == 3) {
+                                int u16 = bc.readU16(dpc + 1);
+                                extra = " " + u16;
+                            } else if (size == 2) {
+                                int u8 = bc.readU8(dpc + 1);
+                                extra = " " + u8;
+                            }
+                            System.out.println(String.format(" %04d: %s%s", dpc, dop.name(), extra));
+                            dpc += size;
+                        }
+                    } catch (Throwable t) {
+                        // ignore diagnostic failure
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
             throw new JSVirtualMachineException("Cannot construct non-function value");
         }
     }

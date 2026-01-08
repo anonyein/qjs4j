@@ -214,6 +214,46 @@ public final class BytecodeEmitter {
     }
 
     /**
+     * Debug: dump the last N bytes of emitted code as disassembly.
+     */
+    public void debugDumpLast(int window) {
+        try {
+            byte[] bytes = code.toByteArray();
+            int len = bytes.length;
+            int start = Math.max(0, len - window);
+            System.out.println("EMIT DIAG: Bytecode emit window (last " + window + " bytes) at offset " + len);
+            int dpc = start;
+            while (dpc < len) {
+                int opcode = bytes[dpc] & 0xFF;
+                Opcode op = Opcode.fromInt(opcode);
+                String extra = "";
+                int size = op.getSize();
+                if (size == 5 && dpc + 4 < len) {
+                    int u32 = ((bytes[dpc + 1] & 0xFF) << 24) | ((bytes[dpc + 2] & 0xFF) << 16) | ((bytes[dpc + 3] & 0xFF) << 8) | (bytes[dpc + 4] & 0xFF);
+                    String atomName = "";
+                    try {
+                        if (u32 >= 0 && u32 < atomPool.size()) {
+                            atomName = "('" + atomPool.get(u32) + "')";
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                    extra = " " + u32 + atomName;
+                } else if (size == 3 && dpc + 2 < len) {
+                    int u16 = ((bytes[dpc + 1] & 0xFF) << 8) | (bytes[dpc + 2] & 0xFF);
+                    extra = " " + u16;
+                } else if (size == 2 && dpc + 1 < len) {
+                    int u8 = bytes[dpc + 1] & 0xFF;
+                    extra = " " + u8;
+                }
+                System.out.println(String.format(" %04d: %s%s", dpc, op.name(), extra));
+                dpc += size;
+            }
+        } catch (Throwable t) {
+            // don't fail compilation due to diagnostic
+        }
+    }
+
+    /**
      * Patch a previously emitted jump instruction with the target offset.
      */
     public void patchJump(int offset, int target) {
