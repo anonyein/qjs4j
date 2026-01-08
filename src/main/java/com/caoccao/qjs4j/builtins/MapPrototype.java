@@ -18,6 +18,7 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.*;
 
+import java.util.ArrayList;
 import java.util.Map;
 
 /**
@@ -85,44 +86,55 @@ public final class MapPrototype {
 
         JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
-        // Convert to ArrayList to allow index-based iteration
-        // This allows us to see entries added during iteration
-        java.util.ArrayList<Map.Entry<JSMap.KeyWrapper, JSValue>> list = new java.util.ArrayList<>();
+        // Create a snapshot of keys to iterate over
+        // Following QuickJS behavior:
+        // - Visit entries present at start, plus any added during iteration
+        // - Skip entries that are deleted during iteration
+        ArrayList<JSMap.KeyWrapper> keys = new ArrayList<>();
         for (Map.Entry<JSMap.KeyWrapper, JSValue> entry : map.entries()) {
-            list.add(entry);
+            keys.add(entry.getKey());
         }
-        
-        // Iterate using index, checking size dynamically to visit newly added entries
+
+        // Iterate through the keys using an index so we can see newly added entries
         int index = 0;
-        while (index < list.size()) {
-            Map.Entry<JSMap.KeyWrapper, JSValue> entry = list.get(index);
-            JSValue key = entry.getKey().value();
-            JSValue value = entry.getValue();
+        while (index < keys.size()) {
+            JSMap.KeyWrapper keyWrapper = keys.get(index);
+            JSValue key = keyWrapper.value();
+
+            // Check if the key still exists in the map (might have been deleted during iteration)
+            if (!map.mapHas(key)) {
+                // Key was deleted, skip it (following QuickJS behavior)
+                index++;
+                continue;
+            }
+
+            JSValue value = map.mapGet(key);
 
             // Call callback with (value, key, map)
             JSValue[] callbackArgs = new JSValue[]{value, key, map};
             JSValue result = callback.call(context, callbackThisArg, callbackArgs);
-            
+
             // Check for exceptions
             if (result instanceof JSError) {
                 return result;
             }
-            
+
             // Check if new entries were added during the callback
-            // If map size grew, add the new entries to our list
-            int currentMapSize = map.size();
-            if (currentMapSize > list.size()) {
-                // Add newly added entries to our iteration list
-                java.util.ArrayList<Map.Entry<JSMap.KeyWrapper, JSValue>> newList = new java.util.ArrayList<>();
-                for (Map.Entry<JSMap.KeyWrapper, JSValue> e : map.entries()) {
-                    newList.add(e);
+            // Add any new keys that aren't already in our iteration list
+            if (map.size() > keys.size()) {
+                // Get current keys from map
+                java.util.Set<JSMap.KeyWrapper> currentKeys = new java.util.HashSet<>();
+                for (Map.Entry<JSMap.KeyWrapper, JSValue> entry : map.entries()) {
+                    currentKeys.add(entry.getKey());
                 }
-                // Add only the new entries (those beyond our current list size)
-                for (int i = list.size(); i < newList.size(); i++) {
-                    list.add(newList.get(i));
+                // Add keys that are in the map but not in our iteration list
+                for (JSMap.KeyWrapper newKey : currentKeys) {
+                    if (!keys.contains(newKey)) {
+                        keys.add(newKey);
+                    }
                 }
             }
-            
+
             index++;
         }
 

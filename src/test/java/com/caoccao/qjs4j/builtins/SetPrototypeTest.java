@@ -117,6 +117,19 @@ public class SetPrototypeTest extends BaseJavetTest {
     }
 
     @Test
+    void testAddDuringIteration() {
+        // Add entries during iteration - they should be visited
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  if(v === 2) s.add(4);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
     void testAddEdgeCases() {
         // Add primitive values
         assertIntegerWithJavet("var s = new Set(); s.add(1); s.size");
@@ -262,6 +275,76 @@ public class SetPrototypeTest extends BaseJavetTest {
     }
 
     @Test
+    void testDeleteAll() {
+        // Delete all entries during iteration
+        assertIntegerWithJavet("""
+                var count = 0;
+                var visited = [];
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  visited.push(v);
+                  s.delete(1);
+                  s.delete(2);
+                  s.delete(3);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeleteAndCheckSetSize() {
+        // Check set size after deletion during forEach
+        assertIntegerWithJavet("""
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  if(v === 2) s.delete(3);
+                });
+                s.size""");
+    }
+
+    @Test
+    void testDeleteAndReAdd() {
+        // Delete and re-add an entry
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  if(v === 1) {
+                    s.delete(3);
+                    s.add(3);
+                  }
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeleteCurrentEntry() {
+        // Delete the current entry during iteration
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  s.delete(v);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeleteDuringIteration() {
+        // Delete an entry that hasn't been visited yet
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  if(v === 2) s.delete(3);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
     void testDeleteEdgeCases() {
         // Delete from empty set
         assertBooleanWithJavet("var s = new Set(); s.delete(1)");
@@ -296,6 +379,103 @@ public class SetPrototypeTest extends BaseJavetTest {
         // Zero values
         assertBooleanWithJavet("var s = new Set(); s.add(0); s.has(-0)");
         assertBooleanWithJavet("var s = new Set(); s.add(-0); s.has(0)");
+    }
+
+    @Test
+    void testDeleteFromEmptySet() {
+        // Delete from empty set (no-op)
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set();
+                s.forEach(function(v) {
+                  s.delete(1);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeleteMultipleDuringIteration() {
+        // Delete multiple entries during iteration
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([1, 2, 3, 4, 5]);
+                s.forEach(function(v) {
+                  if(v === 1) {
+                    s.delete(3);
+                    s.delete(4);
+                  }
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeleteNonExistent() {
+        // Delete non-existent value during iteration
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([1, 2]);
+                s.forEach(function(v) {
+                  s.delete(999);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeletePreviousEntry() {
+        // Delete an entry that was already visited
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  if(v === 3) s.delete(1);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeleteWithComplexValues() {
+        // Delete with object values
+        assertIntegerWithJavet("""
+                var count = 0;
+                var obj1 = {id: 1};
+                var obj2 = {id: 2};
+                var obj3 = {id: 3};
+                var s = new Set([obj1, obj2, obj3]);
+                s.forEach(function(v) {
+                  if(v === obj2) s.delete(obj3);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeleteWithNullValue() {
+        // Test with a set that has null as a value
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([null, 2, 3]);
+                s.forEach(function(v) {
+                  if(v === null) s.delete(2);
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
+    void testDeleteWithUndefinedValue() {
+        // Test with a set that has undefined as a value
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([undefined, 2, 3]);
+                s.forEach(function(v) {
+                  if(v === undefined) s.delete(2);
+                  count++;
+                });
+                count""");
     }
 
     @Test
@@ -838,6 +1018,18 @@ public class SetPrototypeTest extends BaseJavetTest {
     }
 
     @Test
+    void testNoDelete() {
+        // Control test: no deletion
+        assertIntegerWithJavet("""
+                var count = 0;
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  count++;
+                });
+                count""");
+    }
+
+    @Test
     void testSetAddZeroValues() {
         // Adding +0 and then -0 should result in size 1
         assertIntegerWithJavet("var s = new Set(); s.add(0); s.add(-0); s.size");
@@ -958,6 +1150,19 @@ public class SetPrototypeTest extends BaseJavetTest {
 
         // Calling values() should produce an iterator
         assertBooleanWithJavet("var it = new Set([1,2,3]).values(); it.next().value === 1");
+    }
+
+    @Test
+    void testVerifyCorrectEntriesVisited() {
+        // Verify which entries are actually visited
+        assertStringWithJavet("""
+                var result = '';
+                var s = new Set([1, 2, 3]);
+                s.forEach(function(v) {
+                  result += v;
+                  if(v === 2) s.delete(3);
+                });
+                result""");
     }
 
     @Test

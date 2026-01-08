@@ -18,6 +18,8 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.*;
 
+import java.util.ArrayList;
+
 /**
  * Implementation of Set.prototype methods.
  * Based on ES2020 Set specification.
@@ -84,7 +86,7 @@ public final class SetPrototype {
      * Set.prototype.forEach(callbackFn, thisArg)
      * ES2020 23.2.3.6
      * Executes a provided function once per each value in the Set, in insertion order.
-     * Note: The list can be modified while traversing it. Newly added elements
+     * Note: The set can be modified while traversing it. Newly added values
      * during iteration will be visited (matching QuickJS behavior).
      */
     public static JSValue forEach(JSContext context, JSValue thisArg, JSValue[] args) {
@@ -98,44 +100,54 @@ public final class SetPrototype {
 
         JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
-        // Convert to ArrayList to allow index-based iteration
-        // This allows us to see elements added during iteration
-        java.util.ArrayList<JSMap.KeyWrapper> list = new java.util.ArrayList<>();
+        // Create a snapshot of values to iterate over
+        // Following QuickJS behavior:
+        // - Visit values present at start, plus any added during iteration
+        // - Skip values that are deleted during iteration
+        ArrayList<JSMap.KeyWrapper> values = new ArrayList<>();
         for (JSMap.KeyWrapper wrapper : set.values()) {
-            list.add(wrapper);
+            values.add(wrapper);
         }
-        
-        // Iterate using index, checking size dynamically to visit newly added elements
+
+        // Iterate through the values using an index so we can see newly added values
         int index = 0;
-        while (index < list.size()) {
-            JSMap.KeyWrapper wrapper = list.get(index);
+        while (index < values.size()) {
+            JSMap.KeyWrapper wrapper = values.get(index);
             JSValue value = wrapper.value();
+
+            // Check if the value still exists in the set (might have been deleted during iteration)
+            if (!set.setHas(value)) {
+                // Value was deleted, skip it (following QuickJS behavior)
+                index++;
+                continue;
+            }
 
             // Call callback with (value, value, set)
             // Note: In Set, both arguments are the value (for consistency with Map)
             JSValue[] callbackArgs = new JSValue[]{value, value, set};
             JSValue result = callback.call(context, callbackThisArg, callbackArgs);
-            
+
             // Check for exceptions
             if (result instanceof JSError) {
                 return result;
             }
-            
-            // Check if new elements were added during the callback
-            // If set size grew, add the new elements to our list
-            int currentSetSize = set.size();
-            if (currentSetSize > list.size()) {
-                // Add newly added elements to our iteration list
-                java.util.ArrayList<JSMap.KeyWrapper> newList = new java.util.ArrayList<>();
+
+            // Check if new values were added during the callback
+            // Add any new values that aren't already in our iteration list
+            if (set.size() > values.size()) {
+                // Get current values from set
+                java.util.Set<JSMap.KeyWrapper> currentValues = new java.util.HashSet<>();
                 for (JSMap.KeyWrapper w : set.values()) {
-                    newList.add(w);
+                    currentValues.add(w);
                 }
-                // Add only the new elements (those beyond our current list size)
-                for (int i = list.size(); i < newList.size(); i++) {
-                    list.add(newList.get(i));
+                // Add values that are in the set but not in our iteration list
+                for (JSMap.KeyWrapper newValue : currentValues) {
+                    if (!values.contains(newValue)) {
+                        values.add(newValue);
+                    }
                 }
             }
-            
+
             index++;
         }
 
