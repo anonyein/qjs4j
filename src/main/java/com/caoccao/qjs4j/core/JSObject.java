@@ -235,7 +235,26 @@ public non-sealed class JSObject implements JSValue {
      * Get a property value by string name.
      */
     public JSValue get(String propertyName) {
-        return get(PropertyKey.fromString(propertyName));
+        // Prefer exact string property lookup first (preserves properties set via set(String,...)).
+        JSValue stringLookup = get(PropertyKey.fromString(propertyName));
+        if (!(stringLookup instanceof JSUndefined)) {
+            return stringLookup;
+        }
+
+        // If not found as a string, and the string is a canonical array index
+        // (non-negative integer within 32-bit range), try index lookup.
+        try {
+            if (propertyName != null && !propertyName.isEmpty()) {
+                long parsed = Long.parseLong(propertyName);
+                if (parsed >= 0 && parsed <= 0xFFFFFFFFL && String.valueOf(parsed).equals(propertyName)) {
+                    return get(PropertyKey.fromIndex((int) parsed));
+                }
+            }
+        } catch (NumberFormatException ignored) {
+            // Not a numeric string - return undefined result from string lookup
+        }
+
+        return stringLookup;
     }
 
     /**

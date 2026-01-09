@@ -87,19 +87,9 @@ public class RunProvidedJsTest extends BaseTest {
         assertThat(biRcVal).isInstanceOf(JSArray.class);
         JSArray biRc = (JSArray) biRcVal;
 
-        // Print identity and debug id for correlation with VM diagnostics
-        System.out.println("DEBUG biRc.identityHash=" + System.identityHashCode(biRc));
-        System.out.println("DEBUG biRc._dbgId=" + biRc.get("_dbgId"));
-
         int code0 = '0';
         int codea = 'a';
         int codeA = 'A';
-
-        // Debug: print array length and sample entries before assertions
-        System.out.println("DEBUG biRc.length=" + biRc.getLength());
-        System.out.println("DEBUG biRc["+code0+"]=" + biRc.get(code0) + ", class=" + (biRc.get(code0) == null ? "null" : biRc.get(code0).getClass().getSimpleName()));
-        System.out.println("DEBUG biRc["+codea+"]=" + biRc.get(codea) + ", class=" + (biRc.get(codea) == null ? "null" : biRc.get(codea).getClass().getSimpleName()));
-        System.out.println("DEBUG biRc["+codeA+"]=" + biRc.get(codeA) + ", class=" + (biRc.get(codeA) == null ? "null" : biRc.get(codeA).getClass().getSimpleName()));
 
         assertThat(biRc.get(code0)).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(0.0));
         assertThat(biRc.get(codea)).isInstanceOfSatisfying(JSNumber.class, num -> assertThat(num.value()).isEqualTo(10.0));
