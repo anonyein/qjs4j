@@ -130,6 +130,12 @@ dependencies {
     testImplementation("com.caoccao.javet:javet-v8-$osType-$archType:${Config.Versions.JAVET}")
 }
 
+// 添加 sourcesJar 任务
+tasks.register<Jar>("sourcesJar") {
+    from(sourceSets.main.get().allJava)
+    archiveClassifier.set("sources")
+}
+
 tasks.test {
     useJUnitPlatform {
         excludeTags("performance")
