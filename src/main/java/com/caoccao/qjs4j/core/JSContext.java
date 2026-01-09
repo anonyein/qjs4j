@@ -202,6 +202,16 @@ public final class JSContext implements AutoCloseable {
      */
     public JSArray createJSArray(long length, int capacity) {
         JSArray jsArray = new JSArray(length, capacity);
+        System.out.println("DEBUG CREATE_JSARRAY: id=" + System.identityHashCode(jsArray) + ", length=" + length);
+        try {
+            StackTraceElement[] st = Thread.currentThread().getStackTrace();
+            StringBuilder sb = new StringBuilder();
+            for (int i = 3; i < Math.min(st.length, 12); i++) {
+                sb.append(" -> ").append(st[i].toString());
+            }
+            System.out.println("DEBUG CREATE_JSARRAY STACK:" + sb.toString());
+        } catch (Throwable ignore) {
+        }
         transferPrototype(jsArray, JSArray.NAME);
         return jsArray;
     }
@@ -215,6 +225,16 @@ public final class JSContext implements AutoCloseable {
      */
     public JSArray createJSArray(JSValue... values) {
         JSArray jsArray = new JSArray(values);
+        System.out.println("DEBUG CREATE_JSARRAY: id=" + System.identityHashCode(jsArray) + ", valuesCount=" + values.length);
+        try {
+            StackTraceElement[] st = Thread.currentThread().getStackTrace();
+            StringBuilder sb = new StringBuilder();
+            for (int i = 3; i < Math.min(st.length, 12); i++) {
+                sb.append(" -> ").append(st[i].toString());
+            }
+            System.out.println("DEBUG CREATE_JSARRAY STACK:" + sb.toString());
+        } catch (Throwable ignore) {
+        }
         transferPrototype(jsArray, JSArray.NAME);
         return jsArray;
     }

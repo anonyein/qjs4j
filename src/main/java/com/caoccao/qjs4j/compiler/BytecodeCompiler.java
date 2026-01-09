@@ -29,6 +29,7 @@ import java.util.*;
  * Implements visitor pattern for traversing AST nodes and emitting appropriate bytecode.
  */
 public final class BytecodeCompiler {
+    private static final boolean DEBUG = false;
     private final BytecodeEmitter emitter;
     private final Deque<LoopContext> loopStack;
     private final Deque<Scope> scopes;
@@ -351,9 +352,15 @@ public final class BytecodeCompiler {
             if (operator == AssignmentExpression.AssignmentOperator.ASSIGN) {
                 // For simple assignment, compile object and property now
                 compileExpression(memberExpr.object());
-                if (memberExpr.computed()) {
-                    compileExpression(memberExpr.property());
-                    emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+                    if (memberExpr.computed()) {
+                          compileExpression(memberExpr.property());
+                          if (DEBUG) {
+                          	try {
+                          		System.out.println("DEBUG EMIT PUT_ARRAY_EL (simple assignment) at compile offset=" + emitter.currentOffset()
+                                  + ", object=" + memberExpr.object() + ", property=" + memberExpr.property());
+                          	} catch (Throwable ignored) {}
+                          }
+                          emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
                 } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
                     // obj.#field = value
                     // Stack: value obj
@@ -375,6 +382,12 @@ public final class BytecodeCompiler {
             } else {
                 // For compound assignment, object and property are already on stack from DUP
                 if (memberExpr.computed()) {
+                    if (DEBUG) {
+                        try {
+                            System.out.println("DEBUG EMIT PUT_ARRAY_EL (compound) at compile offset=" + emitter.currentOffset()
+                                    + ", object=" + memberExpr.object() + ", property=" + memberExpr.property());
+                        } catch (Throwable ignored) {}
+                    }
                     emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
                 } else if (memberExpr.property() instanceof PrivateIdentifier privateId) {
                     // obj.#field += value
@@ -1335,11 +1348,25 @@ public final class BytecodeCompiler {
 
         // Compile init
         if (forStmt.init() != null) {
+                if (DEBUG) {
+                    try {
+                        System.out.println("DEBUG FOR init startOffset=" + emitter.currentOffset());
+                    } catch (Throwable ignored) {}
+                }
             if (forStmt.init() instanceof VariableDeclaration varDecl) {
                 compileVariableDeclaration(varDecl);
             } else if (forStmt.init() instanceof Expression expr) {
                 compileExpression(expr);
                 emitter.emitOpcode(Opcode.DROP);
+            } else if (forStmt.init() instanceof com.caoccao.qjs4j.compiler.ast.ExpressionStatement exprStmt) {
+                // Parser may provide an ExpressionStatement for the init part of a for-loop
+                compileExpression(exprStmt.expression());
+                emitter.emitOpcode(Opcode.DROP);
+            }
+            if (DEBUG) {
+                try {
+                    System.out.println("DEBUG FOR init endOffset=" + emitter.currentOffset());
+                } catch (Throwable ignored) {}
             }
         }
 
@@ -1844,8 +1871,14 @@ public final class BytecodeCompiler {
                 emitter.emitOpcodeAtom(Opcode.SET_VAR, name);
             }
         } else if (left instanceof MemberExpression memberExpr) {
-            if (memberExpr.computed()) {
-                emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
+                if (memberExpr.computed()) {
+                	if (DEBUG) {
+                		try {
+                			System.out.println("DEBUG EMIT PUT_ARRAY_EL (other) at compile offset=" + emitter.currentOffset()
+                                + ", object=" + memberExpr.object() + ", property=" + memberExpr.property());
+                		} catch (Throwable ignored) {}
+                	}
+                	emitter.emitOpcode(Opcode.PUT_ARRAY_EL);
             } else if (memberExpr.property() instanceof Identifier propId) {
                 emitter.emitOpcodeAtom(Opcode.PUT_FIELD, propId.name());
             }
@@ -2774,8 +2807,20 @@ public final class BytecodeCompiler {
                 emitter.emitOpcode(Opcode.UNDEFINED);
             }
 
-            // Assign to pattern (handles Identifier, ObjectPattern, ArrayPattern)
-            compilePatternAssignment(declarator.id());
+            // If simple identifier in declaration, initialize appropriately
+            if (declarator.id() instanceof Identifier id) {
+                String varName = id.name();
+                if (inGlobalScope) {
+                    // Use PUT_VAR_INIT for global variable initialization (distinct from runtime PUT_VAR)
+                    emitter.emitOpcodeAtom(Opcode.PUT_VAR_INIT, varName);
+                } else {
+                    int localIndex = currentScope().declareLocal(varName);
+                    emitter.emitOpcodeU16(Opcode.PUT_LOCAL, localIndex);
+                }
+            } else {
+                // Delegate complex patterns to existing handler
+                compilePatternAssignment(declarator.id());
+            }
         }
     }
 

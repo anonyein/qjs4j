@@ -289,6 +289,11 @@ public non-sealed class JSObject implements JSValue {
                 if (getter != null && context != null) {
                     // Call the getter with the ORIGINAL receiver as 'this', not the prototype
                     JSValue result = getter.call(context, receiver, new JSValue[0]);
+                    if (key.asString() != null && "inheritsFrom".equals(key.asString())) {
+                        System.out.println("DEBUG GET (getter): thisId=" + System.identityHashCode(this)
+                                + ", receiverId=" + System.identityHashCode(receiver)
+                                + ", getterResultClass=" + (result == null ? "null" : result.getClass().getSimpleName()));
+                    }
                     // Check if getter threw an exception - return the error value or undefined
                     if (context.hasPendingException()) {
                         return result != null ? result : context.getPendingException();
@@ -296,9 +301,19 @@ public non-sealed class JSObject implements JSValue {
                     return result;
                 }
                 // Getter is explicitly undefined or no context available
+                if (key.asString() != null && "inheritsFrom".equals(key.asString())) {
+                    System.out.println("DEBUG GET (getter-undefined): thisId=" + System.identityHashCode(this)
+                            + ", receiverId=" + System.identityHashCode(receiver) + ", result=undefined");
+                }
                 return JSUndefined.INSTANCE;
             }
             // Regular property with value
+            if (key.asString() != null && "inheritsFrom".equals(key.asString())) {
+                JSValue val = propertyValues[offset];
+                System.out.println("DEBUG GET (own): thisId=" + System.identityHashCode(this)
+                        + ", receiverId=" + System.identityHashCode(receiver)
+                        + ", valueClass=" + (val == null ? "null" : val.getClass().getSimpleName()));
+            }
             return propertyValues[offset];
         }
 
@@ -310,6 +325,10 @@ public non-sealed class JSObject implements JSValue {
             try {
                 // Check for circular reference
                 if (visited.contains(prototype)) {
+                    if (key.asString() != null && "inheritsFrom".equals(key.asString())) {
+                        System.out.println("DEBUG GET (circular): prototypeId=" + System.identityHashCode(prototype)
+                                + ", returning undefined");
+                    }
                     return JSUndefined.INSTANCE;
                 }
 
@@ -317,7 +336,15 @@ public non-sealed class JSObject implements JSValue {
                 visited.add(prototype);
 
                 // Recurse into prototype chain, passing along the original receiver
-                return prototype.get(key, context, receiver);
+                JSValue result = prototype.get(key, context, receiver);
+                if (key.asString() != null && "inheritsFrom".equals(key.asString())) {
+                    System.out.println("DEBUG GET (proto): thisId=" + System.identityHashCode(this)
+                            + ", prototypeId=" + System.identityHashCode(prototype)
+                            + ", receiverId=" + System.identityHashCode(receiver)
+                            + ", resolvedClass=" + (result == null ? "null" : result.getClass().getSimpleName())
+                            + ", resolvedValue=" + result);
+                }
+                return result;
             } finally {
                 // Clean up: remove from visited set
                 visited.remove(prototype);
@@ -548,6 +575,27 @@ public non-sealed class JSObject implements JSValue {
      * Set a property value by property key with context for setter functions.
      */
     public void set(PropertyKey key, JSValue value, JSContext context) {
+        // Debug hook: observe assignments to inheritsFrom to verify prototype wiring
+        try {
+            if (key != null && "inheritsFrom".equals(key.toPropertyString())) {
+                System.out.println("DEBUG SET: targetId=" + System.identityHashCode(this) + ", key=" + key.toPropertyString() + ", valueClass=" + (value == null ? "null" : value.getClass().getSimpleName()));
+            }
+            // Debug assignments to BI_RC (global binding in test) for correlation
+            if (key != null && "BI_RC".equals(key.toPropertyString())) {
+                try {
+                    String idStr = value instanceof JSObject ? String.valueOf(System.identityHashCode(value)) : "n/a";
+                    System.out.println("DEBUG SET_BI_RC: targetId=" + System.identityHashCode(this) + ", key=" + key.toPropertyString()
+                            + ", valueClass=" + (value == null ? "null" : value.getClass().getSimpleName())
+                            + ", id=" + idStr);
+                    StackTraceElement[] st = Thread.currentThread().getStackTrace();
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 3; i < Math.min(st.length, 7); i++) {
+                        sb.append(" -> ").append(st[i].toString());
+                    }
+                    System.out.println("DEBUG SET_BI_RC STACK:" + sb.toString());
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
         // Check if property already exists
         int offset = shape.getPropertyOffset(key);
         if (offset >= 0) {
@@ -613,7 +661,33 @@ public non-sealed class JSObject implements JSValue {
     // JSValue implementation
 
     public void setPrototype(JSObject prototype) {
+        // Prevent setting prototype to self
+        if (prototype == this) {
+            System.out.println("DEBUG SET_PROTOTYPE: attempt to set prototype to self ignored: thisId="
+                    + System.identityHashCode(this));
+            return;
+        }
+
+        // Prevent creating prototype cycles: walk the candidate prototype chain
+        JSObject p = prototype;
+        while (p != null) {
+            if (p == this) {
+                System.out.println("DEBUG SET_PROTOTYPE: prototype assignment would create cycle - ignored: thisId="
+                        + System.identityHashCode(this) + ", prototypeId=" + System.identityHashCode(prototype)
+                        + ", caller=" + Thread.currentThread().getStackTrace()[2]);
+                return;
+            }
+            p = p.prototype;
+        }
+
         this.prototype = prototype;
+        if (prototype != null) {
+            System.out.println("DEBUG SET_PROTOTYPE: thisId=" + System.identityHashCode(this)
+                    + ", prototypeId=" + System.identityHashCode(prototype)
+                    + ", caller=" + Thread.currentThread().getStackTrace()[2]);
+        } else {
+            System.out.println("DEBUG SET_PROTOTYPE: thisId=" + System.identityHashCode(this) + ", prototypeId=null");
+        }
     }
 
     @Override

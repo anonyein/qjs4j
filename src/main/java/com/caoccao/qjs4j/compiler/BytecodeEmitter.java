@@ -32,6 +32,7 @@ import java.util.Map;
  * Handles encoding of opcodes, operands, and manages constant/atom pools.
  */
 public final class BytecodeEmitter {
+    private static final boolean DEBUG = false;
     private final List<String> atomPool;
     private final AtomTable atoms;
     private final ByteArrayOutputStream code;
@@ -74,7 +75,6 @@ public final class BytecodeEmitter {
             index = atomPool.size();
             atomPool.add(str);
         }
-        emitU32(index);
         return index;
     }
 
@@ -85,14 +85,12 @@ public final class BytecodeEmitter {
     public int emitConstant(JSValue value) {
         Integer cached = constantIndexCache.get(value);
         if (cached != null) {
-            emitU32(cached);
             return cached;
         }
 
         int index = constantPool.size();
         constantPool.add(value);
         constantIndexCache.put(value, index);
-        emitU32(index);
         return index;
     }
 
@@ -124,8 +122,27 @@ public final class BytecodeEmitter {
      * Emit an opcode with an atom operand.
      */
     public void emitOpcodeAtom(Opcode op, String atom) {
+        int opStart = currentOffset();
         emitOpcode(op);
-        emitAtom(atom);
+        int index = atomPool.indexOf(atom);
+        if (index == -1) {
+            index = atomPool.size();
+            atomPool.add(atom);
+        }
+        if (DEBUG) {
+            try {
+                System.out.println("DEBUG EMIT ATOM opStart=" + opStart + " opcode=" + op + " atom='" + atom + "' index=" + index + " offset=" + currentOffset());
+            } catch (Throwable ignored) {}
+        }
+        int operandSize = op.getSize() - 1;
+        switch (operandSize) {
+            case 0 -> {
+            }
+            case 1 -> emitU8(index);
+            case 2 -> emitU16(index);
+            case 4 -> emitU32(index);
+            default -> throw new IllegalStateException("Unsupported atom operand size: " + operandSize + " for opcode=" + op);
+        }
     }
 
     /**
@@ -133,7 +150,24 @@ public final class BytecodeEmitter {
      */
     public void emitOpcodeConstant(Opcode op, JSValue constant) {
         emitOpcode(op);
-        emitConstant(constant);
+        Integer cached = constantIndexCache.get(constant);
+        int index;
+        if (cached != null) {
+            index = cached;
+        } else {
+            index = constantPool.size();
+            constantPool.add(constant);
+            constantIndexCache.put(constant, index);
+        }
+        int operandSize = op.getSize() - 1;
+        switch (operandSize) {
+            case 0 -> {
+            }
+            case 1 -> emitU8(index);
+            case 2 -> emitU16(index);
+            case 4 -> emitU32(index);
+            default -> throw new IllegalStateException("Unsupported constant operand size: " + operandSize + " for opcode=" + op);
+        }
     }
 
     /**

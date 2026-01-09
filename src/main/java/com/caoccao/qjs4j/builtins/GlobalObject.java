@@ -719,12 +719,29 @@ public final class GlobalObject {
         functionPrototype.defineProperty(PropertyKey.fromString("name"),
                 PropertyDescriptor.dataDescriptor(new JSString(""), false, false, true));
 
+        // According to ECMAScript, Function.prototype's [[Prototype]] is Object.prototype
+        context.transferPrototype(functionPrototype, JSObject.NAME);
+        // Debug: print linkage info
+        try {
+            JSValue objCtorVal = global.get("Object");
+            if (objCtorVal instanceof JSObject objCtor) {
+                JSValue objProtoVal = objCtor.get("prototype");
+                System.out.println("DEBUG: Object.prototype id=" + (objProtoVal instanceof JSObject ? System.identityHashCode(objProtoVal) : "null"));
+                System.out.println("DEBUG: Function.prototype [[Prototype]] id=" + (functionPrototype.getPrototype() != null ? System.identityHashCode(functionPrototype.getPrototype()) : "null"));
+                System.out.println("DEBUG: linked=" + (functionPrototype.getPrototype() == objProtoVal));
+            }
+        } catch (Throwable ignored) {
+        }
+
         // Function constructor should be a function, not a plain object
         JSNativeFunction functionConstructor = new JSNativeFunction(JSFunction.NAME, 1, FunctionConstructor::call);
         functionConstructor.set("prototype", functionPrototype);
         functionPrototype.set("constructor", functionConstructor);
 
         global.set(JSFunction.NAME, functionConstructor);
+
+        // Ensure the Function constructor itself inherits from Function.prototype
+        context.transferPrototype(functionConstructor, JSFunction.NAME);
     }
 
     /**

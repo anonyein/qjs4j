@@ -51,6 +51,13 @@ public abstract sealed class JSFunction extends JSObject
             }
         }
         context.transferPrototype(this, NAME);
+        // Ensure the function's own 'prototype' object (constructor.prototype) inherits from Object.prototype
+        JSValue protoProp = this.get("prototype");
+        if (protoProp instanceof JSObject protoObj) {
+            if (protoObj.getPrototype() == null) {
+                context.transferPrototype(protoObj, JSObject.NAME);
+            }
+        }
     }
 
     @Override

@@ -30,6 +30,7 @@ import java.util.List;
  * Executes compiled bytecode using a stack-based architecture.
  */
 public final class VirtualMachine {
+    private static final boolean DEBUG = false;
     private final JSContext context;
     private final StringBuilder propertyAccessChain;  // Track last property access for better error messages
     private final CallStack valueStack;
@@ -153,6 +154,20 @@ public final class VirtualMachine {
             Bytecode bytecode = function.getBytecode();
             int pc = 0;
 
+            // Disassemble bytecode for debugging: print opcode at each offset
+            try {
+                if (DEBUG) {
+                    System.out.println("DEBUG BYTECODE DISASM for function: length=" + bytecode.getLength());
+                    int di = 0;
+                    while (di < bytecode.getLength()) {
+                        int opc = bytecode.readOpcode(di);
+                        Opcode o = Opcode.fromInt(opc);
+                        System.out.println("  disasm pc=" + di + " op=" + o + " size=" + o.getSize());
+                        di += o.getSize();
+                    }
+                }
+            } catch (Throwable ignored) {}
+
             // Main execution loop
             while (true) {
                 if (pendingException != null) {
@@ -194,6 +209,13 @@ public final class VirtualMachine {
                 int opcode = bytecode.readOpcode(pc);
                 Opcode op = Opcode.fromInt(opcode);
 
+                // Targeted tracing for suspicious PUT_ARRAY_EL compile offsets
+                try {
+                    if (DEBUG && (pc == 138 || pc == 271 || pc == 404 || pc == 626 || pc == 696)) {
+                        System.out.println("TRACE EXEC PC=" + pc + " op=" + op + " stackTop=" + valueStack.getStackTop());
+                    }
+                } catch (Throwable ignored) {}
+
                 switch (op) {
                     // ==================== Constants and Literals ====================
                     case INVALID -> throw new JSVirtualMachineException("Invalid opcode at PC " + pc);
@@ -203,7 +225,11 @@ public final class VirtualMachine {
                     }
                     case PUSH_CONST -> {
                         int constIndex = bytecode.readU32(pc + 1);
-                        JSValue constValue = bytecode.getConstants()[constIndex];
+                        JSValue[] constPool = bytecode.getConstants();
+                        if (DEBUG) {
+                            System.out.println("DEBUG PUSH_CONST pc=" + pc + " constIndex=" + constIndex + " constPoolLen=" + constPool.length);
+                        }
+                        JSValue constValue = constPool[constIndex];
 
                         // Initialize prototype chain for functions
                         if (constValue instanceof JSFunction func) {
@@ -588,6 +614,12 @@ public final class VirtualMachine {
                         int getVarAtom = bytecode.readU32(pc + 1);
                         String getVarName = bytecode.getAtoms()[getVarAtom];
                         JSValue varValue = context.getGlobalObject().get(PropertyKey.fromString(getVarName));
+                        try {
+                            if (DEBUG && (pc == 93 || pc == 231 || pc == 364)) {
+                                String idStr = varValue instanceof JSObject ? String.valueOf(System.identityHashCode(varValue)) : "n/a";
+                                System.out.println("TRACE GET_VAR pc=" + pc + ", name=" + getVarName + ", class=" + (varValue == null ? "null" : varValue.getClass().getSimpleName()) + ", id=" + idStr + ", value=" + varValue);
+                            }
+                        } catch (Throwable ignored) {}
                         // Start tracking property access from variable name (unless locked)
                         if (!propertyAccessLock) {
                             resetPropertyAccessTracking();
@@ -600,6 +632,20 @@ public final class VirtualMachine {
                         int putVarAtom = bytecode.readU32(pc + 1);
                         String putVarName = bytecode.getAtoms()[putVarAtom];
                         JSValue putValue = valueStack.pop();
+                        try {
+                            if (DEBUG) {
+                                String idStr = putValue instanceof JSObject ? String.valueOf(System.identityHashCode(putValue)) : "n/a";
+                                System.out.println("DEBUG PUT_VAR: name=" + putVarName
+                                        + ", class=" + (putValue == null ? "null" : putValue.getClass().getSimpleName())
+                                        + ", id=" + idStr);
+                                StackTraceElement[] st = Thread.currentThread().getStackTrace();
+                                StringBuilder sb = new StringBuilder();
+                                for (int i = 3; i < Math.min(st.length, 7); i++) {
+                                    sb.append(" -> ").append(st[i].toString());
+                                }
+                                System.out.println("DEBUG PUT_VAR STACK:" + sb.toString());
+                            }
+                        } catch (Throwable ignored) {}
                         context.getGlobalObject().set(PropertyKey.fromString(putVarName), putValue);
                         pc += op.getSize();
                     }
@@ -607,7 +653,44 @@ public final class VirtualMachine {
                         int setVarAtom = bytecode.readU32(pc + 1);
                         String setVarName = bytecode.getAtoms()[setVarAtom];
                         JSValue setValue = valueStack.peek(0);
+                        try {
+                            if (DEBUG) {
+                                String idStr = setValue instanceof JSObject ? String.valueOf(System.identityHashCode(setValue)) : "n/a";
+                                System.out.println("DEBUG SET_VAR: name=" + setVarName
+                                        + ", class=" + (setValue == null ? "null" : setValue.getClass().getSimpleName())
+                                        + ", id=" + idStr);
+                                StackTraceElement[] st = Thread.currentThread().getStackTrace();
+                                StringBuilder sb = new StringBuilder();
+                                for (int i = 3; i < Math.min(st.length, 7); i++) {
+                                    sb.append(" -> ").append(st[i].toString());
+                                }
+                                System.out.println("DEBUG SET_VAR STACK:" + sb.toString());
+                            }
+                        } catch (Throwable ignored) {}
                         context.getGlobalObject().set(PropertyKey.fromString(setVarName), setValue);
+                        pc += op.getSize();
+                    }
+                    case PUT_VAR_INIT -> {
+                        // Initialize a global lexical variable. Stack: value ->
+                        // Opcode size is 3, operand width is 2 bytes, so readU16 here.
+                        int putVarInitAtom = bytecode.readU16(pc + 1);
+                        String putVarInitName = bytecode.getAtoms()[putVarInitAtom];
+                        JSValue putVarInitValue = valueStack.pop();
+                        try {
+                            if (DEBUG) {
+                                String idStr = putVarInitValue instanceof JSObject ? String.valueOf(System.identityHashCode(putVarInitValue)) : "n/a";
+                                System.out.println("DEBUG PUT_VAR_INIT: name=" + putVarInitName
+                                        + ", class=" + (putVarInitValue == null ? "null" : putVarInitValue.getClass().getSimpleName())
+                                        + ", id=" + idStr);
+                                StackTraceElement[] st = Thread.currentThread().getStackTrace();
+                                StringBuilder sb = new StringBuilder();
+                                for (int i = 3; i < Math.min(st.length, 7); i++) {
+                                    sb.append(" -> ").append(st[i].toString());
+                                }
+                                System.out.println("DEBUG PUT_VAR_INIT STACK:" + sb.toString());
+                            }
+                        } catch (Throwable ignored) {}
+                        context.getGlobalObject().set(PropertyKey.fromString(putVarInitName), putVarInitValue);
                         pc += op.getSize();
                     }
                     case GET_LOCAL -> {
@@ -676,6 +759,30 @@ public final class VirtualMachine {
                         pc += op.getSize();
                     }
                     case GET_ARRAY_EL -> {
+                        // Snapshot stack for targeted PCs before popping
+                        try {
+                            if (pc == 138 || pc == 271 || pc == 404 || pc == 529 || pc == 578 || pc == 594) {
+                                int stTop = valueStack.getStackTop();
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("TRACE STACK BEFORE GET_ARRAY_EL pc=").append(pc).append(" top=").append(stTop);
+                                int show = Math.min(5, stTop);
+                                for (int si = 0; si < show; si++) {
+                                    JSValue v = valueStack.peek(si);
+                                    sb.append(" | [").append(si).append("]=")
+                                            .append(v == null ? "null" : v.getClass().getSimpleName());
+                                    if (v instanceof JSObject) {
+                                        sb.append("@id=").append(System.identityHashCode(v));
+                                    }
+                                    if (v instanceof JSString) {
+                                        sb.append("('" + ((JSString) v).value() + "')");
+                                    }
+                                }
+                                if (DEBUG) {
+                                    System.out.println(sb.toString());
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+
                         JSValue index = valueStack.pop();
                         JSValue arrayObj = valueStack.pop();
 
@@ -684,6 +791,15 @@ public final class VirtualMachine {
                         if (targetObj != null) {
                             PropertyKey key = PropertyKey.fromValue(context, index);
                             JSValue result = targetObj.get(key, context);
+                            try {
+                                if (DEBUG) {
+                                    System.out.println("DEBUG GET_ARRAY_EL: pc=" + pc + ", objId=" + System.identityHashCode(targetObj)
+                                            + ", key=" + key.toPropertyString()
+                                            + ", isIndex=" + key.isIndex()
+                                            + (key.isIndex() ? ", idx=" + key.asIndex() : ", str=" + key.asString())
+                                            + ", resultClass=" + (result == null ? "null" : result.getClass().getSimpleName()));
+                                }
+                            } catch (Throwable ignored) {}
                             // Check if getter threw an exception
                             if (context.hasPendingException()) {
                                 pendingException = context.getPendingException();
@@ -718,11 +834,44 @@ public final class VirtualMachine {
                     }
                     case PUT_ARRAY_EL -> {
                         // Stack layout: [value, object, property] (property on top)
+                        // Snapshot stack for targeted PCs before popping
+                        try {
+                            if (pc == 138 || pc == 271 || pc == 404 || pc == 626 || pc == 696) {
+                                int stTop = valueStack.getStackTop();
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("TRACE STACK BEFORE PUT_ARRAY_EL pc=").append(pc).append(" top=").append(stTop);
+                                int show = Math.min(6, stTop);
+                                for (int si = 0; si < show; si++) {
+                                    JSValue v = valueStack.peek(si);
+                                    sb.append(" | [").append(si).append("]=")
+                                            .append(v == null ? "null" : v.getClass().getSimpleName());
+                                    if (v instanceof JSObject) {
+                                        sb.append("@id=").append(System.identityHashCode(v));
+                                    }
+                                    if (v instanceof JSString) {
+                                        sb.append("('" + ((JSString) v).value() + "')");
+                                    }
+                                }
+                                if (DEBUG) {
+                                    System.out.println(sb.toString());
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+
                         JSValue putElIndex = valueStack.pop();   // Pop property
                         JSValue putElObj = valueStack.pop();     // Pop object
                         JSValue putElValue = valueStack.pop();   // Pop value
                         if (putElObj instanceof JSObject jsObj) {
                             PropertyKey key = PropertyKey.fromValue(context, putElIndex);
+                            try {
+                                if (DEBUG) {
+                                    System.out.println("DEBUG PUT_ARRAY_EL: pc=" + pc + ", objId=" + System.identityHashCode(jsObj)
+                                            + ", key=" + key.toPropertyString()
+                                            + ", isIndex=" + key.isIndex()
+                                            + (key.isIndex() ? ", idx=" + key.asIndex() : ", str=" + key.asString())
+                                            + ", putElValueClass=" + (putElValue == null ? "null" : putElValue.getClass().getSimpleName()));
+                                }
+                            } catch (Throwable ignored) {}
                             jsObj.set(key, putElValue, context);
                             // Check if setter threw an exception
                             if (context.hasPendingException()) {
@@ -737,7 +886,37 @@ public final class VirtualMachine {
 
                     // ==================== Control Flow ====================
                     case IF_FALSE -> {
+                        // Snapshot stack for targeted PCs before popping condition
+                        try {
+                            if (pc == 104 || pc == 237 || pc == 370) {
+                                int stTop = valueStack.getStackTop();
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("TRACE STACK BEFORE IF_FALSE pc=").append(pc).append(" top=").append(stTop);
+                                int show = Math.min(6, stTop);
+                                for (int si = 0; si < show; si++) {
+                                    JSValue v = valueStack.peek(si);
+                                    sb.append(" | [").append(si).append("]=")
+                                            .append(v == null ? "null" : v.getClass().getSimpleName());
+                                    if (v instanceof JSObject) {
+                                        sb.append("@id=").append(System.identityHashCode(v));
+                                    }
+                                    if (v instanceof JSString) {
+                                        sb.append("('" + ((JSString) v).value() + "')");
+                                    }
+                                }
+                                if (DEBUG) {
+                                    System.out.println(sb.toString());
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+
                         JSValue condition = valueStack.pop();
+                        // Targeted debug for loop condition PCs
+                        try {
+                            if (DEBUG && (pc == 104 || pc == 237 || pc == 370)) {
+                                System.out.println("TRACE IF_FALSE pc=" + pc + ", conditionClass=" + (condition == null ? "null" : condition.getClass().getSimpleName()) + ", conditionValue=" + condition);
+                            }
+                        } catch (Throwable ignored) {}
                         boolean isFalsy = JSTypeConversions.toBoolean(condition) == JSBoolean.FALSE;
                         if (isFalsy) {
                             int offset = bytecode.readI32(pc + 1);
@@ -747,7 +926,37 @@ public final class VirtualMachine {
                         }
                     }
                     case IF_TRUE -> {
+                        // Snapshot stack for targeted PCs before popping condition
+                        try {
+                            if (pc == 104 || pc == 237 || pc == 370) {
+                                int stTop = valueStack.getStackTop();
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("TRACE STACK BEFORE IF_TRUE pc=").append(pc).append(" top=").append(stTop);
+                                int show = Math.min(6, stTop);
+                                for (int si = 0; si < show; si++) {
+                                    JSValue v = valueStack.peek(si);
+                                    sb.append(" | [").append(si).append("]=")
+                                            .append(v == null ? "null" : v.getClass().getSimpleName());
+                                    if (v instanceof JSObject) {
+                                        sb.append("@id=").append(System.identityHashCode(v));
+                                    }
+                                    if (v instanceof JSString) {
+                                        sb.append("('" + ((JSString) v).value() + "')");
+                                    }
+                                }
+                                if (DEBUG) {
+                                    System.out.println(sb.toString());
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+
                         JSValue trueCondition = valueStack.pop();
+                        // Targeted debug for loop condition PCs
+                        try {
+                            if (DEBUG && (pc == 104 || pc == 237 || pc == 370)) {
+                                System.out.println("TRACE IF_TRUE pc=" + pc + ", conditionClass=" + (trueCondition == null ? "null" : trueCondition.getClass().getSimpleName()) + ", conditionValue=" + trueCondition);
+                            }
+                        } catch (Throwable ignored) {}
                         boolean isTruthy = JSTypeConversions.toBoolean(trueCondition) == JSBoolean.TRUE;
                         if (isTruthy) {
                             int offset = bytecode.readI32(pc + 1);
@@ -1223,7 +1432,11 @@ public final class VirtualMachine {
             } else {
                 context.exitStrictMode();
             }
-            throw new JSVirtualMachineException("VM error: " + e.getMessage(), e);
+                if (DEBUG) {
+                    System.out.println("DEBUG VM EXCEPTION: " + e.getClass().getName() + ": " + e.getMessage());
+                    e.printStackTrace(System.out);
+                }
+                throw new JSVirtualMachineException("VM error: " + e.getMessage(), e);
         }
     }
 
@@ -1939,17 +2152,63 @@ public final class VirtualMachine {
     }
 
     private void handleLt() {
+        // Peek operands to log before popping (helps debug operand order)
+        JSValue rightPeek = valueStack.peek(0);
+        JSValue leftPeek = valueStack.peek(1);
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("TRACE LT operands left=");
+            if (leftPeek == null) sb.append("null"); else {
+                sb.append(leftPeek.getClass().getSimpleName());
+                if (leftPeek instanceof JSNumber) sb.append("(" + ((JSNumber) leftPeek).value() + ")");
+                if (leftPeek instanceof JSString) sb.append("('" + ((JSString) leftPeek).value() + "')");
+                if (leftPeek instanceof JSObject) sb.append("@id=" + System.identityHashCode(leftPeek));
+            }
+            sb.append(" right=");
+            if (rightPeek == null) sb.append("null"); else {
+                sb.append(rightPeek.getClass().getSimpleName());
+                if (rightPeek instanceof JSNumber) sb.append("(" + ((JSNumber) rightPeek).value() + ")");
+                if (rightPeek instanceof JSString) sb.append("('" + ((JSString) rightPeek).value() + "')");
+                if (rightPeek instanceof JSObject) sb.append("@id=" + System.identityHashCode(rightPeek));
+            }
+            System.out.println(sb.toString());
+        } catch (Throwable ignored) {}
+
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         boolean result = JSTypeConversions.lessThan(context, left, right);
+        try { System.out.println("TRACE LT result=" + result); } catch (Throwable ignored) {}
         valueStack.push(JSBoolean.valueOf(result));
     }
 
     private void handleLte() {
+        // Peek operands to log before popping (helps debug operand order)
+        JSValue rightPeek = valueStack.peek(0);
+        JSValue leftPeek = valueStack.peek(1);
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("TRACE LTE operands left=");
+            if (leftPeek == null) sb.append("null"); else {
+                sb.append(leftPeek.getClass().getSimpleName());
+                if (leftPeek instanceof JSNumber) sb.append("(" + ((JSNumber) leftPeek).value() + ")");
+                if (leftPeek instanceof JSString) sb.append("('" + ((JSString) leftPeek).value() + "')");
+                if (leftPeek instanceof JSObject) sb.append("@id=" + System.identityHashCode(leftPeek));
+            }
+            sb.append(" right=");
+            if (rightPeek == null) sb.append("null"); else {
+                sb.append(rightPeek.getClass().getSimpleName());
+                if (rightPeek instanceof JSNumber) sb.append("(" + ((JSNumber) rightPeek).value() + ")");
+                if (rightPeek instanceof JSString) sb.append("('" + ((JSString) rightPeek).value() + "')");
+                if (rightPeek instanceof JSObject) sb.append("@id=" + System.identityHashCode(rightPeek));
+            }
+            System.out.println(sb.toString());
+        } catch (Throwable ignored) {}
+
         JSValue right = valueStack.pop();
         JSValue left = valueStack.pop();
         boolean result = JSTypeConversions.lessThan(context, left, right) ||
                 JSTypeConversions.abstractEquals(context, left, right);
+        try { System.out.println("TRACE LTE result=" + result); } catch (Throwable ignored) {}
         valueStack.push(JSBoolean.valueOf(result));
     }
 

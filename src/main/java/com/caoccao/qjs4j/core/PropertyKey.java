@@ -70,7 +70,20 @@ public final class PropertyKey {
      */
     public static PropertyKey fromValue(JSContext context, JSValue value) {
         if (value instanceof JSString s) {
-            return fromString(s.value());
+            String str = s.value();
+            // If the string is a canonical array index (non-negative integer within 32-bit range),
+            // treat it as an index key so array accesses like obj["48"] behave as numeric indices.
+            try {
+                if (!str.isEmpty()) {
+                    long parsed = Long.parseLong(str);
+                    if (parsed >= 0 && parsed <= 0xFFFFFFFFL && String.valueOf(parsed).equals(str)) {
+                        return fromIndex((int) parsed);
+                    }
+                }
+            } catch (NumberFormatException ignored) {
+                // Fall through to treat as normal string
+            }
+            return fromString(str);
         }
         if (value instanceof JSSymbol s) {
             return fromSymbol(s);
