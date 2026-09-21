@@ -2510,14 +2510,9 @@ public final class OpcodeHandler {
                 executionContext.virtualMachine.context.clearPendingException();
                 executionContext.push(JSUndefined.INSTANCE);
             } else {
-<<<<<<< HEAD
-                if (executionContext.virtualMachine.trackPropertyAccess && !executionContext.virtualMachine.propertyAccessLock) {
-                    if (executionContext.virtualMachine.propertyAccessChain.length() > 0) {
-=======
                 if (executionContext.virtualMachine.trackPropertyAccess
                         && !executionContext.virtualMachine.propertyAccessLock) {
                     if (!executionContext.virtualMachine.propertyAccessChain.isEmpty()) {
->>>>>>> origin/temp
                         executionContext.virtualMachine.propertyAccessChain.append('.');
                     }
                     executionContext.virtualMachine.propertyAccessChain.append(fieldName);
