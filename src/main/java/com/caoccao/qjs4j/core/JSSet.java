@@ -19,8 +19,7 @@ package com.caoccao.qjs4j.core;
 import java.util.*;
 
 /**
- * Represents a JavaScript Set object.
- * Sets maintain insertion order and use SameValueZero equality for values.
+ * Represents a JavaScript Set object. Sets maintain insertion order and use SameValueZero equality for values.
  */
 public final class JSSet extends JSObject {
     public static final String NAME = "Set";
@@ -36,116 +35,6 @@ public final class JSSet extends JSObject {
         this.data = new LinkedHashMap<>();
         this.entriesById = new HashMap<>();
         this.nextEntryId = 1;
-    }
-
-    private static void closeIterator(JSContext context, JSValue iterator) {
-        if (!(iterator instanceof JSObject iteratorObject)) {
-            return;
-        }
-        JSValue pendingException = context.getPendingException();
-        if (pendingException != null) {
-            context.clearPendingException();
-        }
-        JSValue returnMethod = iteratorObject.get(PropertyKey.RETURN);
-        if (returnMethod instanceof JSFunction returnFunction) {
-            try {
-                returnFunction.call(context, iterator, JSValue.NO_ARGS);
-            } catch (RuntimeException ignored) {
-                // Preserve the original abrupt completion.
-            }
-        }
-        if (pendingException != null) {
-            context.clearPendingException();
-            context.setPendingException(pendingException);
-        }
-    }
-
-    public static JSObject create(JSContext context, JSValue... args) {
-        JSSet setObj = context.createJSSet();
-        initializePrototypeFromNewTarget(context, setObj);
-        if (context.hasPendingException()) {
-            return returnAbruptResult(context, setObj);
-        }
-
-        if (args.length > 0 && !(args[0] instanceof JSUndefined) && !(args[0] instanceof JSNull)) {
-            JSValue iterableArg = args[0];
-
-            JSValue adder = setObj.get(PropertyKey.fromString("add"));
-            if (context.hasPendingException()) {
-                return returnAbruptResult(context, setObj);
-            }
-            if (!(adder instanceof JSFunction adderFunction)) {
-                return context.throwTypeError("set/add is not a function");
-            }
-
-            JSValue iterator = JSIteratorHelper.getIterator(context, iterableArg);
-            if (context.hasPendingException()) {
-                return returnAbruptResult(context, setObj);
-            }
-            if (!(iterator instanceof JSObject)) {
-                return context.throwTypeError("Object is not iterable");
-            }
-
-            while (true) {
-                JSObject nextResult;
-                try {
-                    nextResult = JSIteratorHelper.iteratorNext(iterator, context);
-                } catch (RuntimeException e) {
-                    throw e;
-                }
-                if (context.hasPendingException()) {
-                    return returnAbruptResult(context, setObj);
-                }
-                if (nextResult == null) {
-                    return context.throwTypeError("Iterator result must be an object");
-                }
-                JSValue done = nextResult.get(PropertyKey.DONE);
-                if (context.hasPendingException()) {
-                    return returnAbruptResult(context, setObj);
-                }
-                if (JSTypeConversions.toBoolean(done).isBooleanTrue()) {
-                    break;
-                }
-
-                JSValue value = nextResult.get(PropertyKey.VALUE);
-                if (context.hasPendingException()) {
-                    return returnAbruptResult(context, setObj);
-                }
-                try {
-                    adderFunction.call(context, setObj, new JSValue[]{value});
-                } catch (RuntimeException e) {
-                    closeIterator(context, iterator);
-                    throw e;
-                }
-                if (context.hasPendingException()) {
-                    closeIterator(context, iterator);
-                    return returnAbruptResult(context, setObj);
-                }
-            }
-        }
-        return setObj;
-    }
-
-    private static void initializePrototypeFromNewTarget(JSContext context, JSSet setObject) {
-        JSValue newTarget = context.getNativeConstructorNewTarget();
-        if (!(newTarget instanceof JSObject newTargetObject)) {
-            return;
-        }
-        JSObject resolvedPrototype = context.getPrototypeFromConstructor(newTargetObject, JSSet.NAME);
-        if (context.hasPendingException()) {
-            return;
-        }
-        if (resolvedPrototype != null) {
-            setObject.setPrototype(resolvedPrototype);
-        }
-    }
-
-    private static JSObject returnAbruptResult(JSContext context, JSSet fallbackObject) {
-        JSValue pendingException = context.getPendingException();
-        if (pendingException instanceof JSObject pendingObject) {
-            return pendingObject;
-        }
-        return fallbackObject;
     }
 
     public IterationCursor createIterationCursor() {
@@ -250,13 +139,22 @@ public final class JSSet extends JSObject {
         return values;
     }
 
+    public static JSObject create(JSContext context, JSValue... args) {
+        JSSet setObj = context.createJSSet();
+        CollectionInitializer.initializePrototypeFromNewTarget(context, setObj, NAME);
+        if (context.hasPendingException()) {
+            return CollectionInitializer.returnAbruptResult(context, setObj);
+        }
+        return CollectionInitializer.initializeFromIterable(context, setObj, args, false);
+    }
+
     private record EntryRecord(long id, JSMap.KeyWrapper keyWrapper) {
     }
 
     public static final class IterationCursor {
+        private int index;
         private final List<Long> orderedIds;
         private final Set<Long> seenIds;
-        private int index;
 
         private IterationCursor() {
             this.orderedIds = new ArrayList<>();

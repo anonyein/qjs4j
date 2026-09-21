@@ -19,15 +19,9 @@ package com.caoccao.qjs4j.test262;
 /**
  * Represents the result of executing a test262 test.
  */
-public class TestResult {
-    private final String message;
-    private final TestStatus status;
-    private final Test262TestCase testCase;
-
+public record TestResult(String message, TestStatus status, Test262TestCase testCase) {
     private TestResult(Test262TestCase testCase, TestStatus status, String message) {
-        this.testCase = testCase;
-        this.status = status;
-        this.message = message;
+        this(message, status, testCase);
     }
 
     public static TestResult fail(Test262TestCase testCase, String message) {
@@ -44,18 +38,6 @@ public class TestResult {
 
     public static TestResult timeout(Test262TestCase testCase) {
         return new TestResult(testCase, TestStatus.TIMEOUT, "Test exceeded timeout");
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public TestStatus getStatus() {
-        return status;
-    }
-
-    public Test262TestCase getTestCase() {
-        return testCase;
     }
 
     public boolean isFailed() {
@@ -76,16 +58,11 @@ public class TestResult {
 
     @Override
     public String toString() {
-        return String.format("TestResult{%s: %s%s}",
-                status,
-                testCase.getPath(),
+        return String.format("TestResult{%s: %s%s}", status, testCase.getPath(),
                 message != null ? " - " + message : "");
     }
 
     public enum TestStatus {
-        PASS,
-        FAIL,
-        SKIP,
-        TIMEOUT
+        FAIL, PASS, SKIP, TIMEOUT
     }
 }

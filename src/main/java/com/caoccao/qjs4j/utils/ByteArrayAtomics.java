@@ -25,38 +25,29 @@ import java.util.Set;
 /**
  * Atomic 8-, 16-, 32- and 64-bit access to a {@code byte[]} data block, on every supported JDK.
  * <p>
- * <strong>Why this exists.</strong> {@code Atomics} was built directly on
- * {@link MethodHandles#byteArrayViewVarHandle}. On JDK 17 and 21 those view handles support the
- * full set of atomic access modes; <strong>on JDK 25 they support none of them</strong> —
- * {@code isAccessModeSupported} returns false for everything but plain get and set, and every
- * atomic call throws {@code UnsupportedOperationException}. A heap {@code byte[]} carries no
- * alignment guarantee the JVM is willing to stand behind any more, so the modes were withdrawn.
- * Since the engine reports the resulting Java exception as an internal VM error, {@code Atomics.add}
- * on a current JDK failed in a way guest code could not recover from.
+ * <strong>Why this exists.</strong> {@code Atomics} was built directly on {@link MethodHandles#byteArrayViewVarHandle}.
+ * On JDK 17 and 21 those view handles support the full set of atomic access modes; <strong>on JDK 25 they support none
+ * of them</strong> — {@code isAccessModeSupported} returns false for everything but plain get and set, and every atomic
+ * call throws {@code UnsupportedOperationException}. A heap {@code byte[]} carries no alignment guarantee the JVM is
+ * willing to stand behind any more, so the modes were withdrawn. Since the engine reports the resulting Java exception
+ * as an internal VM error, {@code Atomics.add} on a current JDK failed in a way guest code could not recover from.
  * <p>
- * <strong>How it is fixed.</strong> The lock-free path is used wherever the JDK still offers it,
- * decided once at class initialisation. Where it does not, operations run under a lock chosen from
- * the identity of the backing array, so every access to one data block — whatever its width, and
- * from whichever agent — serialises on the same monitor. Unrelated arrays may share a lock, which
- * costs contention and not correctness. The 8-bit path uses
- * {@link MethodHandles#arrayElementVarHandle}, which is not a view handle and is unaffected, but it
- * still routes through the lock when the fallback is active so that overlapping accesses of
- * different widths stay consistent with each other.
+ * <strong>How it is fixed.</strong> The lock-free path is used wherever the JDK still offers it, decided once at class
+ * initialisation. Where it does not, operations run under a lock chosen from the identity of the backing array, so
+ * every access to one data block — whatever its width, and from whichever agent — serialises on the same monitor.
+ * Unrelated arrays may share a lock, which costs contention and not correctness. The 8-bit path uses
+ * {@link MethodHandles#arrayElementVarHandle}, which is not a view handle and is unaffected, but it still routes
+ * through the lock when the fallback is active so that overlapping accesses of different widths stay consistent with
+ * each other.
  */
 public final class ByteArrayAtomics {
+    private static final VarHandle BYTE_VH = MethodHandles.arrayElementVarHandle(byte[].class);
+    private static final VarHandle INT_VH = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
     /**
-     * The array-element handle for {@code byte[]}. Not a view handle: it addresses the array's own
-     * elements and needs no heap {@code byte[]} alignment, so it works wherever {@code VarHandle}
-     * itself does. Like the view handles below it is created inside the {@code static} block's
-     * {@code try}, so a runtime without it degrades to the locked path rather than failing the class.
-     */
-    private static final VarHandle BYTE_VH;
-    /**
-     * Locks for the fallback path. A power of two so the stripe is a mask of the identity hash;
-     * enough of them that unrelated buffers rarely collide, few enough to be free when unused.
+     * Locks for the fallback path. A power of two so the stripe is a mask of the identity hash; enough of them that
+     * unrelated buffers rarely collide, few enough to be free when unused.
      */
     private static final int LOCK_COUNT = 64;
-    private static final Object[] LOCKS = createLocks();
     /**
      * The byte-array view handles and the array-element handle. Deliberately not field initialisers:
      * on a runtime whose {@code MethodHandles.byteArrayViewVarHandle} or
@@ -67,38 +58,16 @@ public final class ByteArrayAtomics {
      * {@code NoSuchMethodError}, an {@code UnsupportedOperationException} or any other failure of
      * creation fall back to the locked path instead of taking the class down.
      */
-    private static final VarHandle SHORT_VH;
-    private static final VarHandle INT_VH;
-    private static final VarHandle LONG_VH;
-    /**
-     * Whether the JDK's byte-array view handles still offer atomic access modes. Computed after the
-     * handles are created; if creating any of them failed, this is {@code false} and every
-     * operation routes through {@link Fallback}.
-     */
     private static final boolean LOCK_FREE;
+    private static final Object[] LOCKS = createLocks();
+    private static final VarHandle LONG_VH = MethodHandles.byteArrayViewVarHandle(long[].class,
+            ByteOrder.LITTLE_ENDIAN);
+    private static final VarHandle SHORT_VH = MethodHandles.byteArrayViewVarHandle(short[].class,
+            ByteOrder.LITTLE_ENDIAN);
 
     static {
-        VarHandle byteVh = null;
-        VarHandle shortVh = null;
-        VarHandle intVh = null;
-        VarHandle longVh = null;
-        boolean handle = true;
-        try {
-            byteVh = MethodHandles.arrayElementVarHandle(byte[].class);
-            shortVh = MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.LITTLE_ENDIAN);
-            intVh = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
-            longVh = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
-        } catch (Throwable creationFailure) {
-            // Any failure to build a handle means the direct path cannot exist; the locked fallback
-            // is the whole implementation. Throwable, not RuntimeException, because a
-            // NoSuchMethodError (an Error) is the most likely symptom on an ART port.
-            handle = false;
-        }
-        BYTE_VH = byteVh;
-        SHORT_VH = shortVh;
-        INT_VH = intVh;
-        LONG_VH = longVh;
-        LOCK_FREE = handle && supportsAtomicAccessModes();
+        // The capability probe reads every view handle, so it must run after field initialization.
+        LOCK_FREE = supportsAtomicAccessModes();
     }
 
     private ByteArrayAtomics() {
@@ -286,7 +255,8 @@ public final class ByteArrayAtomics {
     /**
      * The monitor guarding a data block on the fallback path.
      *
-     * @param array the backing array
+     * @param array
+     *            the backing array
      * @return the lock for that array
      */
     private static Object lockFor(byte[] array) {
@@ -294,15 +264,12 @@ public final class ByteArrayAtomics {
     }
 
     private static int readInt(byte[] array, int offset) {
-        return (array[offset] & 0xFF)
-                | ((array[offset + 1] & 0xFF) << 8)
-                | ((array[offset + 2] & 0xFF) << 16)
+        return (array[offset] & 0xFF) | ((array[offset + 1] & 0xFF) << 8) | ((array[offset + 2] & 0xFF) << 16)
                 | ((array[offset + 3] & 0xFF) << 24);
     }
 
     private static long readLong(byte[] array, int offset) {
-        return (readInt(array, offset) & 0xFFFFFFFFL)
-                | ((long) readInt(array, offset + 4) << 32);
+        return (readInt(array, offset) & 0xFFFFFFFFL) | ((long) readInt(array, offset + 4) << 32);
     }
 
     private static short readShort(byte[] array, int offset) {
@@ -312,16 +279,16 @@ public final class ByteArrayAtomics {
     /**
      * Every access mode the direct path invokes on a view of the given width.
      * <p>
-     * The probe used to check all eight modes on the {@code int} view but only two on {@code long}
-     * and one on {@code short}, while the path it selected went on to invoke long
-     * {@code SET_VOLATILE}, {@code COMPARE_AND_EXCHANGE}, {@code GET_AND_SET} and all three bitwise
-     * modes, plus short {@code SET_VOLATILE}. On the JDKs this project supports those capabilities
-     * move together, so nothing failed — but the contract the probe stated was broader than what it
-     * verified, and a JVM with partial support would have taken the direct path and thrown
-     * {@code UnsupportedOperationException} from an unchecked mode. Naming the modes in one place
-     * keeps the probe and the calls it authorises the same list.
+     * The probe used to check all eight modes on the {@code int} view but only two on {@code long} and one on
+     * {@code short}, while the path it selected went on to invoke long {@code SET_VOLATILE},
+     * {@code COMPARE_AND_EXCHANGE}, {@code GET_AND_SET} and all three bitwise modes, plus short {@code SET_VOLATILE}.
+     * On the JDKs this project supports those capabilities move together, so nothing failed — but the contract the
+     * probe stated was broader than what it verified, and a JVM with partial support would have taken the direct path
+     * and thrown {@code UnsupportedOperationException} from an unchecked mode. Naming the modes in one place keeps the
+     * probe and the calls it authorises the same list.
      *
-     * @param viewType the view element type: {@code short[]}, {@code int[]} or {@code long[]}
+     * @param viewType
+     *            the view element type: {@code short[]}, {@code int[]} or {@code long[]}
      * @return the access modes that width requires
      */
     static Set<VarHandle.AccessMode> requiredAccessModes(Class<?> viewType) {
@@ -330,15 +297,10 @@ public final class ByteArrayAtomics {
             // short view itself only ever loads and stores.
             return EnumSet.of(VarHandle.AccessMode.GET_VOLATILE, VarHandle.AccessMode.SET_VOLATILE);
         }
-        return EnumSet.of(
-                VarHandle.AccessMode.GET_VOLATILE,
-                VarHandle.AccessMode.SET_VOLATILE,
-                VarHandle.AccessMode.COMPARE_AND_EXCHANGE,
-                VarHandle.AccessMode.GET_AND_SET,
-                VarHandle.AccessMode.GET_AND_ADD,
-                VarHandle.AccessMode.GET_AND_BITWISE_AND,
-                VarHandle.AccessMode.GET_AND_BITWISE_OR,
-                VarHandle.AccessMode.GET_AND_BITWISE_XOR);
+        return EnumSet.of(VarHandle.AccessMode.GET_VOLATILE, VarHandle.AccessMode.SET_VOLATILE,
+                VarHandle.AccessMode.COMPARE_AND_EXCHANGE, VarHandle.AccessMode.GET_AND_SET,
+                VarHandle.AccessMode.GET_AND_ADD, VarHandle.AccessMode.GET_AND_BITWISE_AND,
+                VarHandle.AccessMode.GET_AND_BITWISE_OR, VarHandle.AccessMode.GET_AND_BITWISE_XOR);
     }
 
     public static void setVolatileByte(byte[] array, int offset, byte value) {
@@ -388,8 +350,10 @@ public final class ByteArrayAtomics {
     /**
      * Whether one view handle offers every mode the direct path would invoke on it.
      *
-     * @param handle   the view handle
-     * @param viewType the view element type
+     * @param handle
+     *            the view handle
+     * @param viewType
+     *            the view element type
      * @return true when every required mode is supported
      */
     private static boolean supportsRequiredAccessModes(VarHandle handle, Class<?> viewType) {
@@ -421,9 +385,9 @@ public final class ByteArrayAtomics {
     /**
      * The lock-based implementations, used when the JDK withdraws the atomic access modes.
      * <p>
-     * Package-private and named separately from the dispatching methods so both paths can be
-     * exercised on whichever JDK the suite happens to run on. Every method here must be called with
-     * the array's monitor free; each takes it itself.
+     * Package-private and named separately from the dispatching methods so both paths can be exercised on whichever JDK
+     * the suite happens to run on. Every method here must be called with the array's monitor free; each takes it
+     * itself.
      */
     static final class Fallback {
         private Fallback() {

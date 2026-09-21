@@ -19,20 +19,12 @@ package com.caoccao.qjs4j.core;
 import java.nio.ByteBuffer;
 
 /**
- * Represents a JavaScript Uint8ClampedArray.
- * 8-bit unsigned integer array with clamping (used for canvas pixel data).
+ * Represents a JavaScript Uint8ClampedArray. 8-bit unsigned integer array with clamping (used for canvas pixel data).
  * Values are clamped to [0, 255] range instead of wrapping.
  */
 public final class JSUint8ClampedArray extends JSTypedArray {
     public static final int BYTES_PER_ELEMENT = 1;
     public static final String NAME = "Uint8ClampedArray";
-
-    /**
-     * Create a Uint8ClampedArray with a new buffer.
-     */
-    public JSUint8ClampedArray(JSContext context, int length) {
-        super(context, length, BYTES_PER_ELEMENT);
-    }
 
     /**
      * Create a Uint8ClampedArray view on an existing buffer.
@@ -41,62 +33,16 @@ public final class JSUint8ClampedArray extends JSTypedArray {
         super(context, buffer, byteOffset, length, BYTES_PER_ELEMENT);
     }
 
-    public static JSObject create(JSContext context, JSValue... args) {
-        int length = 0;
-        if (args.length >= 1) {
-            JSValue firstArg = normalizeConstructorSource(context, args[0]);
-            if (context.hasPendingException()) {
-                return null;
-            }
-            if (firstArg instanceof JSNumber lengthNum) {
-                length = toTypedArrayIndex(context, lengthNum, BYTES_PER_ELEMENT);
-            } else if (firstArg instanceof IJSArrayBuffer jsArrayBuffer) {
-                int byteOffset = 0;
-                if (args.length >= 2) {
-                    byteOffset = resolveAndValidateByteOffset(context, args[1], BYTES_PER_ELEMENT);
-                    if (context.hasPendingException()) {
-                        return null;
-                    }
-                }
-                if (args.length >= 3 && !(args[2] instanceof JSUndefined)) {
-                    length = toTypedArrayBufferLength(context, args[2], BYTES_PER_ELEMENT);
-                    if (context.hasPendingException()) {
-                        return null;
-                    }
-                    return context.createJSUint8ClampedArray(jsArrayBuffer, byteOffset, length);
-                }
-                return context.createJSUint8ClampedArray(jsArrayBuffer, byteOffset, -1);
-            } else if (firstArg instanceof JSTypedArray jsTypedArray) {
-                if (jsTypedArray.isOutOfBounds()) {
-                    context.throwTypeError("source TypedArray is out of bounds");
-                    return null;
-                }
-                length = jsTypedArray.getLength();
-                JSTypedArray newTypedArray = context.createJSUint8ClampedArray(length);
-                newTypedArray.setArray(jsTypedArray, 0);
-                return newTypedArray;
-            } else if (firstArg instanceof JSArray jsArray) {
-                length = toTypedArrayLength(jsArray.getLength(), BYTES_PER_ELEMENT);
-                JSTypedArray jsTypedArray = context.createJSUint8ClampedArray(length);
-                jsTypedArray.setArray(jsArray, 0);
-                return jsTypedArray;
-            } else if (firstArg instanceof JSIterator jsIterator) {
-                JSArray jsArray = JSIteratorHelper.toArray(context, jsIterator);
-                length = toTypedArrayLength(jsArray.getLength(), BYTES_PER_ELEMENT);
-                JSTypedArray jsTypedArray = context.createJSUint8ClampedArray(length);
-                jsTypedArray.setArray(jsArray, 0);
-                return jsTypedArray;
-            } else if (firstArg instanceof JSObject jsObject) {
-                JSValue lengthValue = jsObject.get(PropertyKey.LENGTH);
-                length = toTypedArrayLength(context, lengthValue, BYTES_PER_ELEMENT);
-                JSTypedArray jsTypedArray = context.createJSUint8ClampedArray(length);
-                jsTypedArray.setArray(jsObject, 0);
-                return jsTypedArray;
-            } else {
-                length = toTypedArrayLength(context, firstArg, BYTES_PER_ELEMENT);
-            }
-        }
-        return context.createJSUint8ClampedArray(length);
+    /**
+     * Create a Uint8ClampedArray with a new buffer.
+     */
+    public JSUint8ClampedArray(JSContext context, int length) {
+        super(context, length, BYTES_PER_ELEMENT);
+    }
+
+    @Override
+    protected JSTypedArray createView(int byteOffset, int length) {
+        return new JSUint8ClampedArray(context, buffer, byteOffset, length);
     }
 
     @Override
@@ -134,25 +80,8 @@ public final class JSUint8ClampedArray extends JSTypedArray {
         buf.put(index, (byte) clampedValue);
     }
 
-    @Override
-    public JSTypedArray subarray(int begin, int end) {
-        // Normalize indices
-        int currentLength = getLength();
-        if (begin < 0) {
-            begin = Math.max(currentLength + begin, 0);
-        } else {
-            begin = Math.min(begin, currentLength);
-        }
-
-        if (end < 0) {
-            end = Math.max(currentLength + end, 0);
-        } else {
-            end = Math.min(end, currentLength);
-        }
-
-        int newLength = Math.max(end - begin, 0);
-        int newByteOffset = byteOffset + begin * BYTES_PER_ELEMENT;
-
-        return new JSUint8ClampedArray(context, buffer, newByteOffset, newLength);
+    public static JSObject create(JSContext context, JSValue... args) {
+        return createFromArguments(context, BYTES_PER_ELEMENT, context::createJSUint8ClampedArray,
+                context::createJSUint8ClampedArray, args);
     }
 }

@@ -26,24 +26,40 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class LowPriorityOpcodeTest extends BaseTest {
-    private JSValue execute(
-            BytecodeEmitter emitter,
-            int localCount,
-            JSValue[] closureVars,
-            JSValue thisArg,
+    private JSValue execute(BytecodeEmitter emitter, int localCount, JSValue[] closureVars, JSValue thisArg,
             JSValue... args) {
-        JSBytecodeFunction function = new JSBytecodeFunction(context, emitter.build(localCount),
-                "test",
-                args.length,
-                closureVars,
-                null,
-                true,
-                false,
-                false,
-                false,
-                true,
-                "function test() { [bytecode] }");
+        JSBytecodeFunction function = new JSBytecodeFunction(context, emitter.build(localCount), "test", args.length,
+                closureVars, null, true, false, false, false, true, "function test() { [bytecode] }");
         return context.getVirtualMachine().execute(function, thisArg, args);
+    }
+
+    @Test
+    public void testClosureOpcodesCaptureArrowLexicalState() {
+        JSBytecodeFunction template = (JSBytecodeFunction) context
+                .eval("(function () { return () => this.tag + arguments[0]; })()");
+        JSObject receiver = context.createJSObject();
+        receiver.set("tag", JSNumber.of(40));
+        for (Opcode opcode : new Opcode[]{Opcode.FCLOSURE, Opcode.FCLOSURE8}) {
+            BytecodeEmitter emitter = new BytecodeEmitter();
+            emitter.emitOpcodeConstant(Opcode.PUSH_CONST, template);
+            emitter.emitOpcode(Opcode.DROP);
+            emitter.emitOpcode(opcode);
+            if (opcode == Opcode.FCLOSURE8) {
+                emitter.emitU8(0);
+            } else {
+                emitter.emitU32(0);
+            }
+            emitter.emitOpcode(Opcode.RETURN);
+
+            JSValue result = execute(emitter, 0, JSValue.NO_ARGS, receiver, JSNumber.of(2));
+            assertThat(result).isInstanceOf(JSBytecodeFunction.class).isNotSameAs(template);
+            JSBytecodeFunction closure = (JSBytecodeFunction) result;
+            assertThat(closure.getCapturedThisArg()).isSameAs(receiver);
+            assertThat(closure.getPrototype()).isSameAs(template.getPrototype());
+            JSValue value = closure.call(context, JSUndefined.INSTANCE, JSValue.NO_ARGS);
+            assertThat(value).isInstanceOfSatisfying(JSNumber.class,
+                    number -> assertThat(number.value()).isEqualTo(42));
+        }
     }
 
     @Test
@@ -99,8 +115,7 @@ public class LowPriorityOpcodeTest extends BaseTest {
         getArrayEl3ErrorEmitter.emitOpcode(Opcode.RETURN);
 
         assertThatThrownBy(() -> execute(getArrayEl3ErrorEmitter, 0, JSValue.NO_ARGS, JSUndefined.INSTANCE))
-                .isInstanceOf(JSVirtualMachineException.class)
-                .hasMessageContaining("value has no property");
+                .isInstanceOf(JSVirtualMachineException.class).hasMessageContaining("value has no property");
     }
 
     @Test
@@ -152,15 +167,12 @@ public class LowPriorityOpcodeTest extends BaseTest {
         argEmitter.emitOpcode(Opcode.ADD);
         argEmitter.emitOpcode(Opcode.RETURN);
 
-        JSValue argResult = execute(
-                argEmitter, 4, JSValue.NO_ARGS, JSUndefined.INSTANCE,
-                new JSNumber(1), new JSNumber(2), new JSNumber(3), new JSNumber(4));
+        JSValue argResult = execute(argEmitter, 4, JSValue.NO_ARGS, JSUndefined.INSTANCE, new JSNumber(1),
+                new JSNumber(2), new JSNumber(3), new JSNumber(4));
         assertThat(argResult).isInstanceOf(JSNumber.class);
         assertThat(((JSNumber) argResult).value()).isEqualTo(389);
 
-        JSValue[] closureVars = new JSValue[]{
-                new JSNumber(1), new JSNumber(2), new JSNumber(3), new JSNumber(4)
-        };
+        JSValue[] closureVars = new JSValue[]{new JSNumber(1), new JSNumber(2), new JSNumber(3), new JSNumber(4)};
         BytecodeEmitter varRefEmitter = new BytecodeEmitter();
         varRefEmitter.emitOpcode(Opcode.GET_VAR_REF0);
         varRefEmitter.emitOpcode(Opcode.GET_VAR_REF1);
@@ -380,7 +392,8 @@ public class LowPriorityOpcodeTest extends BaseTest {
         assertThat(const8Result).isInstanceOf(JSNumber.class);
         assertThat(((JSNumber) const8Result).value()).isEqualTo(42);
 
-        JSNativeFunction callable = new JSNativeFunction(context, "c", 0, (ctx, thisArg, args) -> new JSNumber(77), false);
+        JSNativeFunction callable = new JSNativeFunction(context, "c", 0, (ctx, thisArg, args) -> new JSNumber(77),
+                false);
         BytecodeEmitter closure8Emitter = new BytecodeEmitter();
         closure8Emitter.emitOpcodeConstant(Opcode.PUSH_CONST, callable);
         closure8Emitter.emitOpcode(Opcode.DROP);

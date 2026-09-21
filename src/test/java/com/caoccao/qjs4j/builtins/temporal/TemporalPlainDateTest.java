@@ -20,7 +20,6 @@ import com.caoccao.qjs4j.BaseJavetTest;
 import org.junit.jupiter.api.Test;
 
 public class TemporalPlainDateTest extends BaseJavetTest {
-
     @Test
     public void testAdd() {
         assertStringWithJavet("new Temporal.PlainDate(2024, 1, 15).add({days: 10}).toString()");
@@ -92,13 +91,14 @@ public class TemporalPlainDateTest extends BaseJavetTest {
     }
 
     @Test
-    public void testConstructorWithSubclass() {
-        assertBooleanWithJavet("(() => { class CustomPlainDate extends Temporal.PlainDate {} const value = new CustomPlainDate(2024, 1, 15); return value instanceof CustomPlainDate && value instanceof Temporal.PlainDate; })()");
+    public void testConstructorWithoutNew() {
+        assertErrorWithJavet("Temporal.PlainDate(2024, 1, 15)");
     }
 
     @Test
-    public void testConstructorWithoutNew() {
-        assertErrorWithJavet("Temporal.PlainDate(2024, 1, 15)");
+    public void testConstructorWithSubclass() {
+        assertBooleanWithJavet(
+                "(() => { class CustomPlainDate extends Temporal.PlainDate {} const value = new CustomPlainDate(2024, 1, 15); return value instanceof CustomPlainDate && value instanceof Temporal.PlainDate; })()");
     }
 
     @Test
@@ -129,6 +129,22 @@ public class TemporalPlainDateTest extends BaseJavetTest {
     @Test
     public void testDaysInYear() {
         assertIntegerWithJavet("new Temporal.PlainDate(2024, 3, 15).daysInYear");
+    }
+
+    @Test
+    public void testDifferenceRoundingAcrossUnitBoundaries() {
+        for (String method : new String[]{"since", "until"}) {
+            for (String[] dates : new String[][]{{"2022-01-01", "2023-12-25"}, {"2023-12-25", "2022-01-01"},
+                    {"2023-01-01", "2023-01-31"}, {"2023-01-31", "2023-01-01"}}) {
+                for (String largestUnit : new String[]{"year", "month", "week"}) {
+                    String smallestUnit = "year".equals(largestUnit) ? "month" : "day";
+                    assertStringWithJavet(
+                            "Temporal.PlainDate.from('" + dates[0] + "')." + method + "(Temporal.PlainDate.from('"
+                                    + dates[1] + "'), {largestUnit: '" + largestUnit + "', smallestUnit: '"
+                                    + smallestUnit + "', roundingMode: 'expand', roundingIncrement: 2}).toString()");
+                }
+            }
+        }
     }
 
     @Test
@@ -218,7 +234,8 @@ public class TemporalPlainDateTest extends BaseJavetTest {
 
     @Test
     public void testToLocaleString() {
-        assertBooleanWithJavet("(() => { const value = new Temporal.PlainDate(2024, 1, 15); const locales = 'en-US'; const options = { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }; return value.toLocaleString(locales, options) === new Intl.DateTimeFormat(locales, options).format(value); })()");
+        assertBooleanWithJavet(
+                "(() => { const value = new Temporal.PlainDate(2024, 1, 15); const locales = 'en-US'; const options = { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }; return value.toLocaleString(locales, options) === new Intl.DateTimeFormat(locales, options).format(value); })()");
     }
 
     @Test

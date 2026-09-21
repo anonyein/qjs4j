@@ -10,6 +10,10 @@ The project implements ES2024 features with full QuickJS specification complianc
 
 ## Common Commands
 
+### Required After Every Change
+
+Always run `./gradlew spotlessApply` after making changes, before final validation and before reporting the work complete. If you make further edits, run it again. Then run `./gradlew spotlessCheck` and the checks appropriate to the change. On Windows, use `./gradlew.bat` instead of `./gradlew`. This Gradle project uses the task names `spotlessApply` and `spotlessCheck` (the equivalents of Maven's `spotless:apply` and `spotless:check`).
+
 ### Build & Test
 ```bash
 ./gradlew build                   # Build
@@ -17,6 +21,8 @@ The project implements ES2024 features with full QuickJS specification complianc
 ./gradlew clean test              # Clean + test
 ./gradlew compileJava             # Compile only (fast check)
 ./gradlew compileTestJava         # Compile tests
+./gradlew spotlessApply           # Format Java with Eclipse JDT and sort members
+./gradlew spotlessCheck           # Verify Java formatting (also part of build/check)
 ```
 
 ### Running a Single Test
@@ -38,9 +44,13 @@ The project implements ES2024 features with full QuickJS specification complianc
 
 `performance` covers two different kinds of case. `slowRegressionTest` is the correctness half —
 the end-to-end Octane v7 regression for issue 7 and the Temporal hot-path assertions, which pass or
-fail and are worth running anywhere; `check` depends on it, so `./gradlew build` runs it. The other
-half is the JMH benchmarks, tagged `benchmark`, which report a number that only means something on a
-quiet machine: `performanceTest` runs both and takes about ninety seconds, almost all of it JMH.
+fail and are worth running anywhere. It is a standalone task: `check` and `build` do not run it.
+CI invokes it in a separate step after `build`, preventing overlap with coverage report generation.
+When requested in the same Gradle invocation, it must run after the unit tests and coverage tasks.
+It uses one test JVM without JaCoCo instrumentation to limit the memory used by the Octane workload.
+The other half is the JMH benchmarks, tagged `benchmark`, which report a number that only means
+something on a quiet machine: `performanceTest` runs both and takes about ninety seconds, almost
+all of it JMH.
 
 Every `test262*` task pins the two things a conformance count depends on, so the commands above
 mean the same thing on every machine:
@@ -261,6 +271,8 @@ When porting QuickJS C code to Java:
 - **License header**: Apache 2.0 (`Copyright (c) 2025-2026. caoccao.com Sam Cao`) on `src/main/` files.
 - **Java 17+ features**: Use records, sealed classes, pattern matching where appropriate.
 - **4-space indentation**, no tabs. Prefer `final` classes where the project does.
+- **Spotless**: Always follow the required formatting and validation steps above after making changes. Eclipse JDT uses `config/eclipse-java-formatter.properties` and sorts members as `SF,SI,F,I,C,M,SM,T`, including fields. Eclipse requires the initializer category `I`; omitting it makes the formatter silently revert to its default order. Keep dependent field initialization in constructors or static initialization blocks so sorting declarations cannot change initialization behavior.
+- **Enum documentation**: Attach descriptions to constants with Javadoc rather than trailing line comments. JDT member sorting can leave trailing comments behind when it moves enum constants.
 - **AST nodes**: Records with `SourceLocation location` implementing sealed interfaces — see `Identifier.java`, `ForOfStatement.java`.
 - **QuickJS alignment**: When in doubt, follow QuickJS's approach (check `quickjs.c`).
 - **Null safety**: Use explicit null checks, avoid returning null (return `JSUndefined.INSTANCE` or throw).
