@@ -2477,7 +2477,7 @@ public final class OpcodeHandler {
             } else {
                 if (executionContext.virtualMachine.trackPropertyAccess
                         && !executionContext.virtualMachine.propertyAccessLock) {
-                    if (!executionContext.virtualMachine.propertyAccessChain.isEmpty()) {
+                    if (executionContext.virtualMachine.propertyAccessChain.length() > 0) {
                         executionContext.virtualMachine.propertyAccessChain.append('.');
                     }
                     executionContext.virtualMachine.propertyAccessChain.append(fieldName);
@@ -2512,7 +2512,7 @@ public final class OpcodeHandler {
             } else {
                 if (executionContext.virtualMachine.trackPropertyAccess
                         && !executionContext.virtualMachine.propertyAccessLock) {
-                    if (!executionContext.virtualMachine.propertyAccessChain.isEmpty()) {
+                    if (executionContext.virtualMachine.propertyAccessChain.length() > 0) {
                         executionContext.virtualMachine.propertyAccessChain.append('.');
                     }
                     executionContext.virtualMachine.propertyAccessChain.append(fieldName);
