@@ -325,11 +325,20 @@ public final class JSReflectObject {
             }
         }
 
+        // An error constructor reached through super() or Reflect.construct needs new.target: the stack it captures
+        // leaves out the frames of the subclass constructors above it, as V8's does.
+        boolean isErrorConstructor = constructorType.name().endsWith("ERROR");
+        JSValue savedNativeConstructorNewTarget = context.getNativeConstructorNewTarget();
+        if (isErrorConstructor) {
+            context.setNativeConstructorNewTarget(newTarget);
+        }
         JSValue result;
         try {
             result = constructorType.create(context, args);
         } catch (JSErrorException e) {
             return context.throwError(e);
+        } finally {
+            context.setNativeConstructorNewTarget(savedNativeConstructorNewTarget);
         }
         if (context.hasPendingException()) {
             return context.getPendingException();

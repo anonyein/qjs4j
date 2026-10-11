@@ -25,21 +25,39 @@ import java.util.Objects;
  */
 public class JSRuntimeOptions {
     /**
-     * The stack budget a single activation is charged.
-     * <p>
-     * A Java interpreter cannot measure its own stack the way QuickJS measures the C stack, so the budget is spent in
-     * units of one nominal frame. The constant is what turns {@link #setMaxStackSize(long)} into a call-depth limit; it
-     * is not a measurement of the JVM frames an activation actually occupies.
+     * The stack budget a single activation is charged by the deprecated {@link #setMaxStackSize(long)}.
+     *
+     * @deprecated the limit is a call depth; use {@link #setMaxCallDepth(int)}
      */
+    @Deprecated
     public static final long BYTES_PER_STACK_FRAME = 256;
+    /**
+     * Default maximum call depth: 10,000 nested activations, about what V8 reaches for plain recursion.
+     * <p>
+     * Each activation also occupies Java stack — about 1.4 KiB for a plain call — so reaching the limit needs a thread
+     * of about 16 MiB. On a smaller stack the JVM runs out first, and that too is reported to the script as a catchable
+     * {@code RangeError: Maximum call stack size exceeded}; run evaluations on a thread with a larger stack, or raise
+     * {@code -Xss}, to get the full depth.
+     */
+    public static final int DEFAULT_MAX_CALL_DEPTH = 10_000;
     /**
      * Default ceiling on {@code ArrayBuffer}/{@code SharedArrayBuffer} data blocks: 64 MiB.
      */
-    public static final long DEFAULT_MAX_MEMORY_USAGE = 64 * 1024 * 1024;
+    public static final long DEFAULT_MAX_DATA_BLOCK_BYTES = 64 * 1024 * 1024;
     /**
-     * Default interpreter stack budget: 256 KiB, which at {@link #BYTES_PER_STACK_FRAME} is 1,024 nested activations.
+     * Default ceiling on data blocks, under the name that read as a heap limit.
+     *
+     * @deprecated use {@link #DEFAULT_MAX_DATA_BLOCK_BYTES}
      */
-    public static final long DEFAULT_MAX_STACK_SIZE = 256 * 1024;
+    @Deprecated
+    public static final long DEFAULT_MAX_MEMORY_USAGE = DEFAULT_MAX_DATA_BLOCK_BYTES;
+    /**
+     * The default call depth expressed as a deprecated stack budget.
+     *
+     * @deprecated use {@link #DEFAULT_MAX_CALL_DEPTH}
+     */
+    @Deprecated
+    public static final long DEFAULT_MAX_STACK_SIZE = DEFAULT_MAX_CALL_DEPTH * BYTES_PER_STACK_FRAME;
     /**
      * Default budget of regular expression backtracking steps for a single match attempt.
      * <p>
@@ -63,15 +81,17 @@ public class JSRuntimeOptions {
      * running.
      */
     protected AtomicsObject atomicsObject;
-    protected long maxMemoryUsage;
-    protected long maxStackSize;
+    protected int maxCallDepth;
+    protected long maxDataBlockBytes;
+    protected IJSModuleLoader moduleLoader;
     protected long regExpBacktrackLimit;
     protected boolean shadowRealmEnabled;
     protected boolean temporalEnabled;
 
     public JSRuntimeOptions() {
-        maxMemoryUsage = DEFAULT_MAX_MEMORY_USAGE;
-        maxStackSize = DEFAULT_MAX_STACK_SIZE;
+        maxCallDepth = DEFAULT_MAX_CALL_DEPTH;
+        maxDataBlockBytes = DEFAULT_MAX_DATA_BLOCK_BYTES;
+        moduleLoader = null;
         regExpBacktrackLimit = DEFAULT_REGEXP_BACKTRACK_LIMIT;
         shadowRealmEnabled = false;
         temporalEnabled = false;
@@ -90,37 +110,66 @@ public class JSRuntimeOptions {
     }
 
     /**
+     * The maximum number of nested activations.
+     *
+     * @return the maximum call depth
+     * @see #setMaxCallDepth(int)
+     */
+    public int getMaxCallDepth() {
+        return maxCallDepth;
+    }
+
+    /**
      * The ceiling on {@code ArrayBuffer} and {@code SharedArrayBuffer} data blocks.
      *
      * @return the limit in bytes, or 0 for no limit
-     * @see #setMaxMemoryUsage(long)
+     * @see #setMaxDataBlockBytes(long)
      */
-    public long getMaxMemoryUsage() {
-        return maxMemoryUsage;
+    public long getMaxDataBlockBytes() {
+        return maxDataBlockBytes;
     }
 
     /**
-     * The call depth {@link #getMaxStackSize()} buys, as {@code maxStackSize / }{@link #BYTES_PER_STACK_FRAME}, clamped
-     * to at least one activation.
+     * The ceiling on {@code ArrayBuffer} and {@code SharedArrayBuffer} data blocks.
+     *
+     * @return the limit in bytes, or 0 for no limit
+     * @deprecated the limit bounds data blocks, not memory; use {@link #getMaxDataBlockBytes()}
+     */
+    @Deprecated
+    public long getMaxMemoryUsage() {
+        return maxDataBlockBytes;
+    }
+
+    /**
+     * The maximum call depth.
      *
      * @return the maximum number of nested activations
+     * @deprecated use {@link #getMaxCallDepth()}
      */
+    @Deprecated
     public int getMaxStackDepth() {
-        long depth = maxStackSize / BYTES_PER_STACK_FRAME;
-        if (depth < 1) {
-            return 1;
-        }
-        return depth > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) depth;
+        return maxCallDepth;
     }
 
     /**
-     * The interpreter stack budget.
+     * The maximum call depth expressed as a stack budget of {@link #BYTES_PER_STACK_FRAME} per activation.
      *
      * @return the budget in bytes
-     * @see #setMaxStackSize(long)
+     * @deprecated use {@link #getMaxCallDepth()}
      */
+    @Deprecated
     public long getMaxStackSize() {
-        return maxStackSize;
+        return maxCallDepth * BYTES_PER_STACK_FRAME;
+    }
+
+    /**
+     * The host hook every module is located and read through.
+     *
+     * @return the loader, or null when no module can be loaded
+     * @see #setModuleLoader(IJSModuleLoader)
+     */
+    public IJSModuleLoader getModuleLoader() {
+        return moduleLoader;
     }
 
     /**
@@ -169,6 +218,27 @@ public class JSRuntimeOptions {
     }
 
     /**
+     * Set the maximum call depth.
+     * <p>
+     * A call nested deeper raises {@code RangeError: Maximum call stack size exceeded}, which guest code can catch. The
+     * limit used to be a byte budget, {@link #setMaxStackSize(long)}, charged 256 nominal bytes per activation: 1,024
+     * frames by default, a tenth of V8's. See {@link #DEFAULT_MAX_CALL_DEPTH} for the Java stack a given depth needs.
+     *
+     * @param maxCallDepth
+     *            the maximum number of nested activations, at least 1
+     * @return this
+     * @throws IllegalArgumentException
+     *             when the depth is below 1, which would refuse every call, the top-level code included
+     */
+    public JSRuntimeOptions setMaxCallDepth(int maxCallDepth) {
+        if (maxCallDepth < 1) {
+            throw new IllegalArgumentException("maxCallDepth must be at least 1: " + maxCallDepth);
+        }
+        this.maxCallDepth = maxCallDepth;
+        return this;
+    }
+
+    /**
      * Set the ceiling on {@code ArrayBuffer} and {@code SharedArrayBuffer} data blocks.
      * <p>
      * <strong>This bounds data blocks, not the heap.</strong> Every byte allocated for an {@code ArrayBuffer} or
@@ -177,32 +247,69 @@ public class JSRuntimeOptions {
      * ordinary Java allocations bounded by {@code -Xmx}. See {@link JSMemoryAccounting} for the full contract, and read
      * the ceiling back through {@link JSRuntime#getMemoryAccounting()}.
      * <p>
+     * <strong>Buffers are smaller than V8's.</strong> The default ceiling, {@link #DEFAULT_MAX_DATA_BLOCK_BYTES}, is 64
+     * MiB, so {@code new ArrayBuffer(2 ** 27)} is a {@code RangeError} until it is raised. Independently of the
+     * ceiling, a data block is one Java {@code byte[]}, so no buffer — and no typed array, whose byte length is its
+     * length times its element size — can exceed {@code Integer.MAX_VALUE - 8} bytes, just under 2 GiB, even with the
+     * ceiling disabled. V8 allocates {@code new ArrayBuffer(2 ** 31)} and larger.
+     * <p>
      * The limit is fixed when a {@link JSRuntime} is constructed; changing it on an options object afterwards has no
      * effect on runtimes already created from it.
      *
-     * @param maxMemoryUsage
+     * @param maxDataBlockBytes
      *            the limit in bytes; 0 or negative for no limit
      * @return this
      */
-    public JSRuntimeOptions setMaxMemoryUsage(long maxMemoryUsage) {
-        this.maxMemoryUsage = Math.max(0L, maxMemoryUsage);
+    public JSRuntimeOptions setMaxDataBlockBytes(long maxDataBlockBytes) {
+        this.maxDataBlockBytes = Math.max(0L, maxDataBlockBytes);
         return this;
     }
 
     /**
-     * Set the interpreter stack budget.
-     * <p>
-     * The budget is spent in units of {@link #BYTES_PER_STACK_FRAME} per activation, so it fixes the maximum call
-     * depth: exceeding it raises {@code RangeError: Maximum call stack size
-     * exceeded}, which guest code can catch. It does not bound the JVM's own stack — deeply recursive engine-internal
-     * work is bounded by {@code -Xss}.
+     * Set the ceiling on {@code ArrayBuffer} and {@code SharedArrayBuffer} data blocks.
+     *
+     * @param maxMemoryUsage
+     *            the limit in bytes; 0 or negative for no limit
+     * @return this
+     * @deprecated the name read as a heap limit, which this is not; use {@link #setMaxDataBlockBytes(long)}
+     */
+    @Deprecated
+    public JSRuntimeOptions setMaxMemoryUsage(long maxMemoryUsage) {
+        return setMaxDataBlockBytes(maxMemoryUsage);
+    }
+
+    /**
+     * Set the maximum call depth as a stack budget of {@link #BYTES_PER_STACK_FRAME} per activation.
      *
      * @param maxStackSize
      *            the budget in bytes; values below one frame are treated as one frame
      * @return this
+     * @deprecated use {@link #setMaxCallDepth(int)}
      */
+    @Deprecated
     public JSRuntimeOptions setMaxStackSize(long maxStackSize) {
-        this.maxStackSize = Math.max(0L, maxStackSize);
+        long depth = maxStackSize / BYTES_PER_STACK_FRAME;
+        this.maxCallDepth = (int) Math.max(1L, Math.min(Integer.MAX_VALUE, depth));
+        return this;
+    }
+
+    /**
+     * Install the host hook every module is located and read through.
+     * <p>
+     * <strong>Without one, no module can be loaded.</strong> Every static {@code import}, dynamic {@code import()} and
+     * {@code ShadowRealm.prototype.importValue} then fails with {@code TypeError: Cannot find module}, so a default
+     * runtime gives scripts no access to the file system. Use {@link JSFileSystemModuleLoader} to load modules from
+     * disk — confined to a root directory when the scripts are not trusted — or implement {@link IJSModuleLoader} to
+     * serve them from anywhere else.
+     * <p>
+     * Runtimes read the loader when they load a module, so changing it affects every runtime built from these options.
+     *
+     * @param moduleLoader
+     *            the loader, or null to load no modules
+     * @return this
+     */
+    public JSRuntimeOptions setModuleLoader(IJSModuleLoader moduleLoader) {
+        this.moduleLoader = moduleLoader;
         return this;
     }
 

@@ -154,7 +154,8 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
         } else {
             // Create default constructor with field initialization
             constructorFunc = createDefaultConstructor(className, classDecl.getSuperClass() != null, instanceFields,
-                    privateSymbols, computedFieldSymbols, autoAccessorBackingSymbols, privateInstanceMethodFunctions);
+                    privateSymbols, computedFieldSymbols, autoAccessorBackingSymbols, privateInstanceMethodFunctions,
+                    classDecl.getLocation());
         }
 
         // Set the source code for the constructor to be the entire class definition
@@ -451,6 +452,7 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
         CompilerContext functionContext = methodCompiler.context();
 
         functionContext.sourceCode = compilerContext.sourceCode;
+        functionContext.mayContainDirectEval = compilerContext.mayContainDirectEval;
         functionContext.nonDeletableGlobalBindings.addAll(compilerContext.nonDeletableGlobalBindings);
         functionContext.privateSymbols = privateSymbols; // Make private symbols available in method
         compilerContext.functionExpressionCompiler.inheritVisibleWithObjectBindings(functionContext);
@@ -645,6 +647,7 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
         CompilerContext blockCtx = blockCompiler.context();
 
         blockCtx.sourceCode = compilerContext.sourceCode;
+        blockCtx.mayContainDirectEval = compilerContext.mayContainDirectEval;
         blockCtx.nonDeletableGlobalBindings.addAll(compilerContext.nonDeletableGlobalBindings);
         blockCtx.privateSymbols = privateSymbols;
 
@@ -708,6 +711,7 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
         CompilerContext initCtx = initializerCompiler.context();
 
         initCtx.sourceCode = compilerContext.sourceCode;
+        initCtx.mayContainDirectEval = compilerContext.mayContainDirectEval;
         initCtx.nonDeletableGlobalBindings.addAll(compilerContext.nonDeletableGlobalBindings);
         initCtx.privateSymbols = privateSymbols;
 
@@ -817,13 +821,14 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
             List<PropertyDefinition> instanceFields, Map<String, JSSymbol> privateSymbols,
             IdentityHashMap<PropertyDefinition, JSSymbol> computedFieldSymbols,
             IdentityHashMap<PropertyDefinition, JSSymbol> autoAccessorBackingSymbols,
-            List<PrivateMethodEntry> privateInstanceMethodFunctions) {
+            List<PrivateMethodEntry> privateInstanceMethodFunctions, SourceLocation classLocation) {
         // Pass parent captureResolver so default constructors can capture outer scope variables
         BytecodeCompiler constructorCompiler = new BytecodeCompiler(true, compilerContext.captureResolver,
                 compilerContext.context);
         CompilerContext ctorCtx = constructorCompiler.context();
 
         ctorCtx.sourceCode = compilerContext.sourceCode;
+        ctorCtx.mayContainDirectEval = compilerContext.mayContainDirectEval;
         ctorCtx.nonDeletableGlobalBindings.addAll(compilerContext.nonDeletableGlobalBindings);
         ctorCtx.privateSymbols = privateSymbols; // Make private symbols available
 
@@ -836,6 +841,9 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
             ctorCtx.captureResolver.resolveCapturedBindingIndex(className);
             ctorCtx.classInnerNameToCapture = className;
         }
+
+        // A frame in the implicit constructor reports the position of its class, as V8 does.
+        ctorCtx.emitter.emitSourcePosition(classLocation);
 
         // Default derived constructor semantics:
         // constructor(...args) { super(...args); }

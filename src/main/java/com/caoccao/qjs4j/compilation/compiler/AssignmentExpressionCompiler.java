@@ -102,21 +102,7 @@ final class AssignmentExpressionCompiler extends AstNodeCompiler<AssignmentExpre
 
             compilerContext.expressionCompiler.compile(assignExpr.getRight());
 
-            switch (operator) {
-                case PLUS_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.ADD);
-                case MINUS_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SUB);
-                case MUL_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.MUL);
-                case DIV_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.DIV);
-                case MOD_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.MOD);
-                case EXP_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.POW);
-                case LSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SHL);
-                case RSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SAR);
-                case URSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SHR);
-                case AND_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.AND);
-                case OR_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.OR);
-                case XOR_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.XOR);
-                default -> throw new JSCompilerException("Unknown assignment operator: " + operator, assignExpr);
-            }
+            emitCompoundOperator(operator);
         } else {
             if (left instanceof MemberExpression memberExpr) {
                 if (memberExpr.getObject().isSuperIdentifier()) {
@@ -197,6 +183,51 @@ final class AssignmentExpressionCompiler extends AstNodeCompiler<AssignmentExpre
         }
     }
 
+    /**
+     * Assign to a local or captured binding directly, as QuickJS's {@code optimize_scope_make_ref} rewrites
+     * {@code scope_make_ref ... put_ref_value} into {@code get_loc ... set_loc}.
+     * <p>
+     * Every assignment to a local used to build a reference object — a {@code JSObject} with an accessor property
+     * backed by two new native functions — and go through {@code GET_REF_VALUE}/{@code PUT_REF_VALUE}. Without a direct
+     * {@code eval} or a {@code with} in scope, a binding the compiler resolved to a slot cannot be redirected while the
+     * right-hand side runs, so the slot is read and written in place; the {@code _CHECK} forms keep the temporal dead
+     * zone: a compound assignment fails reading, a plain one fails writing, after the right-hand side, as the
+     * specification orders it. (A sloppy direct eval in the right-hand side can declare a nearer binding, and the
+     * assignment must still go to the one resolved first, so code that may contain one keeps references.)
+     * <p>
+     * Stack: value
+     */
+    private void compileDirectBindingAssignment(AssignmentExpression assignExpr, String name, Integer localIndex,
+            Integer capturedIndex) {
+        AssignmentOperator operator = assignExpr.getOperator();
+        if (operator != AssignmentOperator.ASSIGN) {
+            if (localIndex != null) {
+                compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC_CHECK, localIndex);
+            } else {
+                compilerContext.emitter.emitOpcodeU16(Opcode.GET_VAR_REF_CHECK, capturedIndex);
+            }
+        }
+        if (operator == AssignmentOperator.ASSIGN && assignExpr.isLhsIdentifierRef()
+                && assignExpr.getRight() instanceof ClassExpression classExpr && classExpr.getId() == null) {
+            compilerContext.inferredClassName = name;
+        }
+        compilerContext.expressionCompiler.compile(assignExpr.getRight());
+        compilerContext.inferredClassName = null;
+        if (operator == AssignmentOperator.ASSIGN && assignExpr.isLhsIdentifierRef()
+                && assignExpr.getRight().isAnonymousFunction()) {
+            compilerContext.emitter.emitOpcodeAtom(Opcode.SET_NAME, name);
+        }
+        if (operator != AssignmentOperator.ASSIGN) {
+            emitCompoundOperator(operator);
+        }
+        if (localIndex != null) {
+            compilerContext.emitter.emitOpcodeU16(Opcode.SET_LOC_CHECK, localIndex);
+        } else {
+            compilerContext.emitter.emitOpcode(Opcode.DUP);
+            compilerContext.emitter.emitOpcodeU16(Opcode.PUT_VAR_REF_CHECK, capturedIndex);
+        }
+    }
+
     private void compileIdentifierAssignmentExpression(AssignmentExpression assignExpr, Identifier identifier) {
         String name = identifier.getName();
         AssignmentOperator operator = assignExpr.getOperator();
@@ -226,21 +257,7 @@ final class AssignmentExpressionCompiler extends AstNodeCompiler<AssignmentExpre
                 compilerContext.emitter.emitOpcodeAtom(Opcode.SET_NAME, name);
             }
             if (operator != AssignmentOperator.ASSIGN) {
-                switch (operator) {
-                    case PLUS_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.ADD);
-                    case MINUS_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SUB);
-                    case MUL_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.MUL);
-                    case DIV_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.DIV);
-                    case MOD_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.MOD);
-                    case EXP_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.POW);
-                    case LSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SHL);
-                    case RSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SAR);
-                    case URSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SHR);
-                    case AND_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.AND);
-                    case OR_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.OR);
-                    case XOR_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.XOR);
-                    default -> throw new JSCompilerException("Unknown assignment operator: " + operator, assignExpr);
-                }
+                emitCompoundOperator(operator);
             }
             return;
         }
@@ -257,21 +274,7 @@ final class AssignmentExpressionCompiler extends AstNodeCompiler<AssignmentExpre
             compilerContext.expressionCompiler.compile(assignExpr.getRight());
 
             if (operator != AssignmentOperator.ASSIGN) {
-                switch (operator) {
-                    case PLUS_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.ADD);
-                    case MINUS_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SUB);
-                    case MUL_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.MUL);
-                    case DIV_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.DIV);
-                    case MOD_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.MOD);
-                    case EXP_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.POW);
-                    case LSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SHL);
-                    case RSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SAR);
-                    case URSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SHR);
-                    case AND_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.AND);
-                    case OR_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.OR);
-                    case XOR_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.XOR);
-                    default -> throw new JSCompilerException("Unknown assignment operator: " + operator, assignExpr);
-                }
+                emitCompoundOperator(operator);
             }
 
             if (localIndex != null) {
@@ -279,6 +282,13 @@ final class AssignmentExpressionCompiler extends AstNodeCompiler<AssignmentExpre
             } else {
                 emitConstAssignmentErrorForCaptured(name, capturedIndex);
             }
+            return;
+        }
+
+        if ((localIndex != null || capturedIndex != null) && !compilerContext.mayContainDirectEval
+                && !compilerContext.withObjectManager.hasActiveWithObject()
+                && compilerContext.withObjectManager.getInheritedBindingNames().isEmpty()) {
+            compileDirectBindingAssignment(assignExpr, name, localIndex, capturedIndex);
             return;
         }
 
@@ -300,21 +310,7 @@ final class AssignmentExpressionCompiler extends AstNodeCompiler<AssignmentExpre
         }
 
         if (operator != AssignmentOperator.ASSIGN) {
-            switch (operator) {
-                case PLUS_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.ADD);
-                case MINUS_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SUB);
-                case MUL_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.MUL);
-                case DIV_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.DIV);
-                case MOD_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.MOD);
-                case EXP_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.POW);
-                case LSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SHL);
-                case RSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SAR);
-                case URSHIFT_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.SHR);
-                case AND_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.AND);
-                case OR_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.OR);
-                case XOR_ASSIGN -> compilerContext.emitter.emitOpcode(Opcode.XOR);
-                default -> throw new JSCompilerException("Unknown assignment operator: " + operator, assignExpr);
-            }
+            emitCompoundOperator(operator);
         }
 
         compilerContext.emitter.emitOpcode(Opcode.INSERT3);
@@ -491,6 +487,14 @@ final class AssignmentExpressionCompiler extends AstNodeCompiler<AssignmentExpre
         }
 
         compilerContext.emitter.patchJump(jumpToEnd, compilerContext.emitter.currentOffset());
+    }
+
+    /**
+     * Apply a compound operator to the old value and the right operand. Logical assignments never get here: compile()
+     * hands them to compileLogicalAssignment first.
+     */
+    private void emitCompoundOperator(AssignmentOperator operator) {
+        compilerContext.emitter.emitOpcode(operator.getOpcode());
     }
 
     private void emitConstAssignmentError(String name) {

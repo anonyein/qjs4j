@@ -29,11 +29,22 @@ import java.util.*;
  * Automatically switches between dense and sparse based on usage patterns.
  */
 public final class JSArray extends JSObject {
+    private static final double HOLE;
+    /**
+     * Bits of the NaN that marks a hole in {@link #doubleArray}. A stored NaN is always canonicalized, so no element
+     * value has these bits.
+     */
+    private static final long HOLE_BITS = 0x7FFC_0DEA_DBEE_F001L;
     public static final int INITIAL_CAPACITY = 8;
     private static final long MAX_ARRAY_INDEX = 0xFFFF_FFFEL; // 2^32 - 2
     private static final long MAX_ARRAY_LENGTH = 0xFFFF_FFFFL; // 2^32 - 1
     /**
-     * Upper bound on dense element storage. Beyond this an array falls back to sparse storage.
+     * Largest dense storage a JVM array can hold.
+     */
+    private static final int MAX_DENSE_CAPACITY = Integer.MAX_VALUE - 8;
+    /**
+     * Dense storage of up to this many elements is used for any index, however sparse the array; the bound on a
+     * capacity hint, and on how far an isolated write may grow dense storage.
      */
     public static final int MAX_DENSE_SIZE = 10000;
     /**
@@ -44,7 +55,21 @@ public final class JSArray extends JSObject {
     public static final String NAME = "Array";
     private static final double UINT32_MAX_DOUBLE = 4_294_967_295d;
     private static final double UINT32_MODULO = 4_294_967_296d;
+
+    static {
+        HOLE = Double.longBitsToDouble(HOLE_BITS);
+    }
+
     private JSValue[] denseArray;
+    /**
+     * Dense elements of an array that has held only numbers, unboxed, or null once any other value is stored. Exactly
+     * one of this and {@link #denseArray} is non-null.
+     * <p>
+     * Every element used to be a {@link JSNumber} reference — a 24-byte object plus the reference for each number — so
+     * an array of 3e7 numbers needed more than 1 GB where V8 needs about 240 MB. Elements are stored as doubles until
+     * the first non-number arrives, when the storage turns into references for good, as V8's element kinds do.
+     */
+    private double[] doubleArray;
     private long length;
     /**
      * Index of the non-configurable element that stopped the most recent length truncation, or -1.
@@ -64,7 +89,7 @@ public final class JSArray extends JSObject {
     public JSArray(JSContext context, JSValue... values) {
         super(context);
         this.length = values.length;
-        this.denseArray = Arrays.copyOf(values, Math.max(values.length, INITIAL_CAPACITY));
+        initializeDenseStorage(values, Math.max(values.length, INITIAL_CAPACITY), false);
         // Mark as array class (equivalent to QuickJS class_id == JS_CLASS_ARRAY)
         this.arrayObject = true;
         initializeLengthProperty();
@@ -77,11 +102,7 @@ public final class JSArray extends JSObject {
     JSArray(JSContext context, JSValue[] ownedValues, boolean takeOwnership) {
         super(context);
         this.length = ownedValues.length;
-        if (takeOwnership) {
-            this.denseArray = ownedValues;
-        } else {
-            this.denseArray = Arrays.copyOf(ownedValues, Math.max(ownedValues.length, INITIAL_CAPACITY));
-        }
+        initializeDenseStorage(ownedValues, Math.max(ownedValues.length, INITIAL_CAPACITY), takeOwnership);
         // Mark as array class (equivalent to QuickJS class_id == JS_CLASS_ARRAY)
         this.arrayObject = true;
         initializeLengthProperty();
@@ -121,10 +142,41 @@ public final class JSArray extends JSObject {
         requireValidLength(length);
         this.length = length;
         capacity = Math.max(INITIAL_CAPACITY, Math.min(capacity, MAX_DENSE_SIZE));
-        this.denseArray = new JSValue[capacity];
+        this.doubleArray = new double[capacity];
+        Arrays.fill(this.doubleArray, HOLE);
         // Mark as array class (equivalent to QuickJS class_id == JS_CLASS_ARRAY)
         this.arrayObject = true;
         initializeLengthProperty();
+    }
+
+    /**
+     * Turn dense storage into references for good, the first time a value other than a number is stored.
+     */
+    private void boxDenseStorage() {
+        double[] doubles = doubleArray;
+        JSValue[] values = new JSValue[doubles.length];
+        for (int i = 0; i < doubles.length; i++) {
+            double value = doubles[i];
+            if (Double.doubleToRawLongBits(value) != HOLE_BITS) {
+                values[i] = JSNumber.of(value);
+            }
+        }
+        denseArray = values;
+        doubleArray = null;
+    }
+
+    /**
+     * Make the dense slots in {@code [from, to)} holes.
+     */
+    private void clearDense(int from, int to) {
+        if (from >= to) {
+            return;
+        }
+        if (doubleArray != null) {
+            Arrays.fill(doubleArray, from, to, HOLE);
+        } else {
+            Arrays.fill(denseArray, from, to, null);
+        }
     }
 
     /**
@@ -279,20 +331,12 @@ public final class JSArray extends JSObject {
                         compactProperties();
                     }
                 }
-                if (intIndex < MAX_DENSE_SIZE) {
-                    ensureDenseCapacity(intIndex + 1);
-                    denseArray[intIndex] = descriptor.getValue();
-                } else {
-                    if (sparseProperties == null) {
-                        sparseProperties = new HashMap<>();
-                    }
-                    sparseProperties.put(intIndex, descriptor.getValue());
-                }
+                putElement(intIndex, descriptor.getValue());
                 return;
             }
             // Non-default descriptor: clear dense entry so shape storage takes precedence.
-            if (intIndex < denseArray.length) {
-                denseArray[intIndex] = null;
+            if (intIndex < denseCapacity()) {
+                setDenseValue(intIndex, null);
             }
         }
         super.definePropertyInternal(key, descriptor);
@@ -312,8 +356,8 @@ public final class JSArray extends JSObject {
 
         if (index <= Integer.MAX_VALUE) {
             int intIndex = (int) index;
-            if (intIndex < denseArray.length && denseArray[intIndex] != null) {
-                denseArray[intIndex] = null;
+            if (hasDenseValue(intIndex)) {
+                setDenseValue(intIndex, null);
                 return true;
             }
             if (sparseProperties != null && sparseProperties.remove(intIndex) != null) {
@@ -324,18 +368,63 @@ public final class JSArray extends JSObject {
         return super.delete(key, throwOnFailure);
     }
 
+    private int denseCapacity() {
+        return doubleArray != null ? doubleArray.length : denseArray.length;
+    }
+
     /**
-     * Ensure dense array has sufficient capacity.
+     * The dense element at an index, or null for a hole or an index beyond the dense capacity.
+     */
+    private JSValue denseValue(int index) {
+        if (doubleArray != null) {
+            if (index < doubleArray.length) {
+                double value = doubleArray[index];
+                if (Double.doubleToRawLongBits(value) != HOLE_BITS) {
+                    return JSNumber.of(value);
+                }
+            }
+            return null;
+        }
+        return index < denseArray.length ? denseArray[index] : null;
+    }
+
+    /**
+     * Ensure dense array has sufficient capacity, moving any element stored sparsely below the new capacity into it so
+     * that an index lives in one storage.
      */
     private void ensureDenseCapacity(int requiredCapacity) {
-        if (requiredCapacity <= denseArray.length) {
+        int capacity = denseCapacity();
+        if (requiredCapacity <= capacity) {
             return;
         }
 
-        int newCapacity = Math.max(denseArray.length * 2, requiredCapacity);
-        newCapacity = Math.min(newCapacity, MAX_DENSE_SIZE);
-
-        denseArray = Arrays.copyOf(denseArray, newCapacity);
+        int newCapacity = (int) Math.min(Math.max(capacity * 2L, requiredCapacity), MAX_DENSE_CAPACITY);
+        if (doubleArray != null) {
+            doubleArray = Arrays.copyOf(doubleArray, newCapacity);
+            Arrays.fill(doubleArray, capacity, newCapacity, HOLE);
+        } else {
+            denseArray = Arrays.copyOf(denseArray, newCapacity);
+        }
+        if (sparseProperties != null) {
+            List<Map.Entry<Integer, JSValue>> migrated = new ArrayList<>();
+            Iterator<Map.Entry<Integer, JSValue>> iterator = sparseProperties.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<Integer, JSValue> entry = iterator.next();
+                int index = entry.getKey();
+                if (index < newCapacity) {
+                    migrated.add(entry);
+                    iterator.remove();
+                }
+            }
+            for (Map.Entry<Integer, JSValue> entry : migrated) {
+                if (!hasDenseValue(entry.getKey())) {
+                    setDenseValue(entry.getKey(), entry.getValue());
+                }
+            }
+            if (sparseProperties.isEmpty()) {
+                sparseProperties = null;
+            }
+        }
     }
 
     @Override
@@ -362,8 +451,9 @@ public final class JSArray extends JSObject {
             int intIndex = (int) index;
 
             // Try dense array first
-            if (intIndex < denseArray.length && denseArray[intIndex] != null) {
-                return denseArray[intIndex];
+            JSValue denseValue = denseValue(intIndex);
+            if (denseValue != null) {
+                return denseValue;
             }
 
             // Check sparse storage
@@ -398,8 +488,9 @@ public final class JSArray extends JSObject {
             // Try own dense/sparse storage
             if (index < length && index <= Integer.MAX_VALUE) {
                 int intIndex = (int) index;
-                if (intIndex < denseArray.length && denseArray[intIndex] != null) {
-                    return denseArray[intIndex];
+                JSValue denseValue = denseValue(intIndex);
+                if (denseValue != null) {
+                    return denseValue;
                 }
                 if (sparseProperties != null) {
                     JSValue value = sparseProperties.get(intIndex);
@@ -438,8 +529,9 @@ public final class JSArray extends JSObject {
 
         if (index <= Integer.MAX_VALUE) {
             int intIndex = (int) index;
-            if (intIndex < denseArray.length && denseArray[intIndex] != null) {
-                return PropertyDescriptor.dataDescriptor(denseArray[intIndex], PropertyDescriptor.DataState.All);
+            JSValue denseValue = denseValue(intIndex);
+            if (denseValue != null) {
+                return PropertyDescriptor.dataDescriptor(denseValue, PropertyDescriptor.DataState.All);
             }
             if (sparseProperties != null) {
                 JSValue sparseValue = sparseProperties.get(intIndex);
@@ -464,11 +556,11 @@ public final class JSArray extends JSObject {
     private List<PropertyKey> getOwnPropertyKeysInternal(boolean enumerableOnly) {
         if (sparseProperties == null && shape.getDeletedPropCount() == 0 && shape.getPropertyCount() == 1
                 && PropertyKey.LENGTH.equals(shape.getPropertyKeyAt(0))) {
-            long denseLimit = Math.min(length, denseArray.length);
+            long denseLimit = Math.min(length, denseCapacity());
             boolean packedDenseRange = denseLimit == length;
             if (packedDenseRange) {
                 for (int index = 0; index < denseLimit; index++) {
-                    if (denseArray[index] == null) {
+                    if (!hasDenseValue(index)) {
                         packedDenseRange = false;
                         break;
                     }
@@ -493,10 +585,9 @@ public final class JSArray extends JSObject {
         List<PropertyKey> symbolKeys = new ArrayList<>();
         Set<PropertyKey> seenPropertyKeys = new HashSet<>();
 
-        long denseLimit = Math.min(length, denseArray.length);
+        long denseLimit = Math.min(length, denseCapacity());
         for (int i = 0; i < denseLimit; i++) {
-            JSValue value = denseArray[i];
-            if (value != null) {
+            if (hasDenseValue(i)) {
                 long numericIndex = Integer.toUnsignedLong(i);
                 if (seenNumericIndices.add(numericIndex)) {
                     numericKeys.add(Map.entry(numericIndex, PropertyKey.fromIndex(i)));
@@ -568,6 +659,13 @@ public final class JSArray extends JSObject {
         return keys;
     }
 
+    private boolean hasDenseValue(int index) {
+        if (doubleArray != null) {
+            return index < doubleArray.length && Double.doubleToRawLongBits(doubleArray[index]) != HOLE_BITS;
+        }
+        return index < denseArray.length && denseArray[index] != null;
+    }
+
     /**
      * Check whether an index has an own element (distinguishes holes from undefined values).
      */
@@ -578,7 +676,7 @@ public final class JSArray extends JSObject {
 
         if (index <= Integer.MAX_VALUE) {
             int intIndex = (int) index;
-            if (intIndex < denseArray.length && denseArray[intIndex] != null) {
+            if (hasDenseValue(intIndex)) {
                 return true;
             }
             return sparseProperties != null && sparseProperties.containsKey(intIndex);
@@ -598,8 +696,7 @@ public final class JSArray extends JSObject {
         }
 
         if (index <= Integer.MAX_VALUE) {
-            int intIndex = (int) index;
-            return intIndex < denseArray.length && denseArray[intIndex] != null;
+            return hasDenseValue((int) index);
         }
         return super.hasOwnProperty(PropertyKey.fromString(Long.toString(index)));
     }
@@ -632,6 +729,29 @@ public final class JSArray extends JSObject {
     }
 
     /**
+     * Take initial dense storage: unboxed when every value is a number, references otherwise.
+     */
+    private void initializeDenseStorage(JSValue[] values, int capacity, boolean takeOwnership) {
+        boolean allNumbers = true;
+        for (JSValue value : values) {
+            if (!(value instanceof JSNumber)) {
+                allNumbers = false;
+                break;
+            }
+        }
+        if (allNumbers) {
+            double[] doubles = new double[capacity];
+            for (int i = 0; i < values.length; i++) {
+                doubles[i] = toStoredDouble(((JSNumber) values[i]).value());
+            }
+            Arrays.fill(doubles, values.length, capacity, HOLE);
+            doubleArray = doubles;
+        } else {
+            denseArray = takeOwnership ? values : Arrays.copyOf(values, capacity);
+        }
+    }
+
+    /**
      * Initialize the "length" property as a special data property.
      */
     private void initializeLengthProperty() {
@@ -639,6 +759,18 @@ public final class JSArray extends JSObject {
         PropertyDescriptor lengthDesc = PropertyDescriptor.dataDescriptor(JSNumber.of(length),
                 PropertyDescriptor.DataState.Writable);
         super.defineProperty(PropertyKey.LENGTH, lengthDesc);
+    }
+
+    /**
+     * Whether an element at this index belongs in dense storage: below the capacity already allocated or
+     * {@link #MAX_DENSE_SIZE}, or just past the allocated capacity, which is where appending and sequential filling
+     * write. Dense storage used to stop at {@link #MAX_DENSE_SIZE} for every array, so element 10,000 and every one
+     * after it went into a {@code HashMap<Integer, JSValue>} — a boxed key and an entry per element, about 90 bytes
+     * each, and a hash lookup per access.
+     */
+    private boolean isDenseIndex(int index) {
+        int capacity = denseCapacity();
+        return index < capacity || index < MAX_DENSE_SIZE || index - capacity < Math.max(MAX_DENSE_SIZE, capacity >> 1);
     }
 
     private boolean isLengthWritable() {
@@ -666,8 +798,9 @@ public final class JSArray extends JSObject {
         if (index >= 0 && index < length && index <= Integer.MAX_VALUE) {
             int intIndex = (int) index;
             // Check dense array
-            if (intIndex < denseArray.length && denseArray[intIndex] != null) {
-                return denseArray[intIndex];
+            JSValue denseValue = denseValue(intIndex);
+            if (denseValue != null) {
+                return denseValue;
             }
             // Check sparse storage
             if (sparseProperties != null) {
@@ -698,8 +831,8 @@ public final class JSArray extends JSObject {
         JSValue value = get(lastIndex);
 
         // Remove the element
-        if (lastIndex < denseArray.length) {
-            denseArray[(int) lastIndex] = null;
+        if (lastIndex < denseCapacity()) {
+            setDenseValue((int) lastIndex, null);
         } else if (lastIndex <= Integer.MAX_VALUE && sparseProperties != null) {
             sparseProperties.remove((int) lastIndex);
         } else {
@@ -727,6 +860,24 @@ public final class JSArray extends JSObject {
             } else if (!isLengthWritable()) {
                 this.context.throwTypeError("Cannot assign to read only property 'length' of object '[object Array]'");
             }
+        }
+    }
+
+    /**
+     * Store an element in dense or sparse storage, never in both.
+     */
+    private void putElement(int index, JSValue value) {
+        if (isDenseIndex(index)) {
+            ensureDenseCapacity(index + 1);
+            setDenseValue(index, value);
+            if (sparseProperties != null && sparseProperties.remove(index) != null && sparseProperties.isEmpty()) {
+                sparseProperties = null;
+            }
+        } else {
+            if (sparseProperties == null) {
+                sparseProperties = new HashMap<>();
+            }
+            sparseProperties.put(index, value);
         }
     }
 
@@ -799,16 +950,8 @@ public final class JSArray extends JSObject {
             setLength(index + 1);
         }
 
-        // Use dense array if index is within reasonable range
-        if (index < MAX_DENSE_SIZE) {
-            ensureDenseCapacity((int) index + 1);
-            denseArray[(int) index] = value;
-        } else if (index <= Integer.MAX_VALUE) {
-            // Use sparse storage for large indices
-            if (sparseProperties == null) {
-                sparseProperties = new HashMap<>();
-            }
-            sparseProperties.put((int) index, value);
+        if (index <= Integer.MAX_VALUE) {
+            putElement((int) index, value);
         } else {
             // Preserve semantics for very large array indices without integer overflow.
             super.set(PropertyKey.fromString(Long.toString(index)), value);
@@ -843,6 +986,24 @@ public final class JSArray extends JSObject {
     }
 
     /**
+     * Store a dense element; null makes a hole. A value other than a number turns unboxed storage into references.
+     */
+    private void setDenseValue(int index, JSValue value) {
+        if (doubleArray != null) {
+            if (value == null) {
+                doubleArray[index] = HOLE;
+                return;
+            }
+            if (value instanceof JSNumber number) {
+                doubleArray[index] = toStoredDouble(number.value());
+                return;
+            }
+            boxDenseStorage();
+        }
+        denseArray[index] = value;
+    }
+
+    /**
      * Set the array length. When length is reduced, elements beyond the new length are deleted.
      */
     public void setLength(long newLength) {
@@ -850,10 +1011,8 @@ public final class JSArray extends JSObject {
 
         if (newLength < length) {
             // Truncate array - delete elements beyond new length
-            int denseLimit = (int) Math.min(newLength, denseArray.length);
-            for (int i = denseLimit; i < Math.min(length, denseArray.length); i++) {
-                denseArray[i] = null;
-            }
+            int denseLimit = (int) Math.min(newLength, denseCapacity());
+            clearDense(denseLimit, (int) Math.min(length, denseCapacity()));
 
             // Remove sparse elements beyond new length
             if (sparseProperties != null) {
@@ -934,19 +1093,17 @@ public final class JSArray extends JSObject {
         }
 
         // Shift dense elements
-        int denseEnd = (int) Math.min(length, denseArray.length);
-        for (int i = start + count; i < denseEnd; i++) {
-            if (i - count < denseArray.length) {
-                denseArray[i - count] = denseArray[i];
+        int denseEnd = (int) Math.min(length, denseCapacity());
+        if (start + count < denseEnd) {
+            if (doubleArray != null) {
+                System.arraycopy(doubleArray, start + count, doubleArray, start, denseEnd - start - count);
+            } else {
+                System.arraycopy(denseArray, start + count, denseArray, start, denseEnd - start - count);
             }
         }
 
         // Clear the tail
-        for (int i = Math.max(0, denseEnd - count); i < denseEnd; i++) {
-            if (i < denseArray.length) {
-                denseArray[i] = null;
-            }
-        }
+        clearDense(Math.max(0, denseEnd - count), denseEnd);
 
         // Handle sparse properties
         if (sparseProperties != null) {
@@ -1033,32 +1190,13 @@ public final class JSArray extends JSObject {
     }
 
     /**
-     * Align array element conversion with Javet's object conversion: integral finite numbers are boxed as Integer/Long
-     * instead of Double.
+     * Convert to a {@link List}; integral numbers become {@link Integer}/{@link Long}, nested objects convert too.
+     *
+     * @see JavaObjectConverter
      */
-    private Object toJavaArrayElement(JSValue value) {
-        if (value instanceof JSNumber number) {
-            double numberValue = number.value();
-            if (Double.isFinite(numberValue) && numberValue == Math.rint(numberValue)
-                    && Double.doubleToRawLongBits(numberValue) != Double.doubleToRawLongBits(-0.0d)) {
-                if (numberValue >= Integer.MIN_VALUE && numberValue <= Integer.MAX_VALUE) {
-                    return (int) numberValue;
-                }
-                if (numberValue >= Long.MIN_VALUE && numberValue <= Long.MAX_VALUE) {
-                    return (long) numberValue;
-                }
-            }
-        }
-        return value.toJavaObject();
-    }
-
     @Override
     public Object toJavaObject() {
-        List<Object> values = new ArrayList<>((int) Math.min(length, Integer.MAX_VALUE));
-        for (long i = 0; i < length; i++) {
-            values.add(toJavaArrayElement(get(i)));
-        }
-        return values;
+        return JavaObjectConverter.convert(this);
     }
 
     @Override
@@ -1147,6 +1285,13 @@ public final class JSArray extends JSObject {
         }
         long length = (long) value;
         return ((double) length == value) ? length : null;
+    }
+
+    /**
+     * A number as stored unboxed: every NaN canonical, so none can be mistaken for {@link #HOLE}.
+     */
+    private static double toStoredDouble(double value) {
+        return Double.isNaN(value) ? Double.NaN : value;
     }
 
     private static long toUint32(double value) {

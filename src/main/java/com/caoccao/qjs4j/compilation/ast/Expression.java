@@ -36,6 +36,16 @@ public abstract sealed class Expression extends Pattern
         return false;
     }
 
+    /**
+     * Whether this expression is a member access or call whose chain of objects and callees contains an optional
+     * {@code ?.} link, parenthesised or not.
+     *
+     * @return true when the chain contains an optional link
+     */
+    public boolean containsOptionalChain() {
+        return false;
+    }
+
     @Override
     public List<String> getBoundNames() {
         if (boundNames == null) {

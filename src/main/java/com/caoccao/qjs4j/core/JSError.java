@@ -42,6 +42,7 @@ public sealed class JSError extends JSObject permits JSAggregateError, JSRangeEr
      * position in a file the caller never passed in — has anything to put here.
      */
     private String sourceName;
+    private JSStackTrace stackTrace;
     private String vmMessage;
 
     /**
@@ -110,6 +111,15 @@ public sealed class JSError extends JSObject permits JSAggregateError, JSRangeEr
         return sourceName;
     }
 
+    /**
+     * The stack trace captured when this error was created.
+     *
+     * @return the trace, or null when none was captured
+     */
+    JSStackTrace getStackTrace() {
+        return stackTrace;
+    }
+
     public String getVmMessage() {
         return vmMessage;
     }
@@ -122,6 +132,10 @@ public sealed class JSError extends JSObject permits JSAggregateError, JSRangeEr
      */
     void setSourceName(String sourceName) {
         this.sourceName = sourceName;
+    }
+
+    void setStackTrace(JSStackTrace stackTrace) {
+        this.stackTrace = stackTrace;
     }
 
     public void setVmMessage(String vmMessage) {
@@ -138,6 +152,47 @@ public sealed class JSError extends JSObject permits JSAggregateError, JSRangeEr
         return name + ": " + message;
     }
 
+    /**
+     * {@code Error.captureStackTrace(targetObject[, constructorOpt])}, the V8 extension Node and most error-wrapping
+     * libraries rely on: gives {@code targetObject} a {@code stack} accessor holding the current stack, leaving out the
+     * frames above and including the most recent call of {@code constructorOpt}.
+     *
+     * @param context
+     *            the realm
+     * @param thisArg
+     *            unused
+     * @param args
+     *            the target object and the optional function to start below
+     * @return {@code undefined}
+     */
+    public static JSValue captureStackTrace(JSContext context, JSValue thisArg, JSValue[] args) {
+        if (args.length == 0 || !(args[0] instanceof JSObject targetObject)) {
+            // V8's message, verbatim.
+            return context.throwTypeError("invalid_argument");
+        }
+        JSObject skipFunction = args.length > 1 && args[1] instanceof JSFunction function ? function : null;
+        if (!context.captureStackTrace(targetObject, skipFunction)) {
+            return context.throwTypeError("Cannot define property stack, object is not extensible");
+        }
+        return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Leave the frames of a subclass's own constructors out of the stack of an error it constructs, as V8 does: when
+     * {@code new MyError()} reaches an error constructor through {@code super()}, the frames above and including
+     * {@code MyError}'s are not part of the trace.
+     *
+     * @param context
+     *            the realm
+     * @param error
+     *            the error just constructed
+     */
+    static void captureStackTraceBelowNewTarget(JSContext context, JSObject error) {
+        if (context.getNativeConstructorNewTarget() instanceof JSBytecodeFunction newTarget) {
+            context.captureStackTrace(error, newTarget);
+        }
+    }
+
     public static JSValue create(JSContext context, JSValue... args) {
         String message = "";
         if (args.length > 0 && !args[0].isUndefined()) {
@@ -147,11 +202,15 @@ public sealed class JSError extends JSObject permits JSAggregateError, JSRangeEr
             }
         }
         JSError jsError = context.createJSError(message);
+        if (args.length > 0 && !args[0].isUndefined()) {
+            defineEmptyMessage(jsError, message);
+        }
         if (args.length > 1) {
             if (!installErrorCause(context, jsError, args[1])) {
                 return JSUndefined.INSTANCE;
             }
         }
+        captureStackTraceBelowNewTarget(context, jsError);
         return jsError;
     }
 
@@ -181,11 +240,35 @@ public sealed class JSError extends JSObject permits JSAggregateError, JSRangeEr
                 new JSNativeFunction(context, "isError", 1, JSError::isError),
                 PropertyDescriptor.DataState.ConfigurableWritable);
 
+        // V8 extensions: Error.captureStackTrace and Error.stackTraceLimit
+        errorConstructor.defineProperty(PropertyKey.fromString("captureStackTrace"),
+                new JSNativeFunction(context, "captureStackTrace", 2, JSError::captureStackTrace),
+                PropertyDescriptor.DataState.ConfigurableWritable);
+        errorConstructor.defineProperty(JSErrorReporter.STACK_TRACE_LIMIT,
+                JSNumber.of(JSErrorReporter.DEFAULT_STACK_TRACE_LIMIT), PropertyDescriptor.DataState.All);
+
         // Constructor property on prototype (writable, non-enumerable, configurable)
         errorPrototype.defineProperty(PropertyKey.fromString("constructor"), errorConstructor,
                 PropertyDescriptor.DataState.ConfigurableWritable);
 
         return errorConstructor;
+    }
+
+    /**
+     * Give an error constructed with an empty message its own {@code message} property, as the constructors do for any
+     * message argument that is not {@code undefined}. The constructor defines the property only for a non-empty text,
+     * so {@code new Error("")} used to inherit {@code message} from the prototype.
+     *
+     * @param error
+     *            the error just constructed
+     * @param message
+     *            the message text
+     */
+    static void defineEmptyMessage(JSError error, String message) {
+        if (message.isEmpty()) {
+            error.defineProperty(PropertyKey.MESSAGE, PropertyDescriptor.dataDescriptor(new JSString(message),
+                    PropertyDescriptor.DataState.ConfigurableWritable));
+        }
     }
 
     /**

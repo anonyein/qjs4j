@@ -24,6 +24,7 @@ import com.caoccao.qjs4j.compilation.lexer.Token;
 import com.caoccao.qjs4j.compilation.lexer.TokenType;
 import com.caoccao.qjs4j.compilation.parser.Parser;
 import com.caoccao.qjs4j.exceptions.JSCompilerException;
+import com.caoccao.qjs4j.exceptions.JSErrorException;
 import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 import com.caoccao.qjs4j.unicode.UnicodeData;
@@ -71,10 +72,12 @@ final class ModuleSourceTransformer {
      * {@link #decodeIdentifierEscapes(String)} and then checked against the Unicode tables by
      * {@link #isValidIdentifierName(String)}, which is the authority. Matching slightly too much costs a rejection with
      * a message; matching too little silently loses a binding.
+     * <p>
+     * The repetition is possessive for the reason given on {@link #MODULE_SPECIFIER_BODY_REGEX}.
      */
     static final String IDENTIFIER_NAME_REGEX = "(?:[\\p{L}\\p{Nl}$_]|\\\\u[0-9A-Fa-f]{4}|\\\\u\\{[0-9A-Fa-f]{1,6}\\})"
             + "(?:[\\p{L}\\p{Nl}\\p{Mn}\\p{Mc}\\p{Nd}\\p{Pc}$_\\u200C\\u200D]"
-            + "|\\\\u[0-9A-Fa-f]{4}|\\\\u\\{[0-9A-Fa-f]{1,6}\\})*";
+            + "|\\\\u[0-9A-Fa-f]{4}|\\\\u\\{[0-9A-Fa-f]{1,6}\\})*+";
 
     static final Pattern MODULE_BINDING_IMPORT_PATTERN = Pattern.compile(
             "(?m)^\\s*import\\s*([^;]*?)\\s+from\\s+(['\"])(" + ModuleSourceTransformer.MODULE_SPECIFIER_BODY_REGEX
@@ -102,8 +105,12 @@ final class ModuleSourceTransformer {
      * A backslash escapes whatever follows it, so a quote character does not necessarily end the literal and a line
      * terminator does not necessarily end the declaration. The previous {@code [^'"\r\n]+} could express neither:
      * {@code './a\'b.mjs'} matched nothing at all, and so did a specifier written across a LineContinuation.
+     * <p>
+     * The repetition is possessive. A greedy repetition of an alternation is matched by recursion, one Java frame per
+     * character, so a long specifier overflowed the stack; giving characters back could never help anyway, because the
+     * body cannot match the quote that has to follow it.
      */
-    static final String MODULE_SPECIFIER_BODY_REGEX = "(?:\\\\[\\s\\S]|[^'\"\\\\\\r\\n])+";
+    static final String MODULE_SPECIFIER_BODY_REGEX = "(?:\\\\[\\s\\S]|[^'\"\\\\\\r\\n])++";
 
     static final Pattern MODULE_STATIC_IMPORT_PATTERN = Pattern
             .compile("(?m)^\\s*import\\s*(?:defer\\s+)?(?:[^;]*?\\s+from\\s+)?['\"]("
@@ -2035,6 +2042,9 @@ final class ModuleSourceTransformer {
         } catch (JSCompilerException compilerError) {
             throw new JSException(
                     context.throwSyntaxError(compilerError.getMessage(), compilerError.getSourceLocation()));
+        } catch (JSErrorException error) {
+            // A dependency nested too deeply to compile is a RangeError, as it is for the entry module.
+            throw new JSException(context.throwError(error));
         }
     }
 

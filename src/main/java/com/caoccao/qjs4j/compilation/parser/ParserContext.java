@@ -51,7 +51,7 @@ final class ParserContext {
     final boolean inheritedStrictMode;
     boolean inOperatorAllowed;
     final boolean isEval;
-    final Deque<Set<String>> labelStack = new ArrayDeque<>();
+    Deque<Set<String>> labelStack = new ArrayDeque<>();
     final Lexer lexer;
     // Module-level early error tracking (ES2024 16.2.1.1)
     final Set<String> moduleExportedNames = new HashSet<>();
@@ -110,7 +110,6 @@ final class ParserContext {
         }
         throw new JSSyntaxErrorException(describeUnexpectedToken());
     }
-
     /**
      * Name the current token the way a diagnostic should, when it is the token that cannot follow.
      * <p>
@@ -160,6 +159,22 @@ final class ParserContext {
             return "Unexpected token '" + name + "'";
         }
         return "Unexpected identifier '" + name + "'";
+    }
+
+    /**
+     * Start a function body with no labels in scope. Labels are per function (ES2024 14.13.1 ContainsDuplicateLabels
+     * does not look into nested functions), so {@code foo: { function f() { foo: {} } }} is legal.
+     *
+     * @return the enclosing labels, to restore with {@link #exitFunctionLabelScope(Deque)}
+     */
+    Deque<Set<String>> enterFunctionLabelScope() {
+        Deque<Set<String>> enclosingLabels = labelStack;
+        labelStack = new ArrayDeque<>();
+        return enclosingLabels;
+    }
+
+    void exitFunctionLabelScope(Deque<Set<String>> enclosingLabels) {
+        labelStack = enclosingLabels;
     }
 
     Token expect(TokenType type) {

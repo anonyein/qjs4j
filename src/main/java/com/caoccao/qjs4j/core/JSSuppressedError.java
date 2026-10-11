@@ -95,6 +95,7 @@ public final class JSSuppressedError extends JSError {
             }
         }
 
+        JSError.captureStackTraceBelowNewTarget(context, jsSuppressedError);
         return jsSuppressedError;
     }
 

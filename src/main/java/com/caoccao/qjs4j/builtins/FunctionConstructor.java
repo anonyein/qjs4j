@@ -19,6 +19,7 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.compilation.compiler.Compiler;
 import com.caoccao.qjs4j.core.*;
 import com.caoccao.qjs4j.exceptions.JSCompilerException;
+import com.caoccao.qjs4j.exceptions.JSErrorException;
 import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 
@@ -164,6 +165,9 @@ public final class FunctionConstructor {
             return context.throwSyntaxError(e.getMessage(), e.getSourceLocation());
         } catch (JSException e) {
             return e.getErrorValue();
+        } catch (JSErrorException e) {
+            // A body nested too deeply to compile is a RangeError, not a generic creation failure.
+            return context.throwError(e);
         } catch (Exception e) {
             return context.throwError(errorPrefix + e.getMessage());
         }

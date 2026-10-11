@@ -41,6 +41,7 @@ final class RealmIntrinsics {
     // Async generator prototype chain (not exposed in global scope)
     private JSObject asyncGeneratorPrototype;
     private JSObject cachedDatePrototype;
+    private JSObject cachedErrorConstructor;
     // Cached Object.prototype for fast internal object creation
     private JSObject cachedObjectPrototype;
     private JSObject cachedPromisePrototype;
@@ -89,6 +90,8 @@ final class RealmIntrinsics {
                 cachedPromisePrototype = protoObj;
             }
         }
+        // Installed by the engine itself before this runs.
+        cachedErrorConstructor = (JSObject) globalObject.get(JSError.NAME);
         JSValue regExpCtor = globalObject.get(JSRegExp.NAME);
         if (regExpCtor instanceof JSObject regExpCtorObject) {
             cachedRegExpConstructor = regExpCtorObject;
@@ -116,6 +119,15 @@ final class RealmIntrinsics {
 
     JSObject getCachedDatePrototype() {
         return cachedDatePrototype;
+    }
+
+    /**
+     * The realm's {@code %Error%}, whose {@code stackTraceLimit} bounds every stack trace the realm captures.
+     *
+     * @return the constructor, or null before the global object is populated
+     */
+    JSObject getCachedErrorConstructor() {
+        return cachedErrorConstructor;
     }
 
     JSObject getCachedPromisePrototype() {
@@ -336,6 +348,7 @@ final class RealmIntrinsics {
         asyncGeneratorFunctionPrototype = null;
         asyncGeneratorPrototype = null;
         cachedDatePrototype = null;
+        cachedErrorConstructor = null;
         cachedObjectPrototype = null;
         cachedPromisePrototype = null;
         cachedRegExpConstructor = null;

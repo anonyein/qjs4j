@@ -17,12 +17,16 @@
 package com.caoccao.qjs4j.cli;
 
 import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSFileSystemModuleLoader;
 import com.caoccao.qjs4j.core.JSRuntime;
+import com.caoccao.qjs4j.core.JSRuntimeOptions;
 import com.caoccao.qjs4j.core.JSUndefined;
 import com.caoccao.qjs4j.core.JSValue;
+import com.caoccao.qjs4j.exceptions.JSTerminationException;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Consumer;
 
 /**
  * Read-Eval-Print Loop for interactive JavaScript execution.
@@ -57,7 +61,25 @@ public final class REPL implements AutoCloseable {
      *            where errors are printed
      */
     public REPL(InputStream input, PrintStream output, PrintStream errorOutput) {
-        this.runtime = new JSRuntime();
+        this(input, output, errorOutput, runtime -> {
+        });
+    }
+
+    /**
+     * Create a REPL over explicit streams, handing the runtime to a hook before the first line is read.
+     *
+     * @param input
+     *            the source of lines
+     * @param output
+     *            where results are printed
+     * @param errorOutput
+     *            where errors are printed
+     * @param runtimeHook
+     *            receives the runtime the loop evaluates in
+     */
+    REPL(InputStream input, PrintStream output, PrintStream errorOutput, Consumer<JSRuntime> runtimeHook) {
+        this.runtime = new JSRuntime(new JSRuntimeOptions().setModuleLoader(new JSFileSystemModuleLoader()));
+        runtimeHook.accept(runtime);
         this.context = runtime.createContext();
         this.reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
         this.outputStream = output;
@@ -93,8 +115,14 @@ public final class REPL implements AutoCloseable {
             } catch (IOException e) {
                 errorStream.println("Error: " + e.getMessage());
                 break;
-            } catch (RuntimeException e) {
+            } catch (JSTerminationException e) {
+                // An interrupted evaluation, or an engine defect: report it and let the next line run. The
+                // interrupt flag stays set until cleared, so clear it or every later line would stop at once.
                 errorStream.println("Error: " + e.getMessage());
+                runtime.clearInterrupt();
+            } catch (RuntimeException | Error e) {
+                // An Error, such as an OutOfMemoryError, used to end the session with a JVM stack dump.
+                errorStream.println("Error: " + e);
             }
         }
     }

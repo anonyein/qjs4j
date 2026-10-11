@@ -23,6 +23,11 @@ import java.util.List;
  * Tracks loop context for break/continue statements. Also used for labeled statements (where isRegularStmt is true).
  */
 final class LoopContext {
+    /**
+     * The local holding a {@code for await} loop's iterator, so a {@code break}, {@code continue} to an outer loop or
+     * {@code return} can call its {@code return()} and await the result; -1 for any other loop.
+     */
+    int asyncIteratorLocal = -1;
     final List<Integer> breakPositions = new ArrayList<>();
     final int breakTargetScopeDepth;
     final List<Integer> continuePositions = new ArrayList<>();

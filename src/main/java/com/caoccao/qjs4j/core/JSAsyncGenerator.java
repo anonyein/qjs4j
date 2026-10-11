@@ -183,6 +183,8 @@ public final class JSAsyncGenerator extends JSObject {
                         JSValue completionResult = completionPromise.getResult();
                         context.enqueueMicrotask(() -> request.promise().fulfill(completionResult));
                     } else if (completionPromise.getState() == JSPromise.PromiseState.REJECTED) {
+                        // Consumed directly rather than through a reaction, so record that it is handled.
+                        completionPromise.markHandled();
                         JSValue completionError = completionPromise.getResult();
                         context.enqueueMicrotask(() -> request.promise().reject(completionError));
                     } else {
@@ -240,6 +242,8 @@ public final class JSAsyncGenerator extends JSObject {
                 return;
             }
             if (resultPromise.getState() == JSPromise.PromiseState.REJECTED) {
+                // Consumed directly rather than through a reaction, so record that it is handled.
+                resultPromise.markHandled();
                 pendingRequestPromise = null;
                 state = AsyncGeneratorState.COMPLETED;
                 request.promise().reject(resultPromise.getResult());

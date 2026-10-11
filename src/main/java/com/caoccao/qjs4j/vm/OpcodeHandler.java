@@ -157,6 +157,25 @@ public final class OpcodeHandler {
     }
 
     /**
+     * How the TypeError a call or {@code new} with an unusable callee raises names it: as the compiler named the callee
+     * ({@code o.a.b is not a function}), or, for a literal callee, by its value.
+     */
+    private static String describeCallee(ExecutionContext executionContext, JSValue callee) {
+        String description = executionContext.bytecode.getCallDescription(executionContext.pc);
+        if (description != null) {
+            return description;
+        }
+        // Described without running script: a literal's text, or "object" for a value the compiler did not name.
+        if (callee instanceof JSString str) {
+            return "\"" + str.value() + "\"";
+        }
+        if (callee instanceof JSObject) {
+            return "object";
+        }
+        return JSAsyncIterator.describeIteratorResult(callee);
+    }
+
+    /**
      * Render a property key for an error message, without running any script.
      *
      * @param keyValue
@@ -293,6 +312,15 @@ public final class OpcodeHandler {
             }
         }
         return null;
+    }
+
+    /**
+     * The {@code length} of a primitive string. It is an own, non-writable, non-configurable property of the String
+     * wrapper, so nothing on the prototype chain can shadow it: read it without allocating the wrapper, and without
+     * flattening a rope.
+     */
+    private static JSNumber getStringLength(JSString string) {
+        return JSNumber.of(string.length());
     }
 
     static void handleAdd(Opcode op, ExecutionContext executionContext) {
@@ -524,6 +552,17 @@ public final class OpcodeHandler {
         JSValue result;
         try {
             if (isConstructorCall != 0) {
+                // A `new` with spread arguments names its callee; a super(...) call leaves the check to construct.
+                String description = executionContext.bytecode.getCallDescription(pc);
+                if (description != null && !JSTypeChecking.isConstructor(functionValue)) {
+                    executionContext.virtualMachine.pendingException = executionContext.virtualMachine.context
+                            .throwTypeError(description + " is not a constructor");
+                    executionContext.virtualMachine.context.clearPendingException();
+                    stack[sp++] = JSUndefined.INSTANCE;
+                    executionContext.sp = sp;
+                    executionContext.pc = pc + op.getSize();
+                    return;
+                }
                 JSValue constructorNewTarget = thisArgValue;
                 if (constructorNewTarget.isNullOrUndefined()) {
                     constructorNewTarget = functionValue;
@@ -546,7 +585,7 @@ public final class OpcodeHandler {
                     result = applyFunction.call(executionContext.virtualMachine.context, thisArgValue, applyArgs);
                 } else {
                     executionContext.virtualMachine.pendingException = executionContext.virtualMachine.context
-                            .throwTypeError("Value is not a function");
+                            .throwTypeError(describeCallee(executionContext, functionValue) + " is not a function");
                     executionContext.virtualMachine.context.clearPendingException();
                     stack[sp++] = JSUndefined.INSTANCE;
                     executionContext.sp = sp;
@@ -900,16 +939,14 @@ public final class OpcodeHandler {
             // pending reactions (e.g., Promise.resolve().then(cb)) run before code after await.
             // ES2024 25.5.5.3: await always takes at least 1 microtask tick.
             executionContext.virtualMachine.context.processMicrotasks();
+            // Awaiting handles the promise's rejection, exactly as attaching a reaction would.
+            promise.markHandled();
 
             // Now the promise should be settled, push the resolved value
             if (promise.getState() == JSPromise.PromiseState.FULFILLED) {
                 executionContext.virtualMachine.valueStack.push(promise.getResult());
             } else if (promise.getState() == JSPromise.PromiseState.REJECTED) {
                 JSValue result = promise.getResult();
-                IJSPromiseRejectCallback callback = executionContext.virtualMachine.context.getPromiseRejectCallback();
-                if (callback != null) {
-                    callback.callback(PromiseRejectEvent.PromiseRejectWithNoHandler, promise, result);
-                }
                 executionContext.virtualMachine.pendingException = result;
                 executionContext.virtualMachine.context.setPendingException(result);
             } else {
@@ -988,7 +1025,9 @@ public final class OpcodeHandler {
         } else if (constructor instanceof JSFunction jsFunction) {
             // Check if the function is constructable
             if (!JSTypeChecking.isConstructor(jsFunction)) {
-                context.throwTypeError(jsFunction.getName() + " is not a constructor");
+                String description = executionContext.bytecode.getCallDescription(executionContext.pc);
+                context.throwTypeError(
+                        (description != null ? description : jsFunction.getName()) + " is not a constructor");
                 virtualMachine.pendingException = context.getPendingException();
                 stack[sp++] = JSUndefined.INSTANCE;
             } else {
@@ -1010,7 +1049,7 @@ public final class OpcodeHandler {
                 }
             }
         } else {
-            context.throwTypeError("not a constructor");
+            context.throwTypeError(describeCallee(executionContext, constructor) + " is not a constructor");
             virtualMachine.pendingException = context.getPendingException();
             stack[sp++] = JSUndefined.INSTANCE;
         }
@@ -1614,7 +1653,6 @@ public final class OpcodeHandler {
             }
             // Eval syntax: no receiver pop (directEvalSyntax)
             JSValue callee = (JSValue) stack[--sp];
-            executionContext.virtualMachine.propertyAccessLock = false;
             executionContext.virtualMachine.valueStack.stackTop = sp;
 
             // Check if callee is a non-constructor, non-async/generator bytecode function eligible for TCO
@@ -1625,7 +1663,6 @@ public final class OpcodeHandler {
             }
 
             if (canTrampoline) {
-                executionContext.virtualMachine.resetPropertyAccessTracking();
                 executionContext.virtualMachine.tailCallPending = new VirtualMachine.TailCallRequest(
                         (JSBytecodeFunction) callee, JSUndefined.INSTANCE, args, argumentCount);
                 executionContext.virtualMachine.lastConstructorThisArg = executionContext.frame.getThisArg();
@@ -1965,10 +2002,16 @@ public final class OpcodeHandler {
         }
 
         executionContext.virtualMachine.clearForOfIteratorExhausted(iteratorObj);
-        // Push iterator, next method, and catch offset (0) onto the stack
-        executionContext.virtualMachine.valueStack.push(iterator); // Iterator object
+        // A sync iterator is closed through its async-from-sync wrapper's return(), which always exists and answers
+        // with a promise (CreateAsyncFromSyncIterator); the loop awaits it on a break or a return.
+        JSValue iteratorForStack = wrapSyncIteratorAsAsync
+                ? JSAsyncIterator.createAsyncFromSyncIteratorForClose(executionContext.virtualMachine.context,
+                        iteratorObj)
+                : iterator;
+        // Push iterator, next method, and the for-await marker onto the stack
+        executionContext.virtualMachine.valueStack.push(iteratorForStack); // Iterator object
         executionContext.virtualMachine.valueStack.push(nextMethodForStack); // next() method
-        executionContext.virtualMachine.valueStack.pushStackValue(JSCatchOffset.ITERATOR_CLOSE_MARKER);
+        executionContext.virtualMachine.valueStack.pushStackValue(JSCatchOffset.ASYNC_ITERATOR_CLOSE_MARKER);
         executionContext.sp = executionContext.virtualMachine.valueStack.stackTop;
         executionContext.pc += op.getSize();
     }
@@ -2334,10 +2377,6 @@ public final class OpcodeHandler {
                     executionContext.virtualMachine.context.clearPendingException();
                     stack[sp - 1] = JSUndefined.INSTANCE;
                 } else {
-                    if (executionContext.virtualMachine.trackPropertyAccess
-                            && !executionContext.virtualMachine.propertyAccessLock) {
-                        executionContext.virtualMachine.appendPropertyAccessForArrayIndex(indexValue);
-                    }
                     stack[sp - 1] = result;
                 }
             } catch (JSVirtualMachineException e) {
@@ -2465,6 +2504,12 @@ public final class OpcodeHandler {
         int atomIndex = executionContext.bytecode.readU32(pc + 1);
         String fieldName = executionContext.bytecode.getAtoms()[atomIndex];
         JSValue objectValue = executionContext.pop();
+        if (objectValue instanceof JSString string && "length".equals(fieldName)) {
+            JSNumber stringLength = getStringLength(string);
+            executionContext.push(stringLength);
+            executionContext.pc = pc + op.getSize();
+            return;
+        }
 
         JSObject targetObject = executionContext.virtualMachine.toObject(objectValue);
         if (targetObject != null) {
@@ -2475,20 +2520,12 @@ public final class OpcodeHandler {
                 executionContext.virtualMachine.context.clearPendingException();
                 executionContext.push(JSUndefined.INSTANCE);
             } else {
-                if (executionContext.virtualMachine.trackPropertyAccess
-                        && !executionContext.virtualMachine.propertyAccessLock) {
-                    if (!executionContext.virtualMachine.propertyAccessChain.isEmpty()) {
-                        executionContext.virtualMachine.propertyAccessChain.append('.');
-                    }
-                    executionContext.virtualMachine.propertyAccessChain.append(fieldName);
-                }
                 executionContext.push(result);
             }
         } else {
             String typeName = objectValue instanceof JSNull ? "null" : "undefined";
             executionContext.virtualMachine.pendingException = executionContext.virtualMachine.context
                     .throwTypeError("Cannot read properties of " + typeName + " (reading '" + fieldName + "')");
-            executionContext.virtualMachine.resetPropertyAccessTracking();
             executionContext.push(JSUndefined.INSTANCE);
         }
         executionContext.pc = pc + op.getSize();
@@ -2500,6 +2537,12 @@ public final class OpcodeHandler {
         int atomIndex = executionContext.bytecode.readU32(pc + 1);
         String fieldName = executionContext.bytecode.getAtoms()[atomIndex];
         JSValue objectValue = executionContext.peek(0);
+        if (objectValue instanceof JSString string && "length".equals(fieldName)) {
+            JSNumber stringLength = getStringLength(string);
+            executionContext.push(stringLength);
+            executionContext.pc = pc + op.getSize();
+            return;
+        }
 
         JSObject targetObject = executionContext.virtualMachine.toObject(objectValue);
         if (targetObject != null) {
@@ -2510,20 +2553,12 @@ public final class OpcodeHandler {
                 executionContext.virtualMachine.context.clearPendingException();
                 executionContext.push(JSUndefined.INSTANCE);
             } else {
-                if (executionContext.virtualMachine.trackPropertyAccess
-                        && !executionContext.virtualMachine.propertyAccessLock) {
-                    if (!executionContext.virtualMachine.propertyAccessChain.isEmpty()) {
-                        executionContext.virtualMachine.propertyAccessChain.append('.');
-                    }
-                    executionContext.virtualMachine.propertyAccessChain.append(fieldName);
-                }
                 executionContext.push(result);
             }
         } else {
             String typeName = objectValue instanceof JSNull ? "null" : "undefined";
             executionContext.virtualMachine.pendingException = executionContext.virtualMachine.context
                     .throwTypeError("Cannot read properties of " + typeName + " (reading '" + fieldName + "')");
-            executionContext.virtualMachine.resetPropertyAccessTracking();
             executionContext.push(JSUndefined.INSTANCE);
         }
         executionContext.pc = pc + op.getSize();
@@ -2532,6 +2567,11 @@ public final class OpcodeHandler {
     static void handleGetLength(Opcode op, ExecutionContext executionContext) {
         int pc = executionContext.pc;
         JSValue objectValue = executionContext.pop();
+        if (objectValue instanceof JSString string) {
+            executionContext.push(getStringLength(string));
+            executionContext.pc = pc + op.getSize();
+            return;
+        }
         JSObject targetObject = executionContext.virtualMachine.toObject(objectValue);
         if (targetObject != null) {
             JSValue result = targetObject.get(PropertyKey.LENGTH);
@@ -2901,11 +2941,6 @@ public final class OpcodeHandler {
             variableValue = globalObject.get(propertyKey);
             hasProperty = !(variableValue instanceof JSUndefined) || globalObject.has(propertyKey);
             if (hasProperty) {
-                if (!allowMissing && executionContext.virtualMachine.trackPropertyAccess
-                        && !executionContext.virtualMachine.propertyAccessLock) {
-                    executionContext.virtualMachine.resetPropertyAccessTracking();
-                    executionContext.virtualMachine.propertyAccessChain.append(variableName);
-                }
                 stack[sp++] = variableValue;
                 executionContext.sp = sp;
                 executionContext.pc = pc + op.getSize();
@@ -2926,7 +2961,8 @@ public final class OpcodeHandler {
                         .throwReferenceError("Cannot access '" + variableName + "' before initialization");
                 stack[sp++] = JSUndefined.INSTANCE;
             } else {
-                stack[sp++] = context.readGlobalLexicalBinding(variableName);
+                JSValue lexicalValue = context.readGlobalLexicalBinding(variableName);
+                stack[sp++] = lexicalValue;
             }
             executionContext.sp = sp;
             executionContext.pc = pc + op.getSize();
@@ -2952,11 +2988,6 @@ public final class OpcodeHandler {
                     .throwReferenceError(variableName + " is not defined");
             stack[sp++] = JSUndefined.INSTANCE;
         } else {
-            if (!allowMissing && executionContext.virtualMachine.trackPropertyAccess
-                    && !executionContext.virtualMachine.propertyAccessLock) {
-                executionContext.virtualMachine.resetPropertyAccessTracking();
-                executionContext.virtualMachine.propertyAccessChain.append(variableName);
-            }
             stack[sp++] = variableValue;
         }
         executionContext.sp = sp;
@@ -3695,8 +3726,9 @@ public final class OpcodeHandler {
     static void handleIteratorCheckObject(Opcode op, ExecutionContext executionContext) {
         JSValue iteratorResult = executionContext.peek(0);
         if (!(iteratorResult instanceof JSObject)) {
-            setErrorAsPending(executionContext,
-                    executionContext.virtualMachine.context.throwTypeError("iterator must return an object"));
+            // V8's wording, which names the value.
+            setErrorAsPending(executionContext, executionContext.virtualMachine.context.throwTypeError(
+                    "Iterator result " + JSAsyncIterator.describeIteratorResult(iteratorResult) + " is not an object"));
             return;
         }
         executionContext.pc += op.getSize();
@@ -3726,6 +3758,9 @@ public final class OpcodeHandler {
 
         int removeStartIndex = markerIndex - 2;
         JSValue iteratorValue = stack[removeStartIndex] instanceof JSValue jsValue ? jsValue : JSUndefined.INSTANCE;
+        // A for-await loop's iterator is only removed here; the compiled code calls return() and awaits it.
+        boolean asyncIterator = stack[markerIndex] instanceof JSCatchOffset marker
+                && marker.isAsyncIteratorCloseMarker();
         int tailCount = sp - (markerIndex + 1);
         if (tailCount > 0) {
             System.arraycopy(stack, markerIndex + 1, stack, removeStartIndex, tailCount);
@@ -3735,7 +3770,7 @@ public final class OpcodeHandler {
             stack[index] = null;
         }
 
-        if (iteratorValue instanceof JSObject iteratorObject && !iteratorValue.isUndefined()) {
+        if (!asyncIterator && iteratorValue instanceof JSObject iteratorObject) {
             boolean iteratorAlreadyExhausted = executionContext.virtualMachine.isForOfIteratorExhausted(iteratorObject);
             executionContext.virtualMachine.clearForOfIteratorExhausted(iteratorObject);
             if (!iteratorAlreadyExhausted) {
@@ -5179,6 +5214,9 @@ public final class OpcodeHandler {
     static void handleSetLocUninitialized(Opcode op, ExecutionContext executionContext) {
         int pc = executionContext.pc;
         int localIndex = executionContext.bytecode.readU16(pc + 1);
+        // Entering the scope that declares this binding again — a loop body's next iteration — starts a new
+        // binding; closures from the previous entry keep the old one.
+        executionContext.frame.detachLocalVarRef(localIndex);
         executionContext.frame.getLocals()[localIndex] = VirtualMachine.UNINITIALIZED_MARKER;
         executionContext.pc = pc + op.getSize();
     }
@@ -5407,7 +5445,6 @@ public final class OpcodeHandler {
         JSStackValue temporaryValue = stack[sp - 1];
         stack[sp - 1] = stack[sp - 2];
         stack[sp - 2] = temporaryValue;
-        executionContext.virtualMachine.propertyAccessLock = true;
         executionContext.pc += 1;
     }
 
@@ -5449,8 +5486,6 @@ public final class OpcodeHandler {
             }
             JSValue receiver = executionContext.virtualMachine.valueStack.pop();
             callee = executionContext.virtualMachine.valueStack.pop();
-            executionContext.virtualMachine.propertyAccessLock = false;
-            executionContext.virtualMachine.resetPropertyAccessTracking();
 
             // Apply OrdinaryCallBindThis for the tail-called function, matching JSBytecodeFunction.call()
             JSBytecodeFunction tailCallee = (JSBytecodeFunction) callee;
@@ -5503,7 +5538,9 @@ public final class OpcodeHandler {
         int throwType = executionContext.bytecode.readU8(pc + 5);
         String throwName = executionContext.bytecode.getAtoms()[throwAtom];
         switch (throwType) {
-            case 0 -> executionContext.virtualMachine.context.throwTypeError("'" + throwName + "' is read-only");
+            // V8's wording for an assignment to a const, a class name or a function's own name; QuickJS says
+            // "'x' is read-only".
+            case 0 -> executionContext.virtualMachine.context.throwTypeError("Assignment to constant variable.");
             case 1 ->
                 executionContext.virtualMachine.context.throwError("SyntaxError: redeclaration of '" + throwName + "'");
             case 2 -> executionContext.virtualMachine.context.throwReferenceError(throwName + " is not initialized");
@@ -6075,7 +6112,6 @@ public final class OpcodeHandler {
 
         // SWAP locks property tracking while evaluating method-call arguments.
         // Unlock before invoking the callee so nested calls can build their own chains.
-        virtualMachine.propertyAccessLock = false;
         virtualMachine.valueStack.stackTop = sp;
 
         // Fast path for native functions (most common case for built-in method calls).
@@ -6099,7 +6135,6 @@ public final class OpcodeHandler {
             if (nativeFunc.requiresNew()) {
                 JSContext errorContext = nativeFunc.getRealmContext() != null ? nativeFunc.getRealmContext() : context;
                 String constructorName = nativeFunc.getName() != null ? nativeFunc.getName() : "constructor";
-                virtualMachine.resetPropertyAccessTracking();
                 String errorMessage = switch (constructorName) {
                     case JSPromise.NAME -> "Promise constructor cannot be invoked without 'new'";
                     default -> "Constructor " + constructorName + " requires 'new'";
@@ -6139,11 +6174,9 @@ public final class OpcodeHandler {
                 context.clearPendingException();
                 stack[sp++] = JSUndefined.INSTANCE;
             }
-            virtualMachine.resetPropertyAccessTracking();
         } else if (callee instanceof JSProxy proxy) {
             JSValue result = virtualMachine.proxyApply(proxy, receiver, args);
             stack[sp++] = result;
-            virtualMachine.resetPropertyAccessTracking();
         } else if (callee instanceof JSFunction function) {
             if (function.getHomeObject() == null && receiver instanceof JSObject receiverObject
                     && function instanceof JSBytecodeFunction bytecodeFunction) {
@@ -6159,7 +6192,6 @@ public final class OpcodeHandler {
             }
             if (isClassCtor) {
                 JSContext errorContext = function.getRealmContext() != null ? function.getRealmContext() : context;
-                virtualMachine.resetPropertyAccessTracking();
                 virtualMachine.pendingException = errorContext
                         .throwTypeError("Class constructor " + function.getName() + " cannot be invoked without 'new'");
                 errorContext.clearPendingException();
@@ -6208,27 +6240,10 @@ public final class OpcodeHandler {
                 stack[sp++] = JSUndefined.INSTANCE;
             }
             // Clear property access tracking after successful call
-            virtualMachine.resetPropertyAccessTracking();
         } else {
             // Not a function - set pending TypeError so JS catch handlers can process it
-            // Generate a descriptive error message similar to V8/QuickJS
-            String message;
-            if (!virtualMachine.propertyAccessChain.isEmpty()) {
-                // Use the tracked property access for better error messages
-                message = virtualMachine.propertyAccessChain + " is not a function";
-            } else if (callee instanceof JSUndefined) {
-                message = "undefined is not a function";
-            } else if (callee instanceof JSNull) {
-                message = "null is not a function";
-            } else if (callee instanceof JSNumber) {
-                message = callee.toJavaObject() + " is not a function";
-            } else if (callee instanceof JSString str) {
-                message = "'" + str.value() + "' is not a function";
-            } else {
-                message = JSTypeChecking.typeof(callee) + " is not a function";
-            }
-            virtualMachine.resetPropertyAccessTracking();
-            virtualMachine.pendingException = context.throwTypeError(message);
+            virtualMachine.pendingException = context
+                    .throwTypeError(describeCallee(executionContext, callee) + " is not a function");
             context.clearPendingException();
             stack[sp++] = JSUndefined.INSTANCE;
         }
@@ -6275,6 +6290,8 @@ public final class OpcodeHandler {
         JSFunction enclosingFunction = executionContext.frame.getFunction();
         if (enclosingFunction != null) {
             importMetaFilename = enclosingFunction.getImportMetaFilename();
+            // A function defined by eval code is located in that eval in a stack trace.
+            closureFunction.setEvalOrigin(enclosingFunction.getEvalOrigin());
         }
         if (importMetaFilename == null || importMetaFilename.isEmpty()) {
             JSStackFrame currentStackFrame = executionContext.virtualMachine.context.getCurrentStackFrame();
@@ -6387,9 +6404,8 @@ public final class OpcodeHandler {
      */
     private static void internalStartGeneratorReturnCompletion(ExecutionContext executionContext, JSValue returnValue) {
         executionContext.virtualMachine.generatorReturnValue = returnValue;
-        executionContext.virtualMachine.generatorForceReturn = true;
-        executionContext.virtualMachine.pendingException = returnValue;
-        executionContext.virtualMachine.context.setPendingException(returnValue);
+        executionContext.virtualMachine.pendingException = VirtualMachine.GENERATOR_RETURN_SIGNAL;
+        executionContext.virtualMachine.context.setPendingException(VirtualMachine.GENERATOR_RETURN_SIGNAL);
     }
 
     private static boolean internalStartsClassDefinition(ExecutionContext executionContext, int pc, Opcode op) {

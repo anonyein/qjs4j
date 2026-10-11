@@ -65,7 +65,7 @@ public class JSModuleGeneratedBindingTest extends BaseTest {
     private String evaluateModuleResult(String name, String source) throws IOException {
         Path path = moduleDirectory.resolve(name);
         Files.writeString(path, source);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(source, path.toString(), true);
             return context.eval("String(globalThis.result)", "probe.js", false).toString();
         }
@@ -98,7 +98,7 @@ public class JSModuleGeneratedBindingTest extends BaseTest {
         Path entry = moduleDirectory.resolve("default-member-main.mjs");
         String entrySource = "import chained from './default-member.mjs';\nglobalThis.result = chained;\n";
         Files.writeString(entry, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(entrySource, entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("2-4");
         }
@@ -142,7 +142,7 @@ public class JSModuleGeneratedBindingTest extends BaseTest {
         Path entry = moduleDirectory.resolve("default-operator-main.mjs");
         String entrySource = "import answer from './default-operator.mjs';\nglobalThis.result = answer;\n";
         Files.writeString(entry, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(entrySource, entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("42");
         }
@@ -209,7 +209,7 @@ public class JSModuleGeneratedBindingTest extends BaseTest {
         Path entry = moduleDirectory.resolve("multiline-value-main.mjs");
         String entrySource = "import answer from './multiline-value.mjs';\nglobalThis.result = answer;\n";
         Files.writeString(entry, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(entrySource, entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("42");
         }
@@ -235,7 +235,7 @@ public class JSModuleGeneratedBindingTest extends BaseTest {
         String entrySource = "export default (\n  1 +\n);\nglobalThis.result = 'ok';\n";
         Path entry = moduleDirectory.resolve("default-invalid.mjs");
         Files.writeString(entry, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             JSException failure = catchThrowableOfType(JSException.class,
                     () -> context.eval(entrySource, entry.toString(), true));
             assertThat(failure).isNotNull();

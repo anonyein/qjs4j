@@ -50,12 +50,16 @@ public final class JSEvalError extends JSError {
             }
         }
         JSEvalError jsEvalError = context.createJSEvalError(message);
+        if (args.length > 0 && !args[0].isUndefined()) {
+            JSError.defineEmptyMessage(jsEvalError, message);
+        }
         context.transferPrototype(jsEvalError, NAME);
         if (args.length > 1) {
             if (!JSError.installErrorCause(context, jsEvalError, args[1])) {
                 return JSUndefined.INSTANCE;
             }
         }
+        JSError.captureStackTraceBelowNewTarget(context, jsEvalError);
         return jsEvalError;
     }
 

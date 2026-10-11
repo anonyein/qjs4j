@@ -23,13 +23,13 @@ public enum RegExpOpcode {
     /** match any character including line terminator */
     ANY(6, 1),
     /** match back reference (variable length) */
-    BACK_REFERENCE(32, 2),
+    BACK_REFERENCE(32, 3),
     /** match back reference (case insensitive) */
-    BACK_REFERENCE_I(33, 2),
+    BACK_REFERENCE_I(33, 3),
     /** backward back reference */
-    BACKWARD_BACK_REFERENCE(34, 2),
+    BACKWARD_BACK_REFERENCE(34, 3),
     /** backward back reference (case insensitive) */
-    BACKWARD_BACK_REFERENCE_I(35, 2),
+    BACKWARD_BACK_REFERENCE_I(35, 3),
     /** match single character */
     CHAR(1, 3),
     /** match single character (case insensitive) */
@@ -103,11 +103,11 @@ public enum RegExpOpcode {
     /** 32-bit character range (case insensitive) */
     RANGE32_I(39, 3),
     /** save capture group end */
-    SAVE_END(20, 2),
+    SAVE_END(20, 3),
     /** reset save positions */
-    SAVE_RESET(21, 3),
+    SAVE_RESET(21, 5),
     /** save capture group start */
-    SAVE_START(19, 2),
+    SAVE_START(19, 3),
     /** store character position to register */
     SET_CHAR_POS(42, 2),
     /** store immediate value to register */

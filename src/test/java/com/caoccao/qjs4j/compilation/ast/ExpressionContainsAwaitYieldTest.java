@@ -98,4 +98,38 @@ public class ExpressionContainsAwaitYieldTest {
         assertThat(arrowFunctionExpression.containsAwait()).isFalse();
         assertThat(arrowFunctionExpression.containsYield()).isFalse();
     }
+
+    @Test
+    public void testLongBinaryChainIsWalkedWithoutRecursion() {
+        // A left-deep chain one million operands long: a recursive walk down the left spine would
+        // need one Java frame per operand.
+        Expression awaitChain = new AwaitExpression(new Literal(1, LOCATION), LOCATION);
+        Expression yieldChain = new Identifier("x", LOCATION);
+        Expression evalChain = new Identifier("x", LOCATION);
+        Identifier lastRightOfAwaitChain = null;
+        for (int i = 0; i < 1_000_000; i++) {
+            lastRightOfAwaitChain = new Identifier("x", LOCATION);
+            awaitChain = new BinaryExpression(BinaryOperator.ADD, awaitChain, lastRightOfAwaitChain, LOCATION);
+            yieldChain = new BinaryExpression(BinaryOperator.LOGICAL_OR, yieldChain, new Identifier("x", LOCATION),
+                    LOCATION);
+            evalChain = new BinaryExpression(BinaryOperator.ADD, evalChain, new Identifier("x", LOCATION), LOCATION);
+        }
+        yieldChain = new BinaryExpression(BinaryOperator.ADD, yieldChain,
+                new YieldExpression(new Literal(1, LOCATION), false, LOCATION), LOCATION);
+        evalChain = new BinaryExpression(BinaryOperator.ADD, evalChain,
+                new CallExpression(new Identifier("eval", LOCATION), List.of(new Literal("var arguments", LOCATION)),
+                        false, LOCATION),
+                LOCATION);
+
+        assertThat(awaitChain.containsAwait()).isTrue();
+        assertThat(awaitChain.containsYield()).isFalse();
+        // The await is the leftmost operand, so no right operand needed to be asked.
+        assertThat(lastRightOfAwaitChain.awaitInside).isNull();
+        assertThat(yieldChain.containsYield()).isTrue();
+        assertThat(yieldChain.containsAwait()).isFalse();
+        assertThat(evalChain.containsDirectEvalVarArguments()).isTrue();
+        assertThat(awaitChain.containsDirectEvalVarArguments()).isFalse();
+        // Cached on every node of the spine.
+        assertThat(((BinaryExpression) yieldChain).getLeft().containsYield()).isFalse();
+    }
 }

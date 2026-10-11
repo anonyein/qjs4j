@@ -24,6 +24,7 @@ import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 import com.caoccao.qjs4j.unicode.UnicodeStringUtils;
 
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -107,6 +108,38 @@ record StatementParser(ParserContext parserContext, ParserDelegates delegates) {
 
     private void collectPatternNames(Pattern pattern, java.util.function.Consumer<String> consumer) {
         pattern.getBoundNames().forEach(consumer);
+    }
+
+    /**
+     * The LexicallyDeclaredNames of a function body, static block or arrow body (ES2024 15.2.1): its top-level
+     * {@code let}, {@code const}, {@code using} and {@code class} declarations. Function declarations at the top of a
+     * function body are var-scoped, not lexical.
+     *
+     * @param statements
+     *            the body's statements
+     * @return the names
+     * @throws JSSyntaxErrorException
+     *             when a name is declared twice
+     */
+    static Set<String> collectFunctionBodyLexicalNames(List<Statement> statements) {
+        Set<String> lexicalNames = new HashSet<>();
+        for (Statement statement : statements) {
+            List<String> names = new ArrayList<>();
+            if (statement instanceof VariableDeclaration variableDeclaration
+                    && variableDeclaration.getKind() != VariableKind.VAR) {
+                for (VariableDeclarator declarator : variableDeclaration.getDeclarations()) {
+                    names.addAll(declarator.getId().getBoundNames());
+                }
+            } else if (statement instanceof ClassDeclaration classDeclaration) {
+                names.add(classDeclaration.getId().getName());
+            }
+            for (String name : names) {
+                if (!lexicalNames.add(name)) {
+                    throw new JSSyntaxErrorException("Identifier '" + name + "' has already been declared");
+                }
+            }
+        }
+        return lexicalNames;
     }
 
     private void collectVarDeclaredNames(Statement statement, Set<String> varNames) {
@@ -295,6 +328,17 @@ record StatementParser(ParserContext parserContext, ParserDelegates delegates) {
     }
 
     BlockStatement parseBlockStatement() {
+        return parseBlockStatement(false);
+    }
+
+    /**
+     * Parse a block.
+     *
+     * @param functionBody
+     *            true for a class static block, whose declarations follow function-body rules rather than block rules
+     * @return the block
+     */
+    BlockStatement parseBlockStatement(boolean functionBody) {
         SourceLocation location = parserContext.getLocation();
         parserContext.expect(TokenType.LBRACE);
 
@@ -311,7 +355,11 @@ record StatementParser(ParserContext parserContext, ParserDelegates delegates) {
             }
         }
 
-        validateBlockEarlyErrors(body);
+        if (functionBody) {
+            validateFunctionBodyEarlyErrors(body);
+        } else {
+            validateBlockEarlyErrors(body);
+        }
         parserContext.expect(TokenType.RBRACE);
         return new BlockStatement(body, location);
     }
@@ -323,14 +371,21 @@ record StatementParser(ParserContext parserContext, ParserDelegates delegates) {
         List<Statement> body = new ArrayList<>();
         boolean hasUseStrict = parserContext.parseDirectives(body);
 
-        while (!parserContext.match(TokenType.RBRACE) && !parserContext.match(TokenType.EOF)) {
-            Statement stmt = parseStatement();
-            if (stmt != null) {
-                body.add(stmt);
+        Deque<Set<String>> enclosingLabels = parserContext.enterFunctionLabelScope();
+        try {
+            while (!parserContext.match(TokenType.RBRACE) && !parserContext.match(TokenType.EOF)) {
+                Statement stmt = parseStatement();
+                if (stmt != null) {
+                    body.add(stmt);
+                }
             }
+        } finally {
+            parserContext.exitFunctionLabelScope(enclosingLabels);
         }
 
-        validateBlockEarlyErrors(body);
+        // An arrow function's body: function-body rules, under which a top-level function declaration is
+        // var-scoped and `function f() {} var f;` is legal.
+        validateFunctionBodyEarlyErrors(body);
         parserContext.expect(TokenType.RBRACE);
         BlockStatement block = new BlockStatement(body, location);
         block.setHasUseStrictDirective(hasUseStrict);
@@ -1526,6 +1581,34 @@ record StatementParser(ParserContext parserContext, ParserDelegates delegates) {
         }
     }
 
+    /**
+     * The early errors of a function body, class static block or arrow body (ES2024 15.2.1): no lexically declared name
+     * twice, and none that is also var-declared — by a {@code var} anywhere in the body outside nested functions, or by
+     * a top-level function declaration.
+     * <p>
+     * Only module and script top levels and blocks used to be checked, so {@code function f() { let x; var x; }} was
+     * accepted and the {@code var} silently won.
+     *
+     * @param statements
+     *            the body's statements
+     */
+    void validateFunctionBodyEarlyErrors(List<Statement> statements) {
+        Set<String> lexicalNames = collectFunctionBodyLexicalNames(statements);
+        Set<String> varNames = new HashSet<>();
+        for (Statement statement : statements) {
+            collectVarDeclaredNames(statement, varNames);
+            FunctionDeclaration functionDeclaration = statement.unwrapLabeledFunctionDeclaration();
+            if (functionDeclaration != null) {
+                varNames.add(functionDeclaration.getId().getName());
+            }
+        }
+        for (String lexicalName : lexicalNames) {
+            if (varNames.contains(lexicalName)) {
+                throw new JSSyntaxErrorException("Identifier '" + lexicalName + "' has already been declared");
+            }
+        }
+    }
+
     private void validateCatchClauseEarlyErrors(Pattern catchParameter, BlockStatement catchBody) {
         if (catchParameter == null || catchBody == null) {
             return;
@@ -1551,6 +1634,21 @@ record StatementParser(ParserContext parserContext, ParserDelegates delegates) {
         for (String catchParameterName : catchParameterNames) {
             if (lexicalNames.contains(catchParameterName)) {
                 throw new JSSyntaxErrorException("Identifier '" + catchParameterName + "' has already been declared");
+            }
+        }
+
+        // Annex B.3.4 lets a var in the catch block redeclare a simple catch parameter only. A destructuring
+        // parameter's names conflict with any var of the block: `catch ([e]) { var e }` is a SyntaxError.
+        if (!(catchParameter instanceof Identifier)) {
+            Set<String> varNames = new HashSet<>();
+            for (Statement statement : catchBody.getBody()) {
+                collectVarDeclaredNames(statement, varNames);
+            }
+            for (String catchParameterName : catchParameterNames) {
+                if (varNames.contains(catchParameterName)) {
+                    throw new JSSyntaxErrorException(
+                            "Identifier '" + catchParameterName + "' has already been declared");
+                }
             }
         }
     }

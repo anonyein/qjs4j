@@ -23,6 +23,11 @@ package com.caoccao.qjs4j.core;
 public abstract sealed class JSFunction extends JSObject
         permits JSBytecodeFunction, JSNativeFunction, JSBoundFunction, JSClass {
     public static final String NAME = "Function";
+    /**
+     * For code that came from {@code eval}, where it was evaluated, in V8's stack-trace form:
+     * {@code eval at outer (file.js:1:27)}. Null for code that did not come from eval.
+     */
+    private String evalOrigin;
     private JSContext homeContext;
     private JSObject homeObject;
     private String importMetaFilename;
@@ -35,6 +40,10 @@ public abstract sealed class JSFunction extends JSObject
      * Call this function with the given context, this value, and arguments.
      */
     public abstract JSValue call(JSContext context, JSValue thisArg, JSValue[] args);
+
+    public String getEvalOrigin() {
+        return evalOrigin;
+    }
 
     protected JSContext getHomeContext() {
         return homeContext;
@@ -127,6 +136,10 @@ public abstract sealed class JSFunction extends JSObject
                 context.transferPrototype(protoObj, JSObject.NAME);
             }
         }
+    }
+
+    public void setEvalOrigin(String evalOrigin) {
+        this.evalOrigin = evalOrigin;
     }
 
     public void setHomeObject(JSObject homeObject) {

@@ -39,11 +39,30 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class JSMicrotaskQueueFailureTest extends BaseTest {
 
     @Test
-    public void testAJSExceptionFromAMicrotaskReachesThePromiseRejectCallback() {
-        // A JSException escaping a microtask is an unhandled rejection as far as the host is
-        // concerned, so it goes to the promise reject callback as well as the failure record.
+    public void testAJSExceptionFromAMicrotaskIsLoggedWithoutACallback() {
+        // With no failure callback, a JSException is logged like any other failure instead of
+        // being left to a promise reject callback that no longer receives it.
+        context.setMicrotaskFailureCallback(null);
+        context.clearMicrotaskFailures();
+        JSError error = context.throwTypeError("logged from microtask");
+        context.clearPendingException();
+        context.enqueueMicrotask(() -> {
+            throw new com.caoccao.qjs4j.exceptions.JSException(error);
+        });
+        context.processMicrotasks();
+
+        assertThat(context.getMicrotaskFailures()).hasSize(1);
+    }
+
+    @Test
+    public void testAJSExceptionFromAMicrotaskIsNotAPromiseRejection() {
+        // A JSException escaping a microtask is not a promise rejection: it used to reach the
+        // promise reject callback with a null promise. It is recorded and goes to the microtask
+        // failure callback; a rejected promise is reported by the promise itself.
         List<JSValue> rejections = new ArrayList<>();
+        List<Throwable> failures = new ArrayList<>();
         context.setPromiseRejectCallback((event, promise, reason) -> rejections.add(reason));
+        context.setMicrotaskFailureCallback(failures::add);
         context.clearMicrotaskFailures();
         JSError error = context.throwTypeError("from microtask");
         context.clearPendingException();
@@ -52,8 +71,8 @@ public class JSMicrotaskQueueFailureTest extends BaseTest {
         });
         context.processMicrotasks();
 
-        assertThat(rejections).hasSize(1);
-        assertThat(rejections.get(0)).isEqualTo(error);
+        assertThat(rejections).isEmpty();
+        assertThat(failures).hasSize(1);
         assertThat(context.getMicrotaskFailures()).hasSize(1);
     }
 

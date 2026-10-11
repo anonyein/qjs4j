@@ -87,7 +87,7 @@ public class JSModuleSourceLocationTest extends BaseTest {
      * @return the reported location
      */
     private SourceLocation moduleErrorLocation(String source, String filename) {
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             try {
                 context.eval(source, filename, true);
             } catch (JSException jsException) {
@@ -130,7 +130,7 @@ public class JSModuleSourceLocationTest extends BaseTest {
     public void testAValidModuleStillEvaluates() {
         // Compiling the source before rewriting it must not reject anything that was fine, and the
         // second compilation must not have side effects the first one would trip over.
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval("export const v = 'ok'; globalThis.result = v;", "valid.js", true);
             assertThat(context.eval("globalThis.result", "check.js", false).toString()).isEqualTo("ok");
         }
@@ -188,7 +188,7 @@ public class JSModuleSourceLocationTest extends BaseTest {
      * @return the reported location
      */
     private SourceLocation untouchedCompilationLocation(String source) {
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             try {
                 new Compiler(source, "untouched.js").setContext(context).compile(true);
             } catch (JSException jsException) {

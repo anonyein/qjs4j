@@ -143,7 +143,7 @@ final class ClassExpressionCompiler extends AstNodeCompiler<ClassExpression> {
         } else {
             constructorFunc = compilerContext.classDeclarationCompiler.createDefaultConstructor(className,
                     classExpr.getSuperClass() != null, instanceFields, privateSymbols, computedFieldSymbols,
-                    autoAccessorBackingSymbols, privateInstanceMethodFunctions);
+                    autoAccessorBackingSymbols, privateInstanceMethodFunctions, classExpr.getLocation());
         }
 
         if (compilerContext.sourceCode != null && classExpr.getLocation() != null) {

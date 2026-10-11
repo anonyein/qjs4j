@@ -2075,109 +2075,63 @@ public final class JSIntlObject {
                 return JSUndefined.INSTANCE;
             }
 
-            // Track whether the unit style was explicitly provided
-            boolean unitStyleExplicit = (unitStyle != null);
-
-            // Read unit display from options
+            // GetDurationUnitOptions: the style is validated before the display is read.
+            String[] validStyles = JSIntlDurationFormat.getValidStylesForUnit(i);
+            if (unitStyle != null && !Arrays.asList(validStyles).contains(unitStyle)) {
+                return context.throwRangeError(
+                        "Value " + unitStyle + " out of range for Intl.DurationFormat options property " + unitName);
+            }
+            boolean subsecondUnit = i >= 7;
+            boolean prevNumeric = "numeric".equals(prevStyle) || "2-digit".equals(prevStyle);
+            String displayDefault = "always";
+            if (unitStyle == null) {
+                if ("digital".equals(style)) {
+                    unitStyle = JSIntlDurationFormat.getDigitalDefault(i);
+                    if (i < 4 || subsecondUnit) {
+                        displayDefault = "auto";
+                    }
+                } else if (prevNumeric) {
+                    unitStyle = "numeric";
+                    if (!"minutes".equals(unitName) && !"seconds".equals(unitName)) {
+                        displayDefault = "auto";
+                    }
+                } else {
+                    unitStyle = style;
+                    displayDefault = "auto";
+                }
+            }
+            // A numeric sub-second unit is the spec's "fractional" style: it is folded into the unit before it.
+            boolean fractional = subsecondUnit && "numeric".equals(unitStyle);
+            if (fractional) {
+                displayDefault = "auto";
+            }
             String display = options != null ? getOptionStringChecked(context, options, unitName + "Display") : null;
             if (context.hasPendingException()) {
                 return JSUndefined.INSTANCE;
             }
-
-            // Get valid styles for this unit
-            String[] validStyles = JSIntlDurationFormat.getValidStylesForUnit(i);
-
-            // Validate unit style
-            if (unitStyle != null) {
-                boolean valid = false;
-                for (String vs : validStyles) {
-                    if (vs.equals(unitStyle)) {
-                        valid = true;
-                        break;
-                    }
-                }
-                if (!valid) {
-                    return context.throwRangeError("Value " + unitStyle
-                            + " out of range for Intl.DurationFormat options property " + unitName);
-                }
-            }
-
-            // Apply defaults if unit style not specified
-            if (unitStyle == null) {
-                if ("digital".equals(style)) {
-                    unitStyle = JSIntlDurationFormat.getDigitalDefault(i);
-                } else if (("numeric".equals(prevStyle) || "2-digit".equals(prevStyle))) {
-                    unitStyle = "numeric";
-                } else {
-                    unitStyle = style;
-                    // For date units with digital style base, ensure the style is valid
-                    if ("digital".equals(unitStyle)) {
-                        unitStyle = "short"; // fallback for date units
-                    }
-                }
-            }
-
-            // Style conflict check (spec step 6/9)
-            if (("numeric".equals(prevStyle) || "2-digit".equals(prevStyle))) {
-                if (!"numeric".equals(unitStyle) && !"2-digit".equals(unitStyle)) {
-                    return context.throwRangeError("Cannot use style \"" + unitStyle + "\" for " + unitName
-                            + " when previous unit uses \"" + prevStyle + "\" style");
-                }
-                // Upgrade minutes/seconds to 2-digit
-                if ("minutes".equals(unitName) || "seconds".equals(unitName)) {
-                    unitStyle = "2-digit";
-                }
-            }
-
-            // Display default: "always" when unit style was explicitly set in options,
-            // "auto" when unit style was defaulted from the base style or digital defaults
             if (display == null) {
-                if (unitStyleExplicit && !"digital".equals(style)) {
-                    display = "always";
-                } else {
-                    display = "auto";
-                }
+                display = displayDefault;
             } else if (!"auto".equals(display) && !"always".equals(display)) {
                 return context.throwRangeError("Value " + display
                         + " out of range for Intl.DurationFormat options property " + unitName + "Display");
             }
+            // ValidateDurationUnitStyle
+            if (fractional && "always".equals(display)) {
+                return context
+                        .throwRangeError("Cannot use display \"always\" for " + unitName + " with \"numeric\" style");
+            }
+            if (prevNumeric && !"numeric".equals(unitStyle) && !"2-digit".equals(unitStyle)) {
+                return context.throwRangeError("Cannot use style \"" + unitStyle + "\" for " + unitName
+                        + " when previous unit uses \"" + prevStyle + "\" style");
+            }
+            if (prevNumeric && ("minutes".equals(unitName) || "seconds".equals(unitName))) {
+                unitStyle = "2-digit";
+            }
 
             unitStyles[i] = unitStyle;
             unitDisplays[i] = display;
-
-            // Update prevStyle - only propagate for time/subsecond units
-            prevStyle = unitStyle;
-        }
-
-        // In digital mode, when hoursDisplay was explicitly set in options,
-        // set minutesDisplay and secondsDisplay to "always" if they weren't
-        // explicitly set. This ensures minutes:seconds pair is always shown
-        // in digital format even when hours is hidden (hoursDisplay="auto").
-        if ("digital".equals(style) && options != null) {
-            JSValue hoursDisplayVal = options.get(PropertyKey.fromString("hoursDisplay"));
-            if (context.hasPendingException()) {
-                return JSUndefined.INSTANCE;
-            }
-            boolean hoursDisplayExplicit = hoursDisplayVal != null && !(hoursDisplayVal instanceof JSUndefined);
-            if (hoursDisplayExplicit) {
-                JSValue minutesDisplayVal = options.get(PropertyKey.fromString("minutesDisplay"));
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-                boolean minutesDisplayExplicit = minutesDisplayVal != null
-                        && !(minutesDisplayVal instanceof JSUndefined);
-                if (!minutesDisplayExplicit) {
-                    unitDisplays[5] = "always"; // minutes
-                }
-                JSValue secondsDisplayVal = options.get(PropertyKey.fromString("secondsDisplay"));
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-                boolean secondsDisplayExplicit = secondsDisplayVal != null
-                        && !(secondsDisplayVal instanceof JSUndefined);
-                if (!secondsDisplayExplicit) {
-                    unitDisplays[6] = "always"; // seconds
-                }
+            if (i >= 4) {
+                prevStyle = unitStyle;
             }
         }
 

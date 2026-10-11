@@ -30,6 +30,12 @@ final class StatementCompiler extends AstNodeCompiler<Statement> {
 
     @Override
     void compile(Statement stmt) {
+        if (stmt == null) {
+            // An absent statement, such as the hoisted-away body of an Annex B `else function f() {}`.
+            return;
+        }
+        // The fallback position of everything the statement emits, for stack traces.
+        compilerContext.emitter.emitSourcePosition(stmt.getLocation());
         if (stmt instanceof ExpressionStatement exprStmt) {
             compileExpressionStatement(exprStmt.getExpression());
         } else if (stmt instanceof BlockStatement block) {

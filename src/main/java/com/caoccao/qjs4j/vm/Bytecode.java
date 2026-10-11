@@ -19,11 +19,18 @@ package com.caoccao.qjs4j.vm;
 import com.caoccao.qjs4j.core.JSValue;
 import com.caoccao.qjs4j.core.PropertyKey;
 
+import java.util.Map;
+
 /**
  * Represents compiled bytecode for a function.
  */
 public final class Bytecode {
+    private static final int[] EMPTY_SOURCE_POSITIONS = new int[0];
     private final String[] atomPool;
+    /**
+     * How each call instruction names its callee, by program counter; null when the function makes no named call.
+     */
+    private Map<Integer, String> callDescriptions;
     private final JSValue[] constantPool;
     private Opcode[] decodedOpcodes;
     private final byte[] instructions;
@@ -31,6 +38,7 @@ public final class Bytecode {
     private final String[] localVarNames;
     private byte[] opcodeRebaseOffsets;
     private PropertyKey[] propertyKeyCache;
+    private int[] sourcePositions;
 
     public Bytecode(byte[] instructions, JSValue[] constantPool, String[] atomPool, int localCount) {
         this(instructions, constantPool, atomPool, localCount, null);
@@ -43,6 +51,7 @@ public final class Bytecode {
         this.atomPool = atomPool;
         this.localCount = localCount;
         this.localVarNames = localVarNames;
+        this.sourcePositions = EMPTY_SOURCE_POSITIONS;
     }
 
     private void ensureDecodedOpcodes() {
@@ -96,6 +105,26 @@ public final class Bytecode {
         return key;
     }
 
+    /**
+     * How the call instruction at a program counter names its callee, as V8 does in {@code x is not a function}.
+     *
+     * @param pc
+     *            the program counter of a call instruction
+     * @return the name, or null when the callee is to be described by its value
+     */
+    public String getCallDescription(int pc) {
+        return callDescriptions == null ? null : callDescriptions.get(pc);
+    }
+
+    /**
+     * The table behind {@link #getCallDescription(int)}, shared by copies of this bytecode.
+     *
+     * @return the table, or null
+     */
+    public Map<Integer, String> getCallDescriptions() {
+        return callDescriptions;
+    }
+
     public JSValue getConstant(int index) {
         return constantPool[index];
     }
@@ -130,6 +159,41 @@ public final class Bytecode {
         return opcodeRebaseOffsets;
     }
 
+    /**
+     * The source position of the instruction at a program counter: QuickJS's {@code find_line_num}.
+     *
+     * @param pc
+     *            the program counter
+     * @return {line, column}, both 1-based, or null when the function recorded no position at or before it
+     */
+    public int[] getSourcePosition(int pc) {
+        int low = 0;
+        int high = sourcePositions.length / 3 - 1;
+        int found = -1;
+        while (low <= high) {
+            int middle = (low + high) >>> 1;
+            if (sourcePositions[middle * 3] <= pc) {
+                found = middle;
+                low = middle + 1;
+            } else {
+                high = middle - 1;
+            }
+        }
+        if (found < 0) {
+            return null;
+        }
+        return new int[]{sourcePositions[found * 3 + 1], sourcePositions[found * 3 + 2]};
+    }
+
+    /**
+     * The (pc, line, column) triples behind {@link #getSourcePosition(int)}.
+     *
+     * @return the table, in ascending pc order
+     */
+    public int[] getSourcePositions() {
+        return sourcePositions;
+    }
+
     public int readI32(int offset) {
         return readU32(offset);
     }
@@ -149,5 +213,13 @@ public final class Bytecode {
 
     public int readU8(int offset) {
         return instructions[offset] & 0xFF;
+    }
+
+    public void setCallDescriptions(Map<Integer, String> callDescriptions) {
+        this.callDescriptions = callDescriptions;
+    }
+
+    public void setSourcePositions(int[] sourcePositions) {
+        this.sourcePositions = sourcePositions;
     }
 }

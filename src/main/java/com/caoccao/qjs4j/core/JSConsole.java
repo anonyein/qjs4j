@@ -150,19 +150,60 @@ public final class JSConsole {
      * console.error(...args) Print to stderr.
      */
     public JSValue error(JSContext context, JSValue thisArg, JSValue[] args) {
-        err.print(getGroupIndent());
-        for (int i = 0; i < args.length; i++) {
-            if (i > 0) {
-                err.print(" ");
-            }
-            err.print(formatArgument(context, args[i]));
-        }
-        err.println();
+        printLine(err, context, args);
         return JSUndefined.INSTANCE;
     }
 
     private String formatArgument(JSContext context, JSValue value) {
         return formatValue(context, value, true, new IdentityHashMap<>(), 0);
+    }
+
+    /**
+     * Format console arguments as Node's {@code util.format} does: a first argument that is a string may contain
+     * {@code %s %d %i %f %j %o %O %c %%}, each taking the next argument; the arguments left over follow, separated by
+     * spaces, strings as they are and anything else inspected. The format string used to be printed verbatim with every
+     * argument after it.
+     *
+     * @param context
+     *            the context
+     * @param args
+     *            the console arguments
+     * @return the line to print
+     */
+    public String formatArguments(JSContext context, JSValue[] args) {
+        StringBuilder line = new StringBuilder();
+        int nextArgument = 0;
+        if (args.length > 0 && args[0] instanceof JSString formatString && formatString.value().indexOf('%') >= 0) {
+            String format = formatString.value();
+            nextArgument = 1;
+            int length = format.length();
+            for (int i = 0; i < length; i++) {
+                char ch = format.charAt(i);
+                if (ch != '%' || i + 1 >= length) {
+                    line.append(ch);
+                    continue;
+                }
+                char specifier = format.charAt(i + 1);
+                if (specifier == '%') {
+                    line.append('%');
+                    i++;
+                    continue;
+                }
+                if ("sdifjoOc".indexOf(specifier) < 0 || nextArgument >= args.length) {
+                    line.append(ch);
+                    continue;
+                }
+                line.append(formatSpecifier(context, specifier, args[nextArgument++]));
+                i++;
+            }
+        }
+        for (int i = nextArgument; i < args.length; i++) {
+            if (!line.isEmpty() || i > 0) {
+                line.append(' ');
+            }
+            line.append(formatArgument(context, args[i]));
+        }
+        return line.toString();
     }
 
     private String formatArray(JSContext context, JSArray array, IdentityHashMap<JSObject, Integer> printStack,
@@ -246,6 +287,10 @@ public final class JSConsole {
 
     private String formatError(JSObject error) {
         JSValue stackValue = error.get(PropertyKey.STACK);
+        // The stack begins with the error's own `Name: message` line, as V8's does.
+        if (stackValue instanceof JSString stackString && !stackString.value().isEmpty()) {
+            return stackString.value().stripTrailing();
+        }
         JSValue nameValue = error.get(PropertyKey.NAME);
         JSValue messageValue = error.get(PropertyKey.MESSAGE);
         String name = nameValue instanceof JSString s ? s.value() : "Error";
@@ -255,13 +300,6 @@ public final class JSConsole {
             stringBuilder.append(name);
         } else {
             stringBuilder.append(name).append(": ").append(message);
-        }
-        if (stackValue instanceof JSString s) {
-            String stack = s.value();
-            if (!stack.isEmpty() && stack.charAt(stack.length() - 1) == '\n') {
-                stack = stack.substring(0, stack.length() - 1);
-            }
-            stringBuilder.append('\n').append(stack);
         }
         return stringBuilder.toString();
     }
@@ -296,6 +334,10 @@ public final class JSConsole {
 
     private String formatMoreItems(long count) {
         return "... " + count + " more item" + (count > 1 ? "s" : "");
+    }
+
+    private String formatNumber(double value) {
+        return isNegativeZero(value) ? "-0" : JSNumber.of(value).toString();
     }
 
     private String formatObject(JSContext context, JSObject object, IdentityHashMap<JSObject, Integer> printStack,
@@ -447,6 +489,69 @@ public final class JSConsole {
         return "Set(" + size + ") " + (items.isEmpty() ? "{  }" : "{ " + String.join(", ", items) + " }");
     }
 
+    private String formatSpecifier(JSContext context, char specifier, JSValue value) {
+        return switch (specifier) {
+            case 's' -> {
+                if (value instanceof JSNumber number) {
+                    yield formatNumber(number.value());
+                }
+                if (value instanceof JSBigInt bigInt) {
+                    yield bigInt + "n";
+                }
+                if (value instanceof JSSymbol symbol) {
+                    yield symbol.toJavaObject();
+                }
+                // typeof "object" only: a function is converted with String(), as in Node.
+                if (value instanceof JSObject object && !(value instanceof JSFunction) && hasBuiltInToString(object)) {
+                    yield formatValue(context, value);
+                }
+                JSString string = JSTypeConversions.toString(context, value);
+                yield context.hasPendingException() ? "" : string.value();
+            }
+            case 'd' -> {
+                if (value instanceof JSBigInt bigInt) {
+                    yield bigInt + "n";
+                }
+                if (value instanceof JSSymbol) {
+                    yield "NaN";
+                }
+                double number = JSTypeConversions.toNumber(context, value).value();
+                yield context.hasPendingException() ? "" : formatNumber(number);
+            }
+            case 'i', 'f' -> {
+                if (value instanceof JSBigInt bigInt && specifier == 'i') {
+                    yield bigInt + "n";
+                }
+                if (value instanceof JSSymbol) {
+                    yield "NaN";
+                }
+                JSString text = JSTypeConversions.toString(context, value);
+                if (context.hasPendingException()) {
+                    yield "";
+                }
+                // Both parse a string argument, which cannot throw, into a number.
+                JSValue parsed = specifier == 'i'
+                        ? JSGlobalObject.GlobalFunction.parseInt(context, JSUndefined.INSTANCE, new JSValue[]{text})
+                        : JSGlobalObject.GlobalFunction.parseFloat(context, JSUndefined.INSTANCE, new JSValue[]{text});
+                yield formatNumber(((JSNumber) parsed).value());
+            }
+            case 'j' -> {
+                JSValue json = context.getJSGlobalObject().getJSONObject().stringify(JSUndefined.INSTANCE,
+                        new JSValue[]{value});
+                if (context.hasPendingException()) {
+                    context.clearPendingException();
+                    yield "[Circular]";
+                }
+                yield json instanceof JSString jsonString ? jsonString.value() : "undefined";
+            }
+            case 'o' -> value instanceof JSArray array
+                    ? appendHiddenLength(formatValue(context, value), array.getLength())
+                    : formatValue(context, value);
+            case 'O' -> formatValue(context, value);
+            default -> ""; // %c takes a CSS argument and prints nothing
+        };
+    }
+
     private String formatTypedArray(JSTypedArray typedArray) {
         String className = getClassName(typedArray);
         int length = typedArray.getLength();
@@ -454,10 +559,10 @@ public final class JSConsole {
         List<String> items = new ArrayList<>(max + 1);
         for (int i = 0; i < max; i++) {
             double element = typedArray.getElement(i);
-            if (Double.isFinite(element) && element == Math.rint(element)) {
+            if (Double.isFinite(element) && element == Math.rint(element) && !isNegativeZero(element)) {
                 items.add(Long.toString((long) element));
             } else {
-                items.add(JSNumber.of(element).toString());
+                items.add(formatNumber(element));
             }
         }
         if (length > max) {
@@ -484,7 +589,10 @@ public final class JSConsole {
         if (value instanceof JSString jsString) {
             return printTopLevelStringRaw ? jsString.value() : quoteString(jsString.value());
         }
-        if (value instanceof JSNumber || value instanceof JSBoolean) {
+        if (value instanceof JSNumber number) {
+            return formatNumber(number.value());
+        }
+        if (value instanceof JSBoolean) {
             return value.toString();
         }
         if (value instanceof JSBigInt bigInt) {
@@ -572,16 +680,23 @@ public final class JSConsole {
      * console.log(...args) Print values to stdout.
      */
     public JSValue log(JSContext context, JSValue thisArg, JSValue[] args) {
-        out.print(getGroupIndent());
-        for (int i = 0; i < args.length; i++) {
-            if (i > 0) {
-                out.print(" ");
-            }
-            out.print(formatArgument(context, args[i]));
-        }
-        out.println();
+        printLine(out, context, args);
         out.flush();
         return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * Print one formatted line, unless formatting threw: the exception propagates and nothing is printed, as in Node. A
+     * partial line, or an empty one, used to be printed first.
+     */
+    private void printLine(PrintStream stream, JSContext context, JSValue[] args) {
+        String line = formatArguments(context, args);
+        if (context.hasPendingException()) {
+            return;
+        }
+        stream.print(getGroupIndent());
+        stream.print(line);
+        stream.println();
     }
 
     private String quoteString(String value) {
@@ -695,14 +810,43 @@ public final class JSConsole {
      * console.warn(...args) Print to stderr.
      */
     public JSValue warn(JSContext context, JSValue thisArg, JSValue[] args) {
-        err.print(getGroupIndent());
-        for (int i = 0; i < args.length; i++) {
-            if (i > 0) {
-                err.print(" ");
-            }
-            err.print(formatArgument(context, args[i]));
-        }
-        err.println();
+        printLine(err, context, args);
         return JSUndefined.INSTANCE;
+    }
+
+    /**
+     * {@code %o} shows an array's hidden {@code length}, as Node's {@code showHidden} inspection does.
+     */
+    private static String appendHiddenLength(String formatted, long length) {
+        // An array prints on one line as "[ ... ]", or "[ ]" when empty.
+        String head = formatted.substring(0, formatted.length() - 2);
+        return head + (head.equals("[") ? " " : ", ") + "[length]: " + length + " ]";
+    }
+
+    /**
+     * Node's {@code hasBuiltInToString}: whether {@code %s} inspects an object rather than calling its
+     * {@code toString}, because the {@code toString} it would get is a built-in one.
+     */
+    private static boolean hasBuiltInToString(JSObject object) {
+        JSValue toString = object.get(PropertyKey.fromString("toString"));
+        if (!(toString instanceof JSFunction)) {
+            return true;
+        }
+        if (object.hasOwnProperty(PropertyKey.fromString("toString"))) {
+            return false;
+        }
+        JSObject pointer = object.getPrototype();
+        while (pointer != null && !pointer.hasOwnProperty(PropertyKey.fromString("toString"))) {
+            pointer = pointer.getPrototype();
+        }
+        if (pointer == null) {
+            return true;
+        }
+        PropertyDescriptor descriptor = pointer.getOwnPropertyDescriptor(PropertyKey.CONSTRUCTOR);
+        return descriptor != null && descriptor.getValue() instanceof JSNativeFunction;
+    }
+
+    private static boolean isNegativeZero(double value) {
+        return value == 0 && Double.doubleToRawLongBits(value) != 0L;
     }
 }

@@ -90,7 +90,7 @@ record FunctionClassParser(ParserContext parserContext, ParserDelegates delegate
         if (funcName != null) {
             String name = funcName.getName();
             if (JSKeyword.EVAL.equals(name) || JSKeyword.ARGUMENTS.equals(name)) {
-                throw new JSSyntaxErrorException("invalid function name in strict code");
+                throw new JSSyntaxErrorException("Unexpected eval or arguments in strict mode");
             } else if (parserContext.isStrictReservedIdentifier(name)) {
                 throw new JSSyntaxErrorException("Unexpected strict mode reserved word");
             }
@@ -162,6 +162,15 @@ record FunctionClassParser(ParserContext parserContext, ParserDelegates delegate
     }
 
     /**
+     * A class's name binds in strict mode code, so it cannot be {@code eval} or {@code arguments}.
+     */
+    private static void validateClassBindingName(Identifier id) {
+        if (JSKeyword.EVAL.equals(id.getName()) || JSKeyword.ARGUMENTS.equals(id.getName())) {
+            throw new JSSyntaxErrorException("Unexpected eval or arguments in strict mode");
+        }
+    }
+
+    /**
      * Parse a class declaration or expression. Syntax: class Name extends Super { body }
      */
     ClassDeclaration parseClassDeclaration() {
@@ -179,6 +188,7 @@ record FunctionClassParser(ParserContext parserContext, ParserDelegates delegate
             if (parserContext.match(TokenType.IDENTIFIER) || parserContext.match(TokenType.AWAIT)
                     || parserContext.match(TokenType.YIELD) || parserContext.match(TokenType.LET)) {
                 id = parserContext.parseIdentifier();
+                validateClassBindingName(id);
             }
 
             // Parse optional extends clause
@@ -314,11 +324,18 @@ record FunctionClassParser(ParserContext parserContext, ParserDelegates delegate
 
         // Check for async method: async name() {} or async *name() {}
         if (parserContext.match(TokenType.ASYNC)) {
-            // Disambiguate: async as method modifier vs async as property name
+            // Disambiguate: async as method modifier vs async as property name. `async` is a modifier only when
+            // the element name follows on the same line: `async() {}` is a method named async, and `async` before
+            // a line break is a field named async.
             TokenType nextType = parserContext.nextToken.type();
-            if (nextType == TokenType.ASSIGN || nextType == TokenType.SEMICOLON || nextType == TokenType.COLON
-                    || nextType == TokenType.COMMA) {
-                // async = value; or async; or async: value — property named "async"
+            boolean hasLineTerminatorAfterAsync = parserContext.nextToken.line() != parserContext.currentToken.line();
+            if (!hasLineTerminatorAfterAsync && (nextType == TokenType.COLON || nextType == TokenType.COMMA)) {
+                // An object-literal member in a class body: V8 reports it at `async`.
+                throw new JSSyntaxErrorException("Unexpected token 'async'");
+            }
+            if (hasLineTerminatorAfterAsync || nextType == TokenType.ASSIGN || nextType == TokenType.SEMICOLON
+                    || nextType == TokenType.LPAREN || nextType == TokenType.RBRACE) {
+                // async = value; async; async() {}; or async at the end of a line — element named "async"
                 Expression key = new Identifier(JSKeyword.ASYNC, methodStartLocation);
                 parserContext.advance();
                 return parseMethodOrField(key, isStatic, isPrivate, false, methodStartLocation);
@@ -455,6 +472,7 @@ record FunctionClassParser(ParserContext parserContext, ParserDelegates delegate
             if (parserContext.match(TokenType.IDENTIFIER) || parserContext.match(TokenType.AWAIT)
                     || parserContext.match(TokenType.YIELD) || parserContext.match(TokenType.LET)) {
                 id = parserContext.parseIdentifier();
+                validateClassBindingName(id);
             }
 
             // Parse optional extends clause
@@ -512,11 +530,19 @@ record FunctionClassParser(ParserContext parserContext, ParserDelegates delegate
             boolean savedSuperPropertyAllowed = parserContext.superPropertyAllowed;
             parserContext.inClassFieldInitializer = true;
             parserContext.superPropertyAllowed = true;
+            // A field initializer is parsed [~Yield, ~Await] whatever function contains the class: `yield` in it is a
+            // strict mode reserved word, not a yield expression of an enclosing generator.
+            int savedGeneratorFunctionNesting = parserContext.generatorFunctionNesting;
+            int savedAsyncFunctionNesting = parserContext.asyncFunctionNesting;
+            parserContext.generatorFunctionNesting = 0;
+            parserContext.asyncFunctionNesting = 0;
             enterFunctionContext(false);
             try {
                 value = delegates.expressions.parseAssignmentExpression();
             } finally {
                 exitFunctionContext(false);
+                parserContext.asyncFunctionNesting = savedAsyncFunctionNesting;
+                parserContext.generatorFunctionNesting = savedGeneratorFunctionNesting;
                 parserContext.superPropertyAllowed = savedSuperPropertyAllowed;
                 parserContext.inClassFieldInitializer = savedInClassFieldInitializer;
             }
@@ -713,14 +739,20 @@ record FunctionClassParser(ParserContext parserContext, ParserDelegates delegate
                     "Illegal 'use strict' directive in function with non-simple parameter list");
         }
 
-        // Parse remaining body statements
-        while (!parserContext.match(TokenType.RBRACE) && !parserContext.match(TokenType.EOF)) {
-            Statement stmt = delegates.statements.parseStatement();
-            if (stmt != null) {
-                body.add(stmt);
+        // Parse remaining body statements, with no enclosing labels in scope
+        Deque<Set<String>> enclosingLabels = parserContext.enterFunctionLabelScope();
+        try {
+            while (!parserContext.match(TokenType.RBRACE) && !parserContext.match(TokenType.EOF)) {
+                Statement stmt = delegates.statements.parseStatement();
+                if (stmt != null) {
+                    body.add(stmt);
+                }
             }
+        } finally {
+            parserContext.exitFunctionLabelScope(enclosingLabels);
         }
 
+        delegates.statements.validateFunctionBodyEarlyErrors(body);
         // Check that parameter names don't conflict with lexical declarations in body
         // Per spec: "It is a Syntax Error if BoundNames of FormalParameters also occurs
         // in the LexicallyDeclaredNames of FunctionBody"
@@ -1016,10 +1048,12 @@ record FunctionClassParser(ParserContext parserContext, ParserDelegates delegate
         parserContext.superPropertyAllowed = true;
         parserContext.asyncFunctionNesting = 0;
         parserContext.generatorFunctionNesting = 0;
+        Deque<Set<String>> enclosingLabels = parserContext.enterFunctionLabelScope();
         try {
-            BlockStatement blockStatement = delegates.statements.parseBlockStatement();
+            BlockStatement blockStatement = delegates.statements.parseBlockStatement(true);
             return new StaticBlock(blockStatement.getBody());
         } finally {
+            parserContext.exitFunctionLabelScope(enclosingLabels);
             parserContext.generatorFunctionNesting = savedGeneratorFunctionNesting;
             parserContext.asyncFunctionNesting = savedAsyncFunctionNesting;
             parserContext.superPropertyAllowed = savedSuperPropertyAllowed;

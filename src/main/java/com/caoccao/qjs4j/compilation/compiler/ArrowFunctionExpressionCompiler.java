@@ -45,6 +45,8 @@ final class ArrowFunctionExpressionCompiler extends AstNodeCompiler<ArrowFunctio
         CompilerContext functionContext = functionCompiler.context();
 
         functionContext.sourceCode = compilerContext.sourceCode;
+        functionContext.mayContainDirectEval = compilerContext.mayContainDirectEval && CompilerContext
+                .sourceMayContainDirectEval(compilerContext.extractSourceCode(arrowExpr.getLocation()));
         functionContext.nonDeletableGlobalBindings.addAll(compilerContext.nonDeletableGlobalBindings);
         functionContext.privateSymbols = compilerContext.privateSymbols;
         compilerContext.functionExpressionCompiler.inheritVisibleWithObjectBindings(functionContext);

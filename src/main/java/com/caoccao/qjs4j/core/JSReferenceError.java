@@ -50,11 +50,15 @@ public final class JSReferenceError extends JSError {
             }
         }
         JSReferenceError jsReferenceError = context.createJSReferenceError(message);
+        if (args.length > 0 && !args[0].isUndefined()) {
+            JSError.defineEmptyMessage(jsReferenceError, message);
+        }
         if (args.length > 1) {
             if (!JSError.installErrorCause(context, jsReferenceError, args[1])) {
                 return JSUndefined.INSTANCE;
             }
         }
+        JSError.captureStackTraceBelowNewTarget(context, jsReferenceError);
         return jsReferenceError;
     }
 

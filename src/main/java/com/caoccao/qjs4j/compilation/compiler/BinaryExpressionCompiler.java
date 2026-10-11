@@ -24,99 +24,53 @@ import com.caoccao.qjs4j.core.JSSymbol;
 import com.caoccao.qjs4j.exceptions.JSCompilerException;
 import com.caoccao.qjs4j.vm.Opcode;
 
+import java.util.ArrayList;
+
 final class BinaryExpressionCompiler extends AstNodeCompiler<BinaryExpression> {
     BinaryExpressionCompiler(CompilerContext compilerContext) {
         super(compilerContext);
     }
 
+    /**
+     * Compiles a binary expression and every binary expression on its left spine with a loop.
+     * <p>
+     * Left-associative chains ({@code a + b + c + ...}, {@code a || b || c ...}) nest on the left, so compiling the
+     * left operand recursively costs one Java frame per operand and generated code with a few thousand operands
+     * overflowed the stack. The loop below performs exactly the steps the recursion did, in the same order: descending
+     * the spine, a short-circuit node saves the compiler state and disables tail calls for its left operand; ascending
+     * it, each node restores that state, then compiles its right operand and emits its operator.
+     */
     @Override
     void compile(BinaryExpression binExpr) {
-        if (binExpr.getOperator() == BinaryOperator.IN
-                && binExpr.getLeft() instanceof PrivateIdentifier privateIdentifier) {
-            compilePrivateInExpression(privateIdentifier, binExpr.getRight());
-            return;
+        ArrayList<BinaryExpression> spine = new ArrayList<>();
+        Expression leftmost = binExpr;
+        while (leftmost instanceof BinaryExpression binaryExpression && !isPrivateIn(binaryExpression)) {
+            spine.add(binaryExpression);
+            if (!binaryExpression.getOperator().isEagerOperator()) {
+                compilerContext.pushState();
+                compilerContext.emitTailCalls = false;
+            }
+            leftmost = binaryExpression.getLeft();
         }
-
-        // Short-circuit operators: must NOT evaluate right operand eagerly
-        switch (binExpr.getOperator()) {
-            case LOGICAL_AND -> {
-                // left && right: if left is falsy, return left; otherwise evaluate and return right
-                compilerContext.pushState();
-                compilerContext.emitTailCalls = false;
-                compilerContext.expressionCompiler.compile(binExpr.getLeft());
+        if (leftmost instanceof BinaryExpression privateInExpression) {
+            compilePrivateInExpression((PrivateIdentifier) privateInExpression.getLeft(),
+                    privateInExpression.getRight());
+        } else {
+            compilerContext.expressionCompiler.compile(leftmost);
+        }
+        for (int i = spine.size() - 1; i >= 0; i--) {
+            BinaryExpression binaryExpression = spine.get(i);
+            if (binaryExpression.getOperator().isEagerOperator()) {
+                compilerContext.expressionCompiler.compile(binaryExpression.getRight());
+                // An operator can call valueOf, toString or Symbol.hasInstance; a frame stopped there reports
+                // the operator's position, as V8 does.
+                compilerContext.emitter.emitSourcePosition(binaryExpression.getLocation());
+                compilerContext.emitter.emitOpcode(binaryExpression.getOperator().getOpcode());
+            } else {
                 compilerContext.popState();
-                compilerContext.emitter.emitOpcode(Opcode.DUP);
-                int jumpEnd = compilerContext.emitter.emitJump(Opcode.IF_FALSE);
-                compilerContext.emitter.emitOpcode(Opcode.DROP);
-                compilerContext.expressionCompiler.compile(binExpr.getRight());
-                compilerContext.emitter.patchJump(jumpEnd, compilerContext.emitter.currentOffset());
-                return;
-            }
-            case LOGICAL_OR -> {
-                // left || right: if left is truthy, return left; otherwise evaluate and return right
-                compilerContext.pushState();
-                compilerContext.emitTailCalls = false;
-                compilerContext.expressionCompiler.compile(binExpr.getLeft());
-                compilerContext.popState();
-                compilerContext.emitter.emitOpcode(Opcode.DUP);
-                int jumpEnd = compilerContext.emitter.emitJump(Opcode.IF_TRUE);
-                compilerContext.emitter.emitOpcode(Opcode.DROP);
-                compilerContext.expressionCompiler.compile(binExpr.getRight());
-                compilerContext.emitter.patchJump(jumpEnd, compilerContext.emitter.currentOffset());
-                return;
-            }
-            case NULLISH_COALESCING -> {
-                // left ?? right: if left is not null/undefined, return left; otherwise evaluate and return right
-                compilerContext.pushState();
-                compilerContext.emitTailCalls = false;
-                compilerContext.expressionCompiler.compile(binExpr.getLeft());
-                compilerContext.popState();
-                compilerContext.emitter.emitOpcode(Opcode.DUP);
-                compilerContext.emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
-                int jumpEnd = compilerContext.emitter.emitJump(Opcode.IF_FALSE);
-                compilerContext.emitter.emitOpcode(Opcode.DROP);
-                compilerContext.expressionCompiler.compile(binExpr.getRight());
-                compilerContext.emitter.patchJump(jumpEnd, compilerContext.emitter.currentOffset());
-                return;
-            }
-            default -> {
-                // Fall through to compile operands for other operators
+                compileShortCircuitTail(binaryExpression);
             }
         }
-
-        // Compile operands
-        compilerContext.expressionCompiler.compile(binExpr.getLeft());
-        compilerContext.expressionCompiler.compile(binExpr.getRight());
-
-        // Emit operation
-        Opcode op = switch (binExpr.getOperator()) {
-            case ADD -> Opcode.ADD;
-            case BIT_AND -> Opcode.AND;
-            case BIT_OR -> Opcode.OR;
-            case BIT_XOR -> Opcode.XOR;
-            case DIV -> Opcode.DIV;
-            case EQ -> Opcode.EQ;
-            case EXP -> Opcode.POW;
-            case GE -> Opcode.GTE;
-            case GT -> Opcode.GT;
-            case IN -> Opcode.IN;
-            case INSTANCEOF -> Opcode.INSTANCEOF;
-            case LE -> Opcode.LTE;
-            case LSHIFT -> Opcode.SHL;
-            case LT -> Opcode.LT;
-            case MOD -> Opcode.MOD;
-            case MUL -> Opcode.MUL;
-            case NE -> Opcode.NEQ;
-            case RSHIFT -> Opcode.SAR;
-            case STRICT_EQ -> Opcode.STRICT_EQ;
-            case STRICT_NE -> Opcode.STRICT_NEQ;
-            case SUB -> Opcode.SUB;
-            case URSHIFT -> Opcode.SHR;
-            // LOGICAL_AND, LOGICAL_OR, NULLISH_COALESCING handled above with short-circuit evaluation
-            default -> throw new JSCompilerException("Unknown binary operator: " + binExpr.getOperator(), binExpr);
-        };
-
-        compilerContext.emitter.emitOpcode(op);
     }
 
     private void compilePrivateInExpression(PrivateIdentifier privateIdentifier, Expression right) {
@@ -132,5 +86,28 @@ final class BinaryExpressionCompiler extends AstNodeCompiler<BinaryExpression> {
 
         compilerContext.emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
         compilerContext.emitter.emitOpcode(Opcode.PRIVATE_IN);
+    }
+
+    private void compileShortCircuitTail(BinaryExpression binExpr) {
+        // Stack: left
+        compilerContext.emitter.emitOpcode(Opcode.DUP);
+        int jumpEnd = switch (binExpr.getOperator()) {
+            // left && right: if left is falsy, return left; otherwise evaluate and return right
+            case LOGICAL_AND -> compilerContext.emitter.emitJump(Opcode.IF_FALSE);
+            // left || right: if left is truthy, return left; otherwise evaluate and return right
+            case LOGICAL_OR -> compilerContext.emitter.emitJump(Opcode.IF_TRUE);
+            // left ?? right: if left is not null/undefined, return left; otherwise evaluate and return right
+            default -> {
+                compilerContext.emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
+                yield compilerContext.emitter.emitJump(Opcode.IF_FALSE);
+            }
+        };
+        compilerContext.emitter.emitOpcode(Opcode.DROP);
+        compilerContext.expressionCompiler.compile(binExpr.getRight());
+        compilerContext.emitter.patchJump(jumpEnd, compilerContext.emitter.currentOffset());
+    }
+
+    private static boolean isPrivateIn(BinaryExpression binExpr) {
+        return binExpr.getOperator() == BinaryOperator.IN && binExpr.getLeft() instanceof PrivateIdentifier;
     }
 }

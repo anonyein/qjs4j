@@ -135,7 +135,7 @@ public final class JSRuntime implements AutoCloseable {
         this.globalSymbolRegistry = new HashMap<>();
         this.globalSymbolReverseRegistry = new HashMap<>();
         this.options = options;
-        this.memoryAccounting = new JSMemoryAccounting(options.getMaxMemoryUsage());
+        this.memoryAccounting = new JSMemoryAccounting(options.getMaxDataBlockBytes());
         // An AtomicsObject this runtime made belongs to it alone, and its waitAsync executor is a
         // resource nothing else will release; one the embedder injected is an agent cluster's
         // shared object, and shutting it down here would break the other members.
@@ -316,7 +316,7 @@ public final class JSRuntime implements AutoCloseable {
     /**
      * Accounting for the binary data blocks guest code sizes directly.
      * <p>
-     * This is what makes {@link JSRuntimeOptions#setMaxMemoryUsage(long)} an enforced limit rather than a stored
+     * This is what makes {@link JSRuntimeOptions#setMaxDataBlockBytes(long)} an enforced limit rather than a stored
      * number. See {@link JSMemoryAccounting} for exactly what it does and does not bound.
      *
      * @return this runtime's accounting, never {@code null}

@@ -60,6 +60,13 @@ final class IdentifierCompiler extends AstNodeCompiler<Identifier> {
             return;
         }
 
+        // A read that can throw a ReferenceError — of a global, a captured binding or a binding still in its
+        // temporal dead zone — reports the identifier's position in a stack trace, as V8 does. A plain local
+        // read cannot throw, so it records nothing.
+        if (compilerContext.scopeManager.findLocalInScopes(name) == null || compilerContext.tdzLocals.contains(name)) {
+            compilerContext.emitter.emitSourcePosition(identifier.getLocation());
+        }
+
         if (compilerContext.withObjectManager.hasActiveWithObject()) {
             emitWithAwareIdentifierLookup(name);
             return;

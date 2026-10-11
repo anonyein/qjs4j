@@ -495,8 +495,7 @@ public final class ObjectPrototype {
                     return blockedTruncationError;
                 }
             }
-            return context
-                    .throwTypeError("Cannot define property " + key.toPropertyString() + ", object is not extensible");
+            return obj.throwDefinePropertyFailure(context, key);
         }
         return obj;
     }

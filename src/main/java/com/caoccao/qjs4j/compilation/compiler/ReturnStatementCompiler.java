@@ -37,10 +37,12 @@ final class ReturnStatementCompiler extends AstNodeCompiler<ReturnStatement> {
         // in strict mode, with no active finally blocks, iterators, or async context,
         // emit TAIL_CALL instead of CALL + RETURN (ES2015 14.6.1 HasCallInTailPosition).
         // Exclude spread calls (which use APPLY, not CALL) and super calls from TCO.
-        if (retStmt.getArgument() instanceof CallExpression && retStmt.getArgument().hasTailCallInTailPosition()
-                && compilerContext.strictMode && !compilerContext.isInAsyncFunction
-                && compilerContext.activeFinallyGosubPatches.isEmpty()
-                && !compilerContext.loopManager.hasActiveIteratorLoops()) {
+        // A call in an optional chain is not excluded, but cannot take this path: when the chain
+        // short-circuits, the call never runs, and the RETURN emitted below is what returns.
+        if (retStmt.getArgument() instanceof CallExpression callExpression && !callExpression.isPartOfOptionalChain()
+                && callExpression.hasTailCallInTailPosition() && compilerContext.strictMode
+                && !compilerContext.isInAsyncFunction && compilerContext.activeFinallyGosubPatches.isEmpty()
+                && compilerContext.tryBlockDepth == 0 && !compilerContext.loopManager.hasActiveIteratorLoops()) {
             // Direct call in tail position: TAIL_CALL handles the return entirely
             compilerContext.emitTailCalls = true;
             compilerContext.expressionCompiler.compile(retStmt.getArgument());
@@ -53,7 +55,7 @@ final class ReturnStatementCompiler extends AstNodeCompiler<ReturnStatement> {
         // set emitTailCalls and fall through to emit RETURN for non-tail paths.
         boolean enableTco = retStmt.getArgument() != null && retStmt.getArgument().hasTailCallInTailPosition()
                 && compilerContext.strictMode && !compilerContext.isInAsyncFunction
-                && compilerContext.activeFinallyGosubPatches.isEmpty()
+                && compilerContext.activeFinallyGosubPatches.isEmpty() && compilerContext.tryBlockDepth == 0
                 && !compilerContext.loopManager.hasActiveIteratorLoops();
 
         if (retStmt.getArgument() != null) {

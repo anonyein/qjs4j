@@ -154,6 +154,11 @@ final class EvalRunner {
         } catch (Exception e) {
             activation.evalError = context.throwError("Execution error: " + e.getMessage());
             return null;
+        } catch (StackOverflowError e) {
+            // Backstop for recursion outside a bytecode frame (the VM converts its own): without it
+            // the Error escaped every catch (Exception) on the way out and reached the embedder raw.
+            activation.evalError = context.throwRangeError("Maximum call stack size exceeded");
+            return null;
         } finally {
             activation.release();
         }
@@ -872,6 +877,11 @@ final class EvalRunner {
             // Initialize the function's prototype chain so it inherits from Function.prototype
             func.initializePrototypeChain(context);
             func.setImportMetaFilename(filename);
+            if (isDirectEval) {
+                // Script-called eval, direct or indirect: its frames read as V8's
+                // `eval (eval at caller (file:line:col), <anonymous>:line:col)`.
+                func.setEvalOrigin(context.describeEvalOrigin());
+            }
         }
 
         /**

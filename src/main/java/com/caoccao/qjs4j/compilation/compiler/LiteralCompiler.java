@@ -74,8 +74,11 @@ final class LiteralCompiler extends AstNodeCompiler<Literal> {
                     compilerContext.emitter.emitOpcodeConstant(Opcode.REGEXP, regexp);
                     return;
                 } catch (Exception e) {
-                    throw new JSSyntaxErrorException("Invalid regular expression literal: " + source,
-                            literal.getLocation());
+                    // V8's wording: the literal, then the reason it was refused.
+                    String reason = e.getMessage();
+                    throw new JSSyntaxErrorException("Invalid regular expression flags".equals(reason)
+                            ? reason
+                            : "Invalid regular expression: " + source + ": " + reason, literal.getLocation());
                 }
             }
             throw new JSSyntaxErrorException("Invalid regular expression literal: " + source, literal.getLocation());

@@ -56,7 +56,7 @@ public class JSModuleNameResolutionTest extends BaseTest {
      */
     private String evaluateEntry(String entryName, String entrySource) throws IOException {
         Path entry = writeModule(entryName, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(entrySource, entry.toString(), true);
             return context.eval("String(globalThis.result)", "probe.js", false).toString();
         }

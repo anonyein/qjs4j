@@ -6,10 +6,10 @@ This document tracks the implementation status of all QuickJS opcodes in qjs4j. 
 
 **Total Opcodes**: 245 (all 245 are now DEFINED in Opcode.java enum)
 **Enum Definitions**: 262 total opcodes in qjs4j Opcode.java (includes 144 original + 118 newly added)
-**Fully Implemented**: 245 (100.0%) - have VM handlers in VirtualMachine.java
+**Fully Implemented**: 245 (100.0%) - each enum constant binds its handler in `OpcodeHandler.java`
 **Defined but Not Implemented**: 0 (0.0%) - added to Opcode.java, need VM implementation
 
-**Last Updated**: 2026-02-10
+**Last Updated**: 2026-10-10 (reviewed: no opcode added or removed since 2026-02-10)
 
 ## Important Notes
 

@@ -16,6 +16,10 @@
 
 package com.caoccao.qjs4j.compilation.ast;
 
+import java.util.ArrayList;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+
 /**
  * Represents a binary expression.
  */
@@ -36,10 +40,7 @@ public final class BinaryExpression extends Expression {
     @Override
     public boolean containsAwait() {
         if (awaitInside == null) {
-            awaitInside = left != null && left.containsAwait();
-            if (!awaitInside && right != null && right.containsAwait()) {
-                awaitInside = true;
-            }
+            containsAlongLeftSpine(this, (node, value) -> node.awaitInside = value, Expression::containsAwait);
         }
         return awaitInside;
     }
@@ -47,10 +48,8 @@ public final class BinaryExpression extends Expression {
     @Override
     public boolean containsDirectEvalVarArguments() {
         if (directEvalVarArgumentsInside == null) {
-            directEvalVarArgumentsInside = left != null && left.containsDirectEvalVarArguments();
-            if (!directEvalVarArgumentsInside && right != null && right.containsDirectEvalVarArguments()) {
-                directEvalVarArgumentsInside = true;
-            }
+            containsAlongLeftSpine(this, (node, value) -> node.directEvalVarArgumentsInside = value,
+                    Expression::containsDirectEvalVarArguments);
         }
         return directEvalVarArgumentsInside;
     }
@@ -58,10 +57,7 @@ public final class BinaryExpression extends Expression {
     @Override
     public boolean containsYield() {
         if (yieldInside == null) {
-            yieldInside = left != null && left.containsYield();
-            if (!yieldInside && right != null && right.containsYield()) {
-                yieldInside = true;
-            }
+            containsAlongLeftSpine(this, (node, value) -> node.yieldInside = value, Expression::containsYield);
         }
         return yieldInside;
     }
@@ -80,11 +76,33 @@ public final class BinaryExpression extends Expression {
 
     @Override
     public boolean hasTailCallInTailPosition() {
-        if (operator == BinaryOperator.NULLISH_COALESCING || operator == BinaryOperator.LOGICAL_AND
-                || operator == BinaryOperator.LOGICAL_OR) {
+        if (!operator.isEagerOperator()) {
             return right.hasTailCallInTailPosition();
         }
         return false;
+    }
+
+    /**
+     * Evaluates a cached, short-circuiting "contains" test over a left-associative chain without recursing down its
+     * left spine. Chains such as {@code a + b + c + ...} nest on the left, so a recursive walk needs one Java frame per
+     * operand and overflows the stack for generated code with thousands of operands.
+     */
+    private static void containsAlongLeftSpine(BinaryExpression root, BiConsumer<BinaryExpression, Boolean> setCache,
+            Predicate<Expression> test) {
+        ArrayList<BinaryExpression> spine = new ArrayList<>();
+        Expression current = root;
+        while (current instanceof BinaryExpression binaryExpression) {
+            spine.add(binaryExpression);
+            current = binaryExpression.left;
+        }
+        boolean result = test.test(current);
+        for (int i = spine.size() - 1; i >= 0; i--) {
+            BinaryExpression binaryExpression = spine.get(i);
+            if (!result && test.test(binaryExpression.right)) {
+                result = true;
+            }
+            setCache.accept(binaryExpression, result);
+        }
     }
 
 }

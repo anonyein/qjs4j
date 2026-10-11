@@ -66,6 +66,8 @@ final class ForOfStatementCompiler extends AstNodeCompiler<ForOfStatement> {
                 }
             }
             compilerContext.expressionCompiler.compile(forOfStmt.getRight());
+            // A value that is not iterable reports the iterable's position, as V8 does.
+            compilerContext.emitter.emitSourcePosition(forOfStmt.getRight().getLocation());
             if (forOfStmt.isAsync()) {
                 compilerContext.emitter.emitOpcode(Opcode.FOR_AWAIT_OF_START);
             } else {
@@ -89,6 +91,8 @@ final class ForOfStatementCompiler extends AstNodeCompiler<ForOfStatement> {
         }
         if (!hasHeadTdzScope) {
             compilerContext.expressionCompiler.compile(forOfStmt.getRight());
+            // A value that is not iterable reports the iterable's position, as V8 does.
+            compilerContext.emitter.emitSourcePosition(forOfStmt.getRight().getLocation());
             if (forOfStmt.isAsync()) {
                 compilerContext.emitter.emitOpcode(Opcode.FOR_AWAIT_OF_START);
             } else {
@@ -105,10 +109,23 @@ final class ForOfStatementCompiler extends AstNodeCompiler<ForOfStatement> {
             compilerContext.scopeManager.currentScope().setUsingStackLocal(forOfUsingStackLocal, useAsyncStack);
         }
 
+        // A for-await loop keeps its iterator in a local too, for the awaited return() of a break or a return.
+        // Stack: iter next marker -> iter next marker iter next marker -> iter next marker iter -> iter next marker
+        int asyncIteratorLocal = -1;
+        if (forOfStmt.isAsync()) {
+            asyncIteratorLocal = compilerContext.scopeManager.currentScope()
+                    .declareLocal("$for_await_iterator_" + compilerContext.emitter.currentOffset());
+            compilerContext.emitter.emitOpcode(Opcode.DUP3);
+            compilerContext.emitter.emitOpcode(Opcode.DROP);
+            compilerContext.emitter.emitOpcode(Opcode.DROP);
+            compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, asyncIteratorLocal);
+        }
+
         int loopStart = compilerContext.emitter.currentOffset();
         LoopContext loop = compilerContext.loopManager.createLoopContext(loopStart,
                 compilerContext.scopeManager.getScopeDepth() - 1, compilerContext.scopeManager.getScopeDepth());
         loop.hasIterator = true;
+        loop.asyncIteratorLocal = asyncIteratorLocal;
         compilerContext.loopManager.pushLoop(loop);
 
         int jumpToEnd;
@@ -167,8 +184,18 @@ final class ForOfStatementCompiler extends AstNodeCompiler<ForOfStatement> {
 
         compilerContext.emitter.emitOpcode(Opcode.DROP);
 
+        // A for-await loop that ran to the end has nothing to close; one left by a break awaits its iterator's
+        // return(). Stack: iter next marker -> (empty)
+        int jumpOverBreakTarget = -1;
+        if (asyncIteratorLocal >= 0) {
+            compilerContext.emitter.emitOpcode(Opcode.ITERATOR_CLOSE);
+            jumpOverBreakTarget = compilerContext.emitter.emitJump(Opcode.GOTO);
+        }
         int breakTarget = compilerContext.emitter.currentOffset();
-        compilerContext.emitter.emitOpcode(Opcode.ITERATOR_CLOSE);
+        compilerContext.emitHelpers.emitLoopIteratorClose(loop);
+        if (jumpOverBreakTarget >= 0) {
+            compilerContext.emitter.patchJump(jumpOverBreakTarget, compilerContext.emitter.currentOffset());
+        }
 
         for (int breakPos : loop.breakPositions) {
             compilerContext.emitter.patchJump(breakPos, breakTarget);

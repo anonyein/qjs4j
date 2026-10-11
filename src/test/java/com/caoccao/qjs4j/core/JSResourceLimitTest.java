@@ -193,6 +193,25 @@ public class JSResourceLimitTest extends BaseJavetTest {
 
     @Test
     @Timeout(60)
+    public void testRegExpReplaceBeyondMaximumLengthRaisesRangeError() {
+        // 2^30 characters, past both engines' ceilings. The replacement loop used to grow its buffer until the JVM
+        // failed an allocation, then caught the OutOfMemoryError and reported a catchable InternalError.
+        assertStringWithJavet("""
+                try {
+                    'a'.repeat(2 ** 17).replace(/a/g, 'b'.repeat(2 ** 13));
+                    'NO ERROR';
+                } catch (e) { 'CAUGHT ' + e.name + ': ' + e.message }""");
+        // The unmatched tail is counted too. Not compared with V8, whose ceiling is four times higher.
+        assertThat(evalToString("""
+                try {
+                    ('x' + 'a'.repeat(1000)).replace(/x/, 'b'.repeat((2 ** 27 - 1) - 500));
+                    'NO ERROR';
+                } catch (e) { 'CAUGHT ' + e.name + ': ' + e.message }"""))
+                .isEqualTo("CAUGHT RangeError: Invalid string length");
+    }
+
+    @Test
+    @Timeout(60)
     public void testRepeatAtTheExactLengthBoundary() {
         // The boundary the division has to get right: exactly MAX_LENGTH is allowed, one more is
         // not. MAX_LENGTH is 2^27 - 1, which is odd, so a two-character string cannot reach it.
@@ -240,6 +259,52 @@ public class JSResourceLimitTest extends BaseJavetTest {
         assertStringWithJavet("JSON.stringify('x'.repeat(NaN))");
         assertStringWithJavet("JSON.stringify('x'.repeat())");
         assertStringWithJavet("try { 'x'.repeat(-Infinity); 'NO ERROR' } catch (e) { 'CAUGHT ' + e.name }");
+    }
+
+    @Test
+    @Timeout(60)
+    public void testReplacementPatternsBeyondMaximumLengthRaiseRangeError() {
+        // Each replacement pattern expands to the whole 2^20-character subject 1024 times, 2^30 characters in all. The
+        // substitution used to be built without a length check, so only the JVM's heap stopped it.
+        assertStringWithJavet("""
+                const s = 'a'.repeat(2 ** 20);
+                const attempt = f => {
+                  try {
+                    return 'length ' + f().length;
+                  } catch (e) {
+                    return e.name + ': ' + e.message;
+                  }
+                };
+                const groupsOnce = () => {
+                  const re = /x/;
+                  re.exec = function () {
+                    re.exec = () => null;
+                    return { 0: 'a', length: 1, index: 0, groups: { n: s } };
+                  };
+                  return re;
+                };
+                [
+                  attempt(() => s.replace(/a+/, '$&'.repeat(1024))),
+                  attempt(() => s.replace(/$/, '$`'.repeat(1024))),
+                  attempt(() => s.replace(/^/, "$'".repeat(1024))),
+                  attempt(() => s.replace(/(?<n>a+)/, '$<n>'.repeat(1024))),
+                  attempt(() => s.replace(/(a+)/, '$01'.repeat(1024))),
+                  attempt(() => s.replace(/(a+)/, '$1'.repeat(1024))),
+                  attempt(() => groupsOnce()[Symbol.replace](s, '$<n>'.repeat(1024))),
+                  attempt(() => s.replace('a', "$'".repeat(1024))),
+                  attempt(() => s.replace('a', '$`$&'.repeat(1024))),
+                  attempt(() => 'x'.repeat(1024).replaceAll('x', () => s)),
+                  attempt(() => s.replaceAll('a', "$'".repeat(1024))),
+                  attempt(() => s.replace('a', '$&'.repeat(1024))),
+                ].join('\\n')""");
+        // The head, replacement and tail are counted together. Not compared with V8, whose ceiling is four times
+        // higher.
+        assertThat(evalToString("""
+                try {
+                    ('a' + 'b'.repeat(2 ** 26)).replace('a', 'c'.repeat(2 ** 26 + 1));
+                    'NO ERROR';
+                } catch (e) { 'CAUGHT ' + e.name + ': ' + e.message }"""))
+                .isEqualTo("CAUGHT RangeError: Invalid string length");
     }
 
     @Test

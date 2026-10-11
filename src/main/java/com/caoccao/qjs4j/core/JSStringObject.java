@@ -65,8 +65,8 @@ public final class JSStringObject extends JSObject {
         this.value = value;
         this.setPrimitiveValue(value);
         // String objects have a non-writable, non-enumerable, non-configurable length property
-        defineProperty(PropertyKey.fromString("length"), PropertyDescriptor
-                .dataDescriptor(JSNumber.of(value.value().length()), PropertyDescriptor.DataState.None));
+        defineProperty(PropertyKey.fromString("length"),
+                PropertyDescriptor.dataDescriptor(JSNumber.of(value.length()), PropertyDescriptor.DataState.None));
     }
 
     /**
@@ -83,7 +83,7 @@ public final class JSStringObject extends JSObject {
     public boolean delete(PropertyKey key, boolean throwOnFailure) {
         JSContext context = this.context;
         int index = key.toIndex();
-        boolean isCharacterIndex = index >= 0 && index < value.value().length();
+        boolean isCharacterIndex = index >= 0 && index < value.length();
         if (isCharacterIndex) {
             if (throwOnFailure) {
                 context.throwTypeError("Cannot delete property '" + key.toPropertyString() + "' of "

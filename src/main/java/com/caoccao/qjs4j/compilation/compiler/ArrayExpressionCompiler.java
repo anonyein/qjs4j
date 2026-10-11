@@ -60,6 +60,8 @@ final class ArrayExpressionCompiler extends AstNodeCompiler<ArrayExpression> {
                     }
                     // Compile the iterable expression
                     compilerContext.expressionCompiler.compile(spreadElement.getArgument());
+                    // A value that is not iterable reports the spread operand's position, as V8 does.
+                    compilerContext.emitter.emitSourcePosition(spreadElement.getArgument().getLocation());
                     // Emit APPEND to spread elements into the array
                     // Stack: array pos iterable -> array pos
                     compilerContext.emitter.emitOpcode(Opcode.APPEND);

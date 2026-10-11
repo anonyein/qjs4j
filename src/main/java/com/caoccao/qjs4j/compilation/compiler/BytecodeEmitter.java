@@ -16,6 +16,7 @@
 
 package com.caoccao.qjs4j.compilation.compiler;
 
+import com.caoccao.qjs4j.compilation.ast.SourceLocation;
 import com.caoccao.qjs4j.core.JSValue;
 import com.caoccao.qjs4j.vm.Bytecode;
 import com.caoccao.qjs4j.vm.Opcode;
@@ -30,6 +31,11 @@ public final class BytecodeEmitter {
     private final Map<String, Integer> atomIndexCache;
     private final List<String> atomPool;
     /**
+     * QuickJS's {@code pc2line} table, as flattened (pc, line, column) triples in ascending pc order: the source
+     * position of the instructions from each pc up to the next entry's.
+     */
+    private Map<Integer, String> callDescriptions;
+    /**
      * Growable code buffer, written and patched in place.
      * <p>
      * This used to be a {@link java.io.ByteArrayOutputStream}, which offers no way to overwrite an already-written
@@ -42,6 +48,8 @@ public final class BytecodeEmitter {
     private int codeSize;
     private final Map<JSValue, Integer> constantIndexCache;
     private final List<JSValue> constantPool;
+    private int[] sourcePositions;
+    private int sourcePositionsSize;
 
     public BytecodeEmitter() {
         this.code = new byte[INITIAL_CODE_CAPACITY];
@@ -50,6 +58,8 @@ public final class BytecodeEmitter {
         this.constantIndexCache = new HashMap<>();
         this.atomPool = new ArrayList<>();
         this.atomIndexCache = new HashMap<>();
+        this.sourcePositions = new int[3 * 16];
+        this.sourcePositionsSize = 0;
     }
 
     /**
@@ -67,7 +77,10 @@ public final class BytecodeEmitter {
         JSValue[] constants = constantPool.toArray(JSValue.NO_ARGS);
         String[] atoms = atomPool.toArray(new String[0]);
 
-        return new Bytecode(instructions, constants, atoms, localCount, localVarNames);
+        Bytecode bytecode = new Bytecode(instructions, constants, atoms, localCount, localVarNames);
+        bytecode.setSourcePositions(Arrays.copyOf(sourcePositions, sourcePositionsSize));
+        bytecode.setCallDescriptions(callDescriptions);
+        return bytecode;
     }
 
     /**
@@ -94,6 +107,22 @@ public final class BytecodeEmitter {
         }
         emitU32(index);
         return index;
+    }
+
+    /**
+     * Record how the call instruction emitted next names its callee, for {@code TypeError: x is not a function}.
+     *
+     * @param description
+     *            the name, or null to describe the value instead
+     */
+    public void emitCallDescription(String description) {
+        if (description == null) {
+            return;
+        }
+        if (callDescriptions == null) {
+            callDescriptions = new HashMap<>();
+        }
+        callDescriptions.put(codeSize, description);
     }
 
     /**
@@ -189,6 +218,35 @@ public final class BytecodeEmitter {
     public void emitOpcodeU8(Opcode op, int value) {
         emitOpcode(op);
         emitU8(value);
+    }
+
+    /**
+     * Record the source position of the instructions emitted from here on, for stack traces.
+     * <p>
+     * Stack traces used to give every frame line 1, because nothing mapped a program counter back to the source. A
+     * position recorded at the current offset replaces one already recorded there, and one equal to the position in
+     * effect is not recorded again, so the table stays as small as the code allows.
+     *
+     * @param location
+     *            the source position, or null to keep the one in effect
+     */
+    public void emitSourcePosition(SourceLocation location) {
+        if (location == null) {
+            return;
+        }
+        if (sourcePositionsSize > 0 && sourcePositions[sourcePositionsSize - 3] == codeSize) {
+            sourcePositionsSize -= 3;
+        }
+        if (sourcePositionsSize > 0 && sourcePositions[sourcePositionsSize - 2] == location.line()
+                && sourcePositions[sourcePositionsSize - 1] == location.column()) {
+            return;
+        }
+        if (sourcePositionsSize + 3 > sourcePositions.length) {
+            sourcePositions = Arrays.copyOf(sourcePositions, sourcePositions.length * 2);
+        }
+        sourcePositions[sourcePositionsSize++] = codeSize;
+        sourcePositions[sourcePositionsSize++] = location.line();
+        sourcePositions[sourcePositionsSize++] = location.column();
     }
 
     /**

@@ -517,11 +517,15 @@ public final class JSIntlNumberFormat extends JSObject {
         if ("percent".equals(unit)) {
             return numberPortion + "%";
         }
+        String display = unitDisplay != null ? unitDisplay : "short";
+        String englishUnit = JSIntlDurationFormat.formatEnglishTimeUnit(numberPortion, unit, display, locale);
+        if (englishUnit != null) {
+            return englishUnit;
+        }
         if (!"kilometer-per-hour".equals(unit)) {
             return numberPortion + " " + unit;
         }
         String languageTag = locale.toLanguageTag();
-        String display = unitDisplay != null ? unitDisplay : "short";
         if (languageTag.startsWith("de")) {
             if ("long".equals(display)) {
                 return numberPortion + " Kilometer pro Stunde";

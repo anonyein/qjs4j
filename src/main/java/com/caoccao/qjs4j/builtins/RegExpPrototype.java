@@ -140,7 +140,7 @@ public final class RegExpPrototype {
         try {
             regexp.reinitialize(pattern, flags);
         } catch (Exception e) {
-            return context.throwSyntaxError("Invalid regular expression: /" + pattern + "/: " + e.getMessage());
+            return context.throwSyntaxError(JSRegExp.describeSyntaxError(pattern, flags, e));
         }
 
         // Spec step 12: Perform ? Set(obj, "lastIndex", 0, true).
@@ -339,7 +339,8 @@ public final class RegExpPrototype {
         }
 
         RegExpEngine engine = regexp.getEngine();
-        RegExpEngine.MatchResult result = engine.exec(str, lastIndex);
+        RegExpEngine.MatchResult result = engine.exec(str, lastIndex,
+                context.getVirtualMachine()::checkExecutionInterrupt);
 
         if (result != null && result.matched()) {
             JSArray array = context.createJSArray();
@@ -959,95 +960,94 @@ public final class RegExpPrototype {
             return inputStringValue;
         }
 
-        try {
-            StringBuilder accumulated = new StringBuilder(inputString.length() + 16);
-            int nextSourcePosition = 0;
-            for (JSObject resultObject : results) {
-                // ES2024 22.2.5.11 step 14a: nCaptures = ToLength(Get(result, "length"))
-                JSValue lengthValue = resultObject.get(PropertyKey.LENGTH);
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-                int resultLength = (int) Math.min(JSTypeConversions.toLength(context, lengthValue), Integer.MAX_VALUE);
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
+        StringBuilder accumulated = new StringBuilder(inputString.length() + 16);
+        int nextSourcePosition = 0;
+        for (JSObject resultObject : results) {
+            // ES2024 22.2.5.11 step 14a: nCaptures = ToLength(Get(result, "length"))
+            JSValue lengthValue = resultObject.get(PropertyKey.LENGTH);
+            if (context.hasPendingException()) {
+                return JSUndefined.INSTANCE;
+            }
+            int resultLength = (int) Math.min(JSTypeConversions.toLength(context, lengthValue), Integer.MAX_VALUE);
+            if (context.hasPendingException()) {
+                return JSUndefined.INSTANCE;
+            }
 
-                // ES2024 22.2.5.11 step 14c: matched = ToString(Get(result, "0"))
-                JSValue matchedValue = resultObject.get(PropertyKey.fromIndex(0));
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-                String matched = JSTypeConversions.toString(context, matchedValue).value();
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
+            // ES2024 22.2.5.11 step 14c: matched = ToString(Get(result, "0"))
+            JSValue matchedValue = resultObject.get(PropertyKey.fromIndex(0));
+            if (context.hasPendingException()) {
+                return JSUndefined.INSTANCE;
+            }
+            String matched = JSTypeConversions.toString(context, matchedValue).value();
+            if (context.hasPendingException()) {
+                return JSUndefined.INSTANCE;
+            }
 
-                // ES2024 22.2.5.11 step 14d: position = ToIntegerOrInfinity(Get(result, "index"))
-                JSValue positionValue = resultObject.get(PropertyKey.INDEX);
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-                int position = (int) JSTypeConversions.toInteger(context, positionValue);
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-                position = Math.max(0, Math.min(position, inputString.length()));
-                int tailPosition = Math.max(0, Math.min(position + matched.length(), inputString.length()));
+            // ES2024 22.2.5.11 step 14d: position = ToIntegerOrInfinity(Get(result, "index"))
+            JSValue positionValue = resultObject.get(PropertyKey.INDEX);
+            if (context.hasPendingException()) {
+                return JSUndefined.INSTANCE;
+            }
+            int position = (int) JSTypeConversions.toInteger(context, positionValue);
+            if (context.hasPendingException()) {
+                return JSUndefined.INSTANCE;
+            }
+            position = Math.max(0, Math.min(position, inputString.length()));
+            int tailPosition = Math.max(0, Math.min(position + matched.length(), inputString.length()));
 
-                // ES2024 22.2.5.11 step 14f-g: captures
-                String[] captures = new String[Math.max(1, resultLength)];
-                captures[0] = matched;
-                for (int i = 1; i < resultLength; i++) {
-                    JSValue captureValue = resultObject.get(PropertyKey.fromIndex(i));
+            // ES2024 22.2.5.11 step 14f-g: captures
+            String[] captures = new String[Math.max(1, resultLength)];
+            captures[0] = matched;
+            for (int i = 1; i < resultLength; i++) {
+                JSValue captureValue = resultObject.get(PropertyKey.fromIndex(i));
+                if (context.hasPendingException()) {
+                    return JSUndefined.INSTANCE;
+                }
+                if (captureValue instanceof JSUndefined) {
+                    captures[i] = null;
+                } else {
+                    captures[i] = JSTypeConversions.toString(context, captureValue).value();
                     if (context.hasPendingException()) {
                         return JSUndefined.INSTANCE;
                     }
-                    if (captureValue instanceof JSUndefined) {
-                        captures[i] = null;
-                    } else {
-                        captures[i] = JSTypeConversions.toString(context, captureValue).value();
-                        if (context.hasPendingException()) {
-                            return JSUndefined.INSTANCE;
-                        }
-                    }
-                }
-
-                // ES2024 22.2.5.11 step 14h: namedCaptures = Get(result, "groups")
-                JSValue groupsValue = resultObject.get(PropertyKey.GROUPS);
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-                if (!functionalReplace && !(groupsValue instanceof JSUndefined)) {
-                    JSObject namedCapturesObject = JSTypeConversions.toObject(context, groupsValue);
-                    if (context.hasPendingException()) {
-                        return JSUndefined.INSTANCE;
-                    }
-                    if (namedCapturesObject == null) {
-                        return context.throwTypeError("Cannot convert undefined or null to object");
-                    }
-                }
-
-                String replacement = StringPrototype.applyRegExpReplacementWithNamedCapturesObject(context,
-                        replaceValue, inputString, position, tailPosition, captures, groupsValue);
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-
-                if (position >= nextSourcePosition) {
-                    accumulated.append(inputString, nextSourcePosition, position);
-                    accumulated.append(replacement);
-                    nextSourcePosition = tailPosition;
                 }
             }
-            if (nextSourcePosition < inputString.length()) {
-                accumulated.append(inputString.substring(nextSourcePosition));
+
+            // ES2024 22.2.5.11 step 14h: namedCaptures = Get(result, "groups")
+            JSValue groupsValue = resultObject.get(PropertyKey.GROUPS);
+            if (context.hasPendingException()) {
+                return JSUndefined.INSTANCE;
             }
-            return new JSString(accumulated.toString());
-        } catch (OutOfMemoryError e) {
-            context.throwError("InternalError", "out of memory");
-            return JSUndefined.INSTANCE;
+            if (!functionalReplace && groupsValue instanceof JSNull) {
+                // ToObject(namedCaptures) fails only for null; undefined is skipped.
+                return context.throwTypeError("Cannot convert undefined or null to object");
+            }
+
+            String replacement = StringPrototype.applyRegExpReplacementWithNamedCapturesObject(context, replaceValue,
+                    inputString, position, tailPosition, captures, groupsValue);
+            if (context.hasPendingException()) {
+                return JSUndefined.INSTANCE;
+            }
+
+            if (position >= nextSourcePosition) {
+                // The result is bounded like every other string, so an oversized replacement is a RangeError rather
+                // than the OutOfMemoryError this used to catch and report as a catchable InternalError.
+                if ((long) accumulated.length() + (position - nextSourcePosition)
+                        + replacement.length() > JSString.MAX_LENGTH) {
+                    return context.throwRangeError("Invalid string length");
+                }
+                accumulated.append(inputString, nextSourcePosition, position);
+                accumulated.append(replacement);
+                nextSourcePosition = tailPosition;
+            }
         }
+        if ((long) accumulated.length() + inputString.length() - nextSourcePosition > JSString.MAX_LENGTH) {
+            return context.throwRangeError("Invalid string length");
+        }
+        if (nextSourcePosition < inputString.length()) {
+            accumulated.append(inputString.substring(nextSourcePosition));
+        }
+        return new JSString(accumulated.toString());
     }
 
     /**

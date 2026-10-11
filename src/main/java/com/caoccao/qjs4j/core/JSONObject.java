@@ -608,53 +608,6 @@ public final class JSONObject {
         return jsValue;
     }
 
-    private ParseResult parseArray(ParseContext parseContext, int start) {
-        if (parseContext.text.charAt(start) != '[') {
-            throw new JSONParseException("Expected '[' " + parseContext.getPositionInfo(start));
-        }
-
-        JSArray arr = context.createJSArray();
-        int i = skipWhitespace(parseContext.text, start + 1);
-
-        // Empty array
-        if (i < parseContext.text.length() && parseContext.text.charAt(i) == ']') {
-            parseContext.recordSourceRange(arr, start, i + 1);
-            return new ParseResult(arr, i + 1);
-        }
-
-        int elementIndex = 0;
-        while (i < parseContext.text.length()) {
-            // Parse value
-            ParseResult valueResult = parseValue(parseContext, i);
-            arr.push(valueResult.value);
-            // Record source for array elements
-            parseContext.recordElementSource(arr, String.valueOf(elementIndex), valueResult.value,
-                    valueResult.sourceStart, valueResult.sourceEnd);
-            elementIndex++;
-            i = skipWhitespace(parseContext.text, valueResult.endIndex);
-
-            // Check for comma or end
-            if (i >= parseContext.text.length()) {
-                throw new JSONParseException(
-                        "Expected ',' or ']' after array element in JSON " + parseContext.getPositionInfo(i));
-            }
-
-            if (parseContext.text.charAt(i) == ']') {
-                parseContext.recordSourceRange(arr, start, i + 1);
-                return new ParseResult(arr, i + 1);
-            }
-
-            if (parseContext.text.charAt(i) != ',') {
-                throw new JSONParseException(
-                        "Expected ',' or ']' after array element in JSON " + parseContext.getPositionInfo(i));
-            }
-
-            i = skipWhitespace(parseContext.text, i + 1);
-        }
-
-        throw new JSONParseException("Unterminated array in JSON " + parseContext.getPositionInfo(i));
-    }
-
     private ParseResult parseFalse(ParseContext parseContext, int start) {
         if (parseContext.text.startsWith("false", start)) {
             return new ParseResult(JSBoolean.FALSE, start + 5, start, start + 5);
@@ -741,65 +694,19 @@ public final class JSONObject {
         return new ParseResult(JSNumber.of(Double.parseDouble(numStr)), i, start, i);
     }
 
-    private ParseResult parseObject(ParseContext parseContext, int start) {
-        if (parseContext.text.charAt(start) != '{') {
-            throw new JSONParseException("Expected '{' " + parseContext.getPositionInfo(start));
+    /**
+     * Parse an object's property name and the colon after it.
+     *
+     * @return the index of the value
+     */
+    private int parseObjectKey(ParseContext parseContext, ParseFrame frame, int start) {
+        ParseResult keyResult = parsePropertyName(parseContext, start, frame.propertyCount);
+        frame.key = ((JSString) keyResult.value).value();
+        int i = skipWhitespace(parseContext.text, keyResult.endIndex);
+        if (i >= parseContext.text.length() || parseContext.text.charAt(i) != ':') {
+            throw new JSONParseException("Expected ':' after property name in JSON " + parseContext.getPositionInfo(i));
         }
-
-        JSObject obj = context.createJSObject();
-        int propertyCount = 0;
-        int i = skipWhitespace(parseContext.text, start + 1);
-
-        // Empty object
-        if (i < parseContext.text.length() && parseContext.text.charAt(i) == '}') {
-            parseContext.recordSourceRange(obj, start, i + 1);
-            return new ParseResult(obj, i + 1);
-        }
-
-        while (i < parseContext.text.length()) {
-            // Parse key (must be string)
-            ParseResult keyResult = parsePropertyName(parseContext, i, propertyCount);
-            String key = ((JSString) keyResult.value).value();
-            i = skipWhitespace(parseContext.text, keyResult.endIndex);
-
-            // Expect colon
-            if (i >= parseContext.text.length() || parseContext.text.charAt(i) != ':') {
-                throw new JSONParseException(
-                        "Expected ':' after property name in JSON " + parseContext.getPositionInfo(i));
-            }
-            i = skipWhitespace(parseContext.text, i + 1);
-
-            // Parse value
-            ParseResult valueResult = parseValue(parseContext, i);
-            // Use DefineOwnProperty (CreateDataProperty), NOT [[Set]]
-            // This ensures __proto__ is treated as a regular property
-            obj.defineProperty(PropertyKey.fromString(key), valueResult.value, PropertyDescriptor.DataState.All);
-            // Record source for object properties
-            parseContext.recordElementSource(obj, key, valueResult.value, valueResult.sourceStart,
-                    valueResult.sourceEnd);
-            propertyCount++;
-            i = skipWhitespace(parseContext.text, valueResult.endIndex);
-
-            // Check for comma or end
-            if (i >= parseContext.text.length()) {
-                throw new JSONParseException(
-                        "Expected ',' or '}' after property value in JSON " + parseContext.getPositionInfo(i));
-            }
-
-            if (parseContext.text.charAt(i) == '}') {
-                parseContext.recordSourceRange(obj, start, i + 1);
-                return new ParseResult(obj, i + 1);
-            }
-
-            if (parseContext.text.charAt(i) != ',') {
-                throw new JSONParseException(
-                        "Expected ',' or '}' after property value in JSON " + parseContext.getPositionInfo(i));
-            }
-
-            i = skipWhitespace(parseContext.text, i + 1);
-        }
-
-        throw new JSONParseException("Unterminated object in JSON " + parseContext.getPositionInfo(i));
+        return skipWhitespace(parseContext.text, i + 1);
     }
 
     private ParseResult parsePropertyName(ParseContext parseContext, int start, int propertyCount) {
@@ -936,25 +843,103 @@ public final class JSONObject {
         throw new JSONParseException("Invalid literal " + parseContext.getPositionInfo(start));
     }
 
+    /**
+     * Parse a JSON value without recursion: arrays and objects being filled are kept on an explicit stack, so the
+     * nesting depth costs heap rather than Java stack. The parser used to recurse once per level, and
+     * {@code JSON.parse("[".repeat(100000) + "]".repeat(100000))}, which V8 parses, overflowed into a
+     * {@code RangeError} — or into a raw {@link StackOverflowError} on a thread with a small stack.
+     */
     private ParseResult parseValue(ParseContext parseContext, int start) {
-        int i = skipWhitespace(parseContext.text, start);
-
-        if (i >= parseContext.text.length()) {
-            throw new JSONParseException("Unexpected end of JSON input");
+        String text = parseContext.text;
+        int length = text.length();
+        Deque<ParseFrame> stack = new ArrayDeque<>();
+        int i = start;
+        while (true) {
+            // Read one value; an array or object that is not empty is opened instead, and read element by element.
+            i = skipWhitespace(text, i);
+            if (i >= length) {
+                throw new JSONParseException("Unexpected end of JSON input");
+            }
+            char ch = text.charAt(i);
+            ParseResult completed;
+            if (ch == '[' || ch == '{') {
+                boolean isArray = ch == '[';
+                JSObject container = isArray ? context.createJSArray() : context.createJSObject();
+                int next = skipWhitespace(text, i + 1);
+                if (next < length && text.charAt(next) == (isArray ? ']' : '}')) {
+                    parseContext.recordSourceRange(container, i, next + 1);
+                    completed = new ParseResult(container, next + 1);
+                } else {
+                    if (next >= length) {
+                        throw new JSONParseException(
+                                (isArray ? "Unterminated array in JSON " : "Unterminated object in JSON ")
+                                        + parseContext.getPositionInfo(next));
+                    }
+                    ParseFrame frame = new ParseFrame(container, i);
+                    stack.push(frame);
+                    i = isArray ? next : parseObjectKey(parseContext, frame, next);
+                    continue;
+                }
+            } else {
+                completed = switch (ch) {
+                    case '"' -> parseString(parseContext, i);
+                    case 't' -> parseTrue(parseContext, i);
+                    case 'f' -> parseFalse(parseContext, i);
+                    case 'n' -> parseNull(parseContext, i);
+                    case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> parseNumber(parseContext, i);
+                    default ->
+                        throw new JSONParseException("Unexpected character: " + ch + parseContext.getPositionInfo(i));
+                };
+            }
+            // Hand the completed value to the containers it closes, innermost first.
+            while (true) {
+                ParseFrame frame = stack.peek();
+                if (frame == null) {
+                    return completed;
+                }
+                boolean isArray = frame.container instanceof JSArray;
+                if (isArray) {
+                    JSArray array = (JSArray) frame.container;
+                    array.push(completed.value);
+                    parseContext.recordElementSource(array, String.valueOf(frame.elementIndex), completed.value,
+                            completed.sourceStart, completed.sourceEnd);
+                    frame.elementIndex++;
+                } else {
+                    // CreateDataProperty, not [[Set]], so __proto__ is an ordinary property.
+                    frame.container.defineProperty(PropertyKey.fromString(frame.key), completed.value,
+                            PropertyDescriptor.DataState.All);
+                    parseContext.recordElementSource(frame.container, frame.key, completed.value, completed.sourceStart,
+                            completed.sourceEnd);
+                    frame.propertyCount++;
+                }
+                i = skipWhitespace(text, completed.endIndex);
+                String expected = isArray
+                        ? "Expected ',' or ']' after array element in JSON "
+                        : "Expected ',' or '}' after property value in JSON ";
+                if (i >= length) {
+                    throw new JSONParseException(expected + parseContext.getPositionInfo(i));
+                }
+                if (text.charAt(i) == (isArray ? ']' : '}')) {
+                    parseContext.recordSourceRange(frame.container, frame.start, i + 1);
+                    stack.pop();
+                    completed = new ParseResult(frame.container, i + 1);
+                    continue;
+                }
+                if (text.charAt(i) != ',') {
+                    throw new JSONParseException(expected + parseContext.getPositionInfo(i));
+                }
+                i = skipWhitespace(text, i + 1);
+                if (i >= length) {
+                    throw new JSONParseException(
+                            (isArray ? "Unterminated array in JSON " : "Unterminated object in JSON ")
+                                    + parseContext.getPositionInfo(i));
+                }
+                if (!isArray) {
+                    i = parseObjectKey(parseContext, frame, i);
+                }
+                break;
+            }
         }
-
-        char ch = parseContext.text.charAt(i);
-
-        return switch (ch) {
-            case '"' -> parseString(parseContext, i);
-            case '{' -> parseObject(parseContext, i);
-            case '[' -> parseArray(parseContext, i);
-            case 't' -> parseTrue(parseContext, i);
-            case 'f' -> parseFalse(parseContext, i);
-            case 'n' -> parseNull(parseContext, i);
-            case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> parseNumber(parseContext, i);
-            default -> throw new JSONParseException("Unexpected character: " + ch + parseContext.getPositionInfo(i));
-        };
     }
 
     /**
@@ -1527,6 +1512,22 @@ public final class JSONObject {
 
         void recordSourceRange(JSValue structured, int start, int end) {
             structuredRanges.put(structured, new int[]{start, end});
+        }
+    }
+
+    /**
+     * An array or object the parser is filling: where it starts, and the next element index or the pending key.
+     */
+    private static final class ParseFrame {
+        private final JSObject container;
+        private int elementIndex;
+        private String key;
+        private int propertyCount;
+        private final int start;
+
+        private ParseFrame(JSObject container, int start) {
+            this.container = container;
+            this.start = start;
         }
     }
 

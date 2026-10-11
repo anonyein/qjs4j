@@ -17,7 +17,6 @@
 package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.core.*;
-import com.caoccao.qjs4j.regexp.RegExpEngine;
 import com.caoccao.qjs4j.unicode.UnicodeNormalization;
 import com.caoccao.qjs4j.unicode.UnicodePropertyResolver;
 
@@ -35,37 +34,35 @@ public final class StringPrototype {
         return createHTML(context, thisArg, args, "a", "name");
     }
 
-    private static String applyRegExpReplacement(JSContext context, JSValue replaceValue, String input, int matchStart,
-            int matchEnd, String[] captures, String[] groupNames) {
-        if (replaceValue instanceof JSFunction replaceFunction) {
-            JSValue[] callbackArgs = buildRegExpReplaceCallbackArgs(context, input, matchStart, captures, groupNames);
-            if (context.hasPendingException()) {
-                return null;
-            }
-            JSValue callbackResult = replaceFunction.call(context, JSUndefined.INSTANCE, callbackArgs);
-            if (context.hasPendingException()) {
-                return null;
-            }
-            return JSTypeConversions.toString(context, callbackResult).value();
+    /**
+     * Append a capture to a substitution, refusing to pass the string length limit. "$1" repeated in a replacement
+     * multiplies a capture's length: GetSubstitution used to build such a string until the JVM ran out of memory.
+     *
+     * @return false with a pending RangeError when the result would be too long
+     */
+    private static boolean appendCapture(JSContext context, StringBuilder builder, String capture) {
+        String text = capture != null ? capture : "";
+        if (exceedsMaxLength(context, builder, text.length())) {
+            return false;
         }
-        String replacementTemplate = JSTypeConversions.toString(context, replaceValue).value();
-        if (context.hasPendingException()) {
-            return null;
-        }
-        return applyRegExpReplacementPattern(context, replacementTemplate, input, matchStart, matchEnd, captures,
-                groupNames, null);
+        builder.append(text);
+        return true;
     }
 
     /**
-     * Scan replacement tokens for both internal capture arrays and observable groups objects. Named-group property
-     * access and conversion stay lazy and in template order.
+     * GetSubstitution: expand the replacement template's tokens. Named-group property access and conversion stay lazy
+     * and in template order.
+     *
+     * @param captures
+     *            the match followed by its captures, a missing capture being null
+     * @param namedCapturesValue
+     *            the match result's groups, or null when there are none
+     * @return the substitution, or null with a pending exception
      */
     private static String applyRegExpReplacementPattern(JSContext context, String replacementTemplate, String input,
-            int matchStart, int matchEnd, String[] captures, String[] groupNames, JSValue namedCapturesValue) {
-        boolean hasNamedCaptures = groupNames != null
-                ? hasNamedCaptures(groupNames)
-                : namedCapturesValue != null && !(namedCapturesValue instanceof JSUndefined)
-                        && !(namedCapturesValue instanceof JSNull);
+            int matchStart, int matchEnd, String[] captures, JSValue namedCapturesValue) {
+        // RegExp.prototype[Symbol.replace] has already refused null groups (ToObject), so only undefined means none.
+        boolean hasNamedCaptures = namedCapturesValue != null && !(namedCapturesValue instanceof JSUndefined);
         StringBuilder resultBuilder = new StringBuilder(replacementTemplate.length() + 16);
         int replacementIndex = 0;
         while (replacementIndex < replacementTemplate.length()) {
@@ -82,17 +79,26 @@ public final class StringPrototype {
                 continue;
             }
             if (nextChar == '&') {
-                resultBuilder.append(captures != null && captures.length > 0 && captures[0] != null ? captures[0] : "");
+                if (exceedsMaxLength(context, resultBuilder, captures[0].length())) {
+                    return null;
+                }
+                resultBuilder.append(captures[0]);
                 replacementIndex += 2;
                 continue;
             }
             if (nextChar == '`') {
+                if (exceedsMaxLength(context, resultBuilder, matchStart)) {
+                    return null;
+                }
                 resultBuilder.append(input, 0, matchStart);
                 replacementIndex += 2;
                 continue;
             }
             if (nextChar == '\'') {
-                resultBuilder.append(input.substring(matchEnd));
+                if (exceedsMaxLength(context, resultBuilder, input.length() - matchEnd)) {
+                    return null;
+                }
+                resultBuilder.append(input, matchEnd, input.length());
                 replacementIndex += 2;
                 continue;
             }
@@ -106,29 +112,18 @@ public final class StringPrototype {
                 int closeIndex = replacementTemplate.indexOf('>', replacementIndex + 2);
                 if (closeIndex >= 0) {
                     String groupName = replacementTemplate.substring(replacementIndex + 2, closeIndex);
-                    if (groupNames != null) {
-                        String replacement = getNamedCaptureReplacement(groupName, captures, groupNames);
-                        if (replacement != null) {
-                            resultBuilder.append(replacement);
-                        }
-                    } else {
-                        JSObject namedCapturesObject = JSTypeConversions.toObject(context, namedCapturesValue);
-                        if (namedCapturesObject == null) {
-                            resultBuilder.append("$<");
-                            replacementIndex += 2;
-                            continue;
-                        }
-                        JSValue groupValue = namedCapturesObject.get(PropertyKey.fromString(groupName));
-                        if (context.hasPendingException()) {
+                    JSObject namedCapturesObject = JSTypeConversions.toObject(context, namedCapturesValue);
+                    JSValue groupValue = namedCapturesObject.get(PropertyKey.fromString(groupName));
+                    if (context.hasPendingException()) {
+                        return null;
+                    }
+                    if (!(groupValue instanceof JSUndefined)) {
+                        String replacement = JSTypeConversions.toString(context, groupValue).value();
+                        if (context.hasPendingException()
+                                || exceedsMaxLength(context, resultBuilder, replacement.length())) {
                             return null;
                         }
-                        if (!(groupValue instanceof JSUndefined)) {
-                            String replacement = JSTypeConversions.toString(context, groupValue).value();
-                            if (context.hasPendingException()) {
-                                return null;
-                            }
-                            resultBuilder.append(replacement);
-                        }
+                        resultBuilder.append(replacement);
                     }
                     replacementIndex = closeIndex + 1;
                     continue;
@@ -139,8 +134,10 @@ public final class StringPrototype {
                     char secondDigit = replacementTemplate.charAt(replacementIndex + 2);
                     if (secondDigit >= '1' && secondDigit <= '9') {
                         int captureIndex = secondDigit - '0';
-                        if (captures != null && captureIndex < captures.length) {
-                            resultBuilder.append(captures[captureIndex] != null ? captures[captureIndex] : "");
+                        if (captureIndex < captures.length) {
+                            if (!appendCapture(context, resultBuilder, captures[captureIndex])) {
+                                return null;
+                            }
                             replacementIndex += 3;
                             continue;
                         }
@@ -154,14 +151,16 @@ public final class StringPrototype {
                     char secondDigit = replacementTemplate.charAt(replacementIndex + 2);
                     if (secondDigit >= '0' && secondDigit <= '9') {
                         int twoDigitCaptureIndex = captureIndex * 10 + (secondDigit - '0');
-                        if (captures != null && twoDigitCaptureIndex < captures.length) {
+                        if (twoDigitCaptureIndex < captures.length) {
                             captureIndex = twoDigitCaptureIndex;
                             consumedDigits = 2;
                         }
                     }
                 }
-                if (captures != null && captureIndex < captures.length) {
-                    resultBuilder.append(captures[captureIndex] != null ? captures[captureIndex] : "");
+                if (captureIndex < captures.length) {
+                    if (!appendCapture(context, resultBuilder, captures[captureIndex])) {
+                        return null;
+                    }
                     replacementIndex += 1 + consumedDigits;
                     continue;
                 }
@@ -190,7 +189,7 @@ public final class StringPrototype {
         if (context.hasPendingException()) {
             return null;
         }
-        return applyRegExpReplacementPattern(context, replacementTemplate, input, matchStart, matchEnd, captures, null,
+        return applyRegExpReplacementPattern(context, replacementTemplate, input, matchStart, matchEnd, captures,
                 namedCapturesValue);
     }
 
@@ -202,11 +201,8 @@ public final class StringPrototype {
         JSString str = toStringCheckObject(context, thisArg);
         String s = str.value();
 
-        if (args.length == 0) {
-            return JSUndefined.INSTANCE;
-        }
-
-        long index = (long) JSTypeConversions.toInteger(context, args[0]);
+        // A missing index is undefined, which ToIntegerOrInfinity makes 0: "abc".at() is "a". It used to be undefined.
+        long index = (long) JSTypeConversions.toInteger(context, args.length > 0 ? args[0] : JSUndefined.INSTANCE);
         int length = s.length();
 
         // Handle negative indices
@@ -245,36 +241,17 @@ public final class StringPrototype {
 
     private static JSValue[] buildRegExpReplaceCallbackArgs(JSContext context, String input, int matchStart,
             String[] captures, JSValue namedCapturesValue) {
-        String[] matchCaptures = captures != null ? captures : new String[]{""};
         boolean hasNamedCaptures = !(namedCapturesValue instanceof JSUndefined);
-        int callbackArgCount = matchCaptures.length + 2 + (hasNamedCaptures ? 1 : 0);
+        int callbackArgCount = captures.length + 2 + (hasNamedCaptures ? 1 : 0);
         JSValue[] callbackArgs = new JSValue[callbackArgCount];
-        for (int captureIndex = 0; captureIndex < matchCaptures.length; captureIndex++) {
-            String captureValue = matchCaptures[captureIndex];
+        for (int captureIndex = 0; captureIndex < captures.length; captureIndex++) {
+            String captureValue = captures[captureIndex];
             callbackArgs[captureIndex] = captureValue != null ? new JSString(captureValue) : JSUndefined.INSTANCE;
         }
-        callbackArgs[matchCaptures.length] = JSNumber.of(matchStart);
-        callbackArgs[matchCaptures.length + 1] = new JSString(input);
+        callbackArgs[captures.length] = JSNumber.of(matchStart);
+        callbackArgs[captures.length + 1] = new JSString(input);
         if (hasNamedCaptures) {
-            callbackArgs[matchCaptures.length + 2] = namedCapturesValue;
-        }
-        return callbackArgs;
-    }
-
-    private static JSValue[] buildRegExpReplaceCallbackArgs(JSContext context, String input, int matchStart,
-            String[] captures, String[] groupNames) {
-        String[] matchCaptures = captures != null ? captures : new String[]{""};
-        boolean hasNamedCaptures = hasNamedCaptures(groupNames);
-        int callbackArgCount = matchCaptures.length + 2 + (hasNamedCaptures ? 1 : 0);
-        JSValue[] callbackArgs = new JSValue[callbackArgCount];
-        for (int captureIndex = 0; captureIndex < matchCaptures.length; captureIndex++) {
-            String captureValue = matchCaptures[captureIndex];
-            callbackArgs[captureIndex] = captureValue != null ? new JSString(captureValue) : JSUndefined.INSTANCE;
-        }
-        callbackArgs[matchCaptures.length] = JSNumber.of(matchStart);
-        callbackArgs[matchCaptures.length + 1] = new JSString(input);
-        if (hasNamedCaptures) {
-            callbackArgs[matchCaptures.length + 2] = createNamedGroupsObject(context, captures, groupNames);
+            callbackArgs[captures.length + 2] = namedCapturesValue;
         }
         return callbackArgs;
     }
@@ -401,6 +378,16 @@ public final class StringPrototype {
     }
 
     /**
+     * The result of a replacement, within the string length limit.
+     */
+    private static JSValue concatenateReplacement(JSContext context, String head, String replacement, String tail) {
+        if ((long) head.length() + replacement.length() + tail.length() > JSString.MAX_LENGTH) {
+            return context.throwRangeError("Invalid string length");
+        }
+        return new JSString(head + replacement + tail);
+    }
+
+    /**
      * Helper method to create HTML wrapper strings. Used by anchor(), big(), blink(), bold(), etc.
      */
     private static JSValue createHTML(JSContext context, JSValue thisArg, JSValue[] args, String tag, String attr) {
@@ -439,49 +426,6 @@ public final class StringPrototype {
         return new JSString(result.toString());
     }
 
-    private static JSObject createNamedGroupsObject(JSContext context, String[] captures, String[] groupNames) {
-        JSObject groupsObject = new JSObject(context);
-        groupsObject.setPrototype(null);
-        if (captures == null || groupNames == null) {
-            return groupsObject;
-        }
-        int maxLength = Math.min(captures.length, groupNames.length);
-        for (int captureIndex = 1; captureIndex < maxLength; captureIndex++) {
-            String groupName = groupNames[captureIndex];
-            if (groupName == null) {
-                continue;
-            }
-            JSValue captureValue = captures[captureIndex] != null
-                    ? new JSString(captures[captureIndex])
-                    : JSUndefined.INSTANCE;
-            groupsObject.defineProperty(PropertyKey.fromString(groupName), captureValue,
-                    PropertyDescriptor.DataState.All);
-        }
-        return groupsObject;
-    }
-
-    private static JSValue createNamedGroupsValue(JSContext context, String[] captures, String[] groupNames) {
-        if (groupNames == null || captures == null) {
-            return JSUndefined.INSTANCE;
-        }
-
-        JSObject groups = new JSObject(context);
-        groups.setPrototype(null);
-
-        int maxLength = Math.min(captures.length, groupNames.length);
-        for (int i = 1; i < maxLength; i++) {
-            String groupName = groupNames[i];
-            if (groupName != null && !groups.hasOwnProperty(groupName)) {
-                if (captures[i] != null) {
-                    groups.set(groupName, new JSString(captures[i]));
-                } else {
-                    groups.set(groupName, JSUndefined.INSTANCE);
-                }
-            }
-        }
-        return groups;
-    }
-
     /**
      * String.prototype.endsWith(searchString[, endPosition]) ES2020 21.1.3.6
      */
@@ -489,8 +433,9 @@ public final class StringPrototype {
         JSString str = toStringCheckObject(context, thisArg);
         String s = str.value();
 
+        // A missing search string is undefined, which converts to "undefined"; it used to answer false.
         if (args.length == 0) {
-            return JSBoolean.FALSE;
+            args = new JSValue[]{JSUndefined.INSTANCE};
         }
         int regexp = isRegExp(context, args[0]);
         if (regexp < 0) {
@@ -512,6 +457,17 @@ public final class StringPrototype {
         }
 
         return JSBoolean.valueOf(s.substring(start, (int) endPosition).equals(searchStr));
+    }
+
+    /**
+     * Whether appending would pass {@link JSString#MAX_LENGTH}; if so, raise {@code RangeError: Invalid string length}.
+     */
+    private static boolean exceedsMaxLength(JSContext context, StringBuilder builder, long addition) {
+        if (builder.length() + addition > JSString.MAX_LENGTH) {
+            context.throwRangeError("Invalid string length");
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -580,50 +536,13 @@ public final class StringPrototype {
         return JSNumber.of(length);
     }
 
-    private static String getNamedCaptureReplacement(String groupName, String[] captures, String[] groupNames) {
-        if (captures == null || groupNames == null) {
-            return null;
-        }
-        String replacement = null;
-        boolean found = false;
-        boolean foundMatchedCapture = false;
-        int maxLength = Math.min(captures.length, groupNames.length);
-        for (int captureIndex = 1; captureIndex < maxLength; captureIndex++) {
-            if (groupName.equals(groupNames[captureIndex])) {
-                found = true;
-                if (captures[captureIndex] != null) {
-                    replacement = captures[captureIndex];
-                    foundMatchedCapture = true;
-                } else if (!foundMatchedCapture) {
-                    replacement = "";
-                }
-            }
-        }
-        if (!found) {
-            return null;
-        }
-        return replacement;
-    }
-
     /**
      * ES2024 GetSubstitution for string replace/replaceAll.
      */
     private static String getSubstitution(JSContext context, String matched, String str, int position,
-            String[] captures, String[] groupNames, String replacement) {
+            String replacement) {
         return applyRegExpReplacementPattern(context, replacement, str, position, position + matched.length(),
-                captures != null ? captures : new String[]{matched}, groupNames, null);
-    }
-
-    private static boolean hasNamedCaptures(String[] groupNames) {
-        if (groupNames == null) {
-            return false;
-        }
-        for (String groupName : groupNames) {
-            if (groupName != null) {
-                return true;
-            }
-        }
-        return false;
+                new String[]{matched}, null);
     }
 
     /**
@@ -633,8 +552,9 @@ public final class StringPrototype {
         JSString str = toStringCheckObject(context, thisArg);
         String s = str.value();
 
+        // A missing search string is undefined, which converts to "undefined"; it used to answer false.
         if (args.length == 0) {
-            return JSBoolean.FALSE;
+            args = new JSValue[]{JSUndefined.INSTANCE};
         }
         int regexp = isRegExp(context, args[0]);
         if (regexp < 0) {
@@ -658,11 +578,9 @@ public final class StringPrototype {
         JSString str = toStringCheckObject(context, thisArg);
         String s = str.value();
 
-        if (args.length == 0) {
-            return JSNumber.of(-1);
-        }
-
-        String searchStr = JSTypeConversions.toString(context, args[0]).value();
+        // A missing search string is undefined, which converts to "undefined"; it used to answer -1.
+        String searchStr = JSTypeConversions.toString(context, args.length > 0 ? args[0] : JSUndefined.INSTANCE)
+                .value();
         long position = args.length > 1 ? (long) JSTypeConversions.toInteger(context, args[1]) : 0;
         position = Math.max(0, Math.min(position, s.length()));
 
@@ -818,11 +736,9 @@ public final class StringPrototype {
         JSString str = toStringCheckObject(context, thisArg);
         String s = str.value();
 
-        if (args.length == 0) {
-            return JSNumber.of(-1);
-        }
-
-        String searchStr = JSTypeConversions.toString(context, args[0]).value();
+        // A missing search string is undefined, which converts to "undefined"; it used to answer -1.
+        String searchStr = JSTypeConversions.toString(context, args.length > 0 ? args[0] : JSUndefined.INSTANCE)
+                .value();
         // ES2024 22.1.3.9: If numPos is NaN, let pos be +∞; otherwise let pos be ToIntegerOrInfinity(numPos)
         long position;
         if (args.length > 1 && !args[1].isUndefined()) {
@@ -1207,16 +1123,7 @@ public final class StringPrototype {
 
         JSString str = toStringCheckObject(context, thisArg);
         String s = str.value();
-        // Handle RegExp
-        if (searchValue instanceof JSRegExp regexp) {
-            if (regexp.isGlobal()) {
-                return replaceAll(context, thisArg, args);
-            } else {
-                return replaceRegExpSubclassOnce(context, regexp, replaceValue, str);
-            }
-        }
-
-        // Handle string search
+        // A RegExp whose Symbol.replace is undefined or null is searched for as its string, like any other object.
         String searchStr = JSTypeConversions.toString(context, searchValue).value();
         boolean functionalReplace = replaceValue instanceof JSFunction;
         String replaceStr = functionalReplace ? null : JSTypeConversions.toString(context, replaceValue).value();
@@ -1235,9 +1142,13 @@ public final class StringPrototype {
             }
             replacement = JSTypeConversions.toString(context, replResult).value();
         } else {
-            replacement = getSubstitution(context, searchStr, s, index, null, null, replaceStr);
+            replacement = getSubstitution(context, searchStr, s, index, replaceStr);
+            if (replacement == null) {
+                return JSUndefined.INSTANCE;
+            }
         }
-        return new JSString(s.substring(0, index) + replacement + s.substring(index + searchStr.length()));
+        return concatenateReplacement(context, s.substring(0, index), replacement,
+                s.substring(index + searchStr.length()));
     }
 
     /**
@@ -1334,92 +1245,18 @@ public final class StringPrototype {
                 }
                 replacement = JSTypeConversions.toString(context, replResult).value();
             } else {
-                replacement = getSubstitution(context, searchStr, s, matchPosition, null, null, replaceStr);
+                replacement = getSubstitution(context, searchStr, s, matchPosition, replaceStr);
+                if (replacement == null) {
+                    return JSUndefined.INSTANCE;
+                }
+            }
+            if (exceedsMaxLength(context, result, replacement.length())) {
+                return JSUndefined.INSTANCE;
             }
             result.append(replacement);
             endOfLastMatch = matchPosition + searchLen;
         }
-        result.append(s.substring(endOfLastMatch));
-        return new JSString(result.toString());
-    }
-
-    private static JSValue replaceRegExpSubclassOnce(JSContext context, JSRegExp regexp, JSValue replaceValue,
-            JSString inputString) {
-        JSValue execValue = regexp.get(PropertyKey.EXEC);
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        if (!(execValue instanceof JSFunction execFunction)) {
-            return context.throwTypeError("exec is not a function");
-        }
-
-        String input = inputString.value();
-        JSValue execResult = execFunction.call(context, regexp, new JSValue[]{inputString});
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        if (execResult instanceof JSNull) {
-            return inputString;
-        }
-        if (!(execResult instanceof JSObject resultObject)) {
-            return context.throwTypeError("RegExp exec method returned non-object");
-        }
-
-        JSValue matchValue = resultObject.get(PropertyKey.fromIndex(0));
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        String matchedString = JSTypeConversions.toString(context, matchValue).value();
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-
-        JSValue indexValue = resultObject.get(PropertyKey.INDEX);
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        int matchStart = (int) JSTypeConversions.toInteger(context, indexValue);
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        int matchEnd = Math.max(matchStart, Math.min(input.length(), matchStart + matchedString.length()));
-        matchStart = Math.max(0, Math.min(matchStart, input.length()));
-
-        JSValue lengthValue = resultObject.get(PropertyKey.LENGTH);
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        long resultLengthLong = JSTypeConversions.toLength(context, lengthValue);
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        int resultLength = (int) Math.min(resultLengthLong, Integer.MAX_VALUE);
-        String[] captures = new String[resultLength];
-        for (int captureIndex = 0; captureIndex < resultLength; captureIndex++) {
-            JSValue captureValue = resultObject.get(PropertyKey.fromIndex(captureIndex));
-            if (context.hasPendingException()) {
-                return JSUndefined.INSTANCE;
-            }
-            if (captureValue instanceof JSUndefined) {
-                captures[captureIndex] = null;
-            } else {
-                captures[captureIndex] = JSTypeConversions.toString(context, captureValue).value();
-                if (context.hasPendingException()) {
-                    return JSUndefined.INSTANCE;
-                }
-            }
-        }
-
-        JSValue namedCapturesValue = resultObject.get(PropertyKey.GROUPS);
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        String replacement = applyRegExpReplacementWithNamedCapturesObject(context, replaceValue, input, matchStart,
-                matchEnd, captures, namedCapturesValue);
-        if (context.hasPendingException()) {
-            return JSUndefined.INSTANCE;
-        }
-        return new JSString(input.substring(0, matchStart) + replacement + input.substring(matchEnd));
+        return concatenateReplacement(context, result.toString(), "", s.substring(endOfLastMatch));
     }
 
     /**
@@ -1541,8 +1378,10 @@ public final class StringPrototype {
         if (context.hasPendingException()) {
             return JSUndefined.INSTANCE;
         }
+        // A RegExp reaches here only when its Symbol.split is undefined or null, and is then a string like any other
+        // object (step 6). It used to be matched as a pattern anyway: /,/ split "a,b" where V8 looks for "/,/".
         String separator = null;
-        if (!(separatorArg instanceof JSUndefined) && !(separatorArg instanceof JSRegExp)) {
+        if (!(separatorArg instanceof JSUndefined)) {
             separator = JSTypeConversions.toString(context, separatorArg).value();
             if (context.hasPendingException()) {
                 return JSUndefined.INSTANCE;
@@ -1553,61 +1392,6 @@ public final class StringPrototype {
         }
         if (separatorArg instanceof JSUndefined) {
             arr.push(str);
-            return arr;
-        }
-
-        // Handle RegExp separator
-        if (separatorArg instanceof JSRegExp regexp) {
-            RegExpEngine engine = regexp.getEngine();
-            int start = 0;
-
-            while (start <= s.length() && arr.getLength() < limit) {
-                RegExpEngine.MatchResult result = engine.exec(s, start);
-
-                if (result == null || !result.matched()) {
-                    // No more matches, add the rest of the string
-                    if (arr.getLength() < limit) {
-                        arr.push(new JSString(s.substring(start)));
-                    }
-                    break;
-                }
-
-                int[][] indices = result.indices();
-                if (indices != null && indices.length > 0) {
-                    int matchStart = indices[0][0];
-                    int matchEnd = indices[0][1];
-
-                    // Add the substring before the match
-                    arr.push(new JSString(s.substring(start, matchStart)));
-
-                    // Add capture groups if any
-                    String[] captures = result.captures();
-                    if (captures != null && captures.length > 1) {
-                        for (int i = 1; i < captures.length && arr.getLength() < limit; i++) {
-                            if (captures[i] != null) {
-                                arr.push(new JSString(captures[i]));
-                            } else {
-                                arr.push(JSUndefined.INSTANCE);
-                            }
-                        }
-                    }
-
-                    // Move past the match
-                    start = matchEnd;
-
-                    // Prevent infinite loop on zero-width matches
-                    if (matchStart == matchEnd) {
-                        if (start < s.length()) {
-                            start++;
-                        } else {
-                            break;
-                        }
-                    }
-                } else {
-                    break;
-                }
-            }
-
             return arr;
         }
 
@@ -1643,8 +1427,9 @@ public final class StringPrototype {
         JSString str = toStringCheckObject(context, thisArg);
         String s = str.value();
 
+        // A missing search string is undefined, which converts to "undefined"; it used to answer false.
         if (args.length == 0) {
-            return JSBoolean.FALSE;
+            args = new JSValue[]{JSUndefined.INSTANCE};
         }
         int regexp = isRegExp(context, args[0]);
         if (regexp < 0) {

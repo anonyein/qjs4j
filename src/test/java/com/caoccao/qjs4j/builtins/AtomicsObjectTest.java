@@ -504,8 +504,10 @@ public class AtomicsObjectTest extends BaseJavetTest {
         assertThat(resultObj.get("value")).isInstanceOf(JSPromise.class);
         JSPromise waitPromise = (JSPromise) resultObj.get("value");
         long deadline = System.currentTimeMillis() + 500;
+        // The helper thread only enqueues the settling job; the context's own thread runs it.
         while (waitPromise.getState() == JSPromise.PromiseState.PENDING && System.currentTimeMillis() < deadline) {
             Thread.yield();
+            context.processMicrotasks();
         }
         assertThat(waitPromise.getState()).isEqualTo(JSPromise.PromiseState.FULFILLED);
         assertThat(waitPromise.getResult().asString().map(JSString::value).orElseThrow()).isEqualTo("timed-out");

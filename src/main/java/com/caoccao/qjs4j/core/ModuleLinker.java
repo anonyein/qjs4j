@@ -23,8 +23,6 @@ import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -1051,7 +1049,7 @@ final class ModuleLinker {
          */
         private String readModuleSource(String resolvedSpecifier) {
             try {
-                return Files.readString(Path.of(resolvedSpecifier));
+                return context.moduleLoader().readModuleText(resolvedSpecifier);
             } catch (IOException | RuntimeException unreadable) {
                 return null;
             }
@@ -1127,10 +1125,11 @@ final class ModuleLinker {
          */
         private void requireModuleIsReadable(LinkedModuleRequest moduleRequest, String resolvedSpecifier,
                 JSDynamicImportModule importerRecord) {
-            // isReadable alone is true of a directory, and a directory is not a payload: the read
-            // would fail at evaluation, which is the ordering this pass exists to prevent.
-            Path payloadPath = Path.of(resolvedSpecifier);
-            if (!Files.isRegularFile(payloadPath) || !Files.isReadable(payloadPath)) {
+            // Resolving only proves the module exists — a directory does — and a payload that cannot be
+            // read would fail at evaluation, which is the ordering this pass exists to prevent. Read it.
+            try {
+                context.moduleLoader().readModuleBytes(resolvedSpecifier);
+            } catch (IOException | RuntimeException unreadable) {
                 throw linkFailure("Cannot find module '" + resolvedSpecifier + "'", importerRecord,
                         moduleRequest.location(), true);
             }
