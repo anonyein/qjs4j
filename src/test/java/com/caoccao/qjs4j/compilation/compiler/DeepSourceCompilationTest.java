@@ -123,12 +123,13 @@ public class DeepSourceCompilationTest extends BaseJavetTest {
                 "1" + " + 2 * 3 - 4 / 5 % 6 ** 1 | 7 & 8 ^ 9 << 1 >> 1 >>> 1".repeat(CHAIN_LENGTH / 10));
         assertBooleanWithJavet("var o = {a: 1}; " + chain("'a' in o", " && "),
                 "var o = {}; " + chain("o instanceof Object", " && "));
-        // V8 compiles comparison chains recursively and gives up on them at about ten thousand
-        // operands with a RangeError; that is a V8 limit, not semantics. Compare at a length both
-        // engines accept, then check that qjs4j has no such limit.
-        String shortEquality = String.join(" == ", Collections.nCopies(5_000, "1")) + " == true";
-        String shortStrictEquality = String.join(" === ", Collections.nCopies(5_000, "1"));
-        String shortLessThan = String.join(" < ", Collections.nCopies(5_000, "1")) + " < 2";
+        // V8 compiles comparison chains recursively and gives up on them with a RangeError at about
+        // ten thousand operands on Linux and macOS, and already at five thousand on Windows; that is
+        // a V8 limit, not semantics. Compare at a length every platform's V8 accepts, then check
+        // that qjs4j has no such limit.
+        String shortEquality = String.join(" == ", Collections.nCopies(1_000, "1")) + " == true";
+        String shortStrictEquality = String.join(" === ", Collections.nCopies(1_000, "1"));
+        String shortLessThan = String.join(" < ", Collections.nCopies(1_000, "1")) + " < 2";
         assertBooleanWithJavet(shortEquality, shortStrictEquality, shortLessThan);
         assertThat(context.eval(chain("1", " == ") + " == true")).isEqualTo(JSBoolean.TRUE);
         assertThat(context.eval(chain("1", " === "))).isEqualTo(JSBoolean.FALSE);

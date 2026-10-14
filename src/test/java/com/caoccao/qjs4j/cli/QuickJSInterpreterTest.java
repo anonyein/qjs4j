@@ -51,11 +51,11 @@ public class QuickJSInterpreterTest {
     Path workingDirectory;
 
     private String err() {
-        return capturedErr.toString(StandardCharsets.UTF_8);
+        return captured(capturedErr);
     }
 
     private String out() {
-        return capturedOut.toString(StandardCharsets.UTF_8);
+        return captured(capturedOut);
     }
 
     @BeforeEach
@@ -378,5 +378,10 @@ public class QuickJSInterpreterTest {
         Path path = workingDirectory.resolve(name);
         Files.writeString(path, content);
         return path;
+    }
+
+    private static String captured(ByteArrayOutputStream stream) {
+        // The CLI ends lines with the platform's separator; the expectations here are written with \n.
+        return stream.toString(StandardCharsets.UTF_8).replace(System.lineSeparator(), "\n");
     }
 }
