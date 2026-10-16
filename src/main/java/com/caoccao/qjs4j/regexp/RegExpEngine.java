@@ -28,6 +28,10 @@ import java.util.Arrays;
  */
 public final class RegExpEngine {
     /**
+     * Backtracking steps and start positions between two interrupt polls.
+     */
+    static final int INTERRUPT_POLL_INTERVAL = 4096;
+    /**
      * Hard cap on the backtracking stack, in bytes — V8's {@code RegExpStack::kMaximumStackSize}, {@code 64 * MB} in
      * {@code src/regexp/regexp-stack.h}.
      * <p>
@@ -84,6 +88,25 @@ public final class RegExpEngine {
      * @return The match result, or null if no match
      */
     public MatchResult exec(String input, int startIndex) {
+        return exec(input, startIndex, null);
+    }
+
+    /**
+     * Execute the regex, polling the host for an interrupt or a deadline as the match runs.
+     * <p>
+     * The matcher never polled, so an embedder that raised or removed the backtracking limit could not stop a match:
+     * {@code JSRuntime.requestInterrupt()} and the execution deadline were ignored until it returned.
+     *
+     * @param input
+     *            The string to match against
+     * @param startIndex
+     *            The index to start matching from
+     * @param interruptProbe
+     *            called every {@value #INTERRUPT_POLL_INTERVAL} backtracking steps and start positions; it throws to
+     *            stop the match, or null not to poll
+     * @return The match result, or null if no match
+     */
+    public MatchResult exec(String input, int startIndex, Runnable interruptProbe) {
         if (input == null || startIndex < 0 || startIndex > input.length()) {
             return null;
         }
@@ -93,6 +116,7 @@ public final class RegExpEngine {
         ExecutionContext executionContext = new ExecutionContext(input, bytecode.instructions(),
                 bytecode.captureCount(), bytecode.groupNames(), bytecode.isIgnoreCase(), bytecode.isMultiline(),
                 bytecode.isDotAll(), isUnicode, bytecode.registerCount(), backtrackLimit);
+        executionContext.interruptProbe = interruptProbe;
 
         // Try matching at each position
         if (isUnicode) {
@@ -101,6 +125,7 @@ public final class RegExpEngine {
             int codePointStart = input.codePointCount(0, startIndex);
             int codePointEnd = bytecode.isSticky() ? codePointStart + 1 : executionContext.inputLength + 1;
             for (int pos = codePointStart; pos < codePointEnd; pos++) {
+                executionContext.pollInterrupt();
                 executionContext.reset(pos);
                 if (execute(executionContext)) {
                     return executionContext.createResult(true);
@@ -109,6 +134,7 @@ public final class RegExpEngine {
         } else {
             int end = bytecode.isSticky() ? startIndex + 1 : input.length() + 1;
             for (int pos = startIndex; pos < end; pos++) {
+                executionContext.pollInterrupt();
                 executionContext.reset(pos);
                 if (execute(executionContext)) {
                     return executionContext.createResult(true);
@@ -298,15 +324,15 @@ public final class RegExpEngine {
                 }
 
                 case SAVE_START -> {
-                    int captureIndex = bc[pc + 1] & 0xFF;
+                    int captureIndex = readU16(bc, pc + 1);
                     executionContext.saveStart(captureIndex);
-                    pc += 2;
+                    pc += 3;
                 }
 
                 case SAVE_END -> {
-                    int captureIndex = bc[pc + 1] & 0xFF;
+                    int captureIndex = readU16(bc, pc + 1);
                     executionContext.saveEnd(captureIndex);
-                    pc += 2;
+                    pc += 3;
                 }
 
                 case RANGE -> {
@@ -388,7 +414,7 @@ public final class RegExpEngine {
                 }
 
                 case BACK_REFERENCE -> {
-                    int groupNum = bc[pc + 1] & 0xFF;
+                    int groupNum = readU16(bc, pc + 1);
                     if (!executionContext.matchBackReference(groupNum, false)) {
                         if (executionContext.hasBacktrack()) {
                             pc = executionContext.popBacktrack();
@@ -396,11 +422,11 @@ public final class RegExpEngine {
                         }
                         return false;
                     }
-                    pc += 2;
+                    pc += 3;
                 }
 
                 case BACK_REFERENCE_I -> {
-                    int groupNum = bc[pc + 1] & 0xFF;
+                    int groupNum = readU16(bc, pc + 1);
                     if (!executionContext.matchBackReference(groupNum, true)) {
                         if (executionContext.hasBacktrack()) {
                             pc = executionContext.popBacktrack();
@@ -408,11 +434,11 @@ public final class RegExpEngine {
                         }
                         return false;
                     }
-                    pc += 2;
+                    pc += 3;
                 }
 
                 case BACKWARD_BACK_REFERENCE -> {
-                    int groupNum = bc[pc + 1] & 0xFF;
+                    int groupNum = readU16(bc, pc + 1);
                     if (!executionContext.matchBackwardBackReference(groupNum, false)) {
                         if (executionContext.hasBacktrack()) {
                             pc = executionContext.popBacktrack();
@@ -420,11 +446,11 @@ public final class RegExpEngine {
                         }
                         return false;
                     }
-                    pc += 2;
+                    pc += 3;
                 }
 
                 case BACKWARD_BACK_REFERENCE_I -> {
-                    int groupNum = bc[pc + 1] & 0xFF;
+                    int groupNum = readU16(bc, pc + 1);
                     if (!executionContext.matchBackwardBackReference(groupNum, true)) {
                         if (executionContext.hasBacktrack()) {
                             pc = executionContext.popBacktrack();
@@ -432,7 +458,7 @@ public final class RegExpEngine {
                         }
                         return false;
                     }
-                    pc += 2;
+                    pc += 3;
                 }
 
                 case GOTO -> {
@@ -508,14 +534,14 @@ public final class RegExpEngine {
                 }
 
                 case SAVE_RESET -> {
-                    int startCapture = bc[pc + 1] & 0xFF;
-                    int endCapture = bc[pc + 2] & 0xFF;
+                    int startCapture = readU16(bc, pc + 1);
+                    int endCapture = readU16(bc, pc + 3);
                     executionContext.stateDirty = true;
                     for (int i = startCapture; i <= endCapture && i < executionContext.captureCount; i++) {
                         executionContext.captureStarts[i] = -1;
                         executionContext.captureEnds[i] = -1;
                     }
-                    pc += 3;
+                    pc += 5;
                 }
 
                 default -> {
@@ -549,6 +575,7 @@ public final class RegExpEngine {
                 // draw on the same register counter and the outer count bounds them.
                 outerContext.registerCount, outerContext.remainingBacktrackBudget());
         tempContext.pos = startPos;
+        tempContext.interruptProbe = outerContext.interruptProbe;
         System.arraycopy(outerContext.captureStarts, 0, tempContext.captureStarts, 0, outerContext.captureCount);
         System.arraycopy(outerContext.captureEnds, 0, tempContext.captureEnds, 0, outerContext.captureCount);
         try {
@@ -624,6 +651,14 @@ public final class RegExpEngine {
         final boolean ignoreCase;
         final String input;
         final int inputLength;
+        /**
+         * Steps left before the next call to {@link #interruptProbe}.
+         */
+        private int interruptCountdown = INTERRUPT_POLL_INTERVAL;
+        /**
+         * The host's interrupt and deadline check, or null.
+         */
+        Runnable interruptProbe;
         private int lastStateOffset;
         final boolean multiline;
         int pos; // Current position in code points
@@ -697,6 +732,12 @@ public final class RegExpEngine {
         private boolean codePointEqualsIgnoreCaseUnicode(int leftCodePoint, int rightCodePoint) {
             if (leftCodePoint == rightCodePoint) {
                 return true;
+            }
+            // U+0130 and U+0131 fold only to themselves under simple case folding (their i/I foldings are Turkic),
+            // but Java's case-insensitive comparison relates them to i and I: /[İ]/iu matched "i", as V8 does not.
+            if (leftCodePoint == 0x0130 || leftCodePoint == 0x0131 || rightCodePoint == 0x0130
+                    || rightCodePoint == 0x0131) {
+                return false;
             }
             String leftString = new String(Character.toChars(leftCodePoint));
             String rightString = new String(Character.toChars(rightCodePoint));
@@ -1129,6 +1170,13 @@ public final class RegExpEngine {
             return true;
         }
 
+        void pollInterrupt() {
+            if (interruptProbe != null && --interruptCountdown <= 0) {
+                interruptCountdown = INTERRUPT_POLL_INTERVAL;
+                interruptProbe.run();
+            }
+        }
+
         int popBacktrack() {
             // The matcher is a backtracking engine, so a pattern like /(a+)+$/ takes time
             // exponential in the input length. Counting pops bounds that: the stack depth stays
@@ -1136,6 +1184,7 @@ public final class RegExpEngine {
             if (backtrackLimit > 0 && ++backtrackSteps > backtrackLimit) {
                 throw new JSRangeErrorException("regular expression execution exceeded the backtracking limit");
             }
+            pollInterrupt();
             backtrackTop -= BACKTRACK_ENTRY_SIZE;
             int base = backtrackTop;
             pos = backtrackData[base + 1];

@@ -29,10 +29,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * {@code maxMemoryUsage} and {@code maxStackSize} were public setters that nothing read: an embedder could configure a
- * 1 KiB memory ceiling and a 1 byte stack, and guest code would still allocate a megabyte and recurse a thousand deep.
- * These cases pin that both options are now enforced, that reservations are released, and that the boundary is a
- * catchable guest error.
+ * {@code maxMemoryUsage} (now {@code maxDataBlockBytes}) and {@code maxStackSize} were public setters that nothing
+ * read: an embedder could configure a 1 KiB memory ceiling and a 1 byte stack, and guest code would still allocate a
+ * megabyte and recurse a thousand deep. These cases pin that both options are now enforced, that reservations are
+ * released, and that the boundary is a catchable guest error.
  */
 public class JSMemoryAccountingTest extends BaseTest {
     /**
@@ -66,7 +66,7 @@ public class JSMemoryAccountingTest extends BaseTest {
 
     @Test
     public void testAllocationBelowLimitSucceeds() {
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(64 * 1024))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(64 * 1024))) {
             // Kept reachable on purpose: reading the total reclaims collected blocks, so a buffer
             // nothing refers to may legitimately have stopped counting by then.
             assertThat(evalToString(runtime, "globalThis.keep = new ArrayBuffer(32768); keep.byteLength"))
@@ -77,7 +77,7 @@ public class JSMemoryAccountingTest extends BaseTest {
 
     @Test
     public void testAllocationBeyondLimitRaisesCatchableRangeError() {
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(1024))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(1024))) {
             // The review's reproducer: a 1 MiB buffer under a 1 KiB ceiling.
             assertThat(evalToString(runtime, "try { new ArrayBuffer(1048576); 'allocated'; } catch (e) { e.name; }"))
                     .isEqualTo("RangeError");
@@ -92,7 +92,7 @@ public class JSMemoryAccountingTest extends BaseTest {
         // request is bigger than the heap is a property of the build's -Xmx; whether the charge is
         // handed back when an allocation fails is a property of this code, and that is what is
         // being tested.
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(64 * 1024))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(64 * 1024))) {
             JSContext context = runtime.createContext();
             JSArrayBuffer buffer = new JSArrayBuffer(context, 1024);
             long chargedBefore = runtime.getMemoryAccounting().getReservedBytes();
@@ -130,7 +130,7 @@ public class JSMemoryAccountingTest extends BaseTest {
     public void testAResizeThatFailsToAllocateGivesTheGrowthBackWhateverTheHeapIs() {
         // The growth is charged before the copy, so a copy that fails has to hand it back. Driven
         // by an allocator that fails on demand, so the test does not depend on the build's -Xmx.
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(64 * 1024))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(64 * 1024))) {
             JSContext context = runtime.createContext();
             JSArrayBuffer buffer = new JSArrayBuffer(context, 1024, 32768);
             long chargedBefore = runtime.getMemoryAccounting().getReservedBytes();
@@ -155,7 +155,7 @@ public class JSMemoryAccountingTest extends BaseTest {
         // The reservation is now the weak reference to its own buffer, and the bytes come back on
         // the thread that asks — either when the total is read or, more usefully, when the next
         // allocation consults the limit.
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(64 * 1024))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(64 * 1024))) {
             JSContext context = runtime.createContext();
             JSArrayBuffer buffer = new JSArrayBuffer(context, 48 * 1024);
             assertThat(runtime.getMemoryAccounting().getReservedBytes()).isEqualTo(48 * 1024);
@@ -177,13 +177,27 @@ public class JSMemoryAccountingTest extends BaseTest {
     @Test
     public void testDefaultLimitIsTheDocumentedDefault() {
         try (JSRuntime runtime = new JSRuntime()) {
-            assertThat(runtime.getMemoryAccounting().getLimit()).isEqualTo(JSRuntimeOptions.DEFAULT_MAX_MEMORY_USAGE);
+            assertThat(runtime.getMemoryAccounting().getLimit())
+                    .isEqualTo(JSRuntimeOptions.DEFAULT_MAX_DATA_BLOCK_BYTES);
+        }
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeprecatedMemoryUsageNamesAreAliases() {
+        // setMaxMemoryUsage read as a heap limit; it is the data-block ceiling under its old name.
+        assertThat(JSRuntimeOptions.DEFAULT_MAX_MEMORY_USAGE).isEqualTo(JSRuntimeOptions.DEFAULT_MAX_DATA_BLOCK_BYTES);
+        JSRuntimeOptions options = new JSRuntimeOptions().setMaxMemoryUsage(4096);
+        assertThat(options.getMaxDataBlockBytes()).isEqualTo(4096);
+        assertThat(options.setMaxDataBlockBytes(-1).getMaxMemoryUsage()).isZero();
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(1024))) {
+            assertThat(runtime.getMemoryAccounting().getLimit()).isEqualTo(1024);
         }
     }
 
     @Test
     public void testDetachReleasesTheReservation() {
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(64 * 1024))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(64 * 1024))) {
             JSContext context = runtime.createContext();
             JSArrayBuffer buffer = new JSArrayBuffer(context, 16384);
             assertThat(runtime.getMemoryAccounting().getReservedBytes()).isEqualTo(16384);
@@ -202,7 +216,7 @@ public class JSMemoryAccountingTest extends BaseTest {
         // bytes charged until the half-constructed buffer was collected, which inflated the
         // runtime's ceiling and made later, much smaller allocations fail for space nothing used.
         assumeTheJvmRefusesTheLargestBlock();
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(0))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(0))) {
             JSContext context = runtime.createContext();
             assertThat(runtime.getMemoryAccounting().getReservedBytes()).isZero();
             assertThatThrownBy(() -> new JSArrayBuffer(context, unallocatableByteLength()))
@@ -217,7 +231,7 @@ public class JSMemoryAccountingTest extends BaseTest {
     @Test
     public void testFailedResizeGivesTheGrowthBackAndLeavesTheBufferAlone() {
         assumeTheJvmRefusesTheLargestBlock();
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(0))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(0))) {
             JSContext context = runtime.createContext();
             JSArrayBuffer buffer = new JSArrayBuffer(context, 16, unallocatableByteLength());
             buffer.getBuffer().put(0, (byte) 7);
@@ -318,8 +332,8 @@ public class JSMemoryAccountingTest extends BaseTest {
 
     @Test
     public void testReservationIsPerRuntime() {
-        try (JSRuntime first = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(64 * 1024));
-                JSRuntime second = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(64 * 1024))) {
+        try (JSRuntime first = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(64 * 1024));
+                JSRuntime second = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(64 * 1024))) {
             evalToString(first, "globalThis.keep = new ArrayBuffer(32768);");
             assertThat(first.getMemoryAccounting().getReservedBytes()).isEqualTo(32768);
             assertThat(second.getMemoryAccounting().getReservedBytes()).isZero();
@@ -338,7 +352,7 @@ public class JSMemoryAccountingTest extends BaseTest {
 
     @Test
     public void testResizeBeyondLimitRaisesRangeError() {
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(8192))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(8192))) {
             assertThat(evalToString(runtime, """
                     var b = new ArrayBuffer(16, { maxByteLength: 1048576 });
                     try { b.resize(65536); 'resized'; } catch (e) { e.name; }""")).isEqualTo("RangeError");
@@ -358,7 +372,7 @@ public class JSMemoryAccountingTest extends BaseTest {
 
     @Test
     public void testSharedArrayBufferMaximumIsCharged() {
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(64 * 1024))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(64 * 1024))) {
             // A growable SharedArrayBuffer must keep one backing block for all agents, so its
             // maximum is charged up front — and refused when it does not fit.
             assertThat(
@@ -371,22 +385,16 @@ public class JSMemoryAccountingTest extends BaseTest {
     }
 
     @Test
-    public void testStackSizeDerivesTheCallDepthLimit() {
-        JSRuntimeOptions options = new JSRuntimeOptions().setMaxStackSize(20 * JSRuntimeOptions.BYTES_PER_STACK_FRAME);
-        assertThat(options.getMaxStackDepth()).isEqualTo(20);
+    public void testTheConfiguredCallDepthIsTheLimit() {
+        JSRuntimeOptions options = new JSRuntimeOptions().setMaxCallDepth(20);
+        assertThat(options.getMaxCallDepth()).isEqualTo(20);
         try (JSRuntime runtime = new JSRuntime(options)) {
             JSContext context = runtime.createContext();
-            assertThat(context.getMaxStackDepth()).isEqualTo(20);
+            assertThat(context.getMaxCallDepth()).isEqualTo(20);
             assertThat(evalToString(runtime, """
                     function recurse(n) { return n === 0 ? 0 : recurse(n - 1); }
                     try { recurse(200); 'completed'; } catch (e) { e.name; }""")).isEqualTo("RangeError");
         }
-    }
-
-    @Test
-    public void testStackSizeIsClampedToAtLeastOneFrame() {
-        assertThat(new JSRuntimeOptions().setMaxStackSize(1).getMaxStackDepth()).isEqualTo(1);
-        assertThat(new JSRuntimeOptions().setMaxStackSize(-5).getMaxStackDepth()).isEqualTo(1);
     }
 
     @Test
@@ -430,7 +438,7 @@ public class JSMemoryAccountingTest extends BaseTest {
 
     @Test
     public void testUnlimitedMemoryUsageDisablesTheCeiling() {
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxMemoryUsage(0))) {
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(0))) {
             assertThat(runtime.getMemoryAccounting().getLimit()).isEqualTo(JSMemoryAccounting.UNLIMITED);
             assertThat(runtime.getMemoryAccounting().wouldExceedLimit(Long.MAX_VALUE)).isFalse();
             assertThat(evalToString(runtime, "new ArrayBuffer(1048576).byteLength")).isEqualTo("1048576");

@@ -104,5 +104,6 @@ public final class BytecodeCompiler {
      */
     public void setSourceCode(String sourceCode) {
         compilerContext.sourceCode = sourceCode;
+        compilerContext.mayContainDirectEval = CompilerContext.sourceMayContainDirectEval(sourceCode);
     }
 }

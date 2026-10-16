@@ -232,16 +232,6 @@ final class ExpressionAssignmentParser {
                 || tokenType == TokenType.AS || tokenType == TokenType.LET;
     }
 
-    private boolean isOptionalChainExpression(Expression expression) {
-        if (expression instanceof MemberExpression memberExpression) {
-            return memberExpression.isOptional() || isOptionalChainExpression(memberExpression.getObject());
-        }
-        if (expression instanceof CallExpression callExpression) {
-            return callExpression.isOptional() || isOptionalChainExpression(callExpression.getCallee());
-        }
-        return false;
-    }
-
     private void parseArrowParameterExpression(Expression expression, List<Pattern> params, List<Expression> defaults) {
         if (expression instanceof Identifier identifier) {
             params.add(identifier);
@@ -299,6 +289,10 @@ final class ExpressionAssignmentParser {
                         && parserContext.nextToken.type() == TokenType.ARROW) {
                     Identifier param = parserContext.parseIdentifier();
                     validateBindingIdentifier(param.getName(), true);
+                    if (parserContext.hasNewlineBefore()) {
+                        // ArrowParameters [no LineTerminator here] =>
+                        throw new JSSyntaxErrorException("Unexpected token '=>'");
+                    }
                     parserContext.expect(TokenType.ARROW);
 
                     ASTNode body;
@@ -428,6 +422,10 @@ final class ExpressionAssignmentParser {
                 parseDestructuringArrowParameter(left, params, defaults);
             } else if (left instanceof SequenceExpression seqExpr) {
                 for (Expression expr : seqExpr.getExpressions()) {
+                    if (parserContext.isParenthesizedExpression(expr)) {
+                        // ((a), b) => 1: a parameter cannot be parenthesized.
+                        throw new JSSyntaxErrorException("Invalid destructuring assignment target");
+                    }
                     parseArrowParameterExpression(expr, params, defaults);
                 }
             } else if (left instanceof ArrayExpression arrayExpr) {
@@ -450,8 +448,8 @@ final class ExpressionAssignmentParser {
                     }
                 }
             } else {
-                throw new JSSyntaxErrorException("Unsupported arrow function parameters at line "
-                        + parserContext.currentToken.line() + ", column " + parserContext.currentToken.column());
+                // (a + b) => 1: a parenthesized expression that is not a parameter list, as V8 reports it.
+                throw new JSSyntaxErrorException("Invalid destructuring assignment target");
             }
 
             parserContext.advance();
@@ -471,6 +469,10 @@ final class ExpressionAssignmentParser {
                 exitArrowFunctionContext(false);
             }
             validateArrowParameters(new FunctionParams(params, defaults, restParameter), body);
+            // Only the async arrow paths used to check this: `(a) => { let a; }` compiled.
+            if (body instanceof BlockStatement blockBody) {
+                validateFormalsBodyDuplicate(params, restParameter, blockBody.getBody());
+            }
 
             SourceLocation fullLocation = new SourceLocation(location.line(), location.column(), location.offset(),
                     parserContext.previousTokenEndOffset);
@@ -506,7 +508,7 @@ final class ExpressionAssignmentParser {
                 throw new JSSyntaxErrorException("Invalid left-hand side in assignment");
             }
             // OptionalExpression is never a valid assignment target (spec 13.15.1)
-            if (isOptionalChainExpression(left)) {
+            if (left.containsOptionalChain()) {
                 throw new JSSyntaxErrorException("Invalid left-hand side in assignment");
             }
             if (parserContext.strictMode && left instanceof Identifier identifier) {
@@ -607,7 +609,8 @@ final class ExpressionAssignmentParser {
             }
             if (depth == 0) {
                 parserContext.advance();
-                return parserContext.match(TokenType.ARROW);
+                // ArrowParameters [no LineTerminator here] =>
+                return parserContext.match(TokenType.ARROW) && !parserContext.hasNewlineBefore();
             }
             return false;
         } finally {
@@ -818,20 +821,11 @@ final class ExpressionAssignmentParser {
         if (restParameter != null) {
             paramNames.addAll(restParameter.getArgument().getBoundNames());
         }
-        if (paramNames.isEmpty()) {
-            return;
-        }
-        for (Statement statement : body) {
-            if (statement instanceof VariableDeclaration variableDeclaration
-                    && (variableDeclaration.getKind() == VariableKind.LET
-                            || variableDeclaration.getKind() == VariableKind.CONST)) {
-                for (VariableDeclarator declarator : variableDeclaration.getDeclarations()) {
-                    for (String declaredName : declarator.getId().getBoundNames()) {
-                        if (paramNames.contains(declaredName)) {
-                            throw new JSSyntaxErrorException("invalid redefinition of parameter name");
-                        }
-                    }
-                }
+        // Every lexical declaration counts — class and using as well as let and const — and the message is
+        // V8's.
+        for (String declaredName : StatementParser.collectFunctionBodyLexicalNames(body)) {
+            if (paramNames.contains(declaredName)) {
+                throw new JSSyntaxErrorException("Identifier '" + declaredName + "' has already been declared");
             }
         }
     }

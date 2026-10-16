@@ -21,6 +21,7 @@ import com.caoccao.qjs4j.core.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Array prototype methods. Implements ECMAScript Array.prototype methods.
@@ -957,44 +958,56 @@ public final class ArrayPrototype {
         if (thisArg instanceof JSNull || thisArg instanceof JSUndefined) {
             return context.throwTypeError("Array.prototype.join called on null or undefined");
         }
-        StringBuilder result = new StringBuilder();
-        if (thisArg instanceof JSArray jsArray) {
-            String separator = args.length > 0 && !(args[0] instanceof JSUndefined)
-                    ? JSTypeConversions.toString(context, args[0]).value()
-                    : ",";
-            long length = jsArray.getLength();
-            for (long i = 0; i < length; i++) {
-                if (i > 0) {
-                    result.append(separator);
-                }
-                JSValue element = jsArray.get(i);
-                if (!(element instanceof JSNull) && !(element instanceof JSUndefined)) {
-                    result.append(JSTypeConversions.toString(context, element).value());
-                }
-                if (result.length() > JSString.MAX_LENGTH) {
-                    return context.throwRangeError("Invalid string length");
-                }
-            }
-        } else if (thisArg instanceof JSObject jsObject) {
-            // Following QuickJS js_array_join: read length first, then coerce separator
-            long length = JSTypeConversions.toLength(context, jsObject.get(PropertyKey.fromString("length")));
-            String separator = args.length > 0 && !(args[0] instanceof JSUndefined)
-                    ? JSTypeConversions.toString(context, args[0]).value()
-                    : ",";
-            for (long i = 0; i < length; i++) {
-                if (i > 0) {
-                    result.append(separator);
-                }
-                JSValue element = jsObject.get(PropertyKey.fromString(Long.toString(i)));
-                if (!(element instanceof JSNull) && !(element instanceof JSUndefined)) {
-                    result.append(JSTypeConversions.toString(context, element).value());
-                }
-                if (result.length() > JSString.MAX_LENGTH) {
-                    return context.throwRangeError("Invalid string length");
-                }
-            }
+        // Step 1: Let O be ? ToObject(this value), which cannot fail past the check above. A primitive receiver used to
+        // join to "".
+        JSObject jsObject = JSTypeConversions.toObject(context, thisArg);
+        // Following QuickJS js_array_join: read length first, then coerce separator
+        long length = jsObject instanceof JSArray jsArray
+                ? jsArray.getLength()
+                : JSTypeConversions.toLength(context, jsObject.get(PropertyKey.LENGTH));
+        if (context.hasPendingException()) {
+            return context.getPendingException();
         }
-        return new JSString(result.toString());
+        String separator = args.length > 0 && !(args[0] instanceof JSUndefined)
+                ? JSTypeConversions.toString(context, args[0]).value()
+                : ",";
+        if (context.hasPendingException()) {
+            return context.getPendingException();
+        }
+        // An array already being joined further up — a cycle — renders as "", as in V8. The recursion used to
+        // continue until the stack overflowed. As in V8's CycleProtectedArrayJoin, the array is registered only once
+        // its length and separator are read, so a separator whose toString joins the same array still joins it.
+        Set<JSObject> joinStack = context.getArrayJoinStack();
+        if (!joinStack.add(jsObject)) {
+            return new JSString("");
+        }
+        try {
+            StringBuilder result = new StringBuilder();
+            for (long i = 0; i < length; i++) {
+                if (i > 0) {
+                    result.append(separator);
+                }
+                JSValue element = jsObject instanceof JSArray jsArray
+                        ? jsArray.get(i)
+                        : jsObject.get(PropertyKey.fromString(Long.toString(i)));
+                if (context.hasPendingException()) {
+                    return context.getPendingException();
+                }
+                if (!(element instanceof JSNull) && !(element instanceof JSUndefined)) {
+                    String elementString = JSTypeConversions.toString(context, element).value();
+                    if (context.hasPendingException()) {
+                        return context.getPendingException();
+                    }
+                    result.append(elementString);
+                }
+                if (result.length() > JSString.MAX_LENGTH) {
+                    return context.throwRangeError("Invalid string length");
+                }
+            }
+            return new JSString(result.toString());
+        } finally {
+            joinStack.remove(jsObject);
+        }
     }
 
     /**
@@ -1844,7 +1857,19 @@ public final class ArrayPrototype {
         if (context.hasPendingException()) {
             return context.getPendingException();
         }
+        // A cycle renders as "", as in join, and the array is registered once its length is read, as in join.
+        Set<JSObject> joinStack = context.getArrayJoinStack();
+        if (!joinStack.add(obj)) {
+            return new JSString("");
+        }
+        try {
+            return toLocaleStringOfElements(context, obj, length, args);
+        } finally {
+            joinStack.remove(obj);
+        }
+    }
 
+    private static JSValue toLocaleStringOfElements(JSContext context, JSObject obj, long length, JSValue[] args) {
         StringBuilder sb = new StringBuilder();
 
         for (long i = 0; i < length; i++) {
@@ -2129,9 +2154,8 @@ public final class ArrayPrototype {
         if (JSTypeChecking.isCallable(joinValue)) {
             return PromiseConstructor.callCallable(context, joinValue, thisArg, JSValue.NO_ARGS);
         }
-        if (thisArg.isArray() && joinValue instanceof JSUndefined) {
-            return join(context, thisArg, JSValue.NO_ARGS);
-        }
+        // Step 3: a non-callable join, undefined included, falls back to Object.prototype.toString. An array with
+        // join set to undefined used to be joined anyway.
         return ObjectPrototype.toString(context, thisArg, args);
     }
 

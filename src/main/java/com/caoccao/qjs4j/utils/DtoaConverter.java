@@ -98,12 +98,26 @@ public final class DtoaConverter {
         // s * 10^(n-k) == value as double, and k is as small as possible.
         BigDecimal exact = new BigDecimal(absValue);
         BigDecimal shortest = exact;
-        int significantDigits = exact.precision();
+        // Only a power of two has a rounding interval narrower below than above, so only there can the k-digit
+        // decimal on the far side of the value read back as the value while the nearest one does not.
+        boolean powerOfTwo = (Double.doubleToRawLongBits(absValue) & 0x000F_FFFF_FFFF_FFFFL) == 0;
         for (int k = 1; k <= 21; k++) {
+            // The nearest k-digit decimal first, as the specification prefers; failing that, the k-digit decimal on
+            // the other side of the value. Testing only the nearest one missed values such as 2 ** -24, whose
+            // nearest 16-digit decimal (…062) reads back as another double while …063 reads back as itself, and
+            // printed 17 digits.
             BigDecimal candidate = exact.round(new MathContext(k, RoundingMode.HALF_EVEN));
             if (candidate.doubleValue() == absValue) {
                 shortest = candidate;
-                significantDigits = k;
+                break;
+            }
+            if (!powerOfTwo) {
+                continue;
+            }
+            RoundingMode otherSide = candidate.compareTo(exact) < 0 ? RoundingMode.CEILING : RoundingMode.FLOOR;
+            candidate = exact.round(new MathContext(k, otherSide));
+            if (candidate.doubleValue() == absValue) {
+                shortest = candidate;
                 break;
             }
         }
@@ -411,8 +425,16 @@ public final class DtoaConverter {
      * @return The string representation in the specified radix
      */
     public static String convertToRadix(double value, int radix) {
-        // Use QuickJS-compatible dtoa implementation
-        return JSDtoa.toString(value, radix);
+        if (Double.isNaN(value)) {
+            return "NaN";
+        }
+        if (Double.isInfinite(value)) {
+            return value > 0 ? "Infinity" : "-Infinity";
+        }
+        if (value == 0) {
+            return "0";
+        }
+        return doubleToRadixString(value, radix);
     }
 
     /**
@@ -471,6 +493,85 @@ public final class DtoaConverter {
             // Count significant digits and add trailing zeros if needed
             return formatFixedPrecision(str, precision, exponent);
         }
+    }
+
+    /**
+     * A port of V8's {@code DoubleToRadixCString}: fraction digits only up to the precision of the input, rounded half
+     * to even with carry, and integer digits beyond 2<sup>53</sup> written as zeros.
+     * <p>
+     * The QuickJS algorithm this replaces printed {@code (1/3).toString(36)} as {@code 0.bzzzzzzzzzxk} where V8 prints
+     * {@code 0.c}, and {@code (1e21).toString(36)} as {@code 5v1j4f4ds7a000} where V8 prints {@code 5v1j4f4ds7c000}.
+     *
+     * @param value
+     *            a finite, non-zero value
+     * @param radix
+     *            the radix, 2 to 36
+     * @return the digits
+     */
+    private static String doubleToRadixString(double value, int radix) {
+        final String chars = "0123456789abcdefghijklmnopqrstuvwxyz";
+        boolean negative = value < 0;
+        if (negative) {
+            value = -value;
+        }
+        // Split the value into an integer part and a fractional part.
+        double integer = Math.floor(value);
+        double fraction = value - integer;
+        // Fraction digits are computed only up to the input's precision.
+        double delta = Math.max(0.5 * (Math.nextUp(value) - value), Double.MIN_VALUE);
+        StringBuilder fractionDigits = new StringBuilder();
+        if (fraction >= delta) {
+            do {
+                // Shift up by one digit.
+                fraction *= radix;
+                delta *= radix;
+                int digit = (int) fraction;
+                fractionDigits.append(chars.charAt(digit));
+                fraction -= digit;
+                // Round to even.
+                if (fraction > 0.5 || (fraction == 0.5 && (digit & 1) != 0)) {
+                    if (fraction + delta > 1) {
+                        // Back-trace the digits already written in case of a carry.
+                        while (true) {
+                            int last = fractionDigits.length() - 1;
+                            if (last < 0) {
+                                // Carry over into the integer part.
+                                integer += 1;
+                                break;
+                            }
+                            char c = fractionDigits.charAt(last);
+                            int lastDigit = c > '9' ? c - 'a' + 10 : c - '0';
+                            fractionDigits.setLength(last);
+                            if (lastDigit + 1 < radix) {
+                                fractionDigits.append(chars.charAt(lastDigit + 1));
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            } while (fraction >= delta);
+        }
+        // Integer digits; the ones a double cannot represent are written as zeros.
+        StringBuilder integerDigits = new StringBuilder();
+        while (Math.getExponent(integer / radix) > 52) {
+            integer /= radix;
+            integerDigits.append('0');
+        }
+        do {
+            double remainder = integer % radix;
+            integerDigits.append(chars.charAt((int) remainder));
+            integer = (integer - remainder) / radix;
+        } while (integer > 0);
+        StringBuilder result = new StringBuilder(integerDigits.length() + fractionDigits.length() + 2);
+        if (negative) {
+            result.append('-');
+        }
+        result.append(integerDigits.reverse());
+        if (!fractionDigits.isEmpty()) {
+            result.append('.').append(fractionDigits);
+        }
+        return result.toString();
     }
 
     /**

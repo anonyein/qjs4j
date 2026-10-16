@@ -17,9 +17,11 @@
 package com.caoccao.qjs4j.compilation.ast;
 
 import com.caoccao.qjs4j.BaseJavetTest;
+import com.caoccao.qjs4j.core.PromiseRejectEvent;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -286,10 +288,10 @@ public class AsyncTest extends BaseJavetTest {
 
     @Test
     void testAwaitRejectedPromise() {
-        AtomicBoolean called = new AtomicBoolean(false);
-        context.setPromiseRejectCallback((event, promise, result) -> {
-            called.set(true);
-        });
+        // Promise.reject(...) has no handler when it is created; the await then attaches one. The
+        // await itself used to be reported as the unhandled rejection.
+        List<PromiseRejectEvent> events = new ArrayList<>();
+        context.setPromiseRejectCallback((event, promise, result) -> events.add(event));
         assertStringWithJavet("""
                 async function test() {
                     try {
@@ -301,7 +303,10 @@ public class AsyncTest extends BaseJavetTest {
                 }
                 test();""");
         context.setPromiseRejectCallback(null);
-        assertThat(called.get()).isTrue();
+        // Once for the sloppy run and once for the strict one.
+        assertThat(events).containsExactly(PromiseRejectEvent.PromiseRejectWithNoHandler,
+                PromiseRejectEvent.PromiseHandlerAddedAfterReject, PromiseRejectEvent.PromiseRejectWithNoHandler,
+                PromiseRejectEvent.PromiseHandlerAddedAfterReject);
     }
 
     @Test

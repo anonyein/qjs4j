@@ -304,7 +304,7 @@ public final class ObjectConstructor {
                 // DefinePropertyOrThrow(O, P, desc)
                 if (!obj.defineProperty(key, desc)) {
                     if (!context.hasPendingException()) {
-                        context.throwTypeError("Cannot redefine property: " + key.toPropertyString());
+                        obj.throwDefinePropertyFailure(context, key);
                     }
                     return JSUndefined.INSTANCE;
                 }
@@ -381,56 +381,10 @@ public final class ObjectConstructor {
             return arg; // Primitives are returned as-is
         }
 
-        // TypedArrays backed by resizable buffers cannot be frozen because their
-        // elements could change due to buffer resizing, which violates frozen semantics.
-        if (jsObject instanceof JSTypedArray jsTypedArray) {
-            IJSArrayBuffer buffer = jsTypedArray.getBuffer();
-            if ((buffer instanceof JSArrayBuffer jsArrayBuffer && jsArrayBuffer.isResizable())
-                    || (buffer instanceof JSSharedArrayBuffer jsSharedArrayBuffer
-                            && jsSharedArrayBuffer.isGrowable())) {
-                return context.throwTypeError("Cannot freeze a TypedArray backed by a resizable buffer");
-            }
+        // SetIntegrityLevel(O, frozen); a TypedArray on a resizable buffer fails its [[PreventExtensions]].
+        if (!jsObject.setIntegrityLevel(context, true)) {
+            return JSUndefined.INSTANCE;
         }
-
-        // Step 3: Set the [[Extensible]] internal slot of O to false
-        if (!jsObject.preventExtensionsWithResult()) {
-            return context.throwTypeError("Cannot freeze array buffer views with elements");
-        }
-
-        // Step 5: Let keys be ? O.[[OwnPropertyKeys]]()
-        List<PropertyKey> propertyKeys = jsObject.getOwnPropertyKeys();
-
-        // Step 7: For each element k of keys, freeze each property
-        for (PropertyKey key : propertyKeys) {
-            PropertyDescriptor currentDesc = jsObject.getOwnPropertyDescriptor(key);
-            if (currentDesc == null) {
-                continue;
-            }
-
-            // Per spec 7.3.16 step 7.b.ii: create a PARTIAL descriptor
-            // For accessor properties: { [[Configurable]]: false }
-            // For data properties: { [[Configurable]]: false, [[Writable]]: false }
-            PropertyDescriptor freezeDesc = new PropertyDescriptor();
-            freezeDesc.setConfigurable(false);
-            if (currentDesc.isAccessorDescriptor()) {
-                // Accessor: only set configurable
-            } else {
-                // Data or generic: also set writable
-                freezeDesc.setWritable(false);
-            }
-
-            // DefinePropertyOrThrow(O, k, desc)
-            if (!jsObject.defineProperty(key, freezeDesc)) {
-                if (!context.hasPendingException()) {
-                    context.throwTypeError("Cannot freeze property: " + key.toPropertyString());
-                }
-                return JSUndefined.INSTANCE;
-            }
-        }
-
-        // Mark the object as frozen (sets frozen, sealed, and extensible flags)
-        jsObject.freeze();
-
         return arg;
     }
 
@@ -1088,36 +1042,10 @@ public final class ObjectConstructor {
             return arg; // Primitives are returned as-is
         }
 
-        // Step 2: Set the [[Extensible]] internal slot of O to false
-        if (!obj.preventExtensionsWithResult()) {
-            return context.throwTypeError("Cannot seal array buffer views with elements");
+        // SetIntegrityLevel(O, sealed)
+        if (!obj.setIntegrityLevel(context, false)) {
+            return JSUndefined.INSTANCE;
         }
-
-        // Step 4: Let keys be ? O.[[OwnPropertyKeys]]()
-        List<PropertyKey> propertyKeys = obj.getOwnPropertyKeys();
-
-        // Step 6: For each property, set configurable=false via DefinePropertyOrThrow
-        for (PropertyKey key : propertyKeys) {
-            PropertyDescriptor currentDesc = obj.getOwnPropertyDescriptor(key);
-            if (currentDesc == null) {
-                continue;
-            }
-
-            // Per spec 7.3.16 step 7.a: { [[Configurable]]: false } partial descriptor
-            PropertyDescriptor sealDesc = new PropertyDescriptor();
-            sealDesc.setConfigurable(false);
-
-            if (!obj.defineProperty(key, sealDesc)) {
-                if (!context.hasPendingException()) {
-                    context.throwTypeError("Cannot seal property: " + key.toPropertyString());
-                }
-                return JSUndefined.INSTANCE;
-            }
-        }
-
-        // Mark the object as sealed
-        obj.seal();
-
         return arg;
     }
 

@@ -73,7 +73,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
     private void assertLinkFailsBeforeAnythingRuns(String entrySource, String entryName, String expectedMessagePart)
             throws IOException {
         Path entry = writeModule(entryName, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             assertThatThrownBy(() -> context.eval(entrySource, entry.toString(), true)).isInstanceOf(JSException.class)
                     .hasMessageContaining(expectedMessagePart);
             assertThat(context.eval("String(globalThis.dependencyBodyRan)", "probe.js", false).toString())
@@ -113,7 +113,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
                 "import { a } from './cycle-a.mjs';\nexport const b = 'b';\nglobalThis.sawA = typeof a;\n");
         Path entry = writeModule("cycle-a.mjs",
                 "import { b } from './cycle-b.mjs';\nexport const a = 'a';\nglobalThis.result = b;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("b");
         }
@@ -154,7 +154,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
         writeModule("throwing.mjs",
                 "globalThis.dependencyBodyRan = true;\nthrow new TypeError('dependency body ran');\n");
         Path entry = writeModule("main-throwing.mjs", "import './throwing.mjs';\nglobalThis.rootBodyRan = true;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             assertThatThrownBy(() -> context.eval(Files.readString(entry), entry.toString(), true))
                     .isInstanceOf(JSException.class).hasMessageContaining("dependency body ran");
             assertThat(context.eval("String(globalThis.dependencyBodyRan)", "probe.js", false).toString())
@@ -175,7 +175,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
                 "import { missing } from './dep-transitive.mjs';\nexport const m = 1;\n");
         String entrySource = "import { m } from './mid-transitive.mjs';\n";
         Path entry = writeModule("main-transitive.mjs", entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             JSException failure = catchThrowableOfType(JSException.class,
                     () -> context.eval(entrySource, entry.toString(), true));
             assertThat(failure).isNotNull();
@@ -202,7 +202,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
         writeModule("dep-located.mjs", "export const other = 1;\n");
         String entrySource = "const before = 1;\nimport { missing as here } from './dep-located.mjs';\n";
         Path entry = writeModule("main-located.mjs", entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             JSException failure = catchThrowableOfType(JSException.class,
                     () -> context.eval(entrySource, entry.toString(), true));
             assertThat(failure).isNotNull();
@@ -265,7 +265,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
         writeModule("shared-middle.mjs", "export * from './shared-one.mjs';\nexport * from './shared-two.mjs';\n");
         Path entry = writeModule("main-shared.mjs",
                 "import { shared } from './shared-middle.mjs';\nglobalThis.result = shared.reached;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("leaf");
         }
@@ -278,7 +278,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
         writeModule("ok-middle.mjs", "export * from './ok-leaf.mjs';\n");
         Path entry = writeModule("main-ok-star.mjs",
                 "import { reached } from './ok-middle.mjs';\nglobalThis.result = reached;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("leaf");
         }
@@ -294,7 +294,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
         writeModule("ns-middle.mjs", "export * from './ns-a.mjs';\nexport * from './ns-b.mjs';\n");
         Path entry = writeModule("main-namespace.mjs",
                 "import * as ns from './ns-middle.mjs';\nglobalThis.result = ns.only;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("a");
         }
@@ -345,7 +345,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
         // exactly what evaluation produces.
         Path entry = writeModule("main-absent.mjs",
                 "import { anything } from './not-here.mjs';\nglobalThis.rootBodyRan = true;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             assertThatThrownBy(() -> context.eval(Files.readString(entry), entry.toString(), true))
                     .isInstanceOf(JSException.class).hasMessageContaining("Cannot find module");
         }
@@ -366,7 +366,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
         writeModule("dep-root-named.mjs", "export const other = 1;\n");
         String entrySource = "import { missing } from './dep-root-named.mjs';\n";
         Path entry = writeModule("main-root-named.mjs", entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             JSException failure = catchThrowableOfType(JSException.class,
                     () -> context.eval(entrySource, entry.toString(), true));
             assertThat(failure).isNotNull();
@@ -419,7 +419,7 @@ public class JSModuleLinkOrderTest extends BaseTest {
                         + "export const middle = leaf + 1;\n");
         Path entry = writeModule("main-count.mjs", "import { middle } from './count-middle.mjs';\n"
                 + "globalThis.order = (globalThis.order || []).concat('entry');\n" + "globalThis.result = middle;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("2");
             assertThat(context.eval("globalThis.order.join(',')", "probe.js", false).toString())

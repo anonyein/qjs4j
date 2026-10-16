@@ -214,8 +214,29 @@ public final class JSRegExp extends JSObject {
         try {
             return context.createJSRegExp(pattern, flags);
         } catch (Exception e) {
-            return context.throwSyntaxError("Invalid regular expression: /" + pattern + "/: " + e.getMessage());
+            return context.throwSyntaxError(describeSyntaxError(pattern, flags, e));
         }
+    }
+
+    /**
+     * V8's message for a pattern or flags the RegExp constructor rejects:
+     * {@code Invalid regular expression: /pattern/flags: reason}, or
+     * {@code Invalid flags supplied to RegExp constructor 'flags'}. The flags used to be left out.
+     *
+     * @param pattern
+     *            the pattern source
+     * @param flags
+     *            the flags
+     * @param failure
+     *            the compiler's exception
+     * @return the message
+     */
+    public static String describeSyntaxError(String pattern, String flags, Exception failure) {
+        String reason = failure.getMessage();
+        if ("Invalid regular expression flags".equals(reason)) {
+            return "Invalid flags supplied to RegExp constructor '" + flags + "'";
+        }
+        return "Invalid regular expression: /" + pattern + "/" + flags + ": " + reason;
     }
 
     /**

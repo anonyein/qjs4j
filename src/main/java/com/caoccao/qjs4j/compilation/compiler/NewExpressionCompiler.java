@@ -35,6 +35,9 @@ final class NewExpressionCompiler extends AstNodeCompiler<NewExpression> {
         if (hasSpread) {
             compilerContext.emitter.emitOpcode(Opcode.DUP);
             compilerContext.emitHelpers.emitArgumentsArrayWithSpread(newExpr.getArguments());
+            // A frame stopped at a `new` reports the position of the `new` keyword, as V8 does.
+            compilerContext.emitter.emitSourcePosition(newExpr.getLocation());
+            compilerContext.emitter.emitCallDescription(CallPrinter.describeCallee(newExpr.getCallee()));
             compilerContext.emitter.emitOpcodeU16(Opcode.APPLY, 1);
             return;
         }
@@ -42,6 +45,8 @@ final class NewExpressionCompiler extends AstNodeCompiler<NewExpression> {
         for (Expression arg : newExpr.getArguments()) {
             compilerContext.expressionCompiler.compile(arg);
         }
+        compilerContext.emitter.emitSourcePosition(newExpr.getLocation());
+        compilerContext.emitter.emitCallDescription(CallPrinter.describeCallee(newExpr.getCallee()));
         compilerContext.emitter.emitOpcodeU16(Opcode.CALL_CONSTRUCTOR, newExpr.getArguments().size());
     }
 }

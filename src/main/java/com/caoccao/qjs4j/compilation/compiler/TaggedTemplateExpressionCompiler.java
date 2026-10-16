@@ -43,19 +43,8 @@ final class TaggedTemplateExpressionCompiler extends AstNodeCompiler<TaggedTempl
         // Check if this is a method call (tag is a member expression)
         if (taggedTemplate.getTag() instanceof MemberExpression memberExpr) {
             // For method calls: obj.method`template`
-            // We need to preserve obj as the 'this' value
-
-            // Push object (receiver)
-            compilerContext.expressionCompiler.compile(memberExpr.getObject());
-
-            // Get the method while keeping the object on the stack
-            if (memberExpr.isComputed()) {
-                compilerContext.emitter.emitOpcode(Opcode.DUP);
-                compilerContext.expressionCompiler.compile(memberExpr.getProperty());
-                compilerContext.emitter.emitOpcode(Opcode.GET_ARRAY_EL);
-            } else if (memberExpr.getProperty() instanceof Identifier propId) {
-                compilerContext.emitter.emitOpcodeAtom(Opcode.GET_FIELD2, propId.getName());
-            }
+            // We need to preserve obj as the 'this' value: Stack: -> receiver function
+            compilerContext.callExpressionCompiler.emitMemberCalleeWithReceiver(memberExpr, false);
 
             // SWAP converts obj/func to func/obj for internalHandleCall and locks property chain
             compilerContext.emitter.emitOpcode(Opcode.SWAP);
@@ -80,6 +69,7 @@ final class TaggedTemplateExpressionCompiler extends AstNodeCompiler<TaggedTempl
         // Call the tag function
         // argCount = 1 (template array) + number of expressions
         int argCount = 1 + expressions.size();
+        compilerContext.emitter.emitCallDescription(CallPrinter.describeCallee(taggedTemplate.getTag()));
         boolean isMethodCall = taggedTemplate.getTag() instanceof MemberExpression;
         if (isMethodCall) {
             compilerContext.emitter.emitOpcodeU16(isTailCall ? Opcode.TAIL_CALL_METHOD : Opcode.CALL_METHOD, argCount);

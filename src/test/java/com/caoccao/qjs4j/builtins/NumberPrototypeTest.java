@@ -520,8 +520,8 @@ public class NumberPrototypeTest extends BaseJavetTest {
 
         // Normal case: basic functionality
         JSValue result = NumberPrototype.toLocaleString(context, num, JSValue.NO_ARGS);
-        // Simplified implementation just uses toString, so should match
-        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("1234.56");
+        // Without arguments the default Intl.NumberFormat applies, grouping included, as in V8
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("1,234.56");
 
         // Special case: NaN
         result = NumberPrototype.toLocaleString(context, new JSNumber(Double.NaN), JSValue.NO_ARGS);
@@ -529,7 +529,7 @@ public class NumberPrototypeTest extends BaseJavetTest {
 
         // Special case: Infinity
         result = NumberPrototype.toLocaleString(context, new JSNumber(Double.POSITIVE_INFINITY), JSValue.NO_ARGS);
-        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("Infinity");
+        assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("∞");
     }
 
     @Test

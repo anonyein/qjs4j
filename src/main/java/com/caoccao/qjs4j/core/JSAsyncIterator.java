@@ -115,6 +115,61 @@ public class JSAsyncIterator extends JSObject {
         return "[object AsyncIterator]";
     }
 
+    /**
+     * %AsyncFromSyncIteratorPrototype%.return ( [ value ] ) ES2024 27.1.6.2.2, as AsyncIteratorClose calls it: with no
+     * value. Every abrupt step rejects the returned promise rather than throwing.
+     */
+    private static JSPromise asyncFromSyncReturn(JSContext context, JSObject syncIterator) {
+        JSValue result;
+        try {
+            JSValue returnMethod = syncIterator.get(PropertyKey.RETURN);
+            if (context.hasPendingException()) {
+                return createRejectedPromise(context, consumePendingException(context));
+            }
+            if (returnMethod.isNullOrUndefined()) {
+                // Step 7: no return method — resolve with { value: undefined, done: true }.
+                JSObject iteratorResult = context.createJSObject();
+                iteratorResult.set(PropertyKey.VALUE, JSUndefined.INSTANCE);
+                iteratorResult.set(PropertyKey.DONE, JSBoolean.TRUE);
+                JSPromise promise = context.createJSPromise();
+                promise.resolve(context, iteratorResult);
+                return promise;
+            }
+            if (!(returnMethod instanceof JSFunction returnFunction)) {
+                JSValue error = context.throwTypeError("iterator return is not a function");
+                context.clearPendingException();
+                return createRejectedPromise(context, error);
+            }
+            result = returnFunction.call(context, syncIterator, JSValue.NO_ARGS);
+        } catch (JSException e) {
+            context.clearPendingException();
+            return createRejectedPromise(context, e.getErrorValue());
+        } catch (JSVirtualMachineException e) {
+            JSValue error = context.hasPendingException() ? consumePendingException(context) : e.getJsValue();
+            return createRejectedPromise(context, error != null ? error : context.throwError(e.getMessage()));
+        }
+        if (context.hasPendingException()) {
+            return createRejectedPromise(context, consumePendingException(context));
+        }
+        if (!(result instanceof JSObject resultObject)) {
+            JSValue error = context
+                    .throwTypeError("Iterator result " + describeIteratorResult(result) + " is not an object");
+            context.clearPendingException();
+            return createRejectedPromise(context, error);
+        }
+        JSValue done = resultObject.get(PropertyKey.DONE);
+        if (context.hasPendingException()) {
+            return createRejectedPromise(context, consumePendingException(context));
+        }
+        JSValue resultValue = resultObject.get(PropertyKey.VALUE);
+        if (context.hasPendingException()) {
+            return createRejectedPromise(context, consumePendingException(context));
+        }
+        // AsyncFromSyncIteratorContinuation: awaits the value, then resolves { value, done }.
+        return createAsyncFromSyncResultPromise(context, resultValue,
+                JSTypeConversions.toBoolean(done) == JSBoolean.TRUE);
+    }
+
     static JSValue consumePendingException(JSContext context) {
         JSValue reason = context.getPendingException();
         context.clearAllPendingExceptions();
@@ -140,6 +195,25 @@ public class JSAsyncIterator extends JSObject {
         JSValue error = context.throwError(message);
         context.clearPendingException();
         return error;
+    }
+
+    /**
+     * The iterator a {@code for await} loop over a sync iterable keeps, for closing: an object whose {@code return} is
+     * %AsyncFromSyncIteratorPrototype%.return, so a {@code break} or {@code return} awaits a promise exactly as it
+     * would for the wrapper the specification creates (CreateAsyncFromSyncIterator). The loop's {@code next} is
+     * supplied separately.
+     *
+     * @param context
+     *            the context
+     * @param syncIterator
+     *            the sync iterator
+     * @return the object to close the loop through
+     */
+    public static JSObject createAsyncFromSyncIteratorForClose(JSContext context, JSObject syncIterator) {
+        JSObject wrapper = context.createJSObject();
+        wrapper.set(PropertyKey.RETURN, new JSNativeFunction(context, "return", 1,
+                (childContext, thisArg, args) -> asyncFromSyncReturn(childContext, syncIterator)));
+        return wrapper;
     }
 
     /**
@@ -214,6 +288,20 @@ public class JSAsyncIterator extends JSObject {
         JSPromise promise = context.createJSPromise();
         promise.reject(reason);
         return promise;
+    }
+
+    /**
+     * A primitive iterator result as V8 names it in "Iterator result X is not an object", without running any script.
+     *
+     * @param value
+     *            the primitive
+     * @return its description
+     */
+    public static String describeIteratorResult(JSValue value) {
+        if (value instanceof JSSymbol symbol) {
+            return symbol.toString();
+        }
+        return JSTypeConversions.toString(null, value).value();
     }
 
     /**

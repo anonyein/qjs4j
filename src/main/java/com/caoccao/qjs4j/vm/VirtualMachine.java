@@ -32,7 +32,22 @@ public final class VirtualMachine {
     static final BigInteger BIGINT_NEGATIVE_ONE = BigInteger.valueOf(-1);
     static final BigInteger BIGINT_ONE = BigInteger.ONE;
     static final BigInteger BIGINT_ZERO = BigInteger.ZERO;
+    /**
+     * The exception value a generator's return completion travels through its {@code finally} blocks as.
+     * <p>
+     * {@code generator.return(v)} resumes the generator with a return completion, which must run every enclosing
+     * {@code finally} block and skip every {@code catch}. It is unwound like an exception, but carried as this private
+     * value rather than as {@code v} itself, so the unwinder can tell it from an exception a {@code finally} block
+     * throws: that throw replaces the return completion and is catchable. The value being returned is held in
+     * {@link #generatorReturnValue}, and in the generator's state while it is suspended inside a {@code finally}. Using
+     * {@code v} as the payload made a throw in a {@code finally} indistinguishable from the return, so it was
+     * swallowed, and a {@code yield} in a {@code finally} later rethrew {@code v} as an ordinary exception.
+     */
+    static final JSValue GENERATOR_RETURN_SIGNAL = new JSSymbol("GeneratorReturnSignal");
     static final int INTERRUPT_CHECK_INTERVAL = 0xFFFF; // Check every ~65K opcodes
+    /**
+     * A chain longer than this is restarted: it only names the expression in an error message.
+     */
     static final int SMALL_ARGS_BUFFER_SIZE = 8;
     static final JSValue UNINITIALIZED_MARKER = new JSSymbol("UninitializedMarker");
     JSGeneratorState activeGeneratorState;
@@ -44,19 +59,15 @@ public final class VirtualMachine {
     long executionDeadlineNanos; // 0 = no deadline
     final Set<JSObject> exhaustedForOfIterators;
     JSValue[] forOfTempValues;
-    boolean generatorForceReturn; // When true, exception handler skips catch offsets, enters only finally
     int generatorResumeIndex;
     List<JSGeneratorState.ResumeRecord> generatorResumeRecords;
-    JSValue generatorReturnValue; // The return value during generator force return
+    JSValue generatorReturnValue; // The value of the return completion GENERATOR_RETURN_SIGNAL stands for
     int interruptCounter;
     JSValue lastConstructorThisArg; // Saved from frame before return for derived constructor check
     JSValue pendingException;
-    final StringBuilder propertyAccessChain; // Track last property access for better error messages
-    boolean propertyAccessLock; // When true, don't update lastPropertyAccess (during argument evaluation)
     final JSValue[] singleArgBuffer = new JSValue[1]; // Reusable 1-element args buffer
     final JSValue[] smallArgsBuffer = new JSValue[SMALL_ARGS_BUFFER_SIZE]; // Reusable small args buffer
     TailCallRequest tailCallPending; // Set by TAIL_CALL handler for trampoline in execute()
-    final boolean trackPropertyAccess;
     final CallStack valueStack;
     YieldResult yieldResult; // Set when generator yields
     int yieldSkipCount; // How many yields to skip (for resuming generators)
@@ -70,10 +81,6 @@ public final class VirtualMachine {
         this.generatorResumeRecords = List.of();
         this.generatorResumeIndex = 0;
         this.pendingException = null;
-        this.propertyAccessChain = new StringBuilder();
-        this.trackPropertyAccess = !"false"
-                .equalsIgnoreCase(System.getProperty("qjs4j.vm.trackPropertyAccess", "true"));
-        this.propertyAccessLock = false;
         this.awaitSuspensionEnabled = false;
         this.awaitSuspensionPromise = null;
         this.yieldResult = null;
@@ -97,8 +104,8 @@ public final class VirtualMachine {
         }
 
         if (leftPrimitive instanceof JSString || rightPrimitive instanceof JSString) {
-            String leftString = JSTypeConversions.toString(context, leftPrimitive).value();
-            String rightString = JSTypeConversions.toString(context, rightPrimitive).value();
+            JSString leftString = JSTypeConversions.toString(context, leftPrimitive);
+            JSString rightString = JSTypeConversions.toString(context, rightPrimitive);
             if (context.hasPendingException()) {
                 capturePendingException();
                 return JSUndefined.INSTANCE;
@@ -110,7 +117,8 @@ public final class VirtualMachine {
                 context.clearPendingException();
                 return JSUndefined.INSTANCE;
             }
-            return new JSString(leftString + rightString);
+            // A long result stays a rope, so appending in a loop does not copy the whole string each time.
+            return JSString.concat(leftString, rightString);
         }
 
         JSValue leftNumeric = toNumericValue(leftPrimitive);
@@ -130,23 +138,6 @@ public final class VirtualMachine {
             return throwMixedBigIntTypeError();
         }
         return JSNumber.of(((JSNumber) leftNumeric).value() + ((JSNumber) rightNumeric).value());
-    }
-
-    void appendPropertyAccessForArrayIndex(JSValue indexValue) {
-        if (indexValue instanceof JSString stringValue) {
-            if (propertyAccessChain.length() > 0) {
-                propertyAccessChain.append('.');
-            }
-            propertyAccessChain.append(stringValue.value());
-        } else if (indexValue instanceof JSNumber numberValue) {
-            String propertyName = JSTypeConversions.toString(context, numberValue).value();
-            if (propertyAccessChain.length() > 0) {
-                propertyAccessChain.append('.');
-            }
-            propertyAccessChain.append(propertyName);
-        } else if (indexValue instanceof JSSymbol symbolValue) {
-            propertyAccessChain.append("[Symbol.").append(symbolValue.getDescription()).append("]");
-        }
     }
 
     /**
@@ -656,10 +647,9 @@ public final class VirtualMachine {
                     pendingException = pendingResumeRecord.value();
                     context.setPendingException(pendingResumeRecord.value());
                 } else if (pendingResumeRecord.kind() == JSGeneratorState.ResumeKind.RETURN) {
-                    generatorForceReturn = true;
                     generatorReturnValue = pendingResumeRecord.value();
-                    pendingException = pendingResumeRecord.value();
-                    context.setPendingException(pendingResumeRecord.value());
+                    pendingException = GENERATOR_RETURN_SIGNAL;
+                    context.setPendingException(GENERATOR_RETURN_SIGNAL);
                 } else {
                     executionContext.push(pendingResumeRecord.value());
                 }
@@ -896,7 +886,7 @@ public final class VirtualMachine {
                     } else {
                         currentFrameDepth = currentFrame.getFrameDepth();
                     }
-                    if (currentFrameDepth >= context.getMaxStackDepth()) {
+                    if (currentFrameDepth >= context.getMaxCallDepth()) {
                         throw new JSVirtualMachineException(
                                 context.throwRangeError("Maximum call stack size exceeded"));
                     }
@@ -1018,9 +1008,11 @@ public final class VirtualMachine {
                     // previous "VM error: " + e.getMessage() flattened every NullPointerException,
                     // ArrayIndexOutOfBoundsException and ClassCastException into one opaque
                     // message that was frequently just "VM error: null". Say where it happened and
-                    // keep the cause.
+                    // keep the cause. It is raised as a termination, not as a JSVirtualMachineException:
+                    // the caller frame's opcode handler turned that into a pending exception, so the
+                    // script could catch an engine bug and the Java cause was dropped.
                     restoreExecuteFailureState(restoreStackTop, previousFrame, savedStrictMode);
-                    throw new JSVirtualMachineException(describeInternalFailure(function, executionContext, e), e);
+                    throw new JSTerminationException(describeInternalFailure(function, executionContext, e), e);
                 }
             }
         } finally {
@@ -1090,10 +1082,9 @@ public final class VirtualMachine {
         JSGeneratorState previousActiveGeneratorState = activeGeneratorState;
         activeGeneratorState = state;
         boolean previousAwaitSuspensionEnabled = awaitSuspensionEnabled;
-        boolean previousGeneratorForceReturn = generatorForceReturn;
         JSValue previousGeneratorReturnValue = generatorReturnValue;
-        // Don't reset generatorForceReturn here - it may be set by the pending resume record
-        // handling in execute() for suspended state mode
+        // A return completion this generator was carrying when it suspended inside a finally block.
+        generatorReturnValue = state.getReturnCompletionValue();
         if (function.isAsync()) {
             awaitSuspensionEnabled = true;
         }
@@ -1103,10 +1094,12 @@ public final class VirtualMachine {
             // Execute (or resume) the generator
             result = execute(function, thisArg, args);
             currentYieldResult = yieldResult;
+            // Kept across the suspension: a yield or await inside a finally block that a return
+            // completion entered resumes still carrying that completion.
+            state.setReturnCompletionValue(generatorReturnValue);
         } finally {
             awaitSuspensionEnabled = previousAwaitSuspensionEnabled;
             activeGeneratorState = previousActiveGeneratorState;
-            generatorForceReturn = previousGeneratorForceReturn;
             generatorReturnValue = previousGeneratorReturnValue;
             yieldSkipCount = previousYieldSkipCount;
             generatorResumeRecords = previousGeneratorResumeRecords;
@@ -1485,16 +1478,8 @@ public final class VirtualMachine {
         tailCallPending = null;
         generatorReturnValue = null;
         exhaustedForOfIterators.clear();
-        propertyAccessChain.setLength(0);
         Arrays.fill(smallArgsBuffer, null);
         singleArgBuffer[0] = null;
-    }
-
-    void resetPropertyAccessTracking() {
-        if (trackPropertyAccess) {
-            this.propertyAccessChain.setLength(0);
-        }
-        this.propertyAccessLock = false;
     }
 
     void restoreExecuteCallerState(int restoreStackTop, StackFrame previousFrame, boolean savedStrictMode) {
@@ -1512,7 +1497,6 @@ public final class VirtualMachine {
     void restoreExecuteFailureState(int restoreStackTop, StackFrame previousFrame, boolean savedStrictMode) {
         valueStack.setStackTop(restoreStackTop);
         currentFrame = previousFrame;
-        resetPropertyAccessTracking();
         if (savedStrictMode) {
             context.enterStrictMode();
         } else {
@@ -1754,23 +1738,18 @@ public final class VirtualMachine {
     /**
      * Auto-close an iterator during exception unwinding. Following QuickJS JS_IteratorClose semantics: - If
      * isThrowCompletion is true, close errors are suppressed (original error preserved). - If isThrowCompletion is
-     * false (return completion), close errors propagate and cancel any active generator force return.
+     * false (a generator's return completion), a close error is left in {@code pendingException} for the unwinder,
+     * replacing the return completion.
      */
     private static void autoCloseIterator(ExecutionContext executionContext, JSObject iterator,
             boolean isThrowCompletion) {
         JSContext currentContext = executionContext.virtualMachine.context;
-        boolean savedGeneratorForceReturn = executionContext.virtualMachine.generatorForceReturn;
-        JSValue savedGeneratorReturnValue = executionContext.virtualMachine.generatorReturnValue;
-        if (savedGeneratorForceReturn) {
-            executionContext.virtualMachine.generatorForceReturn = false;
-        }
         JSValue returnMethodValue;
         try {
             returnMethodValue = iterator.get(PropertyKey.RETURN);
         } catch (JSVirtualMachineException e) {
             if (!isThrowCompletion) {
                 executionContext.virtualMachine.capturePendingExceptionFromVmOrContext(e);
-                executionContext.virtualMachine.generatorForceReturn = false;
             } else {
                 currentContext.clearPendingException();
             }
@@ -1779,12 +1758,10 @@ public final class VirtualMachine {
         if (currentContext.hasPendingException()) {
             if (!isThrowCompletion) {
                 executionContext.virtualMachine.pendingException = currentContext.getPendingException();
-                executionContext.virtualMachine.generatorForceReturn = false;
             }
             currentContext.clearPendingException();
             return;
         }
-        boolean shouldRestoreGeneratorForceReturn = true;
         if (returnMethodValue instanceof JSFunction returnMethod) {
             JSValue closeResult;
             try {
@@ -1792,7 +1769,6 @@ public final class VirtualMachine {
             } catch (JSVirtualMachineException e) {
                 if (!isThrowCompletion) {
                     executionContext.virtualMachine.capturePendingExceptionFromVmOrContext(e);
-                    executionContext.virtualMachine.generatorForceReturn = false;
                 } else {
                     currentContext.clearPendingException();
                 }
@@ -1801,23 +1777,16 @@ public final class VirtualMachine {
             if (currentContext.hasPendingException()) {
                 if (!isThrowCompletion) {
                     executionContext.virtualMachine.pendingException = currentContext.getPendingException();
-                    executionContext.virtualMachine.generatorForceReturn = false;
-                    shouldRestoreGeneratorForceReturn = false;
                 }
                 currentContext.clearPendingException();
-            } else if (!(closeResult instanceof JSObject)) {
-                if (!isThrowCompletion) {
-                    executionContext.virtualMachine.pendingException = currentContext
-                            .throwTypeError("iterator result is not an object");
-                    executionContext.virtualMachine.generatorForceReturn = false;
-                    shouldRestoreGeneratorForceReturn = false;
-                }
+            } else if (!(closeResult instanceof JSObject) && !isThrowCompletion) {
+                executionContext.virtualMachine.pendingException = currentContext
+                        .throwTypeError("iterator result is not an object");
             }
-        }
-
-        if (savedGeneratorForceReturn && shouldRestoreGeneratorForceReturn) {
-            executionContext.virtualMachine.generatorForceReturn = true;
-            executionContext.virtualMachine.generatorReturnValue = savedGeneratorReturnValue;
+        } else if (!returnMethodValue.isNullOrUndefined() && !isThrowCompletion) {
+            // GetMethod: a return that is neither undefined nor callable is a TypeError.
+            executionContext.virtualMachine.pendingException = currentContext
+                    .throwTypeError("iterator return is not a function");
         }
     }
 
@@ -1874,15 +1843,22 @@ public final class VirtualMachine {
                         JSValue iteratorValue = (JSValue) executionContext.virtualMachine.valueStack.stack[iterIdx];
                         executionContext.virtualMachine.valueStack.stackTop--; // pop iter
                         if (iteratorValue instanceof JSObject iteratorObj && !iteratorValue.isUndefined()) {
-                            // For throw completions, suppress close errors.
-                            // For return completions (generatorForceReturn), propagate close errors.
-                            boolean isThrowCompletion = !executionContext.virtualMachine.generatorForceReturn;
-                            autoCloseIterator(executionContext, iteratorObj, isThrowCompletion);
+                            // A throw completion keeps its exception whatever the close does. A return
+                            // completion is replaced by a close that fails, and that failure is an
+                            // ordinary exception the catch handlers below may take.
+                            autoCloseIterator(executionContext, iteratorObj, exception != GENERATOR_RETURN_SIGNAL);
+                            if (executionContext.virtualMachine.pendingException != null) {
+                                exception = executionContext.virtualMachine.pendingException;
+                                executionContext.virtualMachine.pendingException = null;
+                                executionContext.virtualMachine.context.clearPendingException();
+                            }
                         }
                     }
                     continue;
                 }
-                if (executionContext.virtualMachine.generatorForceReturn && !catchOffset.isFinally()) {
+                // A return completion runs finally blocks only; an exception a finally block throws
+                // is not the return signal, so it replaces the return and every handler sees it.
+                if (exception == GENERATOR_RETURN_SIGNAL && !catchOffset.isFinally()) {
                     continue;
                 }
                 executionContext.virtualMachine.valueStack.pushStackValue(exception);
@@ -1898,18 +1874,12 @@ public final class VirtualMachine {
             return PendingExceptionAction.CONTINUE;
         }
 
-        if (executionContext.virtualMachine.generatorForceReturn) {
-            executionContext.virtualMachine.generatorForceReturn = false;
+        if (exception == GENERATOR_RETURN_SIGNAL) {
             executionContext.virtualMachine.restoreExecuteCallerState(executionContext.restoreStackTop,
                     executionContext.previousFrame, executionContext.savedStrictMode);
             executionContext.virtualMachine.context.clearPendingException();
             executionContext.returnValue = executionContext.virtualMachine.generatorReturnValue;
             return PendingExceptionAction.RETURN;
-        }
-
-        if (executionContext.virtualMachine.pendingException != null) {
-            exception = executionContext.virtualMachine.pendingException;
-            executionContext.virtualMachine.pendingException = null;
         }
 
         executionContext.virtualMachine.restoreExecuteCallerState(executionContext.restoreStackTop,

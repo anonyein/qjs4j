@@ -1016,7 +1016,13 @@ public final class AtomicsObject implements AutoCloseable {
                     // A wait cancelled because its runtime closed must not touch that runtime's
                     // promise: the context it belongs to is gone.
                     if (!registration.isCancelled()) {
-                        promise.fulfill(new JSString(waitResult));
+                        // EnqueueResolveInAgentJob: the promise is settled by a job on the context's own
+                        // thread, never here. Enqueueing is the one cross-thread operation the engine
+                        // supports, so the promise needs no lock of its own.
+                        // Closing the context clears its queue, so a job enqueued for a closing runtime
+                        // is dropped rather than run.
+                        String settledResult = waitResult;
+                        context.enqueueMicrotask(() -> promise.fulfill(new JSString(settledResult)));
                     }
                 });
             } catch (RejectedExecutionException e) {

@@ -61,6 +61,9 @@ public final class JSAggregateError extends JSError {
         }
 
         JSAggregateError jsAggregateError = context.createJSAggregateError(message);
+        if (args.length > 1 && !(args[1] instanceof JSUndefined)) {
+            JSError.defineEmptyMessage(jsAggregateError, message);
+        }
 
         // Step 4: InstallErrorCause(O, options)
         if (args.length > 2) {
@@ -78,6 +81,7 @@ public final class JSAggregateError extends JSError {
         jsAggregateError.defineProperty(PropertyKey.ERRORS,
                 PropertyDescriptor.dataDescriptor(errorsList, PropertyDescriptor.DataState.ConfigurableWritable));
 
+        JSError.captureStackTraceBelowNewTarget(context, jsAggregateError);
         return jsAggregateError;
     }
 

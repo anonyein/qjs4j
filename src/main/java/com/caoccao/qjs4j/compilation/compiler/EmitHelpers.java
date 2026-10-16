@@ -38,10 +38,76 @@ final class EmitHelpers {
         this.compilerContext = compilerContext;
     }
 
+    /**
+     * Compile one optional chain, every link of it sharing one exit: QuickJS's {@code optional_chaining_label}.
+     * <p>
+     * Each {@code ?.} that finds a nullish value jumps to the end of the chain with {@code undefined}, so the links
+     * after it — member accesses, calls and their arguments — are skipped together, while a link after an ordinary call
+     * or member access still sees whatever that produced. Each link used to be compiled with a null check of its own,
+     * which treated an {@code undefined} returned by {@code f?.()} as if the chain had short-circuited, and a
+     * short-circuited call in tail position skipped the {@code return} after it.
+     *
+     * @param body
+     *            emits the chain; Stack: -> value
+     * @param shortCircuitTail
+     *            emitted on the short-circuit path only, after {@code undefined} is pushed, or null for none
+     */
+    void compileOptionalChain(Runnable body, Runnable shortCircuitTail) {
+        List<Integer> savedOptionalChainJumps = compilerContext.optionalChainJumps;
+        List<Integer> optionalChainJumps = new ArrayList<>();
+        compilerContext.optionalChainJumps = optionalChainJumps;
+        try {
+            body.run();
+        } finally {
+            compilerContext.optionalChainJumps = savedOptionalChainJumps;
+        }
+        int jumpOverShortCircuitTail = shortCircuitTail != null ? compilerContext.emitter.emitJump(Opcode.GOTO) : -1;
+        for (int optionalChainJump : optionalChainJumps) {
+            compilerContext.emitter.patchJump(optionalChainJump, compilerContext.emitter.currentOffset());
+        }
+        if (shortCircuitTail != null) {
+            shortCircuitTail.run();
+            compilerContext.emitter.patchJump(jumpOverShortCircuitTail, compilerContext.emitter.currentOffset());
+        }
+    }
+
+    /**
+     * Compile the object or callee of a link of an optional chain.
+     * <p>
+     * When both the link and its target belong to the chain being compiled, the target joins it, so a {@code ?.}
+     * anywhere further down jumps straight to the end of the whole chain. Otherwise the target is an ordinary
+     * expression — the chain's root, or a chain that parentheses ended — and is compiled on its own.
+     *
+     * @param link
+     *            the member or call expression whose object or callee this is
+     * @param target
+     *            the object or callee
+     */
+    void compileOptionalChainLinkTarget(Expression link, Expression target) {
+        if (link.isPartOfOptionalChain() && target.isPartOfOptionalChain()) {
+            compilerContext.optionalChainLink = target;
+        }
+        compilerContext.expressionCompiler.compile(target);
+    }
+
+    /**
+     * Whether a member or call expression about to be compiled is the next link of the optional chain being compiled.
+     * Clears the mark, so nothing compiled inside the node can mistake itself for that link.
+     *
+     * @param expression
+     *            the member or call expression
+     * @return true when it joins the chain being compiled
+     */
+    boolean consumeOptionalChainLink(Expression expression) {
+        boolean joinsOptionalChain = compilerContext.optionalChainLink == expression;
+        compilerContext.optionalChainLink = null;
+        return joinsOptionalChain;
+    }
+
     void emitAbruptCompletionIteratorClose() {
         for (LoopContext loopContext : compilerContext.loopManager) {
             if (loopContext.hasIterator) {
-                compilerContext.emitter.emitOpcode(Opcode.ITERATOR_CLOSE);
+                emitLoopIteratorClose(loopContext);
             }
         }
     }
@@ -75,6 +141,7 @@ final class EmitHelpers {
         for (Expression arg : arguments) {
             if (arg instanceof SpreadElement spreadElement) {
                 compilerContext.expressionCompiler.compile(spreadElement.getArgument());
+                compilerContext.emitter.emitSourcePosition(spreadElement.getArgument().getLocation());
                 compilerContext.emitter.emitOpcode(Opcode.APPEND);
             } else {
                 compilerContext.expressionCompiler.compile(arg);
@@ -83,6 +150,32 @@ final class EmitHelpers {
             }
         }
         compilerContext.emitter.emitOpcode(Opcode.DROP);
+    }
+
+    /**
+     * AsyncIteratorClose for a {@code for await} loop left by a {@code break}, a {@code continue} to an outer loop or a
+     * {@code return}: call the iterator's {@code return()}, await the result and require an object. The loop used to
+     * call {@code return()} without awaiting it, as for a sync iterator, so the loop completed ticks before V8's.
+     * <p>
+     * Runs after {@code ITERATOR_CLOSE} has taken the loop's iterator off the stack, so a {@code return()} that throws
+     * is not called a second time by exception unwinding.
+     * <p>
+     * Stack: unchanged
+     */
+    void emitAsyncIteratorReturn(int iteratorLocal) {
+        compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, iteratorLocal);
+        compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+        compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+        compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+        // Stack: iter undefined undefined undefined -> iter undefined undefined result noReturnMethod
+        compilerContext.emitter.emitOpcodeU8(Opcode.ITERATOR_CALL, 2);
+        int jumpWithoutReturnMethod = compilerContext.emitter.emitJump(Opcode.IF_TRUE);
+        compilerContext.emitter.emitOpcode(Opcode.AWAIT);
+        compilerContext.emitter.emitOpcode(Opcode.ITERATOR_CHECK_OBJECT);
+        compilerContext.emitter.patchJump(jumpWithoutReturnMethod, compilerContext.emitter.currentOffset());
+        for (int i = 0; i < 4; i++) {
+            compilerContext.emitter.emitOpcode(Opcode.DROP);
+        }
     }
 
     /**
@@ -350,9 +443,32 @@ final class EmitHelpers {
                 break;
             }
             if (loopCtx.hasIterator) {
-                compilerContext.emitter.emitOpcode(Opcode.ITERATOR_CLOSE);
+                emitLoopIteratorClose(loopCtx);
             }
         }
+    }
+
+    /**
+     * Close a loop's iterator: {@code ITERATOR_CLOSE}, followed for a {@code for await} loop by the awaited
+     * {@code return()}.
+     */
+    void emitLoopIteratorClose(LoopContext loopContext) {
+        compilerContext.emitter.emitOpcode(Opcode.ITERATOR_CLOSE);
+        if (loopContext.asyncIteratorLocal >= 0) {
+            emitAsyncIteratorReturn(loopContext.asyncIteratorLocal);
+        }
+    }
+
+    /**
+     * Record the position a failing access of this member reports in a stack trace, as V8 does: the property name of a
+     * {@code .name} access, the {@code [} of a computed one.
+     *
+     * @param memberExpr
+     *            the member expression
+     */
+    void emitMemberSourcePosition(MemberExpression memberExpr) {
+        compilerContext.emitter.emitSourcePosition(
+                memberExpr.isComputed() ? memberExpr.getLocation() : memberExpr.getProperty().getLocation());
     }
 
     void emitMethodCallOnLocalObject(int localIndex, String methodName, int argCount) {
@@ -397,6 +513,28 @@ final class EmitHelpers {
             return;
         }
         throw new JSCompilerException("Invalid non-computed field key", key);
+    }
+
+    /**
+     * QuickJS's {@code optional_chain_test}: short-circuit the optional chain being compiled when the value on top of
+     * the stack is nullish.
+     * <p>
+     * Stack: ... value -> ... value when it is neither {@code undefined} nor {@code null}; otherwise {@code dropCount}
+     * values are dropped, {@code undefined} is pushed, and control jumps to the end of the chain.
+     *
+     * @param dropCount
+     *            how many values the short-circuit path drops, the tested value included
+     */
+    void emitOptionalChainTest(int dropCount) {
+        compilerContext.emitter.emitOpcode(Opcode.DUP);
+        compilerContext.emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
+        int jumpToNext = compilerContext.emitter.emitJump(Opcode.IF_FALSE);
+        for (int i = 0; i < dropCount; i++) {
+            compilerContext.emitter.emitOpcode(Opcode.DROP);
+        }
+        compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+        compilerContext.optionalChainJumps.add(compilerContext.emitter.emitJump(Opcode.GOTO));
+        compilerContext.emitter.patchJump(jumpToNext, compilerContext.emitter.currentOffset());
     }
 
     void emitScopeUsingDisposal(CompilerScope scope) {

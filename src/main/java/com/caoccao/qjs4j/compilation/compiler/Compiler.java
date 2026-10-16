@@ -28,6 +28,7 @@ import com.caoccao.qjs4j.core.JSSymbol;
 import com.caoccao.qjs4j.core.JSValue;
 import com.caoccao.qjs4j.exceptions.JSCompilerException;
 import com.caoccao.qjs4j.exceptions.JSErrorException;
+import com.caoccao.qjs4j.exceptions.JSRangeErrorException;
 import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 import com.caoccao.qjs4j.vm.Bytecode;
 
@@ -40,6 +41,7 @@ import java.util.Set;
  * Pipeline: JavaScript Source → Lexer → Tokens → Parser → AST → BytecodeCompiler → Bytecode
  */
 public final class Compiler {
+    private static final String MAXIMUM_CALL_STACK_SIZE_EXCEEDED = "Maximum call stack size exceeded";
     private boolean classFieldEval;
     private JSContext context;
     private boolean evalAllowNewTarget;
@@ -99,9 +101,12 @@ public final class Compiler {
             boolean strict = isModule || ast.isStrict();
             JSBytecodeFunction func = new JSBytecodeFunction(context, bytecode, name, 0, JSValue.NO_ARGS, null, true,
                     false, false, false, strict, null);
+            func.setProgram(true);
             return new CompileResult(func, ast);
         } catch (JSCompilerException | JSErrorException e) {
             throw e;
+        } catch (StackOverflowError e) {
+            throw createStackOverflowException();
         } catch (Exception e) {
             throw new JSCompilerException("Unexpected compilation error: " + e.getMessage(), e, ast);
         }
@@ -125,7 +130,11 @@ public final class Compiler {
         if (classFieldEval) {
             parser.setClassFieldEval(true);
         }
-        return parser.parse();
+        try {
+            return parser.parse();
+        } catch (StackOverflowError e) {
+            throw createStackOverflowException();
+        }
     }
 
     public Compiler setClassFieldEval(boolean classFieldEval) {
@@ -186,6 +195,16 @@ public final class Compiler {
                 }
             }
         }
+    }
+
+    /**
+     * The parser and the bytecode compiler are recursive descent, so source nested deeper than the Java stack allows
+     * (thousands of parentheses, ternaries or {@code if} statements) overflows it. V8 reports the same input as a
+     * {@code RangeError: Maximum call stack size exceeded} at parse time; a raw {@link StackOverflowError} is not an
+     * {@link Exception}, so it used to escape every engine catch and terminate the embedder's thread.
+     */
+    private static JSRangeErrorException createStackOverflowException() {
+        return new JSRangeErrorException(MAXIMUM_CALL_STACK_SIZE_EXCEEDED);
     }
 
     public record CompileResult(JSBytecodeFunction function, Program ast) {

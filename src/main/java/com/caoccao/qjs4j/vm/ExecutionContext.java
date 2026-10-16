@@ -34,6 +34,7 @@ final class ExecutionContext {
         this.savedStrictMode = savedStrictMode;
         this.locals = frame.getLocals();
         this.pc = 0;
+        frame.setExecutionContext(this);
         this.opcodeRequestedReturn = false;
         this.returnValue = null;
         this.sp = 0;

@@ -54,7 +54,7 @@ public class JSTextModuleImportTest extends BaseTest {
         String entrySource = "import value from './" + payloadName + "' with { type: 'text' };\n"
                 + "globalThis.result = value;\n";
         Files.writeString(entry, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(entrySource, entry.toString(), true);
             return context.eval("globalThis.result", "probe.js", false).toString();
         }
@@ -73,7 +73,7 @@ public class JSTextModuleImportTest extends BaseTest {
         String entrySource = "import defer * as ns from './deferred.txt' with { type: 'text' };\n"
                 + "globalThis.result = ns.default;\n";
         Files.writeString(entry, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(entrySource, entry.toString(), true);
             context.processMicrotasks();
             assertThat(context.eval("globalThis.result", "probe.js", false).toString()).isEqualTo(payload);
@@ -88,7 +88,7 @@ public class JSTextModuleImportTest extends BaseTest {
         String entrySource = "const m = await import('./dynamic.txt', "
                 + "{ with: { type: 'text' } });\nglobalThis.result = m.default;\n";
         Files.writeString(entry, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(entrySource, entry.toString(), true);
             context.processMicrotasks();
             assertThat(context.eval("globalThis.result", "probe.js", false).toString()).isEqualTo(payload);

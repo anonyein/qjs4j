@@ -50,11 +50,15 @@ public final class JSSyntaxError extends JSError {
             }
         }
         JSSyntaxError jsSyntaxError = context.createJSSyntaxError(message);
+        if (args.length > 0 && !args[0].isUndefined()) {
+            JSError.defineEmptyMessage(jsSyntaxError, message);
+        }
         if (args.length > 1) {
             if (!JSError.installErrorCause(context, jsSyntaxError, args[1])) {
                 return JSUndefined.INSTANCE;
             }
         }
+        JSError.captureStackTraceBelowNewTarget(context, jsSyntaxError);
         return jsSyntaxError;
     }
 

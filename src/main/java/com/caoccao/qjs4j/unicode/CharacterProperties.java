@@ -31,7 +31,8 @@ public final class CharacterProperties {
         // but these entries differ from Java's Character.toLowerCase().
         return switch (codePoint) {
             case 0x00B5 -> 0x03BC; // MICRO SIGN → GREEK SMALL LETTER MU
-            case 0x0130 -> 0x0069; // LATIN CAPITAL LETTER I WITH DOT ABOVE → i
+            // U+0130 has only Turkic (T) and full (F) foldings, so simple case folding leaves it alone, as in V8.
+            case 0x0130 -> 0x0130;
             case 0x017F -> 0x0073; // LATIN SMALL LETTER LONG S → s
             case 0x0345 -> 0x03B9; // COMBINING GREEK YPOGEGRAMMENI → GREEK SMALL LETTER IOTA
             case 0x0390, 0x1FD3 -> 0x0390; // GREEK SMALL LETTER IOTA WITH DIALYTIKA AND TONOS

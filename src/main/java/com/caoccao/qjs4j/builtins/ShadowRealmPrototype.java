@@ -25,9 +25,6 @@ import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.exceptions.JSVirtualMachineException;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -223,6 +220,11 @@ public final class ShadowRealmPrototype {
         return exportsObject;
     }
 
+    private static String getReferrerFilename(JSContext callerContext) {
+        JSStackFrame stackFrame = callerContext.getCurrentStackFrame();
+        return stackFrame != null ? stackFrame.filename() : null;
+    }
+
     private static JSValue getWrappedValue(JSContext callerContext, JSContext targetContext, JSValue value) {
         if (JSTypeChecking.isPrimitive(value)) {
             return value;
@@ -259,9 +261,18 @@ public final class ShadowRealmPrototype {
         JSContext shadowContext = shadowRealm.getShadowContext();
 
         try {
-            Path modulePath = resolveModulePath(callerContext, specifier);
-            String moduleSource = Files.readString(modulePath);
-            JSObject exportsObject = evaluateShadowRealmModule(shadowContext, moduleSource, modulePath.toString());
+            // Through the host's module loader, like every other import: this used to read the path
+            // with java.nio.file.Files, so importValue reached any file the process could read.
+            IJSModuleLoader moduleLoader = callerContext.getRuntime().getOptions().getModuleLoader();
+            String resolvedSpecifier = moduleLoader != null
+                    ? moduleLoader.resolve(specifier, getReferrerFilename(callerContext))
+                    : null;
+            if (resolvedSpecifier == null) {
+                rejectWithCallerTypeError(callerContext, promise, "ShadowRealm import failed");
+                return promise;
+            }
+            String moduleSource = moduleLoader.loadText(resolvedSpecifier);
+            JSObject exportsObject = evaluateShadowRealmModule(shadowContext, moduleSource, resolvedSpecifier);
 
             if (!exportsObject.hasOwnProperty(PropertyKey.fromString(exportName))) {
                 rejectWithCallerTypeError(callerContext, promise, "Requested export does not exist");
@@ -303,25 +314,5 @@ public final class ShadowRealmPrototype {
         JSValue errorValue = callerContext.throwTypeError(message, sourceLocation);
         callerContext.clearPendingException();
         promise.reject(errorValue);
-    }
-
-    private static Path resolveModulePath(JSContext callerContext, String specifier) {
-        Path specifierPath = Paths.get(specifier);
-        if (specifierPath.isAbsolute()) {
-            return specifierPath.normalize();
-        }
-
-        JSStackFrame stackFrame = callerContext.getCurrentStackFrame();
-        if (stackFrame != null) {
-            String filename = stackFrame.filename();
-            if (filename != null && !filename.isEmpty() && !filename.startsWith("<")) {
-                Path currentFile = Paths.get(filename);
-                Path parent = currentFile.getParent();
-                if (parent != null) {
-                    return parent.resolve(specifier).normalize();
-                }
-            }
-        }
-        return specifierPath.normalize();
     }
 }

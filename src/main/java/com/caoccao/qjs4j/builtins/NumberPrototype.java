@@ -139,13 +139,12 @@ public final class NumberPrototype {
     }
 
     /**
-     * Number.prototype.toLocaleString() ES2020 20.1.3.4 (simplified)
+     * Number.prototype.toLocaleString() ECMA-402 15.4.1: format through {@code Intl.NumberFormat}, with the default
+     * locale and options when none are given. A call without arguments used to return {@code toString()}, so
+     * {@code (1234567.891).toLocaleString()} had no grouping separators.
      */
     public static JSValue toLocaleString(JSContext context, JSValue thisArg, JSValue[] args) {
         return thisArg.asNumberWithDownCast().map(jsNumber -> {
-            if (args.length == 0) {
-                return new JSString(DtoaConverter.convert(jsNumber.value()));
-            }
             JSValue numberFormatValue = JSIntlObject.createNumberFormat(context, null, args);
             if (context.hasPendingException()) {
                 return JSUndefined.INSTANCE;

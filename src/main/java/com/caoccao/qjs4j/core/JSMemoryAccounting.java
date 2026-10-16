@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <strong>What this bounds.</strong> Every byte the engine allocates for an {@code ArrayBuffer} or
  * {@code SharedArrayBuffer} data block — and therefore for every typed array and {@code DataView} built on one — is
  * reserved here before the allocation happens. A reservation that would exceed
- * {@link JSRuntimeOptions#getMaxMemoryUsage()} is refused and the caller raises a catchable {@code RangeError}, so a
+ * {@link JSRuntimeOptions#getMaxDataBlockBytes()} is refused and the caller raises a catchable {@code RangeError}, so a
  * script cannot walk the JVM heap off a cliff with {@code new ArrayBuffer(n)}. Reservations are released when the
  * buffer is detached or transferred, and otherwise when the buffer becomes unreachable: each reservation is a weak
  * reference to its buffer, and {@link #reserve(Object, long)} drains the collected ones before deciding whether the

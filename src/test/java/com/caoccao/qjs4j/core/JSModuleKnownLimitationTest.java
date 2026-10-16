@@ -60,7 +60,7 @@ public class JSModuleKnownLimitationTest extends BaseTest {
         writeModule("dep-attr.mjs", "export const x = 42;\n");
         Path entry = writeModule("main-attr.mjs",
                 "import { x } from './dep-attr.mjs' with { type: 'javascript' };\n" + "globalThis.result = x;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString())
                     .as("Node refuses the attribute; qjs4j loads the module as JavaScript").isEqualTo("42");
@@ -81,7 +81,7 @@ public class JSModuleKnownLimitationTest extends BaseTest {
     public void testKnownLimitationGeneratedBindingsAreVisibleToDirectEval() throws IOException {
         Path entry = writeModule("main-generated.mjs",
                 "export const x = 1;\n" + "globalThis.probe = eval('typeof __q' + 'js4jModuleExports');\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThat(context.eval("String(globalThis.probe)", "probe.js", false).toString())
                     .as("Node answers \"undefined\": no such binding is in scope in a module").isEqualTo("object");
@@ -103,7 +103,7 @@ public class JSModuleKnownLimitationTest extends BaseTest {
         writeModule("dep-closure.mjs", "export let x = 1;\nexport function inc() { x++; }\n");
         Path entry = writeModule("main-closure.mjs", "import { x, inc } from './dep-closure.mjs';\n"
                 + "globalThis.readX = () => x;\n" + "globalThis.bumpX = inc;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThatThrownBy(() -> context.eval("readX()", "probe.js", false))
                     .as("Node returns 1; qjs4j has already deleted the overlay the closure reads")

@@ -60,6 +60,8 @@ final class FunctionExpressionCompiler extends AstNodeCompiler<FunctionExpressio
         CompilerContext functionContext = functionCompiler.context();
 
         functionContext.sourceCode = compilerContext.sourceCode;
+        functionContext.mayContainDirectEval = compilerContext.mayContainDirectEval && CompilerContext
+                .sourceMayContainDirectEval(compilerContext.extractSourceCode(functionExpression.getLocation()));
         functionContext.nonDeletableGlobalBindings.addAll(compilerContext.nonDeletableGlobalBindings);
         functionContext.privateSymbols = compilerContext.privateSymbols;
         inheritVisibleWithObjectBindings(functionContext);
@@ -356,6 +358,8 @@ final class FunctionExpressionCompiler extends AstNodeCompiler<FunctionExpressio
             int slotIndex = entry[0];
             int paramIndex = entry[1];
             Pattern pattern = params.get(paramIndex);
+            // A frame failing to destructure an argument reports the parameter's position.
+            functionContext.emitter.emitSourcePosition(pattern.getLocation());
             // Push the argument value onto the stack
             functionContext.emitter.emitOpcodeU16(Opcode.GET_LOC, slotIndex);
             // Destructure and assign to local variables
@@ -405,6 +409,7 @@ final class FunctionExpressionCompiler extends AstNodeCompiler<FunctionExpressio
         CompilerContext wrapperContext = wrapperCompiler.context();
 
         wrapperContext.sourceCode = compilerContext.sourceCode;
+        wrapperContext.mayContainDirectEval = compilerContext.mayContainDirectEval;
         wrapperContext.nonDeletableGlobalBindings.addAll(compilerContext.nonDeletableGlobalBindings);
         wrapperContext.privateSymbols = compilerContext.privateSymbols;
         inheritVisibleWithObjectBindings(wrapperContext);

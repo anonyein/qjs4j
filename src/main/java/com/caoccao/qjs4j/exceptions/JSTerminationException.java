@@ -47,6 +47,18 @@ public final class JSTerminationException extends Error {
     }
 
     /**
+     * Create a termination signal for an engine defect, keeping the Java exception that revealed it.
+     *
+     * @param message
+     *            where the defect surfaced
+     * @param cause
+     *            the escaping Java exception, with its own stack trace
+     */
+    public JSTerminationException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    /**
      * Termination carries no Java stack: it is a control signal, not a defect report, and it is raised on the
      * interpreter's hottest paths.
      *

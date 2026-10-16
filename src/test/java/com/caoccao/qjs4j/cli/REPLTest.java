@@ -16,6 +16,7 @@
 
 package com.caoccao.qjs4j.cli;
 
+import com.caoccao.qjs4j.core.JSRuntime;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -41,6 +42,21 @@ public class REPLTest {
             repl.run();
         }
         return new Output(out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void testAnInterruptedEvaluationIsReportedAndTheLoopContinues() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        try (PrintStream outStream = new PrintStream(out, true, StandardCharsets.UTF_8);
+                PrintStream errStream = new PrintStream(err, true, StandardCharsets.UTF_8);
+                REPL repl = new REPL(new ByteArrayInputStream("1 + 1\n6 * 7\nexit\n".getBytes(StandardCharsets.UTF_8)),
+                        outStream, errStream, JSRuntime::requestInterrupt)) {
+            repl.run();
+        }
+        // The first line meets the pending interrupt; the loop reports it, clears it, and evaluates the next.
+        assertThat(err.toString(StandardCharsets.UTF_8)).contains("Error: execution interrupted");
+        assertThat(out.toString(StandardCharsets.UTF_8)).contains("42");
     }
 
     @Test

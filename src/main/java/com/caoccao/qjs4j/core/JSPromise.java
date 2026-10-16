@@ -25,13 +25,23 @@ import java.util.List;
 /**
  * Represents a JavaScript Promise object. Based on ES2020 Promise specification (simplified). Promises represent the
  * eventual result of an asynchronous operation.
+ * <p>
+ * A promise is confined to its context's thread, like the rest of the engine, so its state needs no lock. It used to
+ * lock on every operation because {@code Atomics.waitAsync} settled its promise from a helper thread; that thread now
+ * enqueues a job that settles it on the context's thread (EnqueueResolveInAgentJob), and enqueueing a microtask is the
+ * one cross-thread operation the engine supports.
  */
 public final class JSPromise extends JSObject {
     public static final String NAME = "Promise";
     private final List<ReactionRecord> fulfillReactions;
+    /**
+     * {@code [[PromiseIsHandled]]}: whether a handler has ever been attached, which decides whether a rejection is
+     * reported to the host as unhandled.
+     */
+    private boolean handled;
     private final List<ReactionRecord> rejectReactions;
-    private volatile JSValue result;
-    private volatile PromiseState state;
+    private JSValue result;
+    private PromiseState state;
 
     /**
      * Create a new Promise in pending state.
@@ -41,6 +51,7 @@ public final class JSPromise extends JSObject {
         this.state = PromiseState.PENDING;
         this.result = JSUndefined.INSTANCE;
         this.fulfillReactions = new ArrayList<>();
+        this.handled = false;
         this.rejectReactions = new ArrayList<>();
     }
 
@@ -48,27 +59,21 @@ public final class JSPromise extends JSObject {
      * Add reactions to be called when promise is fulfilled or rejected.
      */
     public void addReactions(ReactionRecord onFulfill, ReactionRecord onReject) {
-        PromiseState settledState;
-        JSValue settledResult;
-        synchronized (this) {
-            if (state == PromiseState.PENDING) {
-                if (onFulfill != null) {
-                    fulfillReactions.add(onFulfill);
-                }
-                if (onReject != null) {
-                    rejectReactions.add(onReject);
-                }
-                return;
+        // PerformPromiseThen: attaching reactions is what handles a rejection.
+        markHandled();
+        if (state == PromiseState.PENDING) {
+            if (onFulfill != null) {
+                fulfillReactions.add(onFulfill);
             }
-            settledState = state;
-            settledResult = result;
-        }
-        if (settledState == PromiseState.FULFILLED && onFulfill != null) {
+            if (onReject != null) {
+                rejectReactions.add(onReject);
+            }
+        } else if (state == PromiseState.FULFILLED && onFulfill != null) {
             // Already fulfilled, trigger immediately
-            triggerReaction(onFulfill, settledResult);
-        } else if (settledState == PromiseState.REJECTED && onReject != null) {
+            triggerReaction(onFulfill, result);
+        } else if (state == PromiseState.REJECTED && onReject != null) {
             // Already rejected, trigger immediately
-            triggerReaction(onReject, settledResult);
+            triggerReaction(onReject, result);
         }
     }
 
@@ -76,17 +81,14 @@ public final class JSPromise extends JSObject {
      * Fulfill the promise with a value. ES2020 25.6.1.4
      */
     public void fulfill(JSValue value) {
-        List<ReactionRecord> reactionsToTrigger;
-        synchronized (this) {
-            if (state != PromiseState.PENDING) {
-                return; // Promise already settled
-            }
-            state = PromiseState.FULFILLED;
-            result = value;
-            reactionsToTrigger = new ArrayList<>(fulfillReactions);
-            fulfillReactions.clear();
-            rejectReactions.clear();
+        if (state != PromiseState.PENDING) {
+            return; // Promise already settled
         }
+        state = PromiseState.FULFILLED;
+        result = value;
+        List<ReactionRecord> reactionsToTrigger = new ArrayList<>(fulfillReactions);
+        fulfillReactions.clear();
+        rejectReactions.clear();
 
         // Trigger all fulfill reactions
         for (ReactionRecord reaction : reactionsToTrigger) {
@@ -109,19 +111,48 @@ public final class JSPromise extends JSObject {
     }
 
     /**
+     * Whether a handler has been attached to this promise, or its result otherwise consumed:
+     * {@code [[PromiseIsHandled]]}.
+     *
+     * @return true when a rejection of this promise is handled
+     */
+    public boolean isHandled() {
+        return handled;
+    }
+
+    /**
+     * Record that this promise's rejection is handled: the {@code [[PromiseIsHandled]]} step of PerformPromiseThen,
+     * also taken by any engine path that consumes a settled promise's result without attaching a reaction, such as an
+     * {@code await} that finds the promise already settled.
+     * <p>
+     * A promise that was already rejected with no handler was reported to the host as
+     * {@link PromiseRejectEvent#PromiseRejectWithNoHandler}; it is now reported as
+     * {@link PromiseRejectEvent#PromiseHandlerAddedAfterReject} (HostPromiseRejectionTracker with {@code "handle"}).
+     */
+    public void markHandled() {
+        boolean handlerAddedAfterReject = state == PromiseState.REJECTED && !handled;
+        handled = true;
+        if (handlerAddedAfterReject) {
+            trackRejection(PromiseRejectEvent.PromiseHandlerAddedAfterReject);
+        }
+    }
+
+    /**
      * Reject the promise with a reason. ES2020 25.6.1.7
      */
     public void reject(JSValue reason) {
-        List<ReactionRecord> reactionsToTrigger;
-        synchronized (this) {
-            if (state != PromiseState.PENDING) {
-                return; // Promise already settled
-            }
-            state = PromiseState.REJECTED;
-            result = reason;
-            reactionsToTrigger = new ArrayList<>(rejectReactions);
-            fulfillReactions.clear();
-            rejectReactions.clear();
+        if (state != PromiseState.PENDING) {
+            return; // Promise already settled
+        }
+        state = PromiseState.REJECTED;
+        result = reason;
+        List<ReactionRecord> reactionsToTrigger = new ArrayList<>(rejectReactions);
+        fulfillReactions.clear();
+        rejectReactions.clear();
+        boolean rejectedWithNoHandler = !handled;
+        // RejectPromise step 7: HostPromiseRejectionTracker(promise, "reject") when nothing handles it yet.
+        if (rejectedWithNoHandler) {
+            trackRejection(PromiseRejectEvent.PromiseRejectWithNoHandler);
         }
 
         // Trigger all reject reactions
@@ -241,6 +272,19 @@ public final class JSPromise extends JSObject {
     @Override
     public String toString() {
         return "[object Promise]";
+    }
+
+    /**
+     * HostPromiseRejectionTracker: report a rejection event to the host's promise reject callback, if one is installed.
+     * <p>
+     * The callback used to be invoked only when an {@code await} found a rejected promise — which is exactly the case
+     * where a handler exists — and never for a rejection that nothing handled.
+     */
+    private void trackRejection(PromiseRejectEvent event) {
+        IJSPromiseRejectCallback callback = context.getPromiseRejectCallback();
+        if (callback != null) {
+            callback.callback(event, this, result);
+        }
     }
 
     /**

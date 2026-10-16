@@ -21,9 +21,7 @@ import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -224,7 +222,7 @@ final class ModuleLoader {
                 if (childRecord != null && childRecord.rawSource() != null && !childRecord.rawSource().isEmpty()) {
                     childSourceCode = childRecord.rawSource();
                 } else {
-                    childSourceCode = Files.readString(Path.of(resolvedChildSpecifier));
+                    childSourceCode = readModuleText(resolvedChildSpecifier);
                 }
             } catch (IOException ioException) {
                 throw new JSException(context.throwTypeError("Cannot find module '" + childSpecifier + "'"));
@@ -401,7 +399,7 @@ final class ModuleLoader {
                     // meant a text file whose bytes happened to look like a declaration was
                     // tokenised and compiled as JavaScript, so `export {}; this is arbitrary text`
                     // was a SyntaxError instead of a string.
-                    String sourceCode = Files.readString(Path.of(resolvedSpecifier));
+                    String sourceCode = readModuleText(resolvedSpecifier);
                     moduleRecord.setRawSource(sourceCode);
                     context.importBindingInstaller().defineDynamicImportNamespaceValue(moduleRecord, "default",
                             new JSString(sourceCode));
@@ -413,7 +411,7 @@ final class ModuleLoader {
                 }
                 // Handle type: 'bytes' import attribute
                 if ("bytes".equals(importType)) {
-                    byte[] fileBytes = Files.readAllBytes(Path.of(resolvedSpecifier));
+                    byte[] fileBytes = readModuleBytes(resolvedSpecifier);
                     moduleRecord.setRawSource("");
                     JSArrayBuffer arrayBuffer = new JSArrayBuffer(context, fileBytes);
                     context.transferPrototype(arrayBuffer, JSArrayBuffer.NAME);
@@ -427,7 +425,7 @@ final class ModuleLoader {
                     moduleRecord.setStatus(JSDynamicImportModule.Status.EVALUATED);
                     return moduleRecord.namespace();
                 }
-                String sourceCode = Files.readString(Path.of(resolvedSpecifier));
+                String sourceCode = readModuleText(resolvedSpecifier);
                 moduleRecord.setRawSource(transformer.normalizeModuleDeclarationLines(sourceCode));
                 if (resolvedSpecifier.endsWith(".json")) {
                     if (!"json".equals(importType)) {
@@ -623,7 +621,7 @@ final class ModuleLoader {
             // Handle type: 'text' import attribute
             if ("text".equals(importType)) {
                 // Data, not source — see the deferred path above.
-                String sourceCode = Files.readString(Path.of(resolvedSpecifier));
+                String sourceCode = readModuleText(resolvedSpecifier);
                 moduleRecord.setRawSource(sourceCode);
                 context.importBindingInstaller().defineDynamicImportNamespaceValue(moduleRecord, "default",
                         new JSString(sourceCode));
@@ -635,7 +633,7 @@ final class ModuleLoader {
             }
             // Handle type: 'bytes' import attribute
             if ("bytes".equals(importType)) {
-                byte[] fileBytes = Files.readAllBytes(Path.of(resolvedSpecifier));
+                byte[] fileBytes = readModuleBytes(resolvedSpecifier);
                 moduleRecord.setRawSource("");
                 JSArrayBuffer arrayBuffer = new JSArrayBuffer(context, fileBytes);
                 context.transferPrototype(arrayBuffer, JSArrayBuffer.NAME);
@@ -648,7 +646,7 @@ final class ModuleLoader {
                 moduleRecord.setStatus(JSDynamicImportModule.Status.EVALUATED);
                 return moduleRecord;
             }
-            String sourceCode = Files.readString(Path.of(resolvedSpecifier));
+            String sourceCode = readModuleText(resolvedSpecifier);
             moduleRecord.setRawSource(transformer.normalizeModuleDeclarationLines(sourceCode));
             if (resolvedSpecifier.endsWith(".json")) {
                 if (!"json".equals(importType)) {
@@ -866,6 +864,32 @@ final class ModuleLoader {
     }
 
     /**
+     * Read a module's payload through the host's module loader.
+     *
+     * @param resolvedSpecifier
+     *            the module's key
+     * @return the payload's bytes
+     * @throws IOException
+     *             when the module cannot be read, or no loader is installed
+     */
+    byte[] readModuleBytes(String resolvedSpecifier) throws IOException {
+        return requireHostModuleLoader().load(resolvedSpecifier);
+    }
+
+    /**
+     * Read a module's payload as UTF-8 text through the host's module loader.
+     *
+     * @param resolvedSpecifier
+     *            the module's key
+     * @return the payload's text
+     * @throws IOException
+     *             when the module cannot be read, or no loader is installed
+     */
+    String readModuleText(String resolvedSpecifier) throws IOException {
+        return requireHostModuleLoader().loadText(resolvedSpecifier);
+    }
+
+    /**
      * Implements ReadyForSyncExecution(_module_, _seen_) from the import-defer spec. Returns true if the module and all
      * its transitive dependencies can be evaluated synchronously.
      */
@@ -890,7 +914,7 @@ final class ModuleLoader {
             sourceCode = record.rawSource();
         } else {
             try {
-                sourceCode = Files.readString(Path.of(resolvedSpecifier));
+                sourceCode = readModuleText(resolvedSpecifier);
             } catch (IOException ioException) {
                 return true;
             }
@@ -998,28 +1022,38 @@ final class ModuleLoader {
         dynamicImportModuleCache.remove(moduleCacheKey);
     }
 
-    String resolveDynamicImportSpecifier(String specifier, String referrerFilename, String errorSpecifier) {
-        final Path rawSpecifierPath;
-        try {
-            rawSpecifierPath = Paths.get(specifier);
-        } catch (InvalidPathException invalidPathException) {
-            throw new JSException(context.throwTypeError("Cannot find module '" + errorSpecifier + "'"));
+    private IJSModuleLoader requireHostModuleLoader() throws IOException {
+        IJSModuleLoader moduleLoader = context.getRuntime().getOptions().getModuleLoader();
+        if (moduleLoader == null) {
+            throw new IOException("No module loader is installed");
         }
+        return moduleLoader;
+    }
 
-        Path resolvedPath = rawSpecifierPath;
-        if (!resolvedPath.isAbsolute() && referrerFilename != null && !referrerFilename.isEmpty()
-                && !referrerFilename.startsWith("<")) {
-            Path referrerPath = Paths.get(referrerFilename);
-            Path parentPath = referrerPath.getParent();
-            if (parentPath != null) {
-                resolvedPath = parentPath.resolve(resolvedPath);
-            }
-        }
-        resolvedPath = resolvedPath.normalize();
-        if (!Files.exists(resolvedPath)) {
+    /**
+     * Resolve a specifier to a module key through the host's module loader.
+     * <p>
+     * The engine used to resolve every specifier to a path and read it with {@code java.nio.file.Files}, so any script
+     * could read any file the process could — {@code import('/etc/hosts', { with: { type: 'text' } })} returned its
+     * contents — and the embedder had no way to intercept or refuse it.
+     *
+     * @param specifier
+     *            the specifier as written
+     * @param referrerFilename
+     *            the importing module's key or file name, or null
+     * @param errorSpecifier
+     *            the specifier to name in the error
+     * @return the module's key
+     * @throws JSException
+     *             a {@code TypeError} when the module cannot be found, or no loader is installed
+     */
+    String resolveDynamicImportSpecifier(String specifier, String referrerFilename, String errorSpecifier) {
+        IJSModuleLoader moduleLoader = context.getRuntime().getOptions().getModuleLoader();
+        String resolvedSpecifier = moduleLoader != null ? moduleLoader.resolve(specifier, referrerFilename) : null;
+        if (resolvedSpecifier == null) {
             throw new JSException(context.throwTypeError("Cannot find module '" + errorSpecifier + "'"));
         }
-        return resolvedPath.toString();
+        return resolvedSpecifier;
     }
 
     void triggerPendingDependents(JSDynamicImportModule moduleRecord) {

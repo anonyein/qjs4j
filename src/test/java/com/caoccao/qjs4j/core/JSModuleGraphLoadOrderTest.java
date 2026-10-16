@@ -66,7 +66,7 @@ public class JSModuleGraphLoadOrderTest extends BaseTest {
             String expectedMessagePart) throws IOException {
         writeModule("side-effect.mjs", "globalThis.dependencyBodyRan = true;\nexport const ok = 1;\n");
         Path entry = writeModule(entryName, entrySource);
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             JSException failure = catchThrowableOfType(JSException.class,
                     () -> context.eval(entrySource, entry.toString(), true));
             assertThat(failure).as("the graph must fail").isNotNull();
@@ -221,7 +221,7 @@ public class JSModuleGraphLoadOrderTest extends BaseTest {
                 "import './side-effect.mjs';\n" + "import text from './payload-ok.txt' with { type: 'text' };\n"
                         + "import data from './payload-ok.json' with { type: 'json' };\n"
                         + "globalThis.result = text + ':' + data.a;\n");
-        try (JSRuntime runtime = new JSRuntime(); JSContext context = runtime.createContext()) {
+        try (JSRuntime runtime = createRuntime(); JSContext context = runtime.createContext()) {
             context.eval(Files.readString(entry), entry.toString(), true);
             assertThat(context.eval("String(globalThis.result)", "probe.js", false).toString()).isEqualTo("payload:1");
             assertThat(context.eval("String(globalThis.dependencyBodyRan)", "probe.js", false).toString())

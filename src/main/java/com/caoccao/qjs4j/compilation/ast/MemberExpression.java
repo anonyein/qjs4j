@@ -23,6 +23,7 @@ public final class MemberExpression extends Expression {
     private final boolean computed;
     private final Expression object;
     private final boolean optional;
+    private final boolean optionalChainInside;
     private final boolean partOfOptionalChain;
     private final Expression property;
 
@@ -34,6 +35,9 @@ public final class MemberExpression extends Expression {
         this.computed = computed;
         this.optional = optional;
         this.partOfOptionalChain = partOfOptionalChain;
+        // Computed once from the object's own answer, so asking costs O(1) rather than a walk down the
+        // chain: the parser asks for every link it adds, which made a long member chain quadratic.
+        this.optionalChainInside = optional || object.containsOptionalChain();
     }
 
     public MemberExpression(Expression object, Expression property, boolean computed, boolean optional,
@@ -51,6 +55,11 @@ public final class MemberExpression extends Expression {
             }
         }
         return awaitInside;
+    }
+
+    @Override
+    public boolean containsOptionalChain() {
+        return optionalChainInside;
     }
 
     @Override

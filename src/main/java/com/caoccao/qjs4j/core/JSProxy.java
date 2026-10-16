@@ -651,9 +651,8 @@ public final class JSProxy extends JSObject {
 
                 // Step 22: If uncheckedResultKeys is not empty, throw TypeError
                 if (!uncheckedResultKeys.isEmpty()) {
-                    PropertyKey extraKey = uncheckedResultKeys.iterator().next();
                     executionContext.throwTypeError(
-                            "'ownKeys' on proxy: trap returned extra key '" + extraKey.toPropertyString() + "'");
+                            "'ownKeys' on proxy: trap returned extra keys but proxy target is non-extensible");
                     return new ArrayList<>();
                 }
             }

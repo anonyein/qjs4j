@@ -30,7 +30,12 @@ qjs4j includes features not present in the original QuickJS:
 - **Float16Array**: IEEE 754 half-precision (16-bit) floating point typed array support
 - **ES2024 Features**: Promise.withResolvers, Object.groupBy, Map.groupBy
 - **ShadowRealm (runtime-gated)**: Proposal feature support for test262 compatibility, enabled via `JSRuntimeOptions.setShadowRealmEnabled(true)`
-- **Module System**: ES6 modules with dynamic `import()` — see the limitation below
+- **Module System**: ES6 modules with dynamic `import()` — see the limitation below. Modules are
+  located and read only through the host hook `JSRuntimeOptions.setModuleLoader(IJSModuleLoader)`;
+  a runtime without a loader loads no module, so scripts get no file-system access by default.
+  `JSFileSystemModuleLoader` loads from disk, and `new JSFileSystemModuleLoader(root)` refuses
+  anything whose real path is outside `root`. The command-line interpreter installs an unrestricted
+  file-system loader.
 - **Microtask Queue**: Full ES2020-compliant microtask infrastructure
 - **Internationalization (Intl)**: `Collator`, `DateTimeFormat`, `DisplayNames`, `DurationFormat`,
   `ListFormat`, `Locale`, `NumberFormat`, `PluralRules`, `RelativeTimeFormat`, `Segmenter`
@@ -58,10 +63,25 @@ qjs4j includes features not present in the original QuickJS:
   evaluation: a graph that names a module it cannot load, or a name nothing exports, fails before
   any module body runs.
 - **Resource limits bound data blocks, not the heap.**
-  `JSRuntimeOptions.setMaxMemoryUsage(long)` counts every byte allocated for an `ArrayBuffer` or
-  `SharedArrayBuffer` and refuses an allocation past the ceiling with a catchable `RangeError`.
+  `JSRuntimeOptions.setMaxDataBlockBytes(long)` (formerly `setMaxMemoryUsage`, now deprecated)
+  counts every byte allocated for an `ArrayBuffer` or `SharedArrayBuffer` and refuses an allocation
+  past the ceiling with a catchable `RangeError`. The default ceiling is 64 MiB, and a single data
+  block is one Java `byte[]`, so no buffer or typed array exceeds `Integer.MAX_VALUE - 8` bytes even
+  with the ceiling disabled; V8 allocates `new ArrayBuffer(2 ** 31)`, qjs4j refuses it.
   Objects, arrays, strings and bytecode are ordinary Java allocations bounded by `-Xmx`.
-  `setMaxStackSize(long)` bounds the interpreter's call depth, not the JVM's own stack.
+  `setMaxCallDepth(int)` bounds the interpreter's call depth — 10,000 frames by default, about V8's — not
+  the JVM's own stack. Each frame also occupies Java stack (about 1.4 KiB for a plain call), so the full
+  default depth needs a thread of about 16 MiB; on a smaller stack the JVM runs out first, which is also
+  reported as a catchable `RangeError`. The command-line interpreter runs scripts on a 256 MiB thread.
+- **Host APIs are not part of the engine.** `setTimeout`, `queueMicrotask`, `structuredClone`,
+  `TextEncoder`, `URL` and the like are host functions, not ECMAScript, and an embedder provides the
+  ones it wants. The command-line interpreter adds `queueMicrotask`, `setTimeout`, `setInterval`,
+  `clearTimeout` and `clearInterval` with Node's ordering, and runs timers until none is left.
+- **Strings are at most 2<sup>27</sup> − 1 code units** (`JSString.MAX_LENGTH`, 134 million), a
+  quarter of V8's 2<sup>29</sup> − 24; longer results raise `RangeError: Invalid string length`. A
+  string at V8's limit is over a gigabyte of `char` data on the Java heap, and building one needs
+  about twice that, so on an ordinary heap the JVM would run out of memory first — the failure the
+  limit exists to turn into a catchable error.
 - **`WeakMap`/`WeakSet` are ephemeron-correct but not enumerable**, as the specification requires;
   a collection that dies while its keys live leaves entries to be pruned lazily.
 

@@ -50,11 +50,15 @@ public final class JSURIError extends JSError {
             }
         }
         JSURIError jsURIError = context.createJSURIError(message);
+        if (args.length > 0 && !args[0].isUndefined()) {
+            JSError.defineEmptyMessage(jsURIError, message);
+        }
         if (args.length > 1) {
             if (!JSError.installErrorCause(context, jsURIError, args[1])) {
                 return JSUndefined.INSTANCE;
             }
         }
+        JSError.captureStackTraceBelowNewTarget(context, jsURIError);
         return jsURIError;
     }
 

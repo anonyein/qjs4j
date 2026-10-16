@@ -16,6 +16,7 @@
 
 package com.caoccao.qjs4j.compilation.compiler;
 
+import com.caoccao.qjs4j.compilation.ast.Expression;
 import com.caoccao.qjs4j.compilation.ast.SourceLocation;
 import com.caoccao.qjs4j.core.JSContext;
 import com.caoccao.qjs4j.core.JSSymbol;
@@ -89,6 +90,12 @@ final class CompilerContext {
     LabeledStatementCompiler labeledStatementCompiler;
     LiteralCompiler literalCompiler;
     final LoopManager loopManager;
+    /**
+     * Whether the code being compiled may contain a sloppy direct {@code eval}, which can declare a binding that
+     * shadows an assignment target while the right-hand side runs; such code keeps reference semantics for assignments.
+     * A textual over-approximation: any {@code eval}, or any backslash-u escape that could spell one.
+     */
+    boolean mayContainDirectEval;
     MemberExpressionCompiler memberExpressionCompiler;
     MemberExpressionDestructuringAssignmentCompiler memberExpressionDestructuringAssignmentCompiler;
     NewExpressionCompiler newExpressionCompiler;
@@ -97,6 +104,18 @@ final class CompilerContext {
     ObjectExpressionCompiler objectExpressionCompiler;
     ObjectExpressionDestructuringAssignmentCompiler objectExpressionDestructuringAssignmentCompiler;
     ObjectPatternCompiler objectPatternCompiler;
+    /**
+     * The jumps to the end of the optional chain being compiled, or null outside one: QuickJS's
+     * {@code optional_chaining_label}. Every {@code ?.} that finds a nullish value jumps there with {@code undefined}
+     * as the value of the whole chain.
+     */
+    List<Integer> optionalChainJumps;
+    /**
+     * The member or call expression about to be compiled as the next link of the optional chain being compiled, or
+     * null. Only that exact node joins the chain; any other optional chain met while it is set — in an argument, a
+     * computed key — starts a chain of its own.
+     */
+    Expression optionalChainLink;
     /**
      * The named-function-expression bindings the code being compiled resolves through enclosing parameter environments.
      * Never null; empty when there are none.
@@ -136,6 +155,11 @@ final class CompilerContext {
     final Set<String> tdzLocals;
     TemplateLiteralCompiler templateLiteralCompiler;
     ThrowStatementCompiler throwStatementCompiler;
+    /**
+     * How many try blocks enclose the code being compiled. A call in a try block is not in tail position (ES2024
+     * 15.10.2 HasCallInTailPosition): its frame must survive for the catch handler to run.
+     */
+    int tryBlockDepth;
     TryStatementCompiler tryStatementCompiler;
     UnaryExpressionCompiler unaryExpressionCompiler;
     boolean useExistingBindingInParentScopes;
@@ -167,6 +191,8 @@ final class CompilerContext {
         this.isLastInProgram = false;
         this.loopManager = new LoopManager();
         this.nonDeletableGlobalBindings = new HashSet<>();
+        this.optionalChainJumps = null;
+        this.optionalChainLink = null;
         this.preResolvedBindingReferences = new HashMap<>();
         this.predeclareProgramLexicalsAsLocals = false;
         this.privateSymbols = Map.of();
@@ -174,6 +200,7 @@ final class CompilerContext {
         this.stateStack = new ArrayDeque<>();
         this.strictMode = inheritedStrictMode;
         this.tdzLocals = new HashSet<>();
+        this.mayContainDirectEval = true;
         this.varDeclarationScopeOverride = null;
         this.varInGlobalProgram = false;
         this.withObjectManager = new WithObjectManager();
@@ -268,6 +295,17 @@ final class CompilerContext {
     void pushState() {
         stateStack.push(new CompilerStateFrame(strictMode, inGlobalScope, inClassBody, inClassFieldInitializer,
                 emitTailCalls, varInGlobalProgram, privateSymbols, inferredClassName));
+    }
+
+    /**
+     * Whether source text may contain a direct {@code eval}; null text, being unknown, may.
+     *
+     * @param text
+     *            the source text, or null
+     * @return false only when the text certainly contains no direct eval
+     */
+    static boolean sourceMayContainDirectEval(String text) {
+        return text == null || text.contains("eval") || text.contains("\\u");
     }
 
     record PreResolvedReference(int objectLocalIndex, int propertyLocalIndex) {

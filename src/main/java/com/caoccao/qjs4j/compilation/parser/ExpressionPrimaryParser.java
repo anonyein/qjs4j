@@ -42,14 +42,14 @@ final class ExpressionPrimaryParser {
     private CallExpression createCallExpression(Expression callee, List<Expression> arguments, boolean optional,
             SourceLocation location) {
         boolean partOfOptionalChain = optional
-                || (isOptionalChainExpression(callee) && !parserContext.isParenthesizedExpression(callee));
+                || (callee.isPartOfOptionalChain() && !parserContext.isParenthesizedExpression(callee));
         return new CallExpression(callee, arguments, optional, partOfOptionalChain, location);
     }
 
     private MemberExpression createMemberExpression(Expression object, Expression property, boolean computed,
             boolean optional, SourceLocation location) {
         boolean partOfOptionalChain = optional
-                || (isOptionalChainExpression(object) && !parserContext.isParenthesizedExpression(object));
+                || (object.isPartOfOptionalChain() && !parserContext.isParenthesizedExpression(object));
         return new MemberExpression(object, property, computed, optional, partOfOptionalChain, location);
     }
 
@@ -58,7 +58,8 @@ final class ExpressionPrimaryParser {
 
         while (true) {
             if (parserContext.match(TokenType.TEMPLATE)) {
-                if (isOptionalChainExpression(expr)) {
+                // Parentheses end an optional chain, so `(a?.b)`x`` is an ordinary tagged template.
+                if (expr.isPartOfOptionalChain() && !parserContext.isParenthesizedExpression(expr)) {
                     throw new JSSyntaxErrorException("Invalid tagged template on optional chain");
                 }
                 SourceLocation location = parserContext.getLocation();
@@ -198,15 +199,15 @@ final class ExpressionPrimaryParser {
                     Expression property = parseMemberPropertyName();
                     callee = createMemberExpression(callee, property, false, false, memberLocation);
                 } else if (parserContext.match(TokenType.LBRACKET)) {
-                    parserContext.advance();
+                    // A computed member is located at its `[`, as in the call loop and as V8 reports it.
                     SourceLocation memberLocation = parserContext.getLocation();
+                    parserContext.advance();
                     Expression property = expressions.parseExpression();
                     parserContext.expect(TokenType.RBRACKET);
                     callee = createMemberExpression(callee, property, true, false, memberLocation);
                 } else if (parserContext.match(TokenType.TEMPLATE)) {
-                    if (isOptionalChainExpression(callee)) {
-                        throw new JSSyntaxErrorException("Invalid tagged template on optional chain");
-                    }
+                    // No optional chain can reach here: `new a?.b` is rejected, and a parenthesized
+                    // chain such as `new (a?.b)`x`` is an ordinary tag.
                     SourceLocation templateLocation = parserContext.getLocation();
                     TemplateLiteral template = delegates.literals.parseTemplateLiteral(true);
                     callee = new TaggedTemplateExpression(callee, template, templateLocation);
@@ -255,8 +256,9 @@ final class ExpressionPrimaryParser {
                 expr = createMemberExpression(expr, property, false, false, memberLocation);
             } else if (parserContext.match(TokenType.LBRACKET)) {
                 validateNoCoverInitializedName(expr);
-                parserContext.advance();
+                // A computed member is located at its `[`, as in the call loop and as V8 reports it.
                 SourceLocation memberLocation = parserContext.getLocation();
+                parserContext.advance();
                 Expression property = expressions.parseExpression();
                 parserContext.expect(TokenType.RBRACKET);
                 expr = createMemberExpression(expr, property, true, false, memberLocation);
@@ -317,7 +319,7 @@ final class ExpressionPrimaryParser {
             if (parserContext.strictMode && expr instanceof CallExpression) {
                 throw new JSSyntaxErrorException("Invalid left-hand side expression in postfix operation");
             }
-            if (isOptionalChainExpression(expr)) {
+            if (expr.containsOptionalChain()) {
                 throw new JSSyntaxErrorException("Invalid left-hand side expression in postfix operation");
             }
             UnaryOperator op = parserContext.match(TokenType.INC) ? UnaryOperator.INC : UnaryOperator.DEC;
@@ -332,7 +334,7 @@ final class ExpressionPrimaryParser {
     Expression parsePostPrimaryExpression(Expression expr, SourceLocation location) {
         while (true) {
             if (parserContext.match(TokenType.TEMPLATE)) {
-                if (isOptionalChainExpression(expr)) {
+                if (expr.isPartOfOptionalChain()) {
                     throw new JSSyntaxErrorException("Invalid tagged template on optional chain");
                 }
                 SourceLocation loc = parserContext.getLocation();
@@ -546,8 +548,9 @@ final class ExpressionPrimaryParser {
                 if (!parserContext.isPrivateNameAccessible(fieldName)) {
                     throw new JSSyntaxErrorException("undefined private field '#" + fieldName + "'");
                 }
-                parserContext.advance();
-                yield new PrivateIdentifier(fieldName, location);
+                // A private name begins an expression only as the left operand of `in`, which the relational parser
+                // takes before it gets here: `(#x in o)` is a brand check, `(#x) in o` and `#x + 1` are errors.
+                throw new JSSyntaxErrorException("Unexpected identifier '" + name + "'");
             }
             case THIS -> {
                 parserContext.advance();
@@ -558,6 +561,9 @@ final class ExpressionPrimaryParser {
 
                 if (parserContext.match(TokenType.RPAREN)) {
                     parserContext.advance();
+                    // `()` is only an arrow function's empty parameter list; as an expression it is an error. It
+                    // used to evaluate to an empty array.
+                    requireArrowAfterCoverParameters("Unexpected token ')'");
                     yield new ArrayExpression(new ArrayList<>(), location);
                 }
 
@@ -574,6 +580,7 @@ final class ExpressionPrimaryParser {
                             restArg = parserContext.parseIdentifier();
                         }
                         parserContext.expect(TokenType.RPAREN);
+                        requireArrowAfterCoverParameters("Unexpected token '...'");
                         yield new ArrayExpression(List.of(new SpreadElement(restArg, restLocation)), location);
                     }
 
@@ -586,6 +593,8 @@ final class ExpressionPrimaryParser {
                             // Single expression in parens
                             parserContext.inOperatorAllowed = savedIn;
                             parserContext.expect(TokenType.RPAREN);
+                            // An expression that starts with an identifier is never itself parenthesized, so
+                            // ((a)) => 1 is caught below, where the inner parentheses are parsed.
                             parserContext.markParenthesizedExpression(firstExpr);
                             yield firstExpr;
                         }
@@ -593,12 +602,14 @@ final class ExpressionPrimaryParser {
                         // Multiple expressions - may contain rest element for arrow params
                         List<Expression> elements = new ArrayList<>();
                         elements.add(firstExpr);
+                        boolean trailingComma = false;
 
                         while (parserContext.match(TokenType.COMMA)) {
                             parserContext.advance();
 
                             if (parserContext.match(TokenType.RPAREN)) {
                                 // Trailing comma
+                                trailingComma = true;
                                 break;
                             }
 
@@ -624,12 +635,18 @@ final class ExpressionPrimaryParser {
                         parserContext.inOperatorAllowed = savedIn;
                         parserContext.expect(TokenType.RPAREN);
 
+                        // A rest element or a trailing comma makes this an arrow parameter list and nothing else.
+                        boolean hasSpread = elements.get(elements.size() - 1) instanceof SpreadElement;
+                        if (hasSpread) {
+                            requireArrowAfterCoverParameters("Unexpected token '...'");
+                        } else if (trailingComma) {
+                            requireArrowAfterCoverParameters("Unexpected token ')'");
+                        }
+
                         if (elements.size() == 1) {
                             yield elements.get(0);
                         }
 
-                        // If there's a SpreadElement, this is arrow params → use ArrayExpression
-                        boolean hasSpread = elements.get(elements.size() - 1) instanceof SpreadElement;
                         if (hasSpread) {
                             yield new ArrayExpression(elements, location);
                         }
@@ -643,6 +660,10 @@ final class ExpressionPrimaryParser {
                     Expression expr = expressions.parseExpression();
                     parserContext.inOperatorAllowed = savedIn;
                     parserContext.expect(TokenType.RPAREN);
+                    if (parserContext.isParenthesizedExpression(expr) && parserContext.match(TokenType.ARROW)) {
+                        // ((a)) => 1: a parameter cannot be parenthesized.
+                        throw new JSSyntaxErrorException("Invalid destructuring assignment target");
+                    }
                     parserContext.markParenthesizedExpression(expr);
                     yield expr;
                 }
@@ -932,7 +953,7 @@ final class ExpressionPrimaryParser {
             if (parserContext.strictMode && operand instanceof CallExpression) {
                 throw new JSSyntaxErrorException("Invalid left-hand side expression in prefix operation");
             }
-            if (isOptionalChainExpression(operand)) {
+            if (operand.containsOptionalChain()) {
                 throw new JSSyntaxErrorException("Invalid left-hand side expression in prefix operation");
             }
             return new UnaryExpression(op, operand, true, location);
@@ -973,14 +994,20 @@ final class ExpressionPrimaryParser {
         return parsePostfixExpression();
     }
 
-    private static boolean isOptionalChainExpression(Expression expression) {
-        if (expression instanceof MemberExpression memberExpression) {
-            return memberExpression.isOptional() || isOptionalChainExpression(memberExpression.getObject());
+    /**
+     * The parenthesized form just read can only be an arrow function's parameter list, so {@code =>} must follow on the
+     * same line.
+     *
+     * @param message
+     *            V8's message for the token that makes it a parameter list
+     */
+    private void requireArrowAfterCoverParameters(String message) {
+        if (!parserContext.match(TokenType.ARROW)) {
+            throw new JSSyntaxErrorException(message);
         }
-        if (expression instanceof CallExpression callExpression) {
-            return callExpression.isOptional() || isOptionalChainExpression(callExpression.getCallee());
+        if (parserContext.hasNewlineBefore()) {
+            throw new JSSyntaxErrorException("Unexpected token '=>'");
         }
-        return false;
     }
 
     private static boolean isPrivateDeleteTarget(Expression expression) {

@@ -197,9 +197,9 @@ public class RegExpEngineTest extends BaseJavetTest {
     public void testLookbehindAssertionsSyntaxAndQuantifierRules() {
         RegExpCompiler compiler = new RegExpCompiler(context.getUnicodePropertyResolver());
         assertThatThrownBy(() -> compiler.compile("(?<=a", "")).isInstanceOf(RegExpCompiler.RegExpSyntaxException.class)
-                .hasMessageContaining("Unclosed lookbehind");
+                .hasMessageContaining("Unterminated group");
         assertThatThrownBy(() -> compiler.compile("(?<!a", "")).isInstanceOf(RegExpCompiler.RegExpSyntaxException.class)
-                .hasMessageContaining("Unclosed lookbehind");
+                .hasMessageContaining("Unterminated group");
         assertThatThrownBy(() -> compiler.compile("(?<=a)+b", ""))
                 .isInstanceOf(RegExpCompiler.RegExpSyntaxException.class).hasMessageContaining("Nothing to repeat");
 
@@ -302,7 +302,7 @@ public class RegExpEngineTest extends BaseJavetTest {
     @Test
     public void testNamedCaptureGroupsNotDefinedThrows() {
         assertThatThrownBy(() -> resetContext().eval("new RegExp('\\\\k<missing>(?<x>a)')"))
-                .isInstanceOf(JSException.class).hasMessageContaining("group name not defined");
+                .isInstanceOf(JSException.class).hasMessageContaining("Invalid named capture referenced");
     }
 
     @Test

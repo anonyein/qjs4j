@@ -891,11 +891,11 @@ public class ArrayPrototypeTest extends BaseJavetTest {
         result = ArrayPrototype.join(context, mixedArr, JSValue.NO_ARGS);
         assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("a,,,b");
 
-        // Edge case: join on non-array
+        // Edge case: join on a primitive, which ToObject makes an array-like of its characters (as in V8)
         JSValue nonArray = new JSString("not an array");
         assertThat(
                 ArrayPrototype.join(context, nonArray, JSValue.NO_ARGS).asString().map(JSString::value).orElseThrow())
-                .isEqualTo("");
+                .isEqualTo("n,o,t, ,a,n, ,a,r,r,a,y");
 
         // Edge case: join called on array-like object
         assertThat(context
@@ -1645,7 +1645,7 @@ public class ArrayPrototypeTest extends BaseJavetTest {
 
     @Test
     public void testToString() {
-        JSArray jsArray = new JSArray(context);
+        JSArray jsArray = context.createJSArray();
         jsArray.push(new JSString("a"));
         jsArray.push(new JSNumber(1));
         jsArray.push(new JSString("c"));
@@ -1653,6 +1653,12 @@ public class ArrayPrototypeTest extends BaseJavetTest {
         // Normal case
         JSValue result = ArrayPrototype.toString(context, jsArray, JSValue.NO_ARGS);
         assertThat(result.asString().map(JSString::value).orElseThrow()).isEqualTo("a,1,c");
+
+        // An array with no join method — here one built without Array.prototype — is not joined
+        JSArray withoutPrototype = new JSArray(context);
+        withoutPrototype.push(new JSString("a"));
+        assertThat(ArrayPrototype.toString(context, withoutPrototype, JSValue.NO_ARGS).asString().map(JSString::value)
+                .orElseThrow()).isEqualTo("[object Array]");
 
         // Edge case: toString on string
         assertThat(ArrayPrototype.toString(context, new JSString("a"), JSValue.NO_ARGS).asString().map(JSString::value)

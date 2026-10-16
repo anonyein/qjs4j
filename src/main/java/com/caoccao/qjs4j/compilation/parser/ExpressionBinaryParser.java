@@ -220,8 +220,26 @@ final class ExpressionBinaryParser {
         return left;
     }
 
+    /**
+     * The private name that begins a brand check, {@code #x in o}: RelationalExpression : PrivateIdentifier in
+     * ShiftExpression. This is the one place a private name can begin an expression, so {@code (#x in o)} is valid and
+     * {@code (#x) in o} or {@code 1 + #x in o} are not; the primary parser rejects a private name anywhere else.
+     */
+    private Expression parsePrivateBrandCheckName() {
+        SourceLocation location = parserContext.getLocation();
+        String fieldName = parserContext.currentToken.value().substring(1);
+        if (!parserContext.isPrivateNameAccessible(fieldName)) {
+            throw new JSSyntaxErrorException("undefined private field '#" + fieldName + "'");
+        }
+        parserContext.advance();
+        return new PrivateIdentifier(fieldName, location);
+    }
+
     Expression parseRelationalExpression() {
-        Expression left = expressions.parseShiftExpression();
+        Expression left = parserContext.inOperatorAllowed && parserContext.match(TokenType.PRIVATE_NAME)
+                && parserContext.nextToken.type() == TokenType.IN
+                        ? parsePrivateBrandCheckName()
+                        : expressions.parseShiftExpression();
 
         while (parserContext.match(TokenType.LT) || parserContext.match(TokenType.LE)
                 || parserContext.match(TokenType.GT) || parserContext.match(TokenType.GE)

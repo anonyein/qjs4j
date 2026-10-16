@@ -50,11 +50,15 @@ public final class JSTypeError extends JSError {
             }
         }
         JSTypeError jsTypeError = context.createJSTypeError(message);
+        if (args.length > 0 && !args[0].isUndefined()) {
+            JSError.defineEmptyMessage(jsTypeError, message);
+        }
         if (args.length > 1) {
             if (!JSError.installErrorCause(context, jsTypeError, args[1])) {
                 return JSUndefined.INSTANCE;
             }
         }
+        JSError.captureStackTraceBelowNewTarget(context, jsTypeError);
         return jsTypeError;
     }
 

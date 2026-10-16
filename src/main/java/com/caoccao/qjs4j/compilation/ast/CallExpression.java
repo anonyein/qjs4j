@@ -28,6 +28,7 @@ public final class CallExpression extends Expression {
     private final Expression callee;
     private Boolean directEvalVarArgumentsInside;
     private final boolean optional;
+    private final boolean optionalChainInside;
     private final boolean partOfOptionalChain;
 
     public CallExpression(Expression callee, List<Expression> arguments, boolean optional, boolean partOfOptionalChain,
@@ -37,6 +38,8 @@ public final class CallExpression extends Expression {
         this.arguments = arguments;
         this.optional = optional;
         this.partOfOptionalChain = partOfOptionalChain;
+        // See MemberExpression: cached so the parser's per-link question costs O(1).
+        this.optionalChainInside = optional || callee.containsOptionalChain();
         directEvalVarArgumentsInside = null;
     }
 
@@ -71,6 +74,11 @@ public final class CallExpression extends Expression {
                     && evalSourceString.contains("var arguments");
         }
         return directEvalVarArgumentsInside;
+    }
+
+    @Override
+    public boolean containsOptionalChain() {
+        return optionalChainInside;
     }
 
     @Override

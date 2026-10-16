@@ -16,8 +16,6 @@
 
 package com.caoccao.qjs4j.core;
 
-import com.caoccao.qjs4j.exceptions.JSException;
-
 import java.util.ArrayDeque;
 
 /**
@@ -79,10 +77,13 @@ public final class JSMicrotaskQueue {
     /**
      * Report a failure that escaped a microtask.
      * <p>
-     * A rejected promise with no handler goes to the promise reject callback as before. Everything is additionally
-     * recorded on the context: previously, with no callback installed, every exception from a microtask disappeared
-     * without trace — a throwing {@code .then()} handler, a {@code JSVirtualMachineException}, or a
-     * {@link NullPointerException} from an engine defect.
+     * Every failure is recorded on the context and handed to the microtask failure callback: previously, with no
+     * callback installed, every exception from a microtask disappeared without trace — a throwing {@code .then()}
+     * handler, a {@code JSVirtualMachineException}, or a {@link NullPointerException} from an engine defect.
+     * <p>
+     * A failure escaping a microtask is not a promise rejection — a promise rejected with no handler is reported by
+     * {@link JSPromise} itself, with the promise — so it no longer goes to the promise reject callback, where it used
+     * to arrive with a {@code null} promise.
      * <p>
      * A {@link com.caoccao.qjs4j.exceptions.JSTerminationException} never reaches here: it is an {@link Error}, and the
      * drain catches only {@link RuntimeException} and {@link StackOverflowError}, so termination ends the drain and
@@ -92,11 +93,6 @@ public final class JSMicrotaskQueue {
      *            the exception that escaped the microtask
      */
     private void handleMicrotaskFailure(Throwable failure) {
-        IJSPromiseRejectCallback callback = context.getPromiseRejectCallback();
-        if (callback != null && failure instanceof JSException jsException) {
-            JSValue reason = jsException.getErrorValue();
-            callback.callback(PromiseRejectEvent.PromiseRejectWithNoHandler, null, reason);
-        }
         context.recordMicrotaskFailure(failure);
     }
 

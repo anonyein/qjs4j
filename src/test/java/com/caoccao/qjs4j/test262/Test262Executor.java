@@ -254,8 +254,9 @@ public class Test262Executor {
         // any one of the runtimes that share it: the main runtime would otherwise close it —
         // cancelling every agent's wait — while the agents were still being shut down below.
         AtomicsObject clusterAtomics = new AtomicsObject();
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setAtomicsObject(clusterAtomics)
-                .setShadowRealmEnabled(true).setTemporalEnabled(true))) {
+        try (JSRuntime runtime = new JSRuntime(
+                new JSRuntimeOptions().setAtomicsObject(clusterAtomics).setModuleLoader(new JSFileSystemModuleLoader())
+                        .setShadowRealmEnabled(true).setTemporalEnabled(true))) {
             try (JSContext context = runtime.createContext()) {
                 agentHost.setSharedAtomicsObject(clusterAtomics);
                 context.setWaitable(!test.hasFlag("CanBlockIsFalse"));

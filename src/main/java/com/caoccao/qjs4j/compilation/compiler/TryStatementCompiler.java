@@ -21,6 +21,7 @@ import com.caoccao.qjs4j.vm.Opcode;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -85,13 +86,26 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
         compilerContext.isLastInProgram = savedIsLastInProgram;
     }
 
+    /**
+     * Compile a try block. A strict-mode {@code return f()} inside it used to be compiled as a tail call, which
+     * discarded the frame and its catch handler: the exception escaped {@code try { return f() } catch (e) {}}.
+     */
+    private void compileTryBlock(BlockStatement block) {
+        compilerContext.tryBlockDepth++;
+        try {
+            compileTryFinallyBlock(block);
+        } finally {
+            compilerContext.tryBlockDepth--;
+        }
+    }
+
     private void compileTryCatchWithoutFinally(TryStatement tryStmt) {
         int catchJump = -1;
         if (tryStmt.getHandler() != null) {
             catchJump = compilerContext.emitter.emitJump(Opcode.CATCH);
         }
 
-        compileTryFinallyBlock(tryStmt.getBlock());
+        compileTryBlock(tryStmt.getBlock());
 
         if (tryStmt.getHandler() != null) {
             compilerContext.emitter.emitOpcode(Opcode.NIP_CATCH);
@@ -112,9 +126,13 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
                 if (catchParam instanceof Identifier id) {
                     int localIndex = compilerContext.scopeManager.currentScope().declareLocal(id.getName());
                     compilerContext.scopeManager.currentScope().markSimpleCatchParam(id.getName());
+                    // A new binding on every entry, so a closure from an earlier pass through this catch, in a loop,
+                    // keeps its own exception.
+                    compilerContext.emitter.emitOpcodeU16(Opcode.SET_LOC_UNINITIALIZED, localIndex);
                     compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, localIndex);
                 } else {
                     compilerContext.patternCompiler.declarePatternVariables(catchParam);
+                    emitFreshCatchBindings(catchParam);
                     compilerContext.patternCompiler.compile(catchParam);
                 }
 
@@ -204,6 +222,7 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
             boolean isLast = index == effectiveLastIndex;
 
             if (statement instanceof ExpressionStatement expressionStatement) {
+                compilerContext.emitter.emitSourcePosition(statement.getLocation());
                 compilerContext.expressionCompiler.compile(expressionStatement.getExpression());
                 if (compilerContext.evalReturnLocalIndex >= 0) {
                     compilerContext.emitter.emitOpcode(Opcode.DUP);
@@ -215,6 +234,7 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
             } else if (statement instanceof TryStatement tryStatement) {
                 boolean saved = compilerContext.isLastInProgram;
                 compilerContext.isLastInProgram = isLast;
+                compilerContext.emitter.emitSourcePosition(statement.getLocation());
                 compile(tryStatement);
                 compilerContext.isLastInProgram = saved;
             } else {
@@ -273,7 +293,7 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
             catchFromTryJump = compilerContext.emitter.emitJump(Opcode.CATCH);
         }
 
-        compileTryFinallyBlock(tryStmt.getBlock());
+        compileTryBlock(tryStmt.getBlock());
         compilerContext.emitter.emitOpcode(Opcode.NIP_CATCH);
         if (tryStmt.getHandler() != null) {
             compilerContext.emitter.emitOpcode(Opcode.NIP_CATCH);
@@ -298,9 +318,13 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
                 if (catchParam instanceof Identifier id) {
                     int localIndex = compilerContext.scopeManager.currentScope().declareLocal(id.getName());
                     compilerContext.scopeManager.currentScope().markSimpleCatchParam(id.getName());
+                    // A new binding on every entry, so a closure from an earlier pass through this catch, in a loop,
+                    // keeps its own exception.
+                    compilerContext.emitter.emitOpcodeU16(Opcode.SET_LOC_UNINITIALIZED, localIndex);
                     compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, localIndex);
                 } else {
                     compilerContext.patternCompiler.declarePatternVariables(catchParam);
+                    emitFreshCatchBindings(catchParam);
                     compilerContext.patternCompiler.compile(catchParam);
                 }
                 int catchBodyCatchJump = compilerContext.emitter.emitJump(Opcode.CATCH);
@@ -366,6 +390,21 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
         int endOffset = compilerContext.emitter.currentOffset();
         for (int jumpToEnd : jumpsToEnd) {
             compilerContext.emitter.patchJump(jumpToEnd, endOffset);
+        }
+    }
+
+    /**
+     * Start fresh bindings for a destructuring catch parameter: new on every entry, and in their temporal dead zone
+     * until the pattern initializes them.
+     */
+    private void emitFreshCatchBindings(Pattern catchParam) {
+        Set<String> names = new LinkedHashSet<>();
+        compilerContext.compilerAnalysis.collectPatternBindingNames(catchParam, names);
+        // declarePatternVariables has just declared every one of these names in the catch scope.
+        for (String name : names) {
+            int localIndex = compilerContext.scopeManager.currentScope().getLocal(name);
+            compilerContext.emitter.emitOpcodeU16(Opcode.SET_LOC_UNINITIALIZED, localIndex);
+            compilerContext.tdzLocals.add(name);
         }
     }
 }

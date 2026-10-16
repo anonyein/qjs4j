@@ -44,6 +44,7 @@ public final class JSGeneratorState {
     private ResumeKind pendingResumeKind;
     private JSValue pendingResumeValue;
     private final List<ResumeRecord> resumeRecords;
+    private JSValue returnCompletionValue;
     private State state;
     private StackFrame suspendedFrame;
     private int suspendedProgramCounter;
@@ -65,6 +66,7 @@ public final class JSGeneratorState {
         this.resumeRecords = new ArrayList<>();
         this.pendingResumeValue = null;
         this.pendingResumeKind = null;
+        this.returnCompletionValue = JSUndefined.INSTANCE;
         this.awaitSuspended = false;
         this.suspendedFrame = null;
         this.suspendedStackValues = null;
@@ -106,6 +108,18 @@ public final class JSGeneratorState {
 
     public List<ResumeRecord> getResumeRecords() {
         return Collections.unmodifiableList(resumeRecords);
+    }
+
+    /**
+     * The value of the return completion this generator was carrying the last time it suspended.
+     * <p>
+     * {@code generator.return(v)} unwinds through the generator's {@code finally} blocks; when one of them yields or
+     * awaits, the generator suspends mid-return and must still return {@code v} once that block completes.
+     *
+     * @return the value being returned
+     */
+    public JSValue getReturnCompletionValue() {
+        return returnCompletionValue;
     }
 
     public State getState() {
@@ -193,6 +207,10 @@ public final class JSGeneratorState {
     public void setPendingResumeRecord(ResumeKind kind, JSValue value) {
         this.pendingResumeKind = kind;
         this.pendingResumeValue = value;
+    }
+
+    public void setReturnCompletionValue(JSValue returnCompletionValue) {
+        this.returnCompletionValue = returnCompletionValue;
     }
 
     public void setState(State state) {

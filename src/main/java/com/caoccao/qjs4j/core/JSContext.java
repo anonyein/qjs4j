@@ -34,12 +34,15 @@ import java.util.*;
  * namespaces).
  */
 public final class JSContext implements AutoCloseable {
-    private static final int DEFAULT_MAX_STACK_DEPTH = 1000;
     /**
      * Upper bound on the failures retained by {@link #recordMicrotaskFailure(Throwable)}, so a repeatedly failing
      * microtask cannot itself become a leak.
      */
     private static final int MAX_RECORDED_MICROTASK_FAILURES = 64;
+    /**
+     * Arrays whose {@code join} or {@code toLocaleString} is running, by identity: V8's cycle detection.
+     */
+    private final Set<JSObject> arrayJoinStack;
     // Call stack management
     private final Deque<JSStackFrame> callStack;
     private boolean closed;
@@ -83,7 +86,7 @@ public final class JSContext implements AutoCloseable {
     private boolean inBareVariableAssignment;
     private boolean inCatchHandler;
     private final JSGlobalObject jsGlobalObject;
-    private int maxStackDepth;
+    private int maxCallDepth;
     private IJSMicrotaskFailureCallback microtaskFailureCallback;
     // Failures that escaped a microtask, oldest first
     private final List<Throwable> microtaskFailures = new ArrayList<>();
@@ -124,6 +127,7 @@ public final class JSContext implements AutoCloseable {
      */
     JSContext(JSRuntime runtime) {
         this.callStack = new ArrayDeque<>();
+        this.arrayJoinStack = Collections.newSetFromMap(new IdentityHashMap<>());
         this.errorReporter = new JSErrorReporter(this);
         this.evalOverlayManager = new EvalOverlayManager(this);
         this.globalLexicalScope = new GlobalLexicalScope();
@@ -132,12 +136,9 @@ public final class JSContext implements AutoCloseable {
         this.finalizationRegistries = new ArrayList<>();
         this.realmIntrinsics = new RealmIntrinsics(this);
         this.jsGlobalObject = new JSGlobalObject(this);
-        // Derived from the runtime's configured stack budget rather than hard-coded, so
-        // JSRuntimeOptions.setMaxStackSize is a limit the engine actually applies. The default
-        // budget divided by the per-frame cost reproduces the previous depth exactly.
-        this.maxStackDepth = runtime != null && runtime.getOptions() != null
-                ? runtime.getOptions().getMaxStackDepth()
-                : DEFAULT_MAX_STACK_DEPTH;
+        // The runtime's configured call depth, so JSRuntimeOptions.setMaxCallDepth is a limit the
+        // engine actually applies.
+        this.maxCallDepth = runtime.getOptions().getMaxCallDepth();
         this.microtaskQueue = new JSMicrotaskQueue(this);
         // A local, not a field: the transformer is given to the three collaborators that use it and
         // the context itself never asks for it again. Keeping a reference would be realm state that
@@ -180,6 +181,10 @@ public final class JSContext implements AutoCloseable {
 
     void captureStackTrace(JSObject error) {
         errorReporter.captureStackTrace(error);
+    }
+
+    boolean captureStackTrace(JSObject target, JSObject skipFunction) {
+        return errorReporter.captureStackTrace(target, skipFunction);
     }
 
     /**
@@ -530,6 +535,15 @@ public final class JSContext implements AutoCloseable {
     }
 
     /**
+     * Where the code about to be evaluated by {@code eval} is evaluated, for its stack frames.
+     *
+     * @return {@code eval at caller (location)}, or null when no script frame is calling
+     */
+    String describeEvalOrigin() {
+        return errorReporter.describeEvalOrigin();
+    }
+
+    /**
      * Enqueue a microtask to be executed.
      *
      * @param microtask
@@ -644,6 +658,16 @@ public final class JSContext implements AutoCloseable {
         this.strictMode = false;
     }
 
+    /**
+     * The arrays whose {@code join} or {@code toLocaleString} is running in this realm. A join that meets an array
+     * already on it renders that array as the empty string, as V8 does, instead of recursing until the stack overflows.
+     *
+     * @return the set, by identity
+     */
+    public Set<JSObject> getArrayJoinStack() {
+        return arrayJoinStack;
+    }
+
     public JSObject getAsyncFunctionConstructor() {
         return realmIntrinsics.getAsyncFunctionConstructor();
     }
@@ -658,6 +682,10 @@ public final class JSContext implements AutoCloseable {
 
     JSObject getCachedDatePrototype() {
         return realmIntrinsics.getCachedDatePrototype();
+    }
+
+    JSObject getCachedErrorConstructor() {
+        return realmIntrinsics.getCachedErrorConstructor();
     }
 
     JSObject getCachedPromisePrototype() {
@@ -759,8 +787,24 @@ public final class JSContext implements AutoCloseable {
         return jsGlobalObject;
     }
 
+    /**
+     * The maximum number of nested activations in this context.
+     *
+     * @return the maximum call depth
+     */
+    public int getMaxCallDepth() {
+        return maxCallDepth;
+    }
+
+    /**
+     * The maximum call depth.
+     *
+     * @return the maximum number of nested activations
+     * @deprecated use {@link #getMaxCallDepth()}
+     */
+    @Deprecated
     public int getMaxStackDepth() {
-        return maxStackDepth;
+        return maxCallDepth;
     }
 
     /**
@@ -862,6 +906,22 @@ public final class JSContext implements AutoCloseable {
      */
     public int getStackDepth() {
         return stackDepth;
+    }
+
+    /**
+     * The frames of the stack trace captured for an object, read without running any script.
+     * <p>
+     * {@code stack} is an accessor whose first read computes the {@code Name: message} line through
+     * {@code Error.prototype.toString}, which can run script. A host reporting an uncaught error needs the frames
+     * without that, and pairs them with a headline of its own.
+     *
+     * @param object
+     *            an error, or an object {@code Error.captureStackTrace} was applied to
+     * @return the frames, one {@code "    at ..."} line each, possibly empty; or null when none were captured
+     */
+    public String getStackFramesForDiagnostics(JSObject object) {
+        JSStackTrace stackTrace = errorReporter.getStackTrace(object);
+        return stackTrace != null ? stackTrace.getFrames() : null;
     }
 
     public JSNativeFunction getThrowTypeErrorIntrinsic() {
@@ -1104,7 +1164,7 @@ public final class JSContext implements AutoCloseable {
      * Push a new stack frame. Returns false if stack limit exceeded.
      */
     public boolean pushStackFrame(JSStackFrame frame) {
-        if (stackDepth >= maxStackDepth) {
+        if (stackDepth >= maxCallDepth) {
             return false;
         }
         callStack.push(frame);
@@ -1147,8 +1207,8 @@ public final class JSContext implements AutoCloseable {
      * <p>
      * Draining the microtask queue has no caller to propagate to, so without this a throwing {@code .then()} handler —
      * or an engine defect surfacing as a {@link NullPointerException} — disappeared with no trace at all. Failures are
-     * always recorded; an installed {@link IJSMicrotaskFailureCallback} sees them immediately, and an engine defect
-     * with no callback installed is logged so it cannot pass unnoticed.
+     * always recorded; an installed {@link IJSMicrotaskFailureCallback} sees them immediately, and with no callback
+     * installed they are logged so they cannot pass unnoticed.
      *
      * @param failure
      *            the exception that escaped the microtask
@@ -1166,12 +1226,10 @@ public final class JSContext implements AutoCloseable {
             callback.onMicrotaskFailure(failure);
             return;
         }
-        if (!(failure instanceof JSException)) {
-            // A JSException is a script-level error and is reported through the promise reject
-            // callback. Anything else is an engine defect and must never be silent.
-            System.getLogger(JSContext.class.getName()).log(System.Logger.Level.WARNING,
-                    "Unhandled failure in microtask", failure);
-        }
+        // Never silent. A JSException used to be left to the promise reject callback, but a failure
+        // escaping a microtask is not a promise rejection, so that callback no longer sees it.
+        System.getLogger(JSContext.class.getName()).log(System.Logger.Level.WARNING, "Unhandled failure in microtask",
+                failure);
     }
 
     /**
@@ -1277,10 +1335,32 @@ public final class JSContext implements AutoCloseable {
     }
 
     /**
-     * Set the maximum stack depth.
+     * Set the maximum number of nested activations in this context, overriding the runtime's
+     * {@link JSRuntimeOptions#setMaxCallDepth(int)}.
+     *
+     * @param maxCallDepth
+     *            the maximum call depth, at least 1
+     * @throws IllegalArgumentException
+     *             when the depth is below 1: zero or a negative depth refused every evaluation, the top-level code
+     *             included, with a RangeError
      */
+    public void setMaxCallDepth(int maxCallDepth) {
+        if (maxCallDepth < 1) {
+            throw new IllegalArgumentException("maxCallDepth must be at least 1: " + maxCallDepth);
+        }
+        this.maxCallDepth = maxCallDepth;
+    }
+
+    /**
+     * Set the maximum call depth.
+     *
+     * @param depth
+     *            the maximum number of nested activations, at least 1
+     * @deprecated use {@link #setMaxCallDepth(int)}
+     */
+    @Deprecated
     public void setMaxStackDepth(int depth) {
-        this.maxStackDepth = depth;
+        setMaxCallDepth(depth);
     }
 
     /**

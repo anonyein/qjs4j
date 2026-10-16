@@ -34,17 +34,17 @@ public final class JSIntlDurationFormat extends JSObject {
      */
     public static final String[] DATE_UNIT_STYLES = {"long", "short", "narrow"};
     /**
-     * Digital defaults per unit (null means no digital default, use outer style).
+     * The Digital Default column of the DurationFormat unit table.
      */
-    private static final String[] DIGITAL_DEFAULTS = {"long", "long", "long", "long", // years, months, weeks, days
+    private static final String[] DIGITAL_DEFAULTS = {"short", "short", "short", "short", // years, months, weeks, days
             "numeric", "numeric", "numeric", // hours, minutes, seconds
             "numeric", "numeric", "numeric" // milliseconds, microseconds, nanoseconds
     };
     /**
-     * Unit display data for en locale. Pattern: {singularLong, otherLong, singularShort, otherShort, narrow} Narrow
-     * uses no space between number and unit symbol.
+     * English CLDR unit names: {singular long, plural long, singular short, plural short, narrow}. Narrow uses no space
+     * between the number and the unit symbol.
      */
-    private static final Map<String, String[]> EN_UNIT_DATA = new LinkedHashMap<>();
+    private static final Map<String, String[]> EN_UNIT_DATA = new HashMap<>();
     public static final String NAME = "Intl.DurationFormat";
     /**
      * Singular unit names (for NumberFormat unit option).
@@ -61,7 +61,7 @@ public final class JSIntlDurationFormat extends JSObject {
 
     static {
         EN_UNIT_DATA.put("year", new String[]{"year", "years", "yr", "yrs", "y"});
-        EN_UNIT_DATA.put("month", new String[]{"month", "months", "mo", "mos", "mo"});
+        EN_UNIT_DATA.put("month", new String[]{"month", "months", "mth", "mths", "m"});
         EN_UNIT_DATA.put("week", new String[]{"week", "weeks", "wk", "wks", "w"});
         EN_UNIT_DATA.put("day", new String[]{"day", "days", "day", "days", "d"});
         EN_UNIT_DATA.put("hour", new String[]{"hour", "hours", "hr", "hr", "h"});
@@ -425,6 +425,20 @@ public final class JSIntlDurationFormat extends JSObject {
         }
     }
 
+    private static void addUnitParts(List<FormatPart> parts, String numberPart, String singularUnit, String unitDisplay,
+            Locale locale) {
+        String unitName = getEnglishTimeUnitName(numberPart, singularUnit, unitDisplay, locale);
+        if (unitName == null) {
+            parts.add(new FormatPart("literal", " ", null));
+            parts.add(new FormatPart("unit", singularUnit, null));
+        } else {
+            if (!"narrow".equals(unitDisplay)) {
+                parts.add(new FormatPart("literal", " ", null));
+            }
+            parts.add(new FormatPart("unit", unitName, null));
+        }
+    }
+
     /**
      * Compute the fractional value by combining sub-second units via BigDecimal. Equivalent to the harness
      * durationToFractional function.
@@ -518,6 +532,29 @@ public final class JSIntlDurationFormat extends JSObject {
             format.setRoundingMode(RoundingMode.DOWN);
         }
         return format.format(value);
+    }
+
+    /**
+     * Format a number with an English time unit, choosing the plural and display width as CLDR does. Unit formatting
+     * used to print the singular unit identifier for every count and width ("30 minute" where V8 prints "30 minutes",
+     * "30 min" or "30m").
+     *
+     * @param numberPart
+     *            the formatted number
+     * @param unit
+     *            the singular unit identifier
+     * @param unitDisplay
+     *            long, short or narrow
+     * @param locale
+     *            the locale
+     * @return the formatted unit, or null when the locale is not English or the unit is not a time unit
+     */
+    public static String formatEnglishTimeUnit(String numberPart, String unit, String unitDisplay, Locale locale) {
+        String unitName = getEnglishTimeUnitName(numberPart, unit, unitDisplay, locale);
+        if (unitName == null) {
+            return null;
+        }
+        return "narrow".equals(unitDisplay) ? numberPart + unitName : numberPart + " " + unitName;
     }
 
     /**
@@ -678,8 +715,7 @@ public final class JSIntlDurationFormat extends JSObject {
         String numberStr = formatBigDecimalNumber(formatValue, 1, minFractionDigits, maxFractionDigits, true, true,
                 locale);
         addNumberPartsToList(parts, numberStr);
-        parts.add(new FormatPart("literal", " ", null));
-        parts.add(new FormatPart("unit", singularUnit, null));
+        addUnitParts(parts, numberStr, singularUnit, unitDisplay, locale);
         return parts;
     }
 
@@ -700,8 +736,7 @@ public final class JSIntlDurationFormat extends JSObject {
 
         String numberStr = formatPlainNumber(formatValue, 1, -1, -1, true, false, locale);
         addNumberPartsToList(parts, numberStr);
-        parts.add(new FormatPart("literal", " ", null));
-        parts.add(new FormatPart("unit", singularUnit, null));
+        addUnitParts(parts, numberStr, singularUnit, unitDisplay, locale);
 
         return parts;
     }
@@ -715,7 +750,8 @@ public final class JSIntlDurationFormat extends JSObject {
 
         String numberPart = formatBigDecimalNumber(formatValue, 1, minFractionDigits, maxFractionDigits, true, true,
                 locale);
-        return numberPart + " " + singularUnit;
+        String english = formatEnglishTimeUnit(numberPart, singularUnit, unitDisplay, locale);
+        return english != null ? english : numberPart + " " + singularUnit;
     }
 
     /**
@@ -743,7 +779,8 @@ public final class JSIntlDurationFormat extends JSObject {
         if (isNegativeZero) {
             numberPart = "-0";
         }
-        return numberPart + " " + singularUnit;
+        String english = formatEnglishTimeUnit(numberPart, singularUnit, unitDisplay, locale);
+        return english != null ? english : numberPart + " " + singularUnit;
     }
 
     /**
@@ -751,6 +788,21 @@ public final class JSIntlDurationFormat extends JSObject {
      */
     public static String getDigitalDefault(int unitIndex) {
         return DIGITAL_DEFAULTS[unitIndex];
+    }
+
+    private static String getEnglishTimeUnitName(String numberPart, String unit, String unitDisplay, Locale locale) {
+        String[] names = EN_UNIT_DATA.get(unit);
+        if (names == null || !"en".equals(locale.getLanguage())) {
+            return null;
+        }
+        // CLDR English plural category "one": exactly 1 with no visible fraction digits, whatever the sign.
+        String digits = numberPart.startsWith("-") || numberPart.startsWith("+") ? numberPart.substring(1) : numberPart;
+        boolean one = "1".equals(digits);
+        return switch (unitDisplay) {
+            case "long" -> one ? names[0] : names[1];
+            case "narrow" -> names[4];
+            default -> one ? names[2] : names[3];
+        };
     }
 
     /**

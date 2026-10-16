@@ -16,15 +16,10 @@
 
 package com.caoccao.qjs4j.core;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.time.zone.ZoneRules;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Represents a JavaScript Date object. Stores the clipped epoch milliseconds like QuickJS.
@@ -43,15 +38,6 @@ public final class JSDate extends JSObject {
     private static final long MILLIS_PER_DAY = 86_400_000L;
     private static final int[] MONTH_DAYS = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     public static final String NAME = "Date";
-    private static final Pattern NOTE_DATETIME_WITH_SPACE_PATTERN = Pattern
-            .compile("^(?<year>(?:[+-]\\d{6}|\\d{4}))-(?<month>\\d{1,2})-(?<day>\\d{1,2})\\s+"
-                    + "(?<hour>\\d{1,2}):(?<minute>\\d{1,2})"
-                    + "(?::(?<second>\\d{1,2})(?:[\\.,](?<fraction>\\d{1,9}))?)?"
-                    + "(?:(?<z>Z)|(?<tzSign>[+-])(?<tzHour>\\d{2})(?::?(?<tzMinute>\\d{2}))?)?$");
-    private static final DateTimeFormatter PARSE_TO_STRING_FORMATTER = DateTimeFormatter
-            .ofPattern("EEE MMM dd yyyy HH:mm:ss 'GMT'XX", Locale.ENGLISH);
-    private static final DateTimeFormatter PARSE_UTC_STRING_FORMATTER = DateTimeFormatter
-            .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH).withZone(ZoneOffset.UTC);
     private static final ZoneRules SYSTEM_ZONE_RULES = ZoneId.systemDefault().getRules();
     public static final DateTimeFormatter TO_STRING_FORMATTER_LONG = DateTimeFormatter
             .ofPattern("EEE MMM dd yyyy HH:mm:ss 'GMT'Z (zzzz)", Locale.ENGLISH);
@@ -110,7 +96,7 @@ public final class JSDate extends JSObject {
         return (long) value;
     }
 
-    public static JSObject create(JSContext context, JSValue... args) {
+    public static JSValue create(JSContext context, JSValue... args) {
         final double timeValue;
         if (args.length == 0) {
             timeValue = dateNow();
@@ -124,7 +110,8 @@ public final class JSDate extends JSObject {
                 JSValue primitive = JSTypeConversions.toPrimitive(context, arg,
                         JSTypeConversions.PreferredType.DEFAULT);
                 if (context.hasPendingException()) {
-                    return (JSObject) context.getPendingException();
+                    // The thrown value may be a primitive: casting it to JSObject failed inside the engine.
+                    return context.getPendingException();
                 }
                 if (primitive instanceof JSString str) {
                     timeValue = parseDateString(str.value());
@@ -137,6 +124,9 @@ public final class JSDate extends JSObject {
             int n = Math.min(args.length, 7);
             for (int i = 0; i < n; i++) {
                 fields[i] = JSTypeConversions.toNumber(context, args[i]).value();
+                if (context.hasPendingException()) {
+                    return context.getPendingException();
+                }
             }
             timeValue = setDateFieldsChecked(fields, true);
         }
@@ -179,8 +169,12 @@ public final class JSDate extends JSObject {
         } else {
             d = (long) timeValue;
             if (isLocal) {
-                timezone = -getTimezoneOffset(d);
-                d += (long) timezone * 60_000L;
+                // The whole offset, seconds included: before standard time a zone's offset is its local mean
+                // time, Berlin's +0:53:28, and dropping the 28 seconds put every such date 28 seconds off.
+                int offsetSeconds = SYSTEM_ZONE_RULES.getOffset(Instant.ofEpochSecond(Math.floorDiv(d, 1000L)))
+                        .getTotalSeconds();
+                timezone = offsetSeconds / 60;
+                d += offsetSeconds * 1000L;
             }
         }
 
@@ -222,6 +216,25 @@ public final class JSDate extends JSObject {
         return 1;
     }
 
+    /**
+     * LocalTZA(t, false): the offset of a local wall-clock time, in seconds.
+     * <p>
+     * The offset used to be looked up with the wall-clock value taken as a UTC instant, so a time in the spring-forward
+     * gap got the offset after the transition and a time in the autumn overlap resolved to its second occurrence. The
+     * specification and V8 use the offset before the transition in both cases, which is what
+     * {@link ZoneRules#getOffset(LocalDateTime)} returns.
+     *
+     * @param zoneRules
+     *            the time zone's rules
+     * @param localMillis
+     *            milliseconds since the epoch of the local date and time, read as if they were UTC
+     * @return the zone's offset from UTC in effect at that wall-clock time
+     */
+    static int getLocalOffsetSeconds(ZoneRules zoneRules, long localMillis) {
+        LocalDateTime localDateTime = LocalDateTime.ofEpochSecond(Math.floorDiv(localMillis, 1000L), 0, ZoneOffset.UTC);
+        return zoneRules.getOffset(localDateTime).getTotalSeconds();
+    }
+
     public static String getTimezoneName(long epochMillis, boolean longFormat) {
         ZoneId zone = ZoneId.systemDefault();
         Instant instant = Instant.ofEpochMilli(epochMillis);
@@ -241,339 +254,14 @@ public final class JSDate extends JSObject {
         return -zoneOffset.getTotalSeconds() / 60;
     }
 
-    private static long mathMod(long a, long b) {
-        long m = a % b;
-        return m + (m < 0 ? b : 0);
-    }
-
-    public static double parseDateString(String input) {
-        if (input == null) {
-            return Double.NaN;
-        }
-        String str = input.trim();
-        if (str.isEmpty()) {
-            return Double.NaN;
-        }
-
-        // Try ISO 8601 date-time string format first (following QuickJS js_date_parse_isostring)
-        double isoResult = parseISODateString(str);
-        if (!Double.isNaN(isoResult)) {
-            return isoResult;
-        }
-
-        double noteDateTimeResult = parseNoteDateTimeWithSpace(str);
-        if (!Double.isNaN(noteDateTimeResult)) {
-            return noteDateTimeResult;
-        }
-
-        try {
-            return ZonedDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli();
-        } catch (DateTimeParseException ignored) {
-        }
-
-        try {
-            LocalDateTime localDateTime = LocalDateTime.parse(str, PARSE_UTC_STRING_FORMATTER);
-            return localDateTime.toInstant(ZoneOffset.UTC).toEpochMilli();
-        } catch (DateTimeParseException ignored) {
-        }
-
-        String noParen = str.replaceFirst("\\s*\\([^)]*\\)\\s*$", "");
-        try {
-            OffsetDateTime offsetDateTime = OffsetDateTime.parse(noParen, PARSE_TO_STRING_FORMATTER);
-            return offsetDateTime.toInstant().toEpochMilli();
-        } catch (DateTimeParseException ignored) {
-        }
-
-        // Fallback to lenient SimpleDateFormat for legacy date formats
-        // This replaces the deprecated Date.parse() method
-        try {
-            SimpleDateFormat format = new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy", Locale.ENGLISH);
-            format.setLenient(true);
-            return format.parse(str).getTime();
-        } catch (ParseException ignored) {
-        }
-
-        return Double.NaN;
-    }
-
     /**
-     * Parse exactly between minDigits and maxDigits decimal digits from str starting at pos.
+     * MakeDate(MakeDay(year, month, date), MakeTime(hour, min, sec, ms)) without TimeClip.
      *
-     * @return int[]{value, newPos} or null if not enough digits
+     * @param fields
+     *            year, month (0-based), date, hours, minutes, seconds, milliseconds
+     * @return the time value before clipping, or {@code NaN} when the year is out of range
      */
-    private static int[] parseDigits(String str, int pos, int minDigits, int maxDigits) {
-        int start = pos;
-        int value = 0;
-        while (pos < str.length() && pos - start < maxDigits && Character.isDigit(str.charAt(pos))) {
-            value = value * 10 + (str.charAt(pos) - '0');
-            pos++;
-        }
-        if (pos - start < minDigits) {
-            return null;
-        }
-        return new int[]{value, pos};
-    }
-
-    /**
-     * Parse ISO 8601 date-time string format following QuickJS js_date_parse_isostring. Handles partial ISO strings:
-     * YYYY, YYYY-MM, YYYY-MM-DD, YYYY-MM-DDTHH:mm[:ss[.sss]][Z|±HH:mm] Also supports extended years: ±YYYYYY Date-only
-     * forms are treated as UTC; date-time forms without timezone are local.
-     */
-    private static double parseISODateString(String str) {
-        int len = str.length();
-        int pos = 0;
-
-        // fields: year, month(0-based), day(1-based), hours, minutes, seconds, ms, (unused), tzOffset
-        int[] fields = {0, 0, 1, 0, 0, 0, 0, 0, 0};
-        boolean isLocal = false;
-
-        // Parse year: yyyy or [+-]yyyyyy
-        if (pos < len && (str.charAt(pos) == '+' || str.charAt(pos) == '-')) {
-            int sign = str.charAt(pos) == '-' ? -1 : 1;
-            pos++;
-            int[] result = parseDigits(str, pos, 6, 6);
-            if (result == null) {
-                return Double.NaN;
-            }
-            fields[0] = result[0] * sign;
-            pos = result[1];
-            if (sign == -1 && fields[0] == 0) {
-                return Double.NaN; // reject -000000
-            }
-        } else {
-            int[] result = parseDigits(str, pos, 4, 4);
-            if (result == null) {
-                return Double.NaN;
-            }
-            fields[0] = result[0];
-            pos = result[1];
-        }
-
-        // Optional month: -MM
-        if (pos < len && str.charAt(pos) == '-') {
-            pos++;
-            int[] monthResult = parseDigits(str, pos, 2, 2);
-            if (monthResult == null) {
-                return Double.NaN;
-            }
-            fields[1] = monthResult[0];
-            pos = monthResult[1];
-            if (fields[1] < 1) {
-                return Double.NaN;
-            }
-            fields[1] -= 1; // convert to 0-based
-
-            // Optional day: -DD
-            if (pos < len && str.charAt(pos) == '-') {
-                pos++;
-                int[] dayResult = parseDigits(str, pos, 2, 2);
-                if (dayResult == null) {
-                    return Double.NaN;
-                }
-                fields[2] = dayResult[0];
-                pos = dayResult[1];
-                if (fields[2] < 1) {
-                    return Double.NaN;
-                }
-            }
-        }
-
-        // Optional time: THH:mm[:ss[.sss]]
-        if (pos < len && str.charAt(pos) == 'T') {
-            pos++;
-            isLocal = true;
-
-            int[] hourResult = parseDigits(str, pos, 2, 2);
-            if (hourResult == null) {
-                fields[3] = 100; // reject unconditionally in validation
-            } else {
-                pos = hourResult[1];
-                if (pos >= len || str.charAt(pos) != ':') {
-                    fields[3] = 100;
-                } else {
-                    fields[3] = hourResult[0];
-                    pos++; // skip ':'
-                    int[] minResult = parseDigits(str, pos, 2, 2);
-                    if (minResult == null) {
-                        fields[3] = 100;
-                    } else {
-                        fields[4] = minResult[0];
-                        pos = minResult[1];
-
-                        // Optional seconds: :ss
-                        if (pos < len && str.charAt(pos) == ':') {
-                            pos++;
-                            int[] secResult = parseDigits(str, pos, 2, 2);
-                            if (secResult == null) {
-                                return Double.NaN;
-                            }
-                            fields[5] = secResult[0];
-                            pos = secResult[1];
-
-                            // Optional milliseconds: .sss (up to 9 fractional digits)
-                            if (pos < len && (str.charAt(pos) == '.' || str.charAt(pos) == ',')) {
-                                pos++;
-                                int msStart = pos;
-                                int msValue = 0;
-                                int msDigits = 0;
-                                while (pos < len && msDigits < 9 && Character.isDigit(str.charAt(pos))) {
-                                    msValue = msValue * 10 + (str.charAt(pos) - '0');
-                                    msDigits++;
-                                    pos++;
-                                }
-                                if (msDigits == 0) {
-                                    return Double.NaN;
-                                }
-                                while (msDigits < 3) {
-                                    msValue *= 10;
-                                    msDigits++;
-                                }
-                                while (msDigits > 3) {
-                                    msValue /= 10;
-                                    msDigits--;
-                                }
-                                fields[6] = msValue;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Parse timezone offset if present: Z or [+-]HH:mm or [+-]HHmm
-        if (pos < len) {
-            isLocal = false;
-            char tzChar = str.charAt(pos);
-            if (tzChar == 'Z') {
-                pos++;
-                fields[8] = 0;
-            } else if (tzChar == '+' || tzChar == '-') {
-                int tzSign = tzChar == '-' ? -1 : 1;
-                pos++;
-                int[] tzHourResult = parseDigits(str, pos, 2, 2);
-                if (tzHourResult == null) {
-                    return Double.NaN;
-                }
-                pos = tzHourResult[1];
-                int tzMinutes;
-                if (pos < len && str.charAt(pos) == ':') {
-                    pos++;
-                    int[] tzMinResult = parseDigits(str, pos, 2, 2);
-                    if (tzMinResult == null) {
-                        return Double.NaN;
-                    }
-                    tzMinutes = tzMinResult[0];
-                    pos = tzMinResult[1];
-                } else {
-                    int[] tzMinResult = parseDigits(str, pos, 2, 2);
-                    if (tzMinResult == null) {
-                        return Double.NaN;
-                    }
-                    tzMinutes = tzMinResult[0];
-                    pos = tzMinResult[1];
-                }
-                fields[8] = tzSign * (tzHourResult[0] * 60 + tzMinutes);
-            } else {
-                return Double.NaN; // extraneous characters
-            }
-        }
-
-        // Error if extraneous characters remain
-        if (pos != len) {
-            return Double.NaN;
-        }
-
-        // Validate fields (following QuickJS js_Date_parse)
-        int[] fieldMax = {0, 11, 31, 24, 59, 59};
-        for (int i = 1; i < 6; i++) {
-            if (fields[i] > fieldMax[i]) {
-                return Double.NaN;
-            }
-        }
-        // Special case: 24:00:00.000 is only valid with zero minutes/seconds/ms
-        if (fields[3] == 24 && (fields[4] | fields[5] | fields[6]) != 0) {
-            return Double.NaN;
-        }
-
-        // Convert to epoch milliseconds
-        double[] dateFields = new double[7];
-        for (int i = 0; i < 7; i++) {
-            dateFields[i] = fields[i];
-        }
-        return setDateFields(dateFields, isLocal) - (double) fields[8] * 60000;
-    }
-
-    private static double parseNoteDateTimeWithSpace(String str) {
-        Matcher matcher = NOTE_DATETIME_WITH_SPACE_PATTERN.matcher(str);
-        if (!matcher.matches()) {
-            return Double.NaN;
-        }
-
-        int year = Integer.parseInt(matcher.group("year"));
-        int month = Integer.parseInt(matcher.group("month"));
-        int day = Integer.parseInt(matcher.group("day"));
-        int hour = Integer.parseInt(matcher.group("hour"));
-        int minute = Integer.parseInt(matcher.group("minute"));
-        int second = 0;
-        int millisecond = 0;
-
-        String secondGroup = matcher.group("second");
-        if (secondGroup != null) {
-            second = Integer.parseInt(secondGroup);
-            String fractionGroup = matcher.group("fraction");
-            if (fractionGroup != null) {
-                if (fractionGroup.length() >= 3) {
-                    millisecond = Integer.parseInt(fractionGroup.substring(0, 3));
-                } else if (fractionGroup.length() == 2) {
-                    millisecond = Integer.parseInt(fractionGroup) * 10;
-                } else {
-                    millisecond = Integer.parseInt(fractionGroup) * 100;
-                }
-            }
-        }
-
-        if (month < 1 || month > 12 || day < 1 || day > 31) {
-            return Double.NaN;
-        }
-        if (hour > 24 || minute > 59 || second > 59) {
-            return Double.NaN;
-        }
-        if (hour == 24 && (minute != 0 || second != 0 || millisecond != 0)) {
-            return Double.NaN;
-        }
-
-        double[] fields = new double[7];
-        fields[0] = year;
-        fields[1] = month - 1;
-        fields[2] = day;
-        fields[3] = hour;
-        fields[4] = minute;
-        fields[5] = second;
-        fields[6] = millisecond;
-
-        if (matcher.group("z") != null) {
-            return setDateFields(fields, false);
-        }
-
-        String tzSign = matcher.group("tzSign");
-        if (tzSign != null) {
-            int timezoneHour = Integer.parseInt(matcher.group("tzHour"));
-            String timezoneMinuteGroup = matcher.group("tzMinute");
-            int timezoneMinute = timezoneMinuteGroup == null ? 0 : Integer.parseInt(timezoneMinuteGroup);
-            if (timezoneHour > 23 || timezoneMinute > 59) {
-                return Double.NaN;
-            }
-            int offsetMinutes = timezoneHour * 60 + timezoneMinute;
-            if ("-".equals(tzSign)) {
-                offsetMinutes = -offsetMinutes;
-            }
-            return setDateFields(fields, false) - (double) offsetMinutes * 60_000;
-        }
-
-        return setDateFields(fields, true);
-    }
-
-    public static double setDateFields(double[] fields, boolean isLocal) {
+    static double makeDate(double[] fields) {
         double year = fields[0];
         double month = fields[1];
         double date = fields[2];
@@ -615,10 +303,37 @@ public final class JSDate extends JSObject {
         if (!Double.isFinite(tv)) {
             return Double.NaN;
         }
+        return tv;
+    }
+
+    private static long mathMod(long a, long b) {
+        long m = a % b;
+        return m + (m < 0 ? b : 0);
+    }
+
+    /**
+     * Date.parse: the date time string format, then the legacy formats V8 accepts.
+     *
+     * @param input
+     *            the string, or null
+     * @return the time value, or {@code NaN}
+     * @see JSDateParser
+     */
+    public static double parseDateString(String input) {
+        if (input == null) {
+            return Double.NaN;
+        }
+        return JSDateParser.parse(input);
+    }
+
+    public static double setDateFields(double[] fields, boolean isLocal) {
+        double tv = makeDate(fields);
+        if (Double.isNaN(tv)) {
+            return Double.NaN;
+        }
 
         if (isLocal) {
-            long ti = clampToLong(tv);
-            tv += (double) getTimezoneOffset(ti) * 60_000;
+            tv -= getLocalOffsetSeconds(SYSTEM_ZONE_RULES, clampToLong(tv)) * 1000D;
         }
 
         return timeClip(tv);

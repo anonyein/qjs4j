@@ -30,15 +30,14 @@ import java.util.*;
 public final class RegExpCompiler {
 
     /**
-     * Maximum number of capture groups in one pattern, counting group 0 — QuickJS {@code CAPTURE_COUNT_MAX}, so 254
-     * explicit groups.
+     * Maximum number of capture groups in one pattern, counting group 0: V8's limit, 32,767 explicit groups. Capture
+     * indices are encoded in two bytes.
      * <p>
-     * Two reasons, beyond matching QuickJS: the compiled bytecode encodes capture indices as a single byte
-     * ({@code appendU8(captureCount - 1)}), so a 256th group silently wrapped and produced bytecode that reset the
-     * wrong capture range; and the matcher's backtrack entry grows by two ints per capture, so an unbounded capture
-     * count let a guest-supplied pattern set the size of every backtrack frame.
+     * The limit was QuickJS's 255, set by its one-byte encoding, so a pattern with 255 groups that V8 compiles was a
+     * {@code SyntaxError}. A capture count no longer sets an unbounded cost: each saved backtrack state grows by two
+     * ints per capture, and the backtrack store is capped at 64 MB, past which a match is a {@code RangeError}.
      */
-    private static final int CAPTURE_COUNT_MAX = 255;
+    private static final int CAPTURE_COUNT_MAX = 32_768;
     /**
      * JavaScript whitespace ranges for \s (differs from Unicode White_Space: includes U+FEFF which is not in the
      * Unicode White_Space property). Pairs of [start, end] inclusive.
@@ -133,7 +132,8 @@ public final class RegExpCompiler {
         try {
             compilePattern(context);
             if (context.pos != context.codePoints.length) {
-                throw new RegExpSyntaxException("Unexpected character in pattern");
+                throw new RegExpSyntaxException(
+                        context.codePoints[context.pos] == ')' ? "Unmatched ')'" : "Unexpected character in pattern");
             }
             // End with MATCH opcode
             buffer.appendU8(RegExpOpcode.MATCH.getCode());
@@ -153,6 +153,9 @@ public final class RegExpCompiler {
                     // point for a typical pattern.
                     Math.min(context.nextAdvanceCheckRegister, RegExpBytecode.ExecutionLimits.MAX_REGISTERS),
                     compiledGroupNames);
+        } catch (RegExpSyntaxException e) {
+            // The reason as it was found, as V8 reports it.
+            throw e;
         } catch (Exception e) {
             throw new RegExpSyntaxException("Failed to compile pattern: " + e.getMessage(), e);
         }
@@ -227,16 +230,16 @@ public final class RegExpCompiler {
             }
 
             case '*', '+', '?' -> {
-                throw new RegExpSyntaxException("Nothing to repeat at position " + context.pos);
+                throw new RegExpSyntaxException("Nothing to repeat");
             }
 
             case '{' -> {
                 if (startsWithValidQuantifier(context)) {
-                    throw new RegExpSyntaxException("Nothing to repeat at position " + context.pos);
+                    throw new RegExpSyntaxException("Nothing to repeat");
                 }
                 // In unicode mode, lone '{' is a syntax error (not AnnexB literal)
                 if (context.isUnicodeMode()) {
-                    throw new RegExpSyntaxException("Lone quantifier bracket at position " + context.pos);
+                    throw new RegExpSyntaxException("Lone quantifier brackets");
                 }
                 compileLiteralChar(context, ch, isBackwardDirection);
                 context.pos++;
@@ -245,7 +248,7 @@ public final class RegExpCompiler {
             case '}' -> {
                 // In unicode mode, lone '}' outside a quantifier is a syntax error
                 if (context.isUnicodeMode()) {
-                    throw new RegExpSyntaxException("Lone quantifier bracket at position " + context.pos);
+                    throw new RegExpSyntaxException("Lone quantifier brackets");
                 }
                 compileLiteralChar(context, ch, isBackwardDirection);
                 context.pos++;
@@ -253,7 +256,7 @@ public final class RegExpCompiler {
 
             case ']' -> {
                 if (context.isUnicodeMode()) {
-                    throw new RegExpSyntaxException("Unexpected ']'");
+                    throw new RegExpSyntaxException("Lone quantifier brackets");
                 }
                 compileLiteralChar(context, ch, isBackwardDirection);
                 context.pos++;
@@ -372,7 +375,7 @@ public final class RegExpCompiler {
         }
 
         if (!foundClosingBracket) {
-            throw new RegExpSyntaxException("Unclosed character class");
+            throw new RegExpSyntaxException("Unterminated character class");
         }
 
         // Emit RANGE/NOT_RANGE or RANGE_I/NOT_RANGE_I opcode based on inverted flag
@@ -536,13 +539,13 @@ public final class RegExpCompiler {
 
                 GroupNameParseResult groupNameParseResult = parseGroupName(context.codePoints, context.pos);
                 if (groupNameParseResult == null) {
-                    throw new RegExpSyntaxException("invalid group name");
+                    throw new RegExpSyntaxException("Invalid capture group name");
                 }
                 context.pos = groupNameParseResult.nextPos();
 
                 Integer groupNum = namedCaptureIndices.get(groupNameParseResult.name());
                 if (groupNum == null) {
-                    throw new RegExpSyntaxException("group name not defined");
+                    throw new RegExpSyntaxException("Invalid named capture referenced");
                 }
 
                 context.buffer.appendU8(context.isIgnoreCase()
@@ -552,7 +555,7 @@ public final class RegExpCompiler {
                         : (isBackwardDirection
                                 ? RegExpOpcode.BACKWARD_BACK_REFERENCE.getCode()
                                 : RegExpOpcode.BACK_REFERENCE.getCode()));
-                context.buffer.appendU8(groupNum);
+                context.buffer.appendU16(groupNum);
             }
             case 'p', 'P' -> {
                 if (!context.isUnicodeMode()) {
@@ -603,7 +606,7 @@ public final class RegExpCompiler {
                             : (isBackwardDirection
                                     ? RegExpOpcode.BACKWARD_BACK_REFERENCE.getCode()
                                     : RegExpOpcode.BACK_REFERENCE.getCode()));
-                    context.buffer.appendU8(groupNum);
+                    context.buffer.appendU16(groupNum);
                 } else if (!context.isUnicodeMode()) {
                     // AnnexB: In non-unicode mode, invalid backreferences are
                     // treated as octal escapes (\1-\7) or identity escapes (\8-\9)
@@ -762,7 +765,7 @@ public final class RegExpCompiler {
         if (context.pos < context.codePoints.length && context.codePoints[context.pos] == '?') {
             context.pos++;
             if (context.pos >= context.codePoints.length) {
-                throw new RegExpSyntaxException("Incomplete group syntax");
+                throw new RegExpSyntaxException("Invalid group");
             }
             InlineModifierGroupParseResult inlineModifierGroupParseResult = tryParseInlineModifierGroup(context);
             if (inlineModifierGroupParseResult != null) {
@@ -774,7 +777,7 @@ public final class RegExpCompiler {
                     context.currentFlags = savedFlags;
                 }
                 if (context.pos >= context.codePoints.length || context.codePoints[context.pos] != ')') {
-                    throw new RegExpSyntaxException("Unclosed group");
+                    throw new RegExpSyntaxException("Unterminated group");
                 }
                 context.pos++;
                 context.lastAtomCanRepeat = true;
@@ -806,19 +809,19 @@ public final class RegExpCompiler {
 
                 GroupNameParseResult groupNameParseResult = parseGroupName(context.codePoints, context.pos);
                 if (groupNameParseResult == null) {
-                    throw new RegExpSyntaxException("invalid group name");
+                    throw new RegExpSyntaxException("Invalid capture group name");
                 }
                 context.pos = groupNameParseResult.nextPos();
                 captureName = groupNameParseResult.name();
             } else {
-                throw new RegExpSyntaxException("Unknown group type: (?" + (char) groupType);
+                throw new RegExpSyntaxException("Invalid group");
             }
         }
 
         int groupIndex = -1;
         if (isCapturing) {
             if (captureCount >= CAPTURE_COUNT_MAX) {
-                throw new RegExpSyntaxException("too many captures");
+                throw new RegExpSyntaxException("Too many captures");
             }
             groupIndex = captureCount++;
             ensureGroupNameSize(groupIndex + 1);
@@ -828,7 +831,7 @@ public final class RegExpCompiler {
             // Save start
             context.buffer.appendU8(
                     isBackwardDirection ? RegExpOpcode.SAVE_END.getCode() : RegExpOpcode.SAVE_START.getCode());
-            context.buffer.appendU8(groupIndex);
+            context.buffer.appendU16(groupIndex);
         }
 
         // Compile group contents
@@ -838,11 +841,11 @@ public final class RegExpCompiler {
             // Save end
             context.buffer.appendU8(
                     isBackwardDirection ? RegExpOpcode.SAVE_START.getCode() : RegExpOpcode.SAVE_END.getCode());
-            context.buffer.appendU8(groupIndex);
+            context.buffer.appendU16(groupIndex);
         }
 
         if (context.pos >= context.codePoints.length || context.codePoints[context.pos] != ')') {
-            throw new RegExpSyntaxException("Unclosed group");
+            throw new RegExpSyntaxException("Unterminated group");
         }
         context.pos++; // Skip ')'
         context.lastAtomCanRepeat = true;
@@ -891,7 +894,7 @@ public final class RegExpCompiler {
         context.buffer.setU32(lookaheadStart + 1, lookaheadLen);
 
         if (context.pos >= context.codePoints.length || context.codePoints[context.pos] != ')') {
-            throw new RegExpSyntaxException("Unclosed lookahead");
+            throw new RegExpSyntaxException("Unterminated group");
         }
         context.pos++; // Skip ')'
     }
@@ -914,7 +917,7 @@ public final class RegExpCompiler {
         context.buffer.setU32(lookbehindStart + 1, lookbehindLen);
 
         if (context.pos >= context.codePoints.length || context.codePoints[context.pos] != ')') {
-            throw new RegExpSyntaxException("Unclosed lookbehind");
+            throw new RegExpSyntaxException("Unterminated group");
         }
         context.pos++; // Skip ')'
     }
@@ -922,13 +925,13 @@ public final class RegExpCompiler {
     private void compilePattern(CompileContext context) {
         // Save start of capture group 0
         context.buffer.appendU8(RegExpOpcode.SAVE_START.getCode());
-        context.buffer.appendU8(0); // Capture group 0
+        context.buffer.appendU16(0); // Capture group 0
 
         compileDisjunction(context, false);
 
         // Save end of capture group 0
         context.buffer.appendU8(RegExpOpcode.SAVE_END.getCode());
-        context.buffer.appendU8(0); // Capture group 0
+        context.buffer.appendU16(0); // Capture group 0
     }
 
     private void compileQuantifier(CompileContext context, int atomStart, int captureCountBeforeAtom) {
@@ -996,10 +999,12 @@ public final class RegExpCompiler {
         boolean needInitialCaptureResetBeforeQuantifier = false;
         if (needCaptureReset) {
             // Prepend SAVE_RESET to the atom code so captures are cleared at each iteration
-            byte[] resetPrefix = new byte[3];
+            byte[] resetPrefix = new byte[5];
             resetPrefix[0] = (byte) RegExpOpcode.SAVE_RESET.getCode();
             resetPrefix[1] = (byte) captureCountBeforeAtom;
-            resetPrefix[2] = (byte) (captureCount - 1);
+            resetPrefix[2] = (byte) (captureCountBeforeAtom >>> 8);
+            resetPrefix[3] = (byte) (captureCount - 1);
+            resetPrefix[4] = (byte) ((captureCount - 1) >>> 8);
             byte[] newAtomCode = new byte[resetPrefix.length + atomCode.length];
             System.arraycopy(resetPrefix, 0, newAtomCode, 0, resetPrefix.length);
             System.arraycopy(atomCode, 0, newAtomCode, resetPrefix.length, atomCode.length);
@@ -1017,8 +1022,8 @@ public final class RegExpCompiler {
 
         if (needInitialCaptureResetBeforeQuantifier) {
             context.buffer.appendU8(RegExpOpcode.SAVE_RESET.getCode());
-            context.buffer.appendU8(captureCountBeforeAtom);
-            context.buffer.appendU8(captureCount - 1);
+            context.buffer.appendU16(captureCountBeforeAtom);
+            context.buffer.appendU16(captureCount - 1);
         }
 
         if (min > MAX_UNROLLED_QUANTIFIER_REPETITIONS) {
@@ -1165,11 +1170,14 @@ public final class RegExpCompiler {
 
             if (!context.lastAtomCanRepeat
                     && (ch == '*' || ch == '+' || ch == '?' || (ch == '{' && startsWithValidQuantifier(context)))) {
-                throw new RegExpSyntaxException("Nothing to repeat at position " + context.pos);
+                throw new RegExpSyntaxException("Nothing to repeat");
             }
 
             if (ch == '*' || ch == '+' || ch == '?' || (ch == '{' && startsWithValidQuantifier(context))) {
                 compileQuantifier(context, atomStart, captureCountBeforeAtom);
+            } else if (ch == '{' && context.isUnicodeMode() && context.lastAtomCanRepeat) {
+                // After an atom an unparsable '{' is a broken quantifier, as V8 reports it, not a lone bracket.
+                throw new RegExpSyntaxException("Incomplete quantifier");
             }
         }
     }
@@ -1245,7 +1253,7 @@ public final class RegExpCompiler {
 
         ExtendedClassSet extendedClassSet = parseUnicodeSetsExpression(context);
         if (context.pos >= context.codePoints.length || context.codePoints[context.pos] != ']') {
-            throw new RegExpSyntaxException("Unclosed character class");
+            throw new RegExpSyntaxException("Unterminated character class");
         }
         context.pos++; // Skip ']'
 
@@ -1959,7 +1967,7 @@ public final class RegExpCompiler {
         }
 
         if (max < min) {
-            throw new RegExpSyntaxException("Invalid quantifier range {" + min + "," + max + "}");
+            throw new RegExpSyntaxException("numbers out of order in {} quantifier");
         }
 
         return new int[]{min, max};
@@ -2038,21 +2046,22 @@ public final class RegExpCompiler {
 
     private ExtendedClassSet parseUnicodeSetsElement(CompileContext context) {
         if (context.pos >= context.codePoints.length) {
-            throw new RegExpSyntaxException("Unexpected end of character class");
+            throw new RegExpSyntaxException("Unterminated character class");
         }
         int currentChar = context.codePoints[context.pos];
         if (currentChar == '\\') {
             context.pos++;
             return parseUnicodeSetsEscapeElement(context);
         }
+        // V8's wording for each.
         if (currentChar == ']' || currentChar == '[') {
-            throw new RegExpSyntaxException("Invalid character in UnicodeSets character class");
+            throw new RegExpSyntaxException("Invalid character in character class");
         }
         if (isInvalidUnicodeSetsClassSinglePunctuator(currentChar)) {
-            throw new RegExpSyntaxException("Invalid character in UnicodeSets character class");
+            throw new RegExpSyntaxException("Invalid character in character class");
         }
         if (isInvalidUnicodeSetsDoublePunctuator(context, currentChar)) {
-            throw new RegExpSyntaxException("Invalid character in UnicodeSets character class");
+            throw new RegExpSyntaxException("Invalid set operation in character class");
         }
         context.pos++;
         return singleCodePointExtendedClassSet(currentChar);
@@ -2079,44 +2088,64 @@ public final class RegExpCompiler {
         return singleCodePointExtendedClassSet(parsedValue);
     }
 
+    /**
+     * ClassSetExpression in {@code v} mode: exactly one of a union, an intersection ({@code &&}) or a subtraction
+     * ({@code --}), whose operands are nested classes, escapes or single characters but not ranges. The operators used
+     * to be accepted in any mix, as in {@code [a&&b--c]} and {@code [ab&&c]}, and {@code [a&&&b]} was accepted.
+     */
     private ExtendedClassSet parseUnicodeSetsExpression(CompileContext context) {
-        ExtendedClassSet result = parseUnicodeSetsIntersectionDifference(context);
-        while (true) {
-            if (context.pos >= context.codePoints.length || context.codePoints[context.pos] == ']') {
-                break;
+        if (isUnicodeSetsClassEnd(context)) {
+            return new ExtendedClassSet(new int[0], List.of(), null);
+        }
+        // A class cannot start with an operator; V8 reports a leading "--" as two stray '-' characters.
+        if (isUnicodeSetsOperatorAt(context, "&&")) {
+            throw new RegExpSyntaxException("Invalid set operation in character class");
+        }
+        if (isUnicodeSetsOperatorAt(context, "--")) {
+            throw new RegExpSyntaxException("Invalid character in character class");
+        }
+        context.lastUnicodeSetsOperandWasRange = false;
+        ExtendedClassSet result = parseUnicodeSetsOperand(context);
+        String operator = isUnicodeSetsOperatorAt(context, "&&")
+                ? "&&"
+                : isUnicodeSetsOperatorAt(context, "--") ? "--" : null;
+        if (operator != null) {
+            if (context.lastUnicodeSetsOperandWasRange) {
+                throw new RegExpSyntaxException("Invalid set operation in character class");
             }
+            while (isUnicodeSetsOperatorAt(context, operator)) {
+                context.pos += 2;
+                // ClassIntersection :: ClassSetOperand && [lookahead ≠ &] ClassSetOperand
+                if ("&&".equals(operator) && context.pos < context.codePoints.length
+                        && context.codePoints[context.pos] == '&') {
+                    throw new RegExpSyntaxException("Invalid character in character class");
+                }
+                context.lastUnicodeSetsOperandWasRange = false;
+                ExtendedClassSet right = parseUnicodeSetsOperand(context);
+                if (context.lastUnicodeSetsOperandWasRange) {
+                    throw new RegExpSyntaxException("Invalid set operation in character class");
+                }
+                result = "&&".equals(operator)
+                        ? intersectExtendedClassSets(result, right)
+                        : subtractExtendedClassSets(result, right);
+            }
+            if (!isUnicodeSetsClassEnd(context)) {
+                throw new RegExpSyntaxException("Invalid set operation in character class");
+            }
+            return normalizeExtendedClassSet(result);
+        }
+        while (!isUnicodeSetsClassEnd(context)) {
             if (isUnicodeSetsOperatorAt(context, "&&") || isUnicodeSetsOperatorAt(context, "--")) {
-                break;
+                throw new RegExpSyntaxException("Invalid set operation in character class");
             }
-            ExtendedClassSet nextOperand = parseUnicodeSetsIntersectionDifference(context);
-            result = unionExtendedClassSets(result, nextOperand);
+            result = unionExtendedClassSets(result, parseUnicodeSetsOperand(context));
         }
         return normalizeExtendedClassSet(result);
     }
 
-    private ExtendedClassSet parseUnicodeSetsIntersectionDifference(CompileContext context) {
-        ExtendedClassSet result = parseUnicodeSetsOperand(context);
-        while (true) {
-            if (isUnicodeSetsOperatorAt(context, "&&")) {
-                context.pos += 2;
-                ExtendedClassSet right = parseUnicodeSetsOperand(context);
-                result = intersectExtendedClassSets(result, right);
-                continue;
-            }
-            if (isUnicodeSetsOperatorAt(context, "--")) {
-                context.pos += 2;
-                ExtendedClassSet right = parseUnicodeSetsOperand(context);
-                result = subtractExtendedClassSets(result, right);
-                continue;
-            }
-            break;
-        }
-        return result;
-    }
-
     private ExtendedClassSet parseUnicodeSetsOperand(CompileContext context) {
         if (context.pos >= context.codePoints.length) {
-            throw new RegExpSyntaxException("Unexpected end of character class");
+            throw new RegExpSyntaxException("Unterminated character class");
         }
         if (context.codePoints[context.pos] == '[') {
             context.pos++;
@@ -2127,9 +2156,11 @@ public final class RegExpCompiler {
             }
             ExtendedClassSet nested = parseUnicodeSetsExpression(context);
             if (context.pos >= context.codePoints.length || context.codePoints[context.pos] != ']') {
-                throw new RegExpSyntaxException("Unclosed character class");
+                throw new RegExpSyntaxException("Unterminated character class");
             }
             context.pos++;
+            // A nested class is an operand whatever ranges it contains.
+            context.lastUnicodeSetsOperandWasRange = false;
             if (inverted) {
                 if (!nested.sequences().isEmpty()) {
                     throw new RegExpSyntaxException("Invalid UnicodeSets negated class");
@@ -2141,6 +2172,10 @@ public final class RegExpCompiler {
         ExtendedClassSet firstElement = parseUnicodeSetsElement(context);
         if (firstElement.singleCodePoint() == null) {
             return firstElement;
+        }
+        if (context.pos + 1 == context.codePoints.length && context.codePoints[context.pos] == '-') {
+            // A range cut off by the end of the pattern: the class is unterminated, as V8 reports it.
+            throw new RegExpSyntaxException("Unterminated character class");
         }
         if (context.pos < context.codePoints.length && context.codePoints[context.pos] == '-'
                 && !isUnicodeSetsOperatorAt(context, "--") && context.pos + 1 < context.codePoints.length
@@ -2155,6 +2190,7 @@ public final class RegExpCompiler {
             if (rangeStart > rangeEnd) {
                 throw new RegExpSyntaxException("Range out of order in character class");
             }
+            context.lastUnicodeSetsOperandWasRange = true;
             return new ExtendedClassSet(new int[]{rangeStart, rangeEnd}, List.of(), null);
         }
         return firstElement;
@@ -2384,7 +2420,7 @@ public final class RegExpCompiler {
                     }
                     GroupNameParseResult groupNameParseResult = parseGroupName(codePoints, i + 3);
                     if (groupNameParseResult == null) {
-                        throw new RegExpSyntaxException("invalid group name");
+                        throw new RegExpSyntaxException("Invalid capture group name");
                     }
                     String name = groupNameParseResult.name();
                     if (currentAltStack.peek().contains(name)) {
@@ -2530,7 +2566,7 @@ public final class RegExpCompiler {
             int currentChar = context.codePoints[context.pos];
             if (currentChar == ':') {
                 if (!sawModifierFlag) {
-                    throw new RegExpSyntaxException("Invalid inline modifiers");
+                    throw new RegExpSyntaxException("Invalid flag group");
                 }
                 context.pos++;
                 int scopedFlags = (context.currentFlags | addFlags) & ~removeFlags;
@@ -2538,7 +2574,7 @@ public final class RegExpCompiler {
             }
             if (currentChar == '-') {
                 if (sawDash) {
-                    throw new RegExpSyntaxException("Invalid inline modifiers");
+                    throw new RegExpSyntaxException("Multiple dashes in flag group");
                 }
                 sawDash = true;
                 parsingRemoveFlags = true;
@@ -2546,17 +2582,17 @@ public final class RegExpCompiler {
                 continue;
             }
             if (!isInlineModifierFlag(currentChar)) {
-                throw new RegExpSyntaxException("Invalid inline modifiers");
+                throw new RegExpSyntaxException("Invalid group");
             }
             int flagBit = toInlineModifierFlagBit(currentChar);
             if (!parsingRemoveFlags) {
                 if ((addFlags & flagBit) != 0) {
-                    throw new RegExpSyntaxException("Invalid inline modifiers");
+                    throw new RegExpSyntaxException("Repeated flag in flag group");
                 }
                 addFlags |= flagBit;
             } else {
                 if ((removeFlags & flagBit) != 0 || (addFlags & flagBit) != 0) {
-                    throw new RegExpSyntaxException("Invalid inline modifiers");
+                    throw new RegExpSyntaxException("Repeated flag in flag group");
                 }
                 removeFlags |= flagBit;
             }
@@ -2564,7 +2600,7 @@ public final class RegExpCompiler {
             context.pos++;
         }
 
-        throw new RegExpSyntaxException("Incomplete group syntax");
+        throw new RegExpSyntaxException("Invalid group");
     }
 
     private UnicodeEscapeParseResult tryParseUnicodeEscapeAt(CompileContext context, int startPos) {
@@ -2655,6 +2691,10 @@ public final class RegExpCompiler {
         }
     }
 
+    private static boolean isUnicodeSetsClassEnd(CompileContext context) {
+        return context.pos >= context.codePoints.length || context.codePoints[context.pos] == ']';
+    }
+
     /**
      * The declared payload length of a {@code RANGE}-family instruction.
      * <p>
@@ -2697,6 +2737,7 @@ public final class RegExpCompiler {
         int currentFlags;
         final int flags;
         boolean lastAtomCanRepeat;
+        boolean lastUnicodeSetsOperandWasRange;
         int nextAdvanceCheckRegister;
         final String pattern;
         int pos;

@@ -50,11 +50,15 @@ public final class JSRangeError extends JSError {
             }
         }
         JSRangeError jsRangeError = context.createJSRangeError(message);
+        if (args.length > 0 && !args[0].isUndefined()) {
+            JSError.defineEmptyMessage(jsRangeError, message);
+        }
         if (args.length > 1) {
             if (!JSError.installErrorCause(context, jsRangeError, args[1])) {
                 return JSUndefined.INSTANCE;
             }
         }
+        JSError.captureStackTraceBelowNewTarget(context, jsRangeError);
         return jsRangeError;
     }
 

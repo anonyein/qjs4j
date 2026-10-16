@@ -57,6 +57,7 @@ final class ForStatementCompiler extends AstNodeCompiler<ForStatement> {
                 compilerContext.expressionCompiler.compile(expr);
                 compilerContext.emitter.emitOpcode(Opcode.DROP);
             } else if (forStmt.getInit() instanceof ExpressionStatement exprStmt) {
+                compilerContext.emitter.emitSourcePosition(exprStmt.getLocation());
                 compilerContext.expressionCompiler.compile(exprStmt.getExpression());
                 compilerContext.emitter.emitOpcode(Opcode.DROP);
             }

@@ -17,6 +17,7 @@
 package com.caoccao.qjs4j.test262;
 
 import com.caoccao.qjs4j.core.JSContext;
+import com.caoccao.qjs4j.core.JSFileSystemModuleLoader;
 import com.caoccao.qjs4j.core.JSRuntime;
 import com.caoccao.qjs4j.core.JSRuntimeOptions;
 import com.caoccao.qjs4j.core.JSValue;
@@ -91,7 +92,8 @@ final class Test262Agent implements AutoCloseable {
     private void run() {
         List<JSRuntime> agentRealmRuntimes = new ArrayList<>();
         try (JSRuntime agentRuntime = new JSRuntime(
-                new JSRuntimeOptions().setAtomicsObject(host.getSharedAtomicsObject()).setTemporalEnabled(true));
+                new JSRuntimeOptions().setAtomicsObject(host.getSharedAtomicsObject())
+                        .setModuleLoader(new JSFileSystemModuleLoader()).setTemporalEnabled(true));
                 JSContext agentContext = agentRuntime.createContext()) {
             runtime = agentRuntime;
             test262Executor.install262Object(agentContext, agentRealmRuntimes, host, this);

@@ -16,6 +16,7 @@
 
 package com.caoccao.qjs4j.cli;
 
+import com.caoccao.qjs4j.core.JSRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,9 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,11 +51,11 @@ public class QuickJSInterpreterTest {
     Path workingDirectory;
 
     private String err() {
-        return capturedErr.toString(StandardCharsets.UTF_8);
+        return captured(capturedErr);
     }
 
     private String out() {
-        return capturedOut.toString(StandardCharsets.UTF_8);
+        return captured(capturedOut);
     }
 
     @BeforeEach
@@ -71,10 +75,61 @@ public class QuickJSInterpreterTest {
     }
 
     @Test
+    public void testAHandledRejectionIsNotReported() {
+        assertThat(QuickJSInterpreter.run(new String[]{"-e", """
+                const late = Promise.reject(new Error('late'));
+                (async () => { try { await Promise.reject(new Error('caught')) } catch (e) {} })();
+                Promise.resolve().then(() => late.catch(() => {}));
+                console.log('done');"""})).isZero();
+        assertThat(out()).contains("done");
+        assertThat(err()).doesNotContain("Uncaught");
+    }
+
+    @Test
+    public void testAnUnhandledRejectionIsReportedAndExitsNonZero() {
+        // Used to print nothing and exit 0; node reports it and fails.
+        assertThat(QuickJSInterpreter.run(new String[]{"-e", """
+                Promise.reject(new Error('truly-unhandled'));
+                (async () => { throw new TypeError('async-unhandled') })();
+                console.log('still runs');"""})).isEqualTo(1);
+        assertThat(out()).contains("still runs");
+        assertThat(err()).contains("qjs4j: Uncaught (in promise) Error: truly-unhandled")
+                .contains("qjs4j: Uncaught (in promise) TypeError: async-unhandled");
+    }
+
+    @Test
     public void testBlankStackFallsBackToTheHeadline() {
         assertThat(QuickJSInterpreter.run(new String[]{"-e", "throw { message: 'blank stack', stack: '   ' }"}))
                 .isEqualTo(1);
         assertThat(err()).contains("blank stack");
+    }
+
+    @Test
+    public void testDeeplyNestedSourceIsReportedAsARangeError() {
+        // Used to end the process with a JVM stack dump: the parser's StackOverflowError escaped
+        // every engine catch and the interpreter's own last resort caught RuntimeException only.
+        String deep = "(".repeat(100_000) + "1" + ")".repeat(100_000);
+        assertThat(QuickJSInterpreter.run(new String[]{"-e", deep})).isEqualTo(1);
+        assertThat(err()).contains("RangeError: Maximum call stack size exceeded")
+                .doesNotContain("java.lang.StackOverflowError");
+    }
+
+    @Test
+    public void testDeepRecursionReachesTheDefaultCallDepth() throws InterruptedException {
+        // On the JVM's default thread stack this ran out at a few hundred frames.
+        assertThat(QuickJSInterpreter.runWithLargeStack(
+                new String[]{"-e", "function f(n) { return n === 0 ? 'bottom' : f(n - 1) } console.log(f(9900))"}))
+                .isZero();
+        assertThat(out()).contains("bottom");
+    }
+
+    @Test
+    public void testErrorEscapingTheEngineIsReportedAndExitsNonZero() {
+        // A termination signal is a java.lang.Error by design, so that a script cannot catch it.
+        // The interpreter must still report it as a failure rather than die with a stack dump.
+        assertThat(QuickJSInterpreter.run(new String[]{"-e", "while (true) {}"}, JSRuntime::requestInterrupt))
+                .isEqualTo(1);
+        assertThat(err()).contains("qjs4j: ").contains("execution interrupted");
     }
 
     @Test
@@ -172,9 +227,138 @@ public class QuickJSInterpreterTest {
     }
 
     @Test
+    public void testTimerAndMicrotaskArgumentsAreValidated() {
+        assertThat(QuickJSInterpreter.run(new String[]{"-e", """
+                const names = [];
+                for (const call of [() => setTimeout(1), () => setInterval(), () => queueMicrotask('x')]) {
+                  try { call() } catch (e) { names.push(e.name + ': ' + e.message) }
+                }
+                try {
+                  setTimeout(() => {}, { valueOf() { throw new Error('delay') } });
+                } catch (e) { names.push(e.message) }
+                // A delay that is not a number from 1 to 2^31 - 1 is 1, so these run in creation order.
+                setTimeout(() => console.log('nan'), NaN);
+                setTimeout(() => console.log('negative'), -5);
+                setTimeout(() => console.log('huge'), 2 ** 40);
+                setTimeout(() => console.log('string'), '1');
+                setTimeout(() => console.log('default'));
+                clearTimeout();
+                clearTimeout(undefined);
+                clearTimeout(12345);
+                console.log(names.join(' | '));"""})).isZero();
+        assertThat(out()).isEqualTo("""
+                TypeError: The "callback" argument must be of type function | \
+                TypeError: The "callback" argument must be of type function | \
+                TypeError: The "callback" argument must be of type function | delay
+                nan
+                negative
+                huge
+                string
+                default
+                """);
+    }
+
+    @Test
+    public void testTimersAndMicrotasksRunInNodeOrder() {
+        // The CLI adds queueMicrotask and the timer functions, which scripts written for Node or browsers rely on.
+        // This order is node's. The three 1 ms interval ticks have 100 ms before the next timer is due, so the order
+        // holds on a loaded machine too; with 10 ms the last tick could slip behind the later timers.
+        assertThat(QuickJSInterpreter.run(new String[]{"-e", """
+                setTimeout(() => console.log('timeout 200'), 200);
+                setTimeout((a, b) => console.log('timeout 0 args', a, b), 0, 'x', 'y');
+                const cleared = setTimeout(() => console.log('cleared'), 50);
+                clearTimeout(cleared);
+                let count = 0;
+                const interval = setInterval(() => {
+                  console.log('interval', ++count);
+                  if (count === 3) clearInterval(interval);
+                }, 1);
+                queueMicrotask(() => console.log('microtask'));
+                Promise.resolve().then(() => console.log('promise'));
+                setTimeout(() => {
+                  Promise.resolve().then(() => console.log('promise in timer'));
+                  queueMicrotask(() => console.log('micro in timer'));
+                }, 100);
+                console.log('sync');"""})).isZero();
+        assertThat(out()).isEqualTo("""
+                sync
+                microtask
+                promise
+                timeout 0 args x y
+                interval 1
+                interval 2
+                interval 3
+                promise in timer
+                micro in timer
+                timeout 200
+                """);
+    }
+
+    @Test
     public void testUncaughtErrorExitsNonZeroWithADiagnosticMessage() {
         assertThat(QuickJSInterpreter.run(new String[]{"-e", "throw new TypeError('boom')"})).isEqualTo(1);
         assertThat(err()).contains("TypeError: boom");
+    }
+
+    @Test
+    public void testUncaughtErrorInACallbackEndsTheRun() {
+        for (String code : new String[]{
+                "setTimeout(() => { throw new Error('in timer') }, 1); setTimeout(() => console.log('never'), 50)", """
+                        queueMicrotask(() => { throw new Error('in micro') });
+                        queueMicrotask(() => { throw new Error('second') });
+                        setTimeout(() => console.log('never'), 5)""",
+                "setTimeout(queueMicrotask, 1); setTimeout(() => console.log('never'), 50)",
+                "setTimeout(() => Promise.reject(new Error('late')), 1); setTimeout(() => console.log('never'), 30)"}) {
+            capturedOut.reset();
+            capturedErr.reset();
+            assertThat(QuickJSInterpreter.run(new String[]{"-e", code})).as(code).isEqualTo(1);
+            assertThat(out()).as(code).doesNotContain("never");
+        }
+        assertThat(err()).contains("qjs4j: Uncaught (in promise) Error: late");
+    }
+
+    @Test
+    public void testUncaughtMicrotaskErrorStopsEveryJobBehindIt() throws IOException {
+        // Node exits as soon as a queueMicrotask callback throws: no microtask, promise job, timer or module code
+        // queued behind it runs. The error used to be recorded and reported after the drain, so everything behind it
+        // ran first, and a job that kept requeueing itself kept the error from ever being reported.
+        Path module = writeFile("failing.mjs", """
+                queueMicrotask(() => { throw new Error('boom') });
+                await null;
+                console.log('module body after await');""");
+        String[][] runs = {{"-e", """
+                queueMicrotask(() => { throw new Error('boom') });
+                queueMicrotask(() => console.log('microtask'));
+                Promise.resolve().then(() => console.log('promise job'));
+                setTimeout(() => console.log('timer'));"""}, {"-e", """
+                queueMicrotask(() => { throw new Error('boom') });
+                const spin = () => queueMicrotask(spin);
+                queueMicrotask(spin);"""}, {"-e", """
+                setTimeout(() => {
+                  queueMicrotask(() => { throw new Error('boom') });
+                  queueMicrotask(() => console.log('microtask in timer'));
+                });
+                setTimeout(() => console.log('second timer'));"""},
+                // Evaluation drains the microtask queue, so here the error is raised inside the timer callback.
+                {"-e", """
+                        setTimeout(() => eval("queueMicrotask(() => { throw new Error('boom') })"));
+                        setTimeout(() => console.log('second timer'));"""}, {"-m", module.toString()}};
+        // Should the drain not stop, the spinning job is interrupted rather than left to hang the build.
+        ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor();
+        try {
+            for (String[] run : runs) {
+                capturedOut.reset();
+                capturedErr.reset();
+                assertThat(QuickJSInterpreter.run(run,
+                        runtime -> watchdog.schedule(runtime::requestInterrupt, 60, TimeUnit.SECONDS))).as(run[1])
+                        .isEqualTo(1);
+                assertThat(out()).as(run[1]).isEmpty();
+                // The callback's own error, with its JavaScript stack, rather than the termination that carried it.
+                assertThat(err()).as(run[1]).startsWith("qjs4j: Error: boom\n    at ");
+            }
+        } finally {
+            watchdog.shutdownNow();
+        }
     }
 
     @Test
@@ -194,5 +378,10 @@ public class QuickJSInterpreterTest {
         Path path = workingDirectory.resolve(name);
         Files.writeString(path, content);
         return path;
+    }
+
+    private static String captured(ByteArrayOutputStream stream) {
+        // The CLI ends lines with the platform's separator; the expectations here are written with \n.
+        return stream.toString(StandardCharsets.UTF_8).replace(System.lineSeparator(), "\n");
     }
 }

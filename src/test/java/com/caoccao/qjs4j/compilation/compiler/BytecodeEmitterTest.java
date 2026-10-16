@@ -17,6 +17,7 @@
 package com.caoccao.qjs4j.compilation.compiler;
 
 import com.caoccao.qjs4j.BaseTest;
+import com.caoccao.qjs4j.compilation.ast.SourceLocation;
 import com.caoccao.qjs4j.core.JSNumber;
 import com.caoccao.qjs4j.core.JSString;
 import com.caoccao.qjs4j.vm.Bytecode;
@@ -145,6 +146,36 @@ public class BytecodeEmitterTest extends BaseTest {
         assertThat(patched).isEqualTo(sizeBeforePatch - (jumpPosition + 4));
         assertThat(code[0]).as("bytes before the patch are untouched").isEqualTo((byte) 0x01);
         assertThat(code[sizeBeforePatch - 1]).as("bytes after the patch are untouched").isEqualTo((byte) 0x02);
+    }
+
+    @Test
+    public void testSourcePositionsMapProgramCountersToTheSource() {
+        BytecodeEmitter emitter = new BytecodeEmitter();
+        emitter.emitSourcePosition(null);
+        emitter.emitSourcePosition(new SourceLocation(1, 1, 0));
+        // A second position at the same offset replaces the first.
+        emitter.emitSourcePosition(new SourceLocation(1, 5, 4));
+        emitter.emitU8(0);
+        // A position equal to the one in effect is not recorded again.
+        emitter.emitSourcePosition(new SourceLocation(1, 5, 4));
+        emitter.emitU8(0);
+        emitter.emitSourcePosition(null);
+        // More positions than the initial table holds.
+        for (int line = 2; line <= 40; line++) {
+            emitter.emitSourcePosition(new SourceLocation(line, 3, 0));
+            emitter.emitU8(0);
+        }
+        Bytecode bytecode = emitter.build(0);
+        int[] positions = bytecode.getSourcePositions();
+        assertThat(positions.length).isEqualTo(3 * 40);
+        assertThat(positions[0]).isZero();
+        assertThat(positions[1]).isEqualTo(1);
+        assertThat(positions[2]).isEqualTo(5);
+        assertThat(bytecode.getSourcePosition(0)).containsExactly(1, 5);
+        assertThat(bytecode.getSourcePosition(1)).as("between entries, the earlier one applies").containsExactly(1, 5);
+        assertThat(bytecode.getSourcePosition(2)).containsExactly(2, 3);
+        assertThat(bytecode.getSourcePosition(1000)).containsExactly(40, 3);
+        assertThat(new BytecodeEmitter().build(0).getSourcePosition(0)).as("no position recorded").isNull();
     }
 
     @Test

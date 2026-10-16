@@ -16,15 +16,12 @@
 
 package com.caoccao.qjs4j.compilation.compiler;
 
-import com.caoccao.qjs4j.compilation.ast.Expression;
 import com.caoccao.qjs4j.compilation.ast.Identifier;
 import com.caoccao.qjs4j.compilation.ast.MemberExpression;
 import com.caoccao.qjs4j.compilation.ast.PrivateIdentifier;
 import com.caoccao.qjs4j.core.JSSymbol;
 import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 import com.caoccao.qjs4j.vm.Opcode;
-
-import java.util.ArrayList;
 
 final class MemberExpressionCompiler extends AstNodeCompiler<MemberExpression> {
     MemberExpressionCompiler(CompilerContext compilerContext) {
@@ -33,79 +30,32 @@ final class MemberExpressionCompiler extends AstNodeCompiler<MemberExpression> {
 
     @Override
     void compile(MemberExpression memberExpr) {
+        boolean joinsOptionalChain = compilerContext.emitHelpers.consumeOptionalChainLink(memberExpr);
         if (memberExpr.getObject().isSuperIdentifier()) {
             compilerContext.emitHelpers.emitGetSuperValue(memberExpr, false);
             return;
         }
-
-        // Detect non-optional continuation of an optional chain (e.g., `.#f` in `o?.c.#f`)
-        // The entire chain after `?.` must short-circuit together.
-        if (!memberExpr.isOptional() && memberExpr.isPartOfOptionalChain()) {
-            compileOptionalChainFull(memberExpr);
-            return;
+        if (!joinsOptionalChain && memberExpr.isPartOfOptionalChain()) {
+            // The last link of an optional chain: every `?.` in it exits here.
+            compilerContext.emitHelpers.compileOptionalChain(() -> compileLink(memberExpr), null);
+        } else {
+            compileLink(memberExpr);
         }
-
-        compilerContext.expressionCompiler.compile(memberExpr.getObject());
-
-        if (memberExpr.isOptional()) {
-            compilerContext.emitter.emitOpcode(Opcode.DUP);
-            compilerContext.emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
-            int jumpToUndefined = compilerContext.emitter.emitJump(Opcode.IF_TRUE);
-
-            emitPropertyAccess(memberExpr);
-
-            int jumpToEnd = compilerContext.emitter.emitJump(Opcode.GOTO);
-
-            compilerContext.emitter.patchJump(jumpToUndefined, compilerContext.emitter.currentOffset());
-            compilerContext.emitter.emitOpcode(Opcode.DROP);
-            compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
-
-            compilerContext.emitter.patchJump(jumpToEnd, compilerContext.emitter.currentOffset());
-            return;
-        }
-
-        emitPropertyAccess(memberExpr);
     }
 
-    /**
-     * Compile an optional chain as a single unit so all accesses after `?.` share one short-circuit exit. E.g.,
-     * `o?.c.#f` -> null-check o, then access .c and .#f inside the non-null branch.
-     */
-    private void compileOptionalChainFull(MemberExpression memberExpr) {
-        var chain = new ArrayList<MemberExpression>();
-        Expression current = memberExpr;
-        while (current instanceof MemberExpression mem) {
-            chain.add(0, mem);
-            if (mem.isOptional()) {
-                break;
-            }
-            current = mem.getObject();
+    private void compileLink(MemberExpression memberExpr) {
+        // Stack: -> value
+        compilerContext.emitHelpers.compileOptionalChainLinkTarget(memberExpr, memberExpr.getObject());
+        if (memberExpr.isOptional()) {
+            compilerContext.emitHelpers.emitOptionalChainTest(1);
         }
-
-        MemberExpression optionalRoot = chain.get(0);
-
-        compilerContext.expressionCompiler.compile(optionalRoot.getObject());
-
-        compilerContext.emitter.emitOpcode(Opcode.DUP);
-        compilerContext.emitter.emitOpcode(Opcode.IS_UNDEFINED_OR_NULL);
-        int jumpToUndefined = compilerContext.emitter.emitJump(Opcode.IF_TRUE);
-
-        for (MemberExpression link : chain) {
-            emitPropertyAccess(link);
-        }
-
-        int jumpToEnd = compilerContext.emitter.emitJump(Opcode.GOTO);
-
-        compilerContext.emitter.patchJump(jumpToUndefined, compilerContext.emitter.currentOffset());
-        compilerContext.emitter.emitOpcode(Opcode.DROP);
-        compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
-
-        compilerContext.emitter.patchJump(jumpToEnd, compilerContext.emitter.currentOffset());
+        emitPropertyAccess(memberExpr);
     }
 
     private void emitPropertyAccess(MemberExpression memberExpr) {
         if (memberExpr.isComputed()) {
             compilerContext.expressionCompiler.compile(memberExpr.getProperty());
+            compilerContext.emitHelpers.emitMemberSourcePosition(memberExpr);
             compilerContext.emitter.emitOpcode(Opcode.GET_ARRAY_EL);
         } else if (memberExpr.getProperty() instanceof PrivateIdentifier privateId) {
             String fieldName = privateId.getName();
@@ -114,11 +64,14 @@ final class MemberExpressionCompiler extends AstNodeCompiler<MemberExpression> {
                     : null;
             if (symbol != null) {
                 compilerContext.emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
+                compilerContext.emitHelpers.emitMemberSourcePosition(memberExpr);
                 compilerContext.emitter.emitOpcode(Opcode.GET_PRIVATE_FIELD);
             } else {
                 throw new JSSyntaxErrorException("Unexpected private field", privateId.getLocation());
             }
         } else if (memberExpr.getProperty() instanceof Identifier propId) {
+            // A failing property read reports the position of the property name, as V8 does.
+            compilerContext.emitHelpers.emitMemberSourcePosition(memberExpr);
             compilerContext.emitter.emitOpcodeAtom(Opcode.GET_FIELD, propId.getName());
         }
     }

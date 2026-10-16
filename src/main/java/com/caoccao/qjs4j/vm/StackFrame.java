@@ -35,6 +35,10 @@ public final class StackFrame {
     private Map<String, Integer> dynamicVarBindingLocalIndexes;
     private Map<String, JSValue> dynamicVarBindings;
     private Map<String, VarRef> evalScopeVarRefs;
+    /**
+     * The activation running this frame, whose program counter is current while the frame is on the stack.
+     */
+    private ExecutionContext executionContext;
     private final int frameDepth;
     private final JSFunction function;
     private final JSValue[] locals;
@@ -129,6 +133,7 @@ public final class StackFrame {
             this.varRefs = EMPTY_VARREFS;
         }
         this.programCounter = 0;
+        this.executionContext = null;
         this.caller = caller;
         this.dynamicVarBindings = null;
         this.dynamicVarBindingLocalIndexes = null;
@@ -164,6 +169,29 @@ public final class StackFrame {
             closedVarRefs = new VarRef[locals.length];
         }
         closedVarRefs[index] = ref;
+    }
+
+    /**
+     * Detach the open {@link VarRef} an earlier entry into a scope left on one of its locals, as the scope is entered
+     * again: closures created during the earlier entry keep the binding they captured, with its value, and closures
+     * created now share a fresh one.
+     * <p>
+     * Only a loop head's bindings used to be closed between iterations, so every {@code let}, {@code const} or class
+     * declared inside a loop body was one binding for the whole loop:
+     * {@code for (let i = 0; i < 3; i++) { const k = i; fs.push(() => k) }} made three closures that all returned 2.
+     *
+     * @param index
+     *            the local slot index
+     */
+    public void detachLocalVarRef(int index) {
+        // The slot index comes from the compiler, so it is in range whenever the table exists.
+        if (localVarRefs != null) {
+            VarRef ref = localVarRefs[index];
+            if (ref != null) {
+                ref.close();
+                localVarRefs[index] = null;
+            }
+        }
     }
 
     /**
@@ -252,8 +280,16 @@ public final class StackFrame {
         return localVarRefs[localIndex];
     }
 
+    /**
+     * The program counter of the instruction this frame is executing, or last executed.
+     * <p>
+     * While the frame runs, the interpreter keeps the count in its activation rather than here, so a frame that called
+     * another — the frames a stack trace walks — answers from that activation.
+     *
+     * @return the program counter
+     */
     public int getProgramCounter() {
-        return programCounter;
+        return executionContext != null ? executionContext.pc : programCounter;
     }
 
     public int getStackBase() {
@@ -367,6 +403,10 @@ public final class StackFrame {
             dynamicVarBindingLocalIndexes = new HashMap<>();
         }
         dynamicVarBindingLocalIndexes.put(name, localIndex);
+    }
+
+    void setExecutionContext(ExecutionContext executionContext) {
+        this.executionContext = executionContext;
     }
 
     public void setProgramCounter(int pc) {

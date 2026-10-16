@@ -32,6 +32,8 @@ import java.util.*;
 public non-sealed class JSObject implements JSValue {
     private static final JSShape EMPTY_SHAPE = new JSShape();
     private static final int INITIAL_PROPERTY_VALUE_CAPACITY = 4;
+    private static final PropertyKey LEGACY_ARGUMENTS_KEY = PropertyKey.fromString(JSKeyword.ARGUMENTS);
+    private static final PropertyKey LEGACY_CALLER_KEY = PropertyKey.fromString("caller");
     /**
      * Maximum number of prototype links a chain walk will follow.
      * <p>
@@ -505,6 +507,26 @@ public non-sealed class JSObject implements JSValue {
     }
 
     /**
+     * Fail an assignment to an accessor property that has no setter, with V8's wording; it used to be reported as a
+     * write to a read-only property.
+     *
+     * @param key
+     *            the property key
+     * @param receiver
+     *            the object assigned to, which the message names
+     * @param throwOnFailure
+     *            true to throw in strict mode
+     * @return false
+     */
+    private boolean failSetWithoutSetter(PropertyKey key, JSObject receiver, boolean throwOnFailure) {
+        if (throwOnFailure && context.isStrictMode()) {
+            context.throwTypeError("Cannot set property " + key.toPropertyString() + " of "
+                    + receiver.getObjectDescriptionForError(true) + " which has only a getter");
+        }
+        return false;
+    }
+
+    /**
      * Read a data property along the prototype chain for diagnostics, guaranteeing that no script runs.
      * <p>
      * Error objects keep {@code name} on their prototype, so a diagnostic reader has to walk. The walk stops at a
@@ -543,13 +565,17 @@ public non-sealed class JSObject implements JSValue {
     }
 
     /**
-     * Freeze this object. Prevents adding new properties, deleting existing properties, and modifying existing
-     * properties.
+     * Freeze this object: SetIntegrityLevel(O, frozen) ES2024 7.3.16, exactly what {@code Object.freeze} does.
+     * <p>
+     * This used to set three flags and leave every property descriptor writable and configurable, so an object frozen
+     * from Java was in a state no script can produce: assignment failed, {@code Object.defineProperty} succeeded, and
+     * {@code Object.isFrozen} said no.
+     *
+     * @return true when the object is frozen; false with a pending {@code TypeError}, or with the exception a proxy
+     *         trap threw
      */
-    public void freeze() {
-        this.frozen = true;
-        this.sealed = true; // Frozen objects are also sealed
-        this.extensible = false; // Frozen objects are not extensible
+    public boolean freeze() {
+        return setIntegrityLevel(context, true);
     }
 
     /**
@@ -668,9 +694,10 @@ public non-sealed class JSObject implements JSValue {
      * @return a description built without running any script
      */
     String getObjectDescriptionForError(boolean forDelete) {
-        // For functions, use format: "function 'functionString'"
+        // A function is named by its source text: `function 'src'` in an assignment error, bare in a delete error
+        // (V8's "Cannot delete property 'prototype' of function f(){}").
         if (this instanceof JSFunction func) {
-            return "function '" + func + "'";
+            return forDelete ? func.toString() : "function '" + func + "'";
         }
 
         // The error type chooses the wrapping, the object chooses what goes inside it:
@@ -1153,6 +1180,18 @@ public non-sealed class JSObject implements JSValue {
     }
 
     /**
+     * Whether a write is to the legacy {@code caller} or {@code arguments} property of a sloppy function, which V8
+     * accepts and ignores: its {@code Function.prototype} setter does nothing for such a function. The specification's
+     * setter is {@code %ThrowTypeError%}, which test262 checks by identity, so the accessor stays and the write is
+     * intercepted here, as the read of the live value is in {@link #lookupOwnForGet}.
+     */
+    private boolean isIgnoredLegacyFunctionPropertyWrite(PropertyKey key, JSObject receiver, JSFunction setter) {
+        return setter == context.getThrowTypeErrorIntrinsic() && receiver instanceof JSFunction receiverFunction
+                && isLegacyFunctionPropertyAccessible(receiverFunction)
+                && (LEGACY_ARGUMENTS_KEY.equals(key) || LEGACY_CALLER_KEY.equals(key));
+    }
+
+    /**
      * Whether this object appears anywhere in the proposed prototype's own chain.
      * <p>
      * The walk is complete: a depth cutoff here is not a resource guard but a false negative, and a false negative
@@ -1468,12 +1507,15 @@ public non-sealed class JSObject implements JSValue {
     }
 
     /**
-     * Seal this object. Prevents adding new properties and deleting existing properties. Existing properties can still
-     * be modified.
+     * Seal this object: SetIntegrityLevel(O, sealed) ES2024 7.3.16, exactly what {@code Object.seal} does. Existing
+     * properties stay writable.
+     *
+     * @return true when the object is sealed; false with a pending {@code TypeError}, or with the exception a proxy
+     *         trap threw
+     * @see #freeze()
      */
-    public void seal() {
-        sealed = true;
-        extensible = false; // Sealed objects are not extensible
+    public boolean seal() {
+        return setIntegrityLevel(context, false);
     }
 
     /**
@@ -1524,8 +1566,6 @@ public non-sealed class JSObject implements JSValue {
         this.htmlDDA = htmlDDA;
     }
 
-    // Prototype chain
-
     /**
      * Mark this object as an immutable prototype exotic object. Per ES2024 9.4.7, [[SetPrototypeOf]] always returns
      * false unless the new prototype is the same as the current one. Used for Object.prototype.
@@ -1533,6 +1573,76 @@ public non-sealed class JSObject implements JSValue {
     public void setImmutablePrototype() {
         immutablePrototype = true;
     }
+
+    /**
+     * SetIntegrityLevel(O, level) ES2024 7.3.16.
+     *
+     * @param context
+     *            the context of the running code, whose realm a TypeError is created in; this object may belong to
+     *            another realm
+     * @param frozenLevel
+     *            true for "frozen", false for "sealed"
+     * @return true on success; false with a pending exception
+     */
+    public boolean setIntegrityLevel(JSContext context, boolean frozenLevel) {
+        String operation = frozenLevel ? "freeze" : "seal";
+        // Step 3: Let status be ? O.[[PreventExtensions]]().
+        if (!preventExtensionsWithResult()) {
+            if (!context.hasPendingException()) {
+                context.throwTypeError(this instanceof JSProxy
+                        ? "'preventExtensions' on proxy: trap returned falsish"
+                        : "Cannot " + operation);
+            }
+            return false;
+        }
+        if (context.hasPendingException()) {
+            return false;
+        }
+        // Step 5: Let keys be ? O.[[OwnPropertyKeys]]().
+        List<PropertyKey> keys = getOwnPropertyKeys();
+        if (context.hasPendingException()) {
+            return false;
+        }
+        for (PropertyKey key : keys) {
+            // Sealing defines { [[Configurable]]: false } outright; freezing reads each descriptor first, to leave an
+            // accessor's [[Writable]] absent.
+            PropertyDescriptor descriptor = new PropertyDescriptor();
+            descriptor.setConfigurable(false);
+            if (frozenLevel) {
+                PropertyDescriptor currentDescriptor = getOwnPropertyDescriptor(key);
+                if (context.hasPendingException()) {
+                    return false;
+                }
+                if (currentDescriptor == null) {
+                    continue;
+                }
+                if (!currentDescriptor.isAccessorDescriptor()) {
+                    descriptor.setWritable(false);
+                }
+            }
+            // DefinePropertyOrThrow(O, k, desc)
+            if (!defineProperty(key, descriptor)) {
+                if (!context.hasPendingException()) {
+                    if (this instanceof JSTypedArray) {
+                        context.throwTypeError("Cannot " + operation + " array buffer views with elements");
+                    } else {
+                        throwDefinePropertyFailure(context, key);
+                    }
+                }
+                return false;
+            }
+            if (context.hasPendingException()) {
+                return false;
+            }
+        }
+        sealed = true;
+        if (frozenLevel) {
+            frozen = true;
+        }
+        return true;
+    }
+
+    // Prototype chain
 
     private boolean setInternal(PropertyKey key, JSValue value, JSObject receiver, boolean throwOnFailure) {
         // Check if property already exists
@@ -1551,7 +1661,7 @@ public non-sealed class JSObject implements JSValue {
                     JSValue exceptionAfter = context.getPendingException();
                     return exceptionAfter == null || exceptionAfter == exceptionBefore;
                 }
-                return failSet(key, throwOnFailure);
+                return failSetWithoutSetter(key, receiver, throwOnFailure);
             }
 
             if (descriptor == null || !descriptor.isWritable() || frozen) {
@@ -1568,10 +1678,10 @@ public non-sealed class JSObject implements JSValue {
 
         // Property doesn't exist on own object - walk prototype chain for setters/writability checks.
         // Per ES spec 9.1.9.1 OrdinarySet, if a prototype is an exotic object, delegate to its [[Set]].
-        Set<JSObject> visited = new HashSet<>();
-        visited.add(this);
+        // Prototype chains are acyclic (setPrototypeChecked refuses a cycle), so the walk needs no visited set;
+        // it allocated one, and boxed every prototype into it, on every store of a new property.
         JSObject proto = prototype;
-        while (proto != null && !visited.contains(proto)) {
+        while (proto != null) {
             if (proto instanceof JSProxy proxy) {
                 return proxy.setWithResult(key, value, receiver);
             }
@@ -1583,13 +1693,15 @@ public non-sealed class JSObject implements JSValue {
                 }
                 return result;
             }
-            visited.add(proto);
             int protoOffset = proto.getOwnPropertyOffset(key);
             if (protoOffset >= 0) {
                 PropertyDescriptor protoDescriptor = proto.shape.getDescriptorAt(protoOffset);
                 if (protoDescriptor != null && protoDescriptor.isAccessorDescriptor()) {
                     JSFunction setter = protoDescriptor.getSetter();
                     if (setter != null) {
+                        if (isIgnoredLegacyFunctionPropertyWrite(key, receiver, setter)) {
+                            return true;
+                        }
                         // Exception identity, not just presence: testing only the flag reported
                         // success whenever an exception was already pending on entry, which
                         // swallowed the setter's own failure.
@@ -1598,7 +1710,7 @@ public non-sealed class JSObject implements JSValue {
                         JSValue exceptionAfter = context.getPendingException();
                         return exceptionAfter == null || exceptionAfter == exceptionBefore;
                     }
-                    return failSet(key, throwOnFailure);
+                    return failSetWithoutSetter(key, receiver, throwOnFailure);
                 }
                 if (protoDescriptor != null && !protoDescriptor.isWritable()) {
                     return failSet(key, throwOnFailure);
@@ -1611,11 +1723,22 @@ public non-sealed class JSObject implements JSValue {
         return setOnReceiver(key, value, receiver, throwOnFailure);
     }
 
-    // Object integrity levels (ES5)
-
     private boolean setOnReceiver(PropertyKey key, JSValue value, JSObject receiver, boolean throwOnFailure) {
         if (receiver instanceof JSImportNamespaceObject || receiver instanceof JSDeferredModuleNamespace) {
             return failSet(key, throwOnFailure);
+        }
+        // An ordinary object storing a new named property on itself: setInternal has already found no own
+        // property, and only an array index could live outside the shape, so step 2c's descriptor lookup can only
+        // answer "none". Go straight to CreateDataProperty.
+        if (receiver == this && getClass() == JSObject.class && key.toArrayIndex() < 0) {
+            if (!extensible) {
+                if (throwOnFailure && context.isStrictMode()) {
+                    context.throwTypeError(
+                            "Cannot add property " + key.toPropertyString() + ", object is not extensible");
+                }
+                return false;
+            }
+            return defineProperty(key, value, PropertyDescriptor.DataState.All);
         }
 
         // ES2024 OrdinarySetWithOwnDescriptor steps 2c-2e:
@@ -1664,6 +1787,8 @@ public non-sealed class JSObject implements JSValue {
         }
         return receiver.defineProperty(key, value, PropertyDescriptor.DataState.All);
     }
+
+    // Object integrity levels (ES5)
 
     /**
      * Set the [[PrimitiveValue]] internal slot. This is for internal use only - not accessible from JavaScript.
@@ -1743,14 +1868,13 @@ public non-sealed class JSObject implements JSValue {
         // traverse the prototype chain. If a Proxy is in the chain, delegate
         // to its set trap. If a setter is found, call it with the primitive receiver.
         // Otherwise return false (caller throws TypeError in strict mode).
-        Set<JSObject> visited = new HashSet<>();
+        // Prototype chains are acyclic, so the walk needs no visited set.
         JSObject current = this;
-        while (current != null && !visited.contains(current)) {
+        while (current != null) {
             // Proxy in the chain: delegate to its set trap with primitive receiver
             if (current instanceof JSProxy proxy) {
                 return proxy.proxySetWithReceiver(key, value, primitiveReceiver);
             }
-            visited.add(current);
             int propertyOffset = current.getOwnPropertyOffset(key);
             if (propertyOffset >= 0) {
                 PropertyDescriptor descriptor = current.shape.getDescriptorAt(propertyOffset);
@@ -1809,6 +1933,12 @@ public non-sealed class JSObject implements JSValue {
         return setWithPrimitiveReceiver(key, value, receiver);
     }
 
+    /**
+     * Convert to a {@link Map} of own enumerable and non-enumerable string-keyed properties, in property order; nested
+     * objects convert too, each object once, so cycles and deep nests are safe.
+     *
+     * @see JavaObjectConverter
+     */
     private boolean shouldSkipLegacyCallerFrame(StackFrame stackFrame) {
         JSFunction stackFunction = stackFrame.getFunction();
         if (stackFunction instanceof JSNativeFunction nativeFunction) {
@@ -1828,16 +1958,45 @@ public non-sealed class JSObject implements JSValue {
         return false;
     }
 
+    /**
+     * Throw the TypeError V8 throws when DefinePropertyOrThrow on this object fails without an exception of its own.
+     * <p>
+     * {@code Object.defineProperty} used to say "object is not extensible" for every failure, including a redefinition
+     * of a non-configurable property on an extensible object, where the reason given was untrue; and
+     * {@code Object.defineProperties} said "Cannot redefine property" for every failure, including an addition to a
+     * non-extensible object.
+     *
+     * @param context
+     *            the context of the running code, whose realm the TypeError is created in; this object may belong to
+     *            another realm
+     * @param key
+     *            the property key whose [[DefineOwnProperty]] returned false
+     * @return the pending exception
+     */
+    public JSValue throwDefinePropertyFailure(JSContext context, PropertyKey key) {
+        String keyName = key.toPropertyString();
+        if (this instanceof JSProxy) {
+            return context
+                    .throwTypeError("'defineProperty' on proxy: trap returned falsish for property '" + keyName + "'");
+        }
+        // Probe without reading the property: a module namespace's descriptor reads the binding, which throws in
+        // its temporal dead zone. A typed array's elements are not in storage, and reading them runs no script.
+        boolean ownProperty = this instanceof JSTypedArray
+                ? getOwnPropertyDescriptor(key) != null
+                : hasOwnProperty(key);
+        if (!ownProperty && this instanceof JSTypedArray && key.isIndex()) {
+            return context.throwTypeError("Invalid typed array index");
+        }
+        // Defining a property that does not exist fails only on a non-extensible object.
+        if (!ownProperty) {
+            return context.throwTypeError("Cannot define property " + keyName + ", object is not extensible");
+        }
+        return context.throwTypeError("Cannot redefine property: " + keyName);
+    }
+
     @Override
     public Object toJavaObject() {
-        Map<String, Object> objMap = new LinkedHashMap<>();
-        // Get all own property keys in order (shaped properties first, then sparse)
-        List<PropertyKey> keys = getOwnPropertyKeys();
-        for (PropertyKey key : keys) {
-            Optional.of(get(key)).map(JSValue::toJavaObject)
-                    .ifPresent(valueObject -> objMap.put(key.toPropertyString(), valueObject));
-        }
-        return objMap;
+        return JavaObjectConverter.convert(this);
     }
 
     @Override

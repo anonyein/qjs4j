@@ -365,9 +365,9 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 // ~450 files of ported engine written long before any suite existed — a 100% whole-tree rule would
 // be a fiction that had to be disabled to commit anything. Raise the floors as coverage rises;
 // never lower them to make a build pass.
-// Measured on this tree: 61.03% line, 46.80% branch.
-val minimumLineCoverage = "0.60".toBigDecimal()
-val minimumBranchCoverage = "0.46".toBigDecimal()
+// Measured on this tree: 67.18% line, 53.45% branch (JDK 17).
+val minimumLineCoverage = "0.65".toBigDecimal()
+val minimumBranchCoverage = "0.51".toBigDecimal()
 
 // A single whole-tree rule is not a gate on any particular subsystem: a change can leave an entire
 // critical package untested while unrelated covered code holds the aggregate above the floor. The
@@ -377,20 +377,20 @@ val minimumBranchCoverage = "0.46".toBigDecimal()
 // Format: package path to (line floor, branch floor).
 val packageCoverageFloors = mapOf(
     "com/caoccao/qjs4j/exceptions" to ("0.95" to "0.93"),
-    "com/caoccao/qjs4j/compilation/lexer" to ("0.79" to "0.66"),
-    "com/caoccao/qjs4j/cli" to ("0.75" to "0.80"),
-    "com/caoccao/qjs4j/compilation/compiler" to ("0.68" to "0.62"),
-    "com/caoccao/qjs4j/regexp" to ("0.67" to "0.53"),
-    "com/caoccao/qjs4j/compilation/parser" to ("0.67" to "0.56"),
-    "com/caoccao/qjs4j/vm" to ("0.65" to "0.50"),
-    "com/caoccao/qjs4j/unicode" to ("0.64" to "0.53"),
+    "com/caoccao/qjs4j/compilation/lexer" to ("0.80" to "0.69"),
+    "com/caoccao/qjs4j/cli" to ("0.88" to "0.88"),
+    "com/caoccao/qjs4j/compilation/compiler" to ("0.82" to "0.73"),
+    "com/caoccao/qjs4j/regexp" to ("0.74" to "0.62"),
+    "com/caoccao/qjs4j/compilation/parser" to ("0.75" to "0.63"),
+    "com/caoccao/qjs4j/vm" to ("0.70" to "0.58"),
+    "com/caoccao/qjs4j/unicode" to ("0.67" to "0.57"),
     // Calibrated to the *lowest* figure across supported JDKs, not to the toolchain's: on JDK 25
     // the lock-free half of ByteArrayAtomics is unreachable by construction, and on 17 and 21 the
     // locked half is only reached through its package-private entry points. Neither run covers
     // both; the union across the matrix does.
     "com/caoccao/qjs4j/utils" to ("0.60" to "0.41"),
-    "com/caoccao/qjs4j/core" to ("0.58" to "0.42"),
-    "com/caoccao/qjs4j/builtins" to ("0.56" to "0.48"),
+    "com/caoccao/qjs4j/core" to ("0.68" to "0.53"),
+    "com/caoccao/qjs4j/builtins" to ("0.60" to "0.53"),
 )
 
 // The classes an embedder's safety actually rests on: lifecycle, resource limits, the diagnostic
