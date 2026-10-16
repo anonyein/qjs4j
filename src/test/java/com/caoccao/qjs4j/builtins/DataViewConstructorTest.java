@@ -18,9 +18,11 @@ package com.caoccao.qjs4j.builtins;
 
 import com.caoccao.qjs4j.BaseJavetTest;
 import com.caoccao.qjs4j.core.JSArrayBuffer;
+import com.caoccao.qjs4j.core.JSContext;
 import com.caoccao.qjs4j.core.JSDataView;
 import com.caoccao.qjs4j.core.JSNumber;
 import com.caoccao.qjs4j.exceptions.JSException;
+import com.caoccao.qjs4j.exceptions.JSRangeErrorException;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +32,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Comprehensive tests for DataView constructor functionality. Tests various constructor call patterns.
  */
 public class DataViewConstructorTest extends BaseJavetTest {
+
+    @Test
+    public void javaBoundsNearLongMaxDoNotOverflow() {
+        JSContext context = resetContext();
+        JSArrayBuffer buffer = context.createJSArrayBuffer(8);
+        assertThatThrownBy(() -> new JSDataView(context, buffer, 1, Long.MAX_VALUE))
+                .isInstanceOf(JSRangeErrorException.class);
+        assertThatThrownBy(() -> new JSDataView(context, buffer, 8, 1)).isInstanceOf(JSRangeErrorException.class);
+        JSDataView view = new JSDataView(context, buffer, 1, 7);
+        assertThatThrownBy(() -> view.getInt8(Long.MAX_VALUE)).isInstanceOf(JSRangeErrorException.class);
+        assertThatThrownBy(() -> view.getInt32(Long.MAX_VALUE - 1, true)).isInstanceOf(JSRangeErrorException.class);
+        assertThatThrownBy(() -> view.setFloat64(Long.MAX_VALUE - 7, 1, true))
+                .isInstanceOf(JSRangeErrorException.class);
+        assertThatThrownBy(() -> view.setInt8(7, (byte) 1)).isInstanceOf(JSRangeErrorException.class);
+        view.setInt8(6, (byte) 5);
+        assertThat(view.getInt8(6)).isEqualTo((byte) 5);
+        assertThat(view.isOutOfBounds()).isFalse();
+        assertThat(new JSDataView(context, buffer, 8, 0).isOutOfBounds()).isFalse();
+    }
 
     @Test
     public void testBasicConstructor() {

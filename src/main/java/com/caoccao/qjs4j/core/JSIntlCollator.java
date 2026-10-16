@@ -18,14 +18,21 @@ package com.caoccao.qjs4j.core;
 
 import java.text.Collator;
 import java.text.Normalizer;
+import java.text.ParseException;
+import java.text.RuleBasedCollator;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Intl.Collator instance object.
  */
 public final class JSIntlCollator extends JSObject {
+    /** Forward French collators by their rules; every French locale shares one rule set, so this holds one entry. */
+    static final Map<String, Collator> FORWARD_FRENCH_COLLATORS = new ConcurrentHashMap<>();
     public static final String NAME = "Intl.Collator";
     private final Collator accentCollator;
+    private final boolean backwardSecondary;
     private JSFunction boundCompareFunction;
     private final String caseFirst;
     private final String collation;
@@ -37,6 +44,8 @@ public final class JSIntlCollator extends JSObject {
     private final Collator primaryCollator;
     private final String resolvedLocaleTag;
     private final String sensitivity;
+    /** Turkish and Azeri pair I with dotless ı and İ with i; a locale-blind fold would merge I into i. */
+    private final boolean turkic;
     private final String usage;
 
     public JSIntlCollator(JSContext context, Locale locale, String sensitivity, String usage, String collation,
@@ -53,7 +62,7 @@ public final class JSIntlCollator extends JSObject {
         // Phonebook mode: explicit phonebk collation or German search
         this.phonebookMode = "phonebk".equals(collation)
                 || ("search".equals(usage) && "de".equals(locale.getLanguage()));
-        this.collator = Collator.getInstance(locale);
+        this.collator = createCollator(locale);
         switch (sensitivity) {
             case "base" -> collator.setStrength(Collator.PRIMARY);
             case "accent" -> collator.setStrength(Collator.SECONDARY);
@@ -67,11 +76,14 @@ public final class JSIntlCollator extends JSObject {
         accentCollator.setStrength(Collator.SECONDARY);
         primaryCollator = (Collator) collator.clone();
         primaryCollator.setStrength(Collator.PRIMARY);
+        // Canadian French weighs accents from the end of the string: the last accent difference decides.
+        backwardSecondary = accentCollator.compare("\u00E9a", "e\u00E1") < 0;
+        turkic = "tr".equals(locale.getLanguage()) || "az".equals(locale.getLanguage());
     }
 
     public int compare(String left, String right) {
-        String effectiveLeft = normalizeDigits(left);
-        String effectiveRight = normalizeDigits(right);
+        String effectiveLeft = left;
+        String effectiveRight = right;
         if (ignorePunctuation) {
             effectiveLeft = stripPunctuation(effectiveLeft);
             effectiveRight = stripPunctuation(effectiveRight);
@@ -80,12 +92,13 @@ public final class JSIntlCollator extends JSObject {
             effectiveLeft = expandGermanUmlauts(effectiveLeft);
             effectiveRight = expandGermanUmlauts(effectiveRight);
         }
-        if ("case".equals(sensitivity)) {
-            effectiveLeft = stripAccents(effectiveLeft);
-            effectiveRight = stripAccents(effectiveRight);
-        }
+        // Every script's decimal digits share the primary weight of the ASCII digit with the same value, so compare
+        // the folded forms; the JDK collator would otherwise rank an unmapped digit after every letter. Numeric
+        // collation loses nothing by folding: ICU gives a digit run one primary weight and no tertiary ones. An
+        // ignorable character carries no weight but still ends a digit run, so the numeric path keeps it for the
+        // tokenizer and drops it from each text segment.
         if (numeric) {
-            return compareNumeric(effectiveLeft, effectiveRight);
+            return compareNumeric(normalizeDigits(effectiveLeft), normalizeDigits(effectiveRight));
         }
         return compareText(effectiveLeft, effectiveRight);
     }
@@ -94,9 +107,18 @@ public final class JSIntlCollator extends JSObject {
         int i = 0;
         int j = 0;
         int secondaryResult = 0;
-        while (i < left.length() && j < right.length()) {
+        int tertiaryResult = 0;
+        while (true) {
             context.getVirtualMachine().checkExecutionInterruptForNative();
-            if (Character.isDigit(left.codePointAt(i)) && Character.isDigit(right.codePointAt(j))) {
+            i = skipIgnorable(left, i);
+            j = skipIgnorable(right, j);
+            if (i >= left.length() && j >= right.length()) {
+                break;
+            }
+            boolean leftDigit = i < left.length() && Character.isDigit(left.codePointAt(i));
+            boolean rightDigit = j < right.length() && Character.isDigit(right.codePointAt(j));
+            if (leftDigit && rightDigit) {
+                // A digit run is one primary weight, its numeric value: leading zeros do not count.
                 int leftEnd = digitEnd(left, i);
                 int rightEnd = digitEnd(right, j);
                 while (i < leftEnd && Character.digit(left.codePointAt(i), 10) == 0) {
@@ -123,46 +145,118 @@ public final class JSIntlCollator extends JSObject {
                 i = leftEnd;
                 j = rightEnd;
             } else {
-                int leftEnd = textEnd(left, i);
-                int rightEnd = textEnd(right, j);
+                // A side that has run out contributes an empty segment, so a trailing accent or a trailing letter
+                // weighs exactly what the sensitivity says it does, rather than counting as extra length.
+                int leftEnd = i < left.length() ? textEnd(left, i) : i;
+                int rightEnd = j < right.length() ? textEnd(right, j) : j;
                 String a = left.substring(i, leftEnd);
                 String b = right.substring(j, rightEnd);
                 int comparison = compareText(a, b);
                 if (comparison != 0) {
-                    if (primaryCollator.compare(a, b) != 0) {
+                    if (comparePrimary(a, b) != 0) {
                         return comparison;
                     }
-                    if (secondaryResult == 0) {
-                        secondaryResult = comparison;
+                    // ICU compares every secondary weight before any tertiary one, so an accent difference later in
+                    // the string outranks a case difference before it. Keep the first difference of each level —
+                    // or, where the locale weighs accents backward, the last secondary one. Case sensitivity has
+                    // no secondary level at all: there every non-primary difference is a case difference.
+                    if (!"case".equals(sensitivity) && compareSecondary(a, b) != 0) {
+                        if (backwardSecondary || secondaryResult == 0) {
+                            secondaryResult = comparison;
+                        }
+                    } else if (tertiaryResult == 0) {
+                        tertiaryResult = comparison;
                     }
                 }
                 i = leftEnd;
                 j = rightEnd;
             }
         }
-        int lengthComparison = Integer.compare(left.length() - i, right.length() - j);
-        return lengthComparison != 0 ? lengthComparison : secondaryResult;
+        return secondaryResult != 0 ? secondaryResult : tertiaryResult;
     }
 
-    private int compareText(String left, String right) {
-        int result = Integer.signum(collator.compare(left, right));
-        if (result == 0 || "false".equals(caseFirst) || "base".equals(sensitivity) || "accent".equals(sensitivity)) {
-            return result;
-        }
-        // Case is a tertiary distinction: accents and base letters retain their locale ordering.
-        if (accentCollator.compare(left, right) != 0) {
-            return result;
-        }
-        for (int i = 0, j = 0; i < left.length() && j < right.length();) {
-            int a = left.codePointAt(i);
-            int b = right.codePointAt(j);
-            if (Character.isUpperCase(a) != Character.isUpperCase(b)) {
-                return Character.isUpperCase(a) == "upper".equals(caseFirst) ? -1 : 1;
+    /** The primary level alone, with case folded away. */
+    private int comparePrimary(String left, String right) {
+        return Integer.signum(primaryCollator.compare(foldCase(left), foldCase(right)));
+    }
+
+    /**
+     * The secondary level alone: accents, with case folded away first because the JDK's Danish collator weighs case at
+     * this level, where ICU keeps it tertiary for every locale.
+     */
+    private int compareSecondary(String left, String right) {
+        return Integer.signum(accentCollator.compare(foldCase(left), foldCase(right)));
+    }
+
+    /**
+     * Settle the tertiary level the way ICU does, one weight per character in order: the first position where the case
+     * differs, or where a plain digit meets its fullwidth or mathematical variant, decides. Lowercase sorts first
+     * unless caseFirst says otherwise; Danish, whose tailoring puts uppercase first, resolves caseFirst to "upper".
+     * Returns 0 when nothing at this level separates the strings.
+     */
+    private int compareTertiary(String left, String right) {
+        boolean digitVariants = "variant".equals(sensitivity);
+        boolean upperFirst = "upper".equals(caseFirst);
+        String a = Normalizer.normalize(left, Normalizer.Form.NFD);
+        String b = Normalizer.normalize(right, Normalizer.Form.NFD);
+        for (int i = 0, j = 0; i < a.length() && j < b.length();) {
+            int x = a.codePointAt(i);
+            int y = b.codePointAt(j);
+            if (x != y) {
+                if (Character.isDigit(x) && Character.isDigit(y)) {
+                    int comparison = digitVariants ? Integer.compare(digitVariantRank(x), digitVariantRank(y)) : 0;
+                    if (comparison != 0) {
+                        return comparison;
+                    }
+                } else if (Character.isUpperCase(x) != Character.isUpperCase(y)) {
+                    return Character.isUpperCase(x) == upperFirst ? -1 : 1;
+                }
             }
-            i += Character.charCount(a);
-            j += Character.charCount(b);
+            i += Character.charCount(x);
+            j += Character.charCount(y);
         }
-        return result;
+        return 0;
+    }
+
+    /**
+     * Compare two strings whose digits may still be in any script or width. The primary and secondary levels come from
+     * the collator over digit-folded forms, because every script's decimal digit shares the primary weight of the ASCII
+     * digit with the same value and the JDK collator would otherwise rank an unmapped digit after every letter. The
+     * tertiary level is settled in character order, where a digit's width and a letter's case both carry weight.
+     */
+    private int compareText(String left, String right) {
+        left = stripIgnorable(left);
+        right = stripIgnorable(right);
+        String foldedLeft = normalizeDigits(left);
+        String foldedRight = normalizeDigits(right);
+        if ("base".equals(sensitivity)) {
+            return comparePrimary(foldedLeft, foldedRight);
+        }
+        if ("accent".equals(sensitivity)) {
+            return compareSecondary(foldedLeft, foldedRight);
+        }
+        if ("case".equals(sensitivity)) {
+            // ICU runs primary strength with a case level: accents carry no weight, but a letter the locale keeps
+            // apart at the primary level, such as Turkish ş or dotless ı, stays apart. Accents are removed only
+            // for the case walk, so the two strings line up character by character.
+            int primary = comparePrimary(foldedLeft, foldedRight);
+            return primary != 0 ? primary : compareTertiary(stripAccents(left), stripAccents(right));
+        }
+        int result = Integer.signum(collator.compare(foldedLeft, foldedRight));
+        if (result != 0 && compareSecondary(foldedLeft, foldedRight) != 0) {
+            return result;
+        }
+        int tertiary = compareTertiary(left, right);
+        return tertiary != 0 ? tertiary : result;
+    }
+
+    /**
+     * Lowercase without adding accents. Turkic casing handles both precomposed İ and its canonical decomposition, I +
+     * dot above. Other locales use the root rules: Lithuanian lowercasing would add a dot to accented I and make Í
+     * differ from í at secondary strength.
+     */
+    private String foldCase(String text) {
+        return text.toLowerCase(turkic ? locale : Locale.ROOT);
     }
 
     public JSFunction getBoundCompareFunction() {
@@ -205,12 +299,50 @@ public final class JSIntlCollator extends JSObject {
         this.boundCompareFunction = boundCompareFunction;
     }
 
+    /**
+     * The JDK's French tailoring is the root rules plus the backward-secondary modifier, so every French locale weighs
+     * accents from the end of the string. ICU, and so V8, does that only for Canadian French; the other French locales
+     * get the same rules without the modifier.
+     */
+    private static Collator createCollator(Locale locale) {
+        Collator collator = Collator.getInstance(locale);
+        if (!"fr".equals(locale.getLanguage()) || "CA".equals(locale.getCountry())
+                || !(collator instanceof RuleBasedCollator ruleBasedCollator)) {
+            return collator;
+        }
+        String rules = ruleBasedCollator.getRules();
+        if (!rules.endsWith("@")) {
+            return collator;
+        }
+        String forwardRules = rules.substring(0, rules.length() - 1);
+        Collator forward = FORWARD_FRENCH_COLLATORS.computeIfAbsent(forwardRules, key -> {
+            try {
+                return new RuleBasedCollator(key);
+            } catch (ParseException e) {
+                return null;
+            }
+        });
+        return forward == null ? collator : (Collator) forward.clone();
+    }
+
     private static int digitEnd(String value, int start) {
         int end = start;
         while (end < value.length() && Character.isDigit(value.codePointAt(end))) {
             end += Character.charCount(value.codePointAt(end));
         }
         return end;
+    }
+
+    /**
+     * The tertiary class of a decimal digit: 0 for one with no compatibility decomposition, 1 for a fullwidth digit and
+     * 2 for a font variant, in the order the Unicode Collation Algorithm assigns their tertiary weights.
+     */
+    private static int digitVariantRank(int codePoint) {
+        if (codePoint >= 0xFF10 && codePoint <= 0xFF19) {
+            return 1;
+        }
+        String text = new String(Character.toChars(codePoint));
+        return Normalizer.normalize(text, Normalizer.Form.NFKD).equals(text) ? 0 : 2;
     }
 
     /**
@@ -243,6 +375,18 @@ public final class JSIntlCollator extends JSObject {
         return result != null ? result.toString() : input;
     }
 
+    /**
+     * Whether ICU gives a character no weight at any level: format characters and controls, apart from the five
+     * controls and NEL that the root collation treats as whitespace. The JDK collator weighs several of these.
+     */
+    private static boolean isIgnorable(int codePoint) {
+        int type = Character.getType(codePoint);
+        if (type == Character.FORMAT) {
+            return true;
+        }
+        return type == Character.CONTROL && !(codePoint >= 0x09 && codePoint <= 0x0D) && codePoint != 0x85;
+    }
+
     private static String normalizeDigits(String text) {
         StringBuilder result = null;
         for (int offset = 0; offset < text.length();) {
@@ -259,6 +403,13 @@ public final class JSIntlCollator extends JSObject {
             offset += Character.charCount(point);
         }
         return result == null ? text : result.toString();
+    }
+
+    private static int skipIgnorable(String value, int start) {
+        while (start < value.length() && isIgnorable(value.codePointAt(start))) {
+            start += Character.charCount(value.codePointAt(start));
+        }
+        return start;
     }
 
     /**
@@ -281,6 +432,22 @@ public final class JSIntlCollator extends JSObject {
             }
         }
         return result != null ? result.toString() : normalized;
+    }
+
+    private static String stripIgnorable(String text) {
+        StringBuilder result = null;
+        for (int offset = 0; offset < text.length();) {
+            int codePoint = text.codePointAt(offset);
+            if (isIgnorable(codePoint)) {
+                if (result == null) {
+                    result = new StringBuilder(text.length()).append(text, 0, offset);
+                }
+            } else if (result != null) {
+                result.appendCodePoint(codePoint);
+            }
+            offset += Character.charCount(codePoint);
+        }
+        return result == null ? text : result.toString();
     }
 
     /**

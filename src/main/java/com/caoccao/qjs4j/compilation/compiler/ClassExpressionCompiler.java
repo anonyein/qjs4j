@@ -167,6 +167,14 @@ final class ClassExpressionCompiler extends AstNodeCompiler<ClassExpression> {
                 compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC,
                         compilerContext.scopeManager.currentScope().getLocal(entry.bindingName()));
             }
+            // The constructor reads its private methods through references to these slots, which every evaluation
+            // of the class in the same frame writes again. Close the slots as soon as they hold this evaluation's
+            // methods, as a loop closes its per-iteration bindings, so the constructor keeps them when the next
+            // evaluation overwrites the slots — including a constructor a throwing static block let escape.
+            for (ClassDeclarationCompiler.PrivateMethodEntry entry : privateInstanceMethodFunctions) {
+                compilerContext.emitter.emitOpcodeU16(Opcode.CLOSE_LOC,
+                        compilerContext.scopeManager.currentScope().getLocal(entry.bindingName()));
+            }
 
             compilerContext.emitter.emitOpcode(Opcode.SWAP);
 

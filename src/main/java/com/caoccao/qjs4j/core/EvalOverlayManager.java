@@ -49,6 +49,14 @@ final class EvalOverlayManager {
         return false;
     }
 
+    /**
+     * Whether an overlay that {@code environment} can see binds {@code name}: one installed by the eval that owns the
+     * environment, or by an eval that code is nested in. Overlays of unrelated evals, even while active, do not count.
+     */
+    boolean hasBinding(String name, JSEvalEnvironment environment) {
+        return resolve(name, environment) != null;
+    }
+
     boolean hasFrames() {
         if (lookupSuppressionDepth > 0) {
             return false;
@@ -68,8 +76,17 @@ final class EvalOverlayManager {
         }
     }
 
+    void push(Map<String, JSValue> savedGlobals, Map<String, PropertyDescriptor> savedDescriptors,
+            Set<String> absentKeys, JSEvalEnvironment environment, Set<String> constantBindings) {
+        frames.push(new Frame(savedGlobals, absentKeys, environment, savedDescriptors, constantBindings));
+    }
+
     void push(Map<String, JSValue> savedGlobals, Set<String> absentKeys) {
-        frames.push(new Frame(savedGlobals, absentKeys));
+        push(savedGlobals, absentKeys, null);
+    }
+
+    void push(Map<String, JSValue> savedGlobals, Set<String> absentKeys, JSEvalEnvironment environment) {
+        push(savedGlobals, Map.of(), absentKeys, environment, Set.of());
     }
 
     void pushLookupSuppression() {
@@ -106,6 +123,28 @@ final class EvalOverlayManager {
 
     void resetLookupSuppression() {
         lookupSuppressionDepth = 0;
+    }
+
+    /**
+     * The binding of {@code name} that code in {@code environment} sees, or null. Frames are walked newest first; an
+     * overlay of the name that the code cannot see is remembered, because the nearest such overlay above the owner is
+     * the one that took the name's global property over and keeps the owner's value in its saved globals.
+     */
+    Binding resolve(String name, JSEvalEnvironment environment) {
+        if (lookupSuppressionDepth > 0 || environment == null) {
+            return null;
+        }
+        Frame displacer = null;
+        for (Frame frame : frames) {
+            if (!frame.savedGlobals().containsKey(name) && !frame.absentKeys().contains(name)) {
+                continue;
+            }
+            if (frame.environment() != null && environment.isWithin(frame.environment())) {
+                return new Binding(frame, displacer);
+            }
+            displacer = frame;
+        }
+        return null;
     }
 
     void restoreFrame(Frame frame) {
@@ -180,13 +219,27 @@ final class EvalOverlayManager {
     }
 
     /**
+     * Where a visible binding lives: in {@code owner}'s overlay on the global object, unless {@code displacer}, a later
+     * overlay of the same name that the code cannot see, holds the global property and keeps the value in its saved
+     * globals.
+     */
+    record Binding(Frame owner, Frame displacer) {
+    }
+
+    /**
      * What one overlay displaced on the global object.
      *
      * @param savedGlobals
      *            the values the overlaid names held before the overlay was installed
      * @param absentKeys
      *            the overlaid names that had no value at all, so restoring means deleting
+     * @param environment
+     *            the eval that installed the overlay, which only code in its lexical environment may consult
      */
-    record Frame(Map<String, JSValue> savedGlobals, Set<String> absentKeys) {
+    record Frame(Map<String, JSValue> savedGlobals, Set<String> absentKeys, JSEvalEnvironment environment,
+            Map<String, PropertyDescriptor> savedDescriptors, Set<String> constantBindings) {
+        Frame(Map<String, JSValue> savedGlobals, Set<String> absentKeys) {
+            this(savedGlobals, absentKeys, null, Map.of(), Set.of());
+        }
     }
 }

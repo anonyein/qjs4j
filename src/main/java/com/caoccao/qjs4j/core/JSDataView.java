@@ -64,7 +64,8 @@ public final class JSDataView extends JSObject {
         if (byteLength < 0) {
             throw new JSRangeErrorException("DataView byteLength out of range");
         }
-        if (!lengthTracking && byteOffset + byteLength > buffer.getByteLength()) {
+        // Subtract rather than add: a Java caller can pass a length near Long.MAX_VALUE that ToIndex never produces.
+        if (!lengthTracking && byteLength > buffer.getByteLength() - byteOffset) {
             throw new JSRangeErrorException("DataView byteLength out of range");
         }
 
@@ -82,7 +83,7 @@ public final class JSDataView extends JSObject {
             throw new JSTypeErrorException("DataView is out of bounds");
         }
         long effectiveByteLength = getByteLength();
-        if (offset < 0 || offset + size > effectiveByteLength) {
+        if (offset < 0 || offset > effectiveByteLength - size) {
             throw new JSRangeErrorException("DataView offset out of range");
         }
     }
@@ -214,7 +215,7 @@ public final class JSDataView extends JSObject {
         if (lengthTracking) {
             return false;
         }
-        return byteOffset + byteLength > currentByteLength;
+        return byteLength > currentByteLength - byteOffset;
     }
 
     public void setBigInt64(long byteOffset, JSBigInt value, boolean littleEndian) {
@@ -311,7 +312,7 @@ public final class JSDataView extends JSObject {
             context.throwRangeError("byteOffset out of range");
             return false;
         }
-        if (!lengthTracking && byteOffset + byteLength > currentByteLength) {
+        if (!lengthTracking && byteLength > currentByteLength - byteOffset) {
             context.throwRangeError("byteOffset + byteLength out of range");
             return false;
         }
@@ -363,7 +364,7 @@ public final class JSDataView extends JSObject {
             if (buffer.isDetached()) {
                 return context.throwTypeError("ArrayBuffer is detached");
             }
-            if (byteOffset + byteLength > buffer.getByteLength()) {
+            if (byteLength > buffer.getByteLength() - byteOffset) {
                 return context.throwRangeError("byteOffset + byteLength out of range");
             }
         } else {
@@ -377,7 +378,7 @@ public final class JSDataView extends JSObject {
         if (byteOffset > buffer.getByteLength()) {
             return context.throwRangeError("byteOffset + byteLength out of range");
         }
-        if (!lengthTracking && byteOffset + byteLength > buffer.getByteLength()) {
+        if (!lengthTracking && byteLength > buffer.getByteLength() - byteOffset) {
             return context.throwRangeError("byteOffset + byteLength out of range");
         }
 

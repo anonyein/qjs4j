@@ -108,6 +108,44 @@ class JSByteBufferTest {
     }
 
     @Test
+    void copiesWriteEachTargetByteOnceInBothPageWalks() {
+        long page = JSByteBuffer.PAGE_SIZE;
+        JSByteBuffer source = JSByteBuffer.allocate(page * 4);
+        source.put(0, (byte) 1).put(page - 1, (byte) 2).put(page * 2, (byte) 3).put(page * 3 - 1, (byte) 4);
+        JSByteBuffer target = JSByteBuffer.allocate(page * 4);
+        for (long number = 0; number < 4; number++) {
+            target.put(number * page + 5, (byte) 9);
+        }
+        // Two source pages and a two-page range: each page is looked up directly.
+        source.copyTo(target, page - 8, page - 8, 16);
+        assertThat(target.get(page - 1)).isEqualTo((byte) 2);
+        assertThat(target.get(page - 8)).isZero();
+        assertThat(target.get(page + 5)).isZero();
+        assertThat(target.get(page * 2 + 5)).isEqualTo((byte) 9);
+        // A four-page range over two source pages: the table is scanned and the holes between hits zeroed.
+        source.copyTo(target, 0, 0, page * 4);
+        assertThat(target.get(0)).isEqualTo((byte) 1);
+        assertThat(target.get(page - 1)).isEqualTo((byte) 2);
+        assertThat(target.get(page + 5)).isZero();
+        assertThat(target.get(page * 2)).isEqualTo((byte) 3);
+        assertThat(target.get(page * 2 + 5)).isZero();
+        assertThat(target.get(page * 3 - 1)).isEqualTo((byte) 4);
+        assertThat(target.get(page * 3 + 5)).isZero();
+        JSByteBuffer small = JSByteBuffer.allocate(64).put(10, (byte) 9).put(40, (byte) 9);
+        source.copyTo(small, page - 32, 0, 64);
+        assertThat(small.get(31)).isEqualTo((byte) 2);
+        assertThat(small.get(10)).isZero();
+        assertThat(small.get(40)).isZero();
+        JSByteBuffer sparse = JSByteBuffer.allocate(page * 4).put(page * 2 + 1, (byte) 7);
+        sparse.clearRange(0, page * 4);
+        assertThat(sparse.get(page * 2 + 1)).isZero();
+        target.clearRange(page - 2, page + 2);
+        assertThat(target.get(page - 1)).isZero();
+        assertThat(target.get(page - 3)).isZero();
+        assertThat(target.get(page * 2)).isEqualTo((byte) 3);
+    }
+
+    @Test
     void invalidRangesFailBeforeMutatingStorageOrPosition() {
         JSByteBuffer buffer = JSByteBuffer.allocate(8).put(0, (byte) 7).position(4).limit(6);
         assertThatThrownBy(() -> buffer.get(-1)).isInstanceOf(IndexOutOfBoundsException.class);
@@ -166,5 +204,40 @@ class JSByteBufferTest {
                 }
             }
         }
+    }
+
+    @Test
+    void sharedCopiesNeverExposeZerosTheSourceDoesNotHold() throws Exception {
+        long size = JSByteBuffer.PAGE_SIZE * 2L + 64;
+        JSByteBuffer source = JSByteBuffer.allocate(size);
+        JSByteBuffer target = JSByteBuffer.allocate(size);
+        byte[] ones = new byte[JSByteBuffer.PAGE_SIZE];
+        java.util.Arrays.fill(ones, (byte) 1);
+        for (long offset = 0; offset < size; offset += ones.length) {
+            int count = (int) Math.min(ones.length, size - offset);
+            source.position(offset).put(ones, 0, count);
+            target.position(offset).put(ones, 0, count);
+        }
+        var started = new java.util.concurrent.CountDownLatch(1);
+        var running = new java.util.concurrent.atomic.AtomicBoolean(true);
+        Thread writer = new Thread(() -> {
+            started.countDown();
+            while (running.get()) {
+                source.copyTo(target, 0, 0, size);
+            }
+        });
+        writer.start();
+        try {
+            assertThat(started.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            long[] probes = {0, JSByteBuffer.PAGE_SIZE - 1, JSByteBuffer.PAGE_SIZE, JSByteBuffer.PAGE_SIZE + 7,
+                    size - 1};
+            for (int i = 0; i < 200000; i++) {
+                assertThat(target.get(probes[i % probes.length])).isEqualTo((byte) 1);
+            }
+        } finally {
+            running.set(false);
+            writer.join(5000);
+        }
+        assertThat(writer.isAlive()).isFalse();
     }
 }

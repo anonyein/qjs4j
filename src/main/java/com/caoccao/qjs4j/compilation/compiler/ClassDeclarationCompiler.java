@@ -90,8 +90,10 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
         compilerContext.pushState();
         compilerContext.privateSymbols = privateSymbols;
 
+        // Stack: ctor proto -> proto ctor -> proto ctor symbol key -> proto ctor -> ctor proto.
+        // DEFINE_METHOD_COMPUTED keeps its object, so the constructor is not duplicated first: a copy would
+        // outlive the class expression and displace the receiver and arguments of a call it is passed to.
         compilerContext.emitter.emitOpcode(Opcode.SWAP);
-        compilerContext.emitter.emitOpcode(Opcode.DUP);
         compilerContext.emitter.emitOpcodeConstant(Opcode.PUSH_CONST, computedFieldSymbol);
         try {
             if (compilerContext.inClassBody) {

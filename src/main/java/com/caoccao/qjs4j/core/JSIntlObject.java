@@ -1493,7 +1493,8 @@ public final class JSIntlObject {
                 }
             }
             if (caseFirst == null) {
-                caseFirst = "false";
+                // CLDR's Danish tailoring orders uppercase first, and ICU reports that as the resolved default.
+                caseFirst = "da".equals(locale.getLanguage()) ? "upper" : "false";
             }
 
             // 6. sensitivity - default depends on usage per ECMA-402 Table 4
