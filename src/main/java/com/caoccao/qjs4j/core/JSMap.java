@@ -23,24 +23,18 @@ import java.util.*;
  */
 public final class JSMap extends JSObject {
     public static final String NAME = "Map";
-    private final Map<KeyWrapper, EntryRecord> data;
-    private final Map<Long, EntryRecord> entriesById;
-    private long nextEntryId;
+    private final OrderedHashTable<EntryRecord> data;
 
     /**
      * Create an empty Map.
      */
     public JSMap(JSContext context) {
         super(context);
-        this.data = new LinkedHashMap<>();
-        this.entriesById = new HashMap<>();
-        this.nextEntryId = 1;
+        this.data = new OrderedHashTable<>();
     }
 
     public IterationCursor createIterationCursor() {
-        IterationCursor cursor = new IterationCursor();
-        refreshIterationCursor(cursor);
-        return cursor;
+        return new IterationCursor(data.cursor());
     }
 
     /**
@@ -70,7 +64,6 @@ public final class JSMap extends JSObject {
      */
     public void mapClear() {
         data.clear();
-        entriesById.clear();
     }
 
     /**
@@ -82,7 +75,6 @@ public final class JSMap extends JSObject {
         if (removedRecord == null) {
             return false;
         }
-        entriesById.remove(removedRecord.id);
         return true;
     }
 
@@ -111,24 +103,13 @@ public final class JSMap extends JSObject {
             existingRecord.value = value;
             return;
         }
-        EntryRecord record = new EntryRecord(nextEntryId++, keyWrapper, value);
+        EntryRecord record = new EntryRecord(keyWrapper, value);
         data.put(keyWrapper, record);
-        entriesById.put(record.id, record);
     }
 
     public IterationEntry nextIterationEntry(IterationCursor cursor) {
-        while (true) {
-            while (cursor.index < cursor.orderedIds.size()) {
-                long entryId = cursor.orderedIds.get(cursor.index++);
-                EntryRecord record = entriesById.get(entryId);
-                if (record != null) {
-                    return new IterationEntry(record.keyWrapper.value(), record.value);
-                }
-            }
-            if (!refreshIterationCursor(cursor)) {
-                return null;
-            }
-        }
+        EntryRecord record = cursor.cursor.next();
+        return record == null ? null : new IterationEntry(record.keyWrapper.value(), record.value);
     }
 
     private JSValue normalizeKey(JSValue key) {
@@ -136,17 +117,6 @@ public final class JSMap extends JSObject {
             return JSNumber.of(0.0);
         }
         return key;
-    }
-
-    private boolean refreshIterationCursor(IterationCursor cursor) {
-        boolean appended = false;
-        for (EntryRecord record : data.values()) {
-            if (cursor.seenIds.add(record.id)) {
-                cursor.orderedIds.add(record.id);
-                appended = true;
-            }
-        }
-        return appended;
     }
 
     /**
@@ -182,26 +152,20 @@ public final class JSMap extends JSObject {
     }
 
     private static final class EntryRecord {
-        private final long id;
         private final KeyWrapper keyWrapper;
         private JSValue value;
 
-        private EntryRecord(long id, KeyWrapper keyWrapper, JSValue value) {
-            this.id = id;
+        private EntryRecord(KeyWrapper keyWrapper, JSValue value) {
             this.keyWrapper = keyWrapper;
             this.value = value;
         }
     }
 
     public static final class IterationCursor {
-        private int index;
-        private final List<Long> orderedIds;
-        private final Set<Long> seenIds;
+        private final OrderedHashTable.Cursor<EntryRecord> cursor;
 
-        private IterationCursor() {
-            this.orderedIds = new ArrayList<>();
-            this.seenIds = new HashSet<>();
-            this.index = 0;
+        private IterationCursor(OrderedHashTable.Cursor<EntryRecord> cursor) {
+            this.cursor = cursor;
         }
     }
 

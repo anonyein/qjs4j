@@ -90,7 +90,7 @@ public class JSSharedArrayBufferGrowthTest extends BaseJavetTest {
                     Thread agent = new Thread(() -> {
                         try {
                             start.await();
-                            int before = buffer.getByteLength();
+                            long before = buffer.getByteLength();
                             try {
                                 buffer.grow(target);
                                 largestAccepted.accumulateAndGet(target, Math::max);

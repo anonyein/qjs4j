@@ -16,8 +16,6 @@
 
 package com.caoccao.qjs4j.core;
 
-import java.nio.ByteBuffer;
-
 /**
  * Represents a JavaScript Float64Array. 64-bit floating point array.
  */
@@ -28,26 +26,26 @@ public final class JSFloat64Array extends JSTypedArray {
     /**
      * Create a Float64Array view on an existing buffer.
      */
-    public JSFloat64Array(JSContext context, IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSFloat64Array(JSContext context, IJSArrayBuffer buffer, long byteOffset, long length) {
         super(context, buffer, byteOffset, length, BYTES_PER_ELEMENT);
     }
 
     /**
      * Create a Float64Array with a new buffer.
      */
-    public JSFloat64Array(JSContext context, int length) {
+    public JSFloat64Array(JSContext context, long length) {
         super(context, length, BYTES_PER_ELEMENT);
     }
 
     @Override
-    protected JSTypedArray createView(int byteOffset, int length) {
+    protected JSTypedArray createView(IJSArrayBuffer buffer, long byteOffset, long length) {
         return new JSFloat64Array(context, buffer, byteOffset, length);
     }
 
     @Override
-    public double getElement(int index) {
+    public double getElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         return buf.getDouble(index * BYTES_PER_ELEMENT);
     }
 
@@ -72,9 +70,9 @@ public final class JSFloat64Array extends JSTypedArray {
     }
 
     @Override
-    public void setElement(int index, double value) {
+    public void setElement(long index, double value) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         buf.putDouble(index * BYTES_PER_ELEMENT, value);
     }
 

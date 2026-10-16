@@ -43,7 +43,7 @@ final class WithStatementCompiler extends AstNodeCompiler<WithStatement> {
 
         compilerContext.scopeManager.enterScope();
         int withObjectLocalIndex = compilerContext.scopeManager.currentScope()
-                .declareLocal("$withObject" + compilerContext.scopeManager.getScopeDepth());
+                .declareLocal("#withObject" + compilerContext.scopeManager.getScopeDepth());
         compilerContext.expressionCompiler.compile(withStmt.getObject());
         compilerContext.emitter.emitOpcode(Opcode.TO_OBJECT);
         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, withObjectLocalIndex);

@@ -23,9 +23,7 @@ import com.caoccao.qjs4j.vm.VirtualMachine;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 /**
  * Builds the realm's error values and the stack traces attached to them — QuickJS's {@code JS_ThrowError2} family, as a
@@ -46,12 +44,6 @@ final class JSErrorReporter {
     static final PropertyKey STACK_TRACE_LIMIT = PropertyKey.fromString("stackTraceLimit");
     private static final Set<String> STATIC_INITIALIZER_NAMES = Set.of("<static initializer>",
             "<static field initializer>");
-    /**
-     * The traces of objects {@code Error.captureStackTrace} was applied to that are not errors, which have nowhere else
-     * to keep one. Weak, so the trace dies with its object.
-     */
-    private final Map<JSObject, JSStackTrace> capturedStackTraces = new WeakHashMap<>();
-
     private final JSContext context;
     // Stack trace capture
     private final List<StackTraceElement> errorStackTrace = new ArrayList<>();
@@ -105,7 +97,7 @@ final class JSErrorReporter {
         if (target instanceof JSError jsError) {
             jsError.setStackTrace(stackTrace);
         } else {
-            capturedStackTraces.put(target, stackTrace);
+            target.setCapturedStackTrace(stackTrace);
         }
         return true;
     }
@@ -227,7 +219,7 @@ final class JSErrorReporter {
         if (owner instanceof JSError jsError) {
             return jsError.getStackTrace();
         }
-        return capturedStackTraces.get(owner);
+        return owner.getCapturedStackTrace();
     }
 
     /**

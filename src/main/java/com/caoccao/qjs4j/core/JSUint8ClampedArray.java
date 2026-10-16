@@ -16,8 +16,6 @@
 
 package com.caoccao.qjs4j.core;
 
-import java.nio.ByteBuffer;
-
 /**
  * Represents a JavaScript Uint8ClampedArray. 8-bit unsigned integer array with clamping (used for canvas pixel data).
  * Values are clamped to [0, 255] range instead of wrapping.
@@ -29,26 +27,26 @@ public final class JSUint8ClampedArray extends JSTypedArray {
     /**
      * Create a Uint8ClampedArray view on an existing buffer.
      */
-    public JSUint8ClampedArray(JSContext context, IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSUint8ClampedArray(JSContext context, IJSArrayBuffer buffer, long byteOffset, long length) {
         super(context, buffer, byteOffset, length, BYTES_PER_ELEMENT);
     }
 
     /**
      * Create a Uint8ClampedArray with a new buffer.
      */
-    public JSUint8ClampedArray(JSContext context, int length) {
+    public JSUint8ClampedArray(JSContext context, long length) {
         super(context, length, BYTES_PER_ELEMENT);
     }
 
     @Override
-    protected JSTypedArray createView(int byteOffset, int length) {
+    protected JSTypedArray createView(IJSArrayBuffer buffer, long byteOffset, long length) {
         return new JSUint8ClampedArray(context, buffer, byteOffset, length);
     }
 
     @Override
-    public double getElement(int index) {
+    public double getElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         return buf.get(index) & 0xFF; // Convert to unsigned
     }
 
@@ -73,9 +71,9 @@ public final class JSUint8ClampedArray extends JSTypedArray {
     }
 
     @Override
-    public void setElement(int index, double value) {
+    public void setElement(long index, double value) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         int clampedValue = JSTypeConversions.toUint8Clamp(value);
         buf.put(index, (byte) clampedValue);
     }

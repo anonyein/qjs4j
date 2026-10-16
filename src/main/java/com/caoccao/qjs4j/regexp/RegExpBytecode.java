@@ -155,9 +155,9 @@ public record RegExpBytecode(byte[] instructions, int flags, int captureCount, i
      */
     public static final class ExecutionLimits {
         /**
-         * Upper bound on registers, and the fallback when the count is not known.
+         * The register operand is an unsigned byte.
          */
-        public static final int MAX_REGISTERS = 16;
+        public static final int MAX_REGISTERS = 256;
 
         private ExecutionLimits() {
         }

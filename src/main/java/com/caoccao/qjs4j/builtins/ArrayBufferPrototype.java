@@ -20,8 +20,6 @@ import com.caoccao.qjs4j.core.*;
 import com.caoccao.qjs4j.exceptions.JSErrorException;
 import com.caoccao.qjs4j.exceptions.JSRangeErrorException;
 
-import java.nio.ByteBuffer;
-
 /**
  * Implementation of ArrayBuffer.prototype methods. Based on ES2020 ArrayBuffer specification.
  */
@@ -133,7 +131,7 @@ public final class ArrayBufferPrototype {
         }
 
         try {
-            buffer.resize((int) newByteLength);
+            buffer.resize(newByteLength);
             return JSUndefined.INSTANCE;
         } catch (JSErrorException e) {
             // Preserve the error's own type. Collapsing every JSErrorException to one type turned
@@ -155,41 +153,41 @@ public final class ArrayBufferPrototype {
             return context.throwTypeError("Cannot slice a detached ArrayBuffer");
         }
 
-        int len = buffer.getByteLength();
+        long len = buffer.getByteLength();
 
         // Compute first (start) per spec using ToIntegerOrInfinity + clamp
-        int first;
+        long first;
         if (args.length > 0) {
             double relativeStart = JSTypeConversions.toInteger(context, args[0]);
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
             if (relativeStart < 0) {
-                first = (int) Math.max(len + relativeStart, 0);
+                first = (long) Math.max(len + relativeStart, 0);
             } else {
-                first = (int) Math.min(relativeStart, len);
+                first = (long) Math.min(relativeStart, len);
             }
         } else {
             first = 0;
         }
 
         // Compute final (end) per spec using ToIntegerOrInfinity + clamp
-        int fin;
+        long fin;
         if (args.length > 1 && !(args[1] instanceof JSUndefined)) {
             double relativeEnd = JSTypeConversions.toInteger(context, args[1]);
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
             if (relativeEnd < 0) {
-                fin = (int) Math.max(len + relativeEnd, 0);
+                fin = (long) Math.max(len + relativeEnd, 0);
             } else {
-                fin = (int) Math.min(relativeEnd, len);
+                fin = (long) Math.min(relativeEnd, len);
             }
         } else {
             fin = len;
         }
 
-        int newLen = Math.max(fin - first, 0);
+        long newLen = Math.max(fin - first, 0);
 
         // SpeciesConstructor: get constructor, check species
         JSValue ctor = speciesConstructor(context, buffer);
@@ -231,14 +229,7 @@ public final class ArrayBufferPrototype {
         }
 
         if (newLen > 0) {
-            ByteBuffer src = buffer.getBuffer();
-            int oldPos = src.position();
-            src.position(first);
-            byte[] bytes = new byte[newLen];
-            src.get(bytes, 0, newLen);
-            src.position(oldPos);
-            newBuffer.getBuffer().put(bytes);
-            newBuffer.getBuffer().position(0);
+            buffer.getBuffer().copyTo(newBuffer.getBuffer(), first, 0, newLen);
         }
         return newBuffer;
     }
@@ -312,14 +303,14 @@ public final class ArrayBufferPrototype {
             return context.throwTypeError("Cannot transfer an immutable ArrayBuffer");
         }
 
-        if (newByteLength > Integer.MAX_VALUE) {
+        if (newByteLength > NumberPrototype.MAX_SAFE_INTEGER) {
             return context.throwRangeError("invalid array buffer length");
         }
 
         try {
             return fixedLength
-                    ? buffer.transferToFixedLength(context, (int) newByteLength)
-                    : buffer.transfer(context, (int) newByteLength);
+                    ? buffer.transferToFixedLength(context, newByteLength)
+                    : buffer.transfer(context, newByteLength);
         } catch (JSErrorException e) {
             // Preserve the error's own type. Collapsing every JSErrorException to one type turned
             // a RangeError into a TypeError (or the reverse) whenever a precheck above missed a

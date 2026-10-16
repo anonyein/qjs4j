@@ -711,9 +711,10 @@ public final class ObjectConstructor {
                     + (items instanceof JSNull ? "null" : "undefined") + " (reading 'Symbol(Symbol.iterator)')");
         }
 
-        if (!(args[1] instanceof JSFunction callback)) {
+        if (!JSTypeChecking.isCallable(args[1])) {
             return context.throwTypeError("Second argument must be a function");
         }
+        JSValue callback = args[1];
 
         // Step 1: Get iterator from items (any iterable, not just arrays)
         JSValue iterator = JSIteratorHelper.getIterator(context, items);
@@ -754,7 +755,8 @@ public final class ObjectConstructor {
             // Call callback - errors close iterator
             JSValue keyValue;
             try {
-                keyValue = callback.call(context, JSUndefined.INSTANCE, new JSValue[]{element, JSNumber.of(index)});
+                keyValue = JSCall.call(context, callback, JSUndefined.INSTANCE,
+                        new JSValue[]{element, JSNumber.of(index)});
                 if (context.hasPendingException()) {
                     closeIteratorPreserveError(context, iterator);
                     return JSUndefined.INSTANCE;

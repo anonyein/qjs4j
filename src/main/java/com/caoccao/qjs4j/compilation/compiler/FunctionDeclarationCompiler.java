@@ -167,7 +167,7 @@ final class FunctionDeclarationCompiler extends AstNodeCompiler<FunctionDeclarat
             }
             functionContext.emitter.emitOpcode(Opcode.UNDEFINED);
             int returnValueIndex = functionContext.scopeManager.currentScope()
-                    .declareLocal("$function_return_" + functionContext.emitter.currentOffset());
+                    .declareLocal("#function_return_" + functionContext.emitter.currentOffset());
             functionContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, returnValueIndex);
             functionContext.emitHelpers.emitCurrentScopeUsingDisposal();
             functionContext.emitter.emitOpcodeU16(Opcode.GET_LOC, returnValueIndex);

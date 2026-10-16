@@ -16,8 +16,6 @@
 
 package com.caoccao.qjs4j.core;
 
-import java.nio.ByteBuffer;
-
 /**
  * Represents a JavaScript Int16Array. 16-bit signed integer array.
  */
@@ -28,26 +26,26 @@ public final class JSInt16Array extends JSTypedArray {
     /**
      * Create an Int16Array view on an existing buffer.
      */
-    public JSInt16Array(JSContext context, IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSInt16Array(JSContext context, IJSArrayBuffer buffer, long byteOffset, long length) {
         super(context, buffer, byteOffset, length, BYTES_PER_ELEMENT);
     }
 
     /**
      * Create an Int16Array with a new buffer.
      */
-    public JSInt16Array(JSContext context, int length) {
+    public JSInt16Array(JSContext context, long length) {
         super(context, length, BYTES_PER_ELEMENT);
     }
 
     @Override
-    protected JSTypedArray createView(int byteOffset, int length) {
+    protected JSTypedArray createView(IJSArrayBuffer buffer, long byteOffset, long length) {
         return new JSInt16Array(context, buffer, byteOffset, length);
     }
 
     @Override
-    public double getElement(int index) {
+    public double getElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         return buf.getShort(index * BYTES_PER_ELEMENT);
     }
 
@@ -72,9 +70,9 @@ public final class JSInt16Array extends JSTypedArray {
     }
 
     @Override
-    public void setElement(int index, double value) {
+    public void setElement(long index, double value) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         buf.putShort(index * BYTES_PER_ELEMENT, (short) JSTypeConversions.toInt32(value));
     }
 

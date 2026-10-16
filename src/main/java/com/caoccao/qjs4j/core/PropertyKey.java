@@ -344,14 +344,19 @@ public final class PropertyKey {
         return new PropertyKey(str, atomIndex);
     }
 
-    /**
-     * Create a property key from an integer index.
-     */
     public static PropertyKey fromIndex(int index) {
         if (index >= 0 && index < INDEX_CACHE_SIZE) {
             return INDEX_PROPERTY_KEYS[index];
         }
         return new PropertyKey(index, -1);
+    }
+
+    /**
+     * Create a property key from an integer index.
+     */
+    /** A canonical index without narrowing a large TypedArray index to int. */
+    public static PropertyKey fromIndex(long index) {
+        return index >= 0 && index <= Integer.MAX_VALUE ? fromIndex((int) index) : fromString(Long.toString(index));
     }
 
     /**

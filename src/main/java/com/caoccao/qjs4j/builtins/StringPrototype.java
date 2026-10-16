@@ -40,7 +40,7 @@ public final class StringPrototype {
      *
      * @return false with a pending RangeError when the result would be too long
      */
-    private static boolean appendCapture(JSContext context, StringBuilder builder, String capture) {
+    private static boolean appendCapture(JSContext context, StringResultBuilder builder, String capture) {
         String text = capture != null ? capture : "";
         if (exceedsMaxLength(context, builder, text.length())) {
             return false;
@@ -59,15 +59,27 @@ public final class StringPrototype {
      *            the match result's groups, or null when there are none
      * @return the substitution, or null with a pending exception
      */
-    private static String applyRegExpReplacementPattern(JSContext context, String replacementTemplate, String input,
+    private static JSString applyRegExpReplacementPattern(JSContext context, String replacementTemplate, String input,
             int matchStart, int matchEnd, String[] captures, JSValue namedCapturesValue) {
         // RegExp.prototype[Symbol.replace] has already refused null groups (ToObject), so only undefined means none.
         boolean hasNamedCaptures = namedCapturesValue != null && !(namedCapturesValue instanceof JSUndefined);
-        StringBuilder resultBuilder = new StringBuilder(replacementTemplate.length() + 16);
+        StringResultBuilder resultBuilder = new StringResultBuilder(context);
+        String prefix = null;
+        String suffix = null;
         int replacementIndex = 0;
         while (replacementIndex < replacementTemplate.length()) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             char currentChar = replacementTemplate.charAt(replacementIndex);
-            if (currentChar != '$' || replacementIndex + 1 >= replacementTemplate.length()) {
+            if (currentChar != '$') {
+                // Preserve literal runs as a single leaf. Per-character appends rebuild short rope leaves for every
+                // match and can allocate gigabytes of temporary strings before the result's length check fires.
+                int nextToken = replacementTemplate.indexOf('$', replacementIndex + 1);
+                int literalEnd = nextToken >= 0 ? nextToken : replacementTemplate.length();
+                resultBuilder.append(replacementTemplate, replacementIndex, literalEnd);
+                replacementIndex = literalEnd;
+                continue;
+            }
+            if (replacementIndex + 1 >= replacementTemplate.length()) {
                 resultBuilder.append(currentChar);
                 replacementIndex++;
                 continue;
@@ -90,7 +102,10 @@ public final class StringPrototype {
                 if (exceedsMaxLength(context, resultBuilder, matchStart)) {
                     return null;
                 }
-                resultBuilder.append(input, 0, matchStart);
+                if (prefix == null) {
+                    prefix = input.substring(0, matchStart);
+                }
+                resultBuilder.append(prefix);
                 replacementIndex += 2;
                 continue;
             }
@@ -98,7 +113,10 @@ public final class StringPrototype {
                 if (exceedsMaxLength(context, resultBuilder, input.length() - matchEnd)) {
                     return null;
                 }
-                resultBuilder.append(input, matchEnd, input.length());
+                if (suffix == null) {
+                    suffix = input.substring(matchEnd);
+                }
+                resultBuilder.append(suffix);
                 replacementIndex += 2;
                 continue;
             }
@@ -168,22 +186,22 @@ public final class StringPrototype {
             resultBuilder.append('$');
             replacementIndex++;
         }
-        return resultBuilder.toString();
+        return resultBuilder.build();
     }
 
-    static String applyRegExpReplacementWithNamedCapturesObject(JSContext context, JSValue replaceValue, String input,
+    static JSString applyRegExpReplacementWithNamedCapturesObject(JSContext context, JSValue replaceValue, String input,
             int matchStart, int matchEnd, String[] captures, JSValue namedCapturesValue) {
-        if (replaceValue instanceof JSFunction replaceFunction) {
+        if (JSTypeChecking.isCallable(replaceValue)) {
             JSValue[] callbackArgs = buildRegExpReplaceCallbackArgs(context, input, matchStart, captures,
                     namedCapturesValue);
             if (context.hasPendingException()) {
                 return null;
             }
-            JSValue callbackResult = replaceFunction.call(context, JSUndefined.INSTANCE, callbackArgs);
+            JSValue callbackResult = JSCall.call(context, replaceValue, JSUndefined.INSTANCE, callbackArgs);
             if (context.hasPendingException()) {
                 return null;
             }
-            return JSTypeConversions.toString(context, callbackResult).value();
+            return JSTypeConversions.toString(context, callbackResult);
         }
         String replacementTemplate = JSTypeConversions.toString(context, replaceValue).value();
         if (context.hasPendingException()) {
@@ -245,6 +263,7 @@ public final class StringPrototype {
         int callbackArgCount = captures.length + 2 + (hasNamedCaptures ? 1 : 0);
         JSValue[] callbackArgs = new JSValue[callbackArgCount];
         for (int captureIndex = 0; captureIndex < captures.length; captureIndex++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             String captureValue = captures[captureIndex];
             callbackArgs[captureIndex] = captureValue != null ? new JSString(captureValue) : JSUndefined.INSTANCE;
         }
@@ -363,28 +382,32 @@ public final class StringPrototype {
      * String.prototype.concat(...strings) ES2020 21.1.3.4
      */
     public static JSValue concat(JSContext context, JSValue thisArg, JSValue[] args) {
-        JSString str = toStringCheckObject(context, thisArg);
-        StringBuilder result = new StringBuilder(str.value());
-
+        JSString result = toStringCheckObject(context, thisArg);
+        if (context.hasPendingException()) {
+            return context.getPendingException();
+        }
         for (JSValue arg : args) {
-            String appended = JSTypeConversions.toString(context, arg).value();
+            context.getVirtualMachine().checkExecutionInterruptForNative();
+            JSString appended = JSTypeConversions.toString(context, arg);
+            if (context.hasPendingException()) {
+                return context.getPendingException();
+            }
             if ((long) result.length() + appended.length() > JSString.MAX_LENGTH) {
                 return context.throwRangeError("Invalid string length");
             }
-            result.append(appended);
+            result = JSString.concat(result, appended);
         }
-
-        return new JSString(result.toString());
+        return result;
     }
 
     /**
      * The result of a replacement, within the string length limit.
      */
-    private static JSValue concatenateReplacement(JSContext context, String head, String replacement, String tail) {
+    private static JSValue concatenateReplacement(JSContext context, JSString head, JSString replacement, String tail) {
         if ((long) head.length() + replacement.length() + tail.length() > JSString.MAX_LENGTH) {
             return context.throwRangeError("Invalid string length");
         }
-        return new JSString(head + replacement + tail);
+        return JSString.concat(JSString.concat(head, replacement), new JSString(tail));
     }
 
     /**
@@ -411,6 +434,7 @@ public final class StringPrototype {
             result.append(' ').append(attr).append("=\"");
             // Escape quotes in attribute value
             for (int i = 0; i < attrText.length(); i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 char c = attrText.charAt(i);
                 if (c == '"') {
                     result.append("&quot;");
@@ -462,7 +486,7 @@ public final class StringPrototype {
     /**
      * Whether appending would pass {@link JSString#MAX_LENGTH}; if so, raise {@code RangeError: Invalid string length}.
      */
-    private static boolean exceedsMaxLength(JSContext context, StringBuilder builder, long addition) {
+    private static boolean exceedsMaxLength(JSContext context, StringResultBuilder builder, long addition) {
         if (builder.length() + addition > JSString.MAX_LENGTH) {
             context.throwRangeError("Invalid string length");
             return true;
@@ -539,7 +563,7 @@ public final class StringPrototype {
     /**
      * ES2024 GetSubstitution for string replace/replaceAll.
      */
-    private static String getSubstitution(JSContext context, String matched, String str, int position,
+    private static JSString getSubstitution(JSContext context, String matched, String str, int position,
             String replacement) {
         return applyRegExpReplacementPattern(context, replacement, str, position, position + matched.length(),
                 new String[]{matched}, null);
@@ -983,7 +1007,10 @@ public final class StringPrototype {
         StringBuilder result = new StringBuilder(s);
 
         while (result.length() < maxLength) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             for (int i = 0; i < fillStr.length() && result.length() < maxLength; i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 result.append(fillStr.charAt(i));
             }
         }
@@ -1018,7 +1045,10 @@ public final class StringPrototype {
         StringBuilder padding = new StringBuilder();
 
         while (padding.length() < fillLen) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             for (int i = 0; i < fillStr.length() && padding.length() < fillLen; i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 padding.append(fillStr.charAt(i));
             }
         }
@@ -1087,14 +1117,19 @@ public final class StringPrototype {
         if (count > JSString.MAX_LENGTH / s.length()) {
             return context.throwRangeError("Invalid string length");
         }
-        int resultLength = (int) (count * s.length());
-
-        StringBuilder result = new StringBuilder(resultLength);
-        for (long i = 0; i < count; i++) {
-            result.append(s);
+        JSString result = new JSString("");
+        JSString block = new JSString(s);
+        while (count != 0) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
+            if ((count & 1) != 0) {
+                result = JSString.concat(result, block);
+            }
+            count >>>= 1;
+            if (count != 0) {
+                block = JSString.concat(block, block);
+            }
         }
-
-        return new JSString(result.toString());
+        return result;
     }
 
     /**
@@ -1114,10 +1149,10 @@ public final class StringPrototype {
                 return JSUndefined.INSTANCE;
             }
             if (!(replacer instanceof JSUndefined) && !(replacer instanceof JSNull)) {
-                if (!(replacer instanceof JSFunction replacerFunction)) {
+                if (!JSTypeChecking.isCallable(replacer)) {
                     return context.throwTypeError("not a function");
                 }
-                return replacerFunction.call(context, searchValueObject, new JSValue[]{thisArg, replaceValue});
+                return JSCall.call(context, replacer, searchValueObject, new JSValue[]{thisArg, replaceValue});
             }
         }
 
@@ -1125,7 +1160,7 @@ public final class StringPrototype {
         String s = str.value();
         // A RegExp whose Symbol.replace is undefined or null is searched for as its string, like any other object.
         String searchStr = JSTypeConversions.toString(context, searchValue).value();
-        boolean functionalReplace = replaceValue instanceof JSFunction;
+        boolean functionalReplace = JSTypeChecking.isCallable(replaceValue);
         String replaceStr = functionalReplace ? null : JSTypeConversions.toString(context, replaceValue).value();
 
         int index = s.indexOf(searchStr);
@@ -1133,21 +1168,21 @@ public final class StringPrototype {
             return str;
         }
 
-        String replacement;
+        JSString replacement;
         if (functionalReplace) {
-            JSValue replResult = ((JSFunction) replaceValue).call(context, JSUndefined.INSTANCE,
+            JSValue replResult = JSCall.call(context, replaceValue, JSUndefined.INSTANCE,
                     new JSValue[]{new JSString(searchStr), JSNumber.of(index), new JSString(s)});
             if (context.hasPendingException()) {
                 return JSUndefined.INSTANCE;
             }
-            replacement = JSTypeConversions.toString(context, replResult).value();
+            replacement = JSTypeConversions.toString(context, replResult);
         } else {
             replacement = getSubstitution(context, searchStr, s, index, replaceStr);
             if (replacement == null) {
                 return JSUndefined.INSTANCE;
             }
         }
-        return concatenateReplacement(context, s.substring(0, index), replacement,
+        return concatenateReplacement(context, new JSString(s.substring(0, index)), replacement,
                 s.substring(index + searchStr.length()));
     }
 
@@ -1192,10 +1227,10 @@ public final class StringPrototype {
                     return JSUndefined.INSTANCE;
                 }
                 if (!(replacer instanceof JSUndefined) && !(replacer instanceof JSNull)) {
-                    if (!(replacer instanceof JSFunction replacerFunction)) {
+                    if (!JSTypeChecking.isCallable(replacer)) {
                         return context.throwTypeError("not a function");
                     }
-                    return replacerFunction.call(context, searchValueObject, new JSValue[]{thisArg, replaceValue});
+                    return JSCall.call(context, replacer, searchValueObject, new JSValue[]{thisArg, replaceValue});
                 }
             }
         }
@@ -1209,7 +1244,7 @@ public final class StringPrototype {
         if (context.hasPendingException()) {
             return JSUndefined.INSTANCE;
         }
-        boolean functionalReplace = replaceValue instanceof JSFunction;
+        boolean functionalReplace = JSTypeChecking.isCallable(replaceValue);
         String replaceStr = functionalReplace ? null : JSTypeConversions.toString(context, replaceValue).value();
         if (context.hasPendingException()) {
             return JSUndefined.INSTANCE;
@@ -1222,28 +1257,31 @@ public final class StringPrototype {
         if (searchLen == 0) {
             // Empty search: match at every position including end
             for (int i = 0; i <= s.length(); i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 matchPositions.add(i);
             }
         } else {
             while ((pos = s.indexOf(searchStr, pos)) >= 0) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 matchPositions.add(pos);
                 pos += searchLen;
             }
         }
 
         // Build result
-        StringBuilder result = new StringBuilder();
+        StringResultBuilder result = new StringResultBuilder(context);
         int endOfLastMatch = 0;
         for (int matchPosition : matchPositions) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             result.append(s, endOfLastMatch, matchPosition);
-            String replacement;
+            JSString replacement;
             if (functionalReplace) {
-                JSValue replResult = ((JSFunction) replaceValue).call(context, JSUndefined.INSTANCE,
+                JSValue replResult = JSCall.call(context, replaceValue, JSUndefined.INSTANCE,
                         new JSValue[]{new JSString(searchStr), JSNumber.of(matchPosition), new JSString(s)});
                 if (context.hasPendingException()) {
                     return JSUndefined.INSTANCE;
                 }
-                replacement = JSTypeConversions.toString(context, replResult).value();
+                replacement = JSTypeConversions.toString(context, replResult);
             } else {
                 replacement = getSubstitution(context, searchStr, s, matchPosition, replaceStr);
                 if (replacement == null) {
@@ -1256,7 +1294,7 @@ public final class StringPrototype {
             result.append(replacement);
             endOfLastMatch = matchPosition + searchLen;
         }
-        return concatenateReplacement(context, result.toString(), "", s.substring(endOfLastMatch));
+        return concatenateReplacement(context, result.build(), new JSString(""), s.substring(endOfLastMatch));
     }
 
     /**
@@ -1399,6 +1437,7 @@ public final class StringPrototype {
         if (separator.isEmpty()) {
             // Split into individual characters
             for (int i = 0; i < s.length() && i < limit; i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 arr.push(new JSString(String.valueOf(s.charAt(i))));
             }
             return arr;
@@ -1408,6 +1447,7 @@ public final class StringPrototype {
         int start = 0;
         int index;
         while ((index = s.indexOf(separator, start)) != -1 && arr.getLength() < limit) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             arr.push(new JSString(s.substring(start, index)));
             start = index + separator.length();
         }
@@ -1683,6 +1723,7 @@ public final class StringPrototype {
         // Replace unpaired surrogates with U+FFFD
         StringBuilder result = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             char c = s.charAt(i);
 
             if (Character.isSurrogate(c)) {
@@ -1712,9 +1753,11 @@ public final class StringPrototype {
         int start = 0;
         int end = s.length();
         while (start < end && isEcmaWhitespace(s.charAt(start))) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             start++;
         }
         while (end > start && isEcmaWhitespace(s.charAt(end - 1))) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             end--;
         }
         return new JSString(s.substring(start, end));
@@ -1728,6 +1771,7 @@ public final class StringPrototype {
         String s = str.value();
         int end = s.length();
         while (end > 0 && isEcmaWhitespace(s.charAt(end - 1))) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             end--;
         }
         return new JSString(s.substring(0, end));
@@ -1741,6 +1785,7 @@ public final class StringPrototype {
         String s = str.value();
         int start = 0;
         while (start < s.length() && isEcmaWhitespace(s.charAt(start))) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             start++;
         }
         return new JSString(s.substring(start));

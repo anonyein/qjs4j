@@ -57,9 +57,10 @@ public final class MapConstructor {
      * function, returning a Map where keys are callback results and values are arrays.
      */
     public static JSValue groupBy(JSContext context, JSValue thisArg, JSValue[] args) {
-        if (args.length < 2 || !(args[1] instanceof JSFunction callback)) {
+        if (args.length < 2 || !JSTypeChecking.isCallable(args[1])) {
             return context.throwTypeError("not a function");
         }
+        JSValue callback = args[1];
 
         JSValue items = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
         JSValue iterator = JSIteratorHelper.getIterator(context, items);
@@ -91,7 +92,8 @@ public final class MapConstructor {
             }
 
             JSValue value = nextResult.get(PropertyKey.VALUE);
-            JSValue key = callback.call(context, JSUndefined.INSTANCE, new JSValue[]{value, JSNumber.of(index)});
+            JSValue key = JSCall.call(context, callback, JSUndefined.INSTANCE,
+                    new JSValue[]{value, JSNumber.of(index)});
             if (context.hasPendingException()) {
                 closeIterator(context, iterator);
                 return JSUndefined.INSTANCE;

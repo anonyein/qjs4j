@@ -25,7 +25,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.PriorityQueue;
+import java.util.NavigableSet;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
@@ -48,7 +49,7 @@ final class CommandLineHost {
     private final JSContext context;
     private int nextTimerId;
     private long nextTimerSequence;
-    private final PriorityQueue<Timer> timerQueue;
+    private final NavigableSet<Timer> timerQueue;
     /**
      * What a {@code queueMicrotask} callback threw, from when it ends the drain until it is reported.
      */
@@ -72,7 +73,7 @@ final class CommandLineHost {
         activeTimers = new HashMap<>();
         nextTimerId = 1;
         nextTimerSequence = 0;
-        timerQueue = new PriorityQueue<>(
+        timerQueue = new TreeSet<>(
                 Comparator.comparingLong((Timer timer) -> timer.dueNanos).thenComparingLong(timer -> timer.sequence));
         uncaughtMicrotaskError = null;
     }
@@ -81,6 +82,7 @@ final class CommandLineHost {
         if (args.length > 0 && args[0] instanceof JSNumber number) {
             Timer timer = activeTimers.remove((int) number.value());
             if (timer != null) {
+                timerQueue.remove(timer);
                 timer.cancelled = true;
             }
         }
@@ -191,7 +193,7 @@ final class CommandLineHost {
      */
     boolean runTimers(BooleanSupplier continueAfterTurn) {
         while (true) {
-            Timer timer = timerQueue.poll();
+            Timer timer = timerQueue.pollFirst();
             if (timer == null) {
                 return true;
             }

@@ -492,8 +492,7 @@ public final class JSGlobalObject {
         JSObject asyncGeneratorPrototype = context.createJSObject();
         asyncGeneratorPrototype.setPrototype(asyncIteratorPrototype);
 
-        // AsyncGenerator.prototype methods are set up on individual JSAsyncGenerator instances
-        // but we need next/return/throw on the prototype too for spec compliance
+        // Shared methods dispatch using the receiver's internal generator state.
         JSNativeFunction asyncGeneratorNext = new JSNativeFunction(context, "next", 1, AsyncGeneratorPrototype::next);
         asyncGeneratorNext.initializePrototypeChain(context);
         asyncGeneratorPrototype.defineProperty(PropertyKey.fromString("next"), asyncGeneratorNext,
@@ -4650,7 +4649,7 @@ public final class JSGlobalObject {
                     if (name == null) {
                         continue;
                     }
-                    if (name.startsWith("$")) {
+                    if (name.startsWith("#")) {
                         continue;
                     }
                     if (shouldOverlayTopLevelLexicals && locals[i] instanceof JSSymbol symbolValue
@@ -4709,7 +4708,7 @@ public final class JSGlobalObject {
                         int selfCaptureIndex = callerBytecodeFunction.getSelfCaptureIndex();
                         for (int captureSlot = 0; captureSlot < callerVarRefs.length; captureSlot++) {
                             String capturedVarName = callerBytecodeFunction.getCapturedVarName(captureSlot);
-                            if (capturedVarName == null || capturedVarName.startsWith("$")) {
+                            if (capturedVarName == null || capturedVarName.startsWith("#")) {
                                 continue;
                             }
                             if (localVarNameSet.contains(capturedVarName)) {
@@ -4771,7 +4770,7 @@ public final class JSGlobalObject {
                         if (name == null || localValue == null || localValue == JSUndefined.INSTANCE) {
                             continue;
                         }
-                        if (!(localValue instanceof JSObject withObject) || !name.startsWith("$withObject")) {
+                        if (!(localValue instanceof JSObject withObject) || !name.startsWith("#withObject")) {
                             continue;
                         }
                         withObjectCandidates.add(new WithObjectCandidate(parseWithDepth(name), withObject));
@@ -5023,7 +5022,7 @@ public final class JSGlobalObject {
                         if (name == null) {
                             continue;
                         }
-                        if (name.startsWith("$")) {
+                        if (name.startsWith("#")) {
                             continue;
                         }
                         if (evalCodeStrict && evalVarDeclarations != null && evalVarDeclarations.contains(name)) {
@@ -5327,7 +5326,7 @@ public final class JSGlobalObject {
             for (int localIndex = 0; localIndex < lexicalLocalVarNames.length
                     && localIndex < lexicalLocals.length; localIndex++) {
                 String localName = lexicalLocalVarNames[localIndex];
-                if (localName == null || localName.startsWith("$")) {
+                if (localName == null || localName.startsWith("#")) {
                     continue;
                 }
                 if (localVarNameSet != null && localVarNameSet.contains(localName)) {

@@ -247,11 +247,9 @@ public class JSRuntimeOptions {
      * ordinary Java allocations bounded by {@code -Xmx}. See {@link JSMemoryAccounting} for the full contract, and read
      * the ceiling back through {@link JSRuntime#getMemoryAccounting()}.
      * <p>
-     * <strong>Buffers are smaller than V8's.</strong> The default ceiling, {@link #DEFAULT_MAX_DATA_BLOCK_BYTES}, is 64
-     * MiB, so {@code new ArrayBuffer(2 ** 27)} is a {@code RangeError} until it is raised. Independently of the
-     * ceiling, a data block is one Java {@code byte[]}, so no buffer — and no typed array, whose byte length is its
-     * length times its element size — can exceed {@code Integer.MAX_VALUE - 8} bytes, just under 2 GiB, even with the
-     * ceiling disabled. V8 allocates {@code new ArrayBuffer(2 ** 31)} and larger.
+     * The default ceiling is 64 MiB. Raise it or pass zero to use larger buffers; segmented storage supports the 64-bit
+     * sandboxed V8 length limit (32 GiB - 1) and commits pages on first write. Accounting charges logical capacity,
+     * including unmaterialized pages, so sparse allocation does not bypass the host policy.
      * <p>
      * The limit is fixed when a {@link JSRuntime} is constructed; changing it on an options object afterwards has no
      * effect on runtimes already created from it.

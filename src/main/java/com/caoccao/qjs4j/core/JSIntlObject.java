@@ -3026,6 +3026,12 @@ public final class JSIntlObject {
                 }
             }
 
+            if ("compact".equals(notation) && minimumFractionDigitsOption == null && maximumFractionDigitsOption == null
+                    && minimumSignificantDigitsOption == null && maximumSignificantDigitsOption == null) {
+                minimumSignificantDigits = 1;
+                maximumSignificantDigits = 2;
+            }
+
             getOptionIntegerOrUndefined(context, optionsObject, "roundingIncrement", 1, 5000);
             if (context.hasPendingException()) {
                 return JSUndefined.INSTANCE;

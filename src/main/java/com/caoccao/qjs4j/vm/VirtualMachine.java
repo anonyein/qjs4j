@@ -312,6 +312,10 @@ public final class VirtualMachine {
         }
     }
 
+    public void checkExecutionInterruptForNative() {
+        checkExecutionInterruptForExecute();
+    }
+
     void clearActiveGeneratorSuspendedExecutionState() {
         if (activeGeneratorState != null) {
             activeGeneratorState.clearSuspendedExecutionState();
@@ -1790,6 +1794,60 @@ public final class VirtualMachine {
         }
     }
 
+    /** Return a promise whose rejection resumes unwinding after AsyncIteratorClose completes. */
+    private static JSPromise closeAsyncIterator(ExecutionContext execution, JSObject iterator, JSValue completion) {
+        VirtualMachine vm = execution.virtualMachine;
+        JSContext context = vm.context;
+        boolean throwing = completion != GENERATOR_RETURN_SIGNAL;
+        JSValue closeResult;
+        try {
+            JSValue method = iterator.get(PropertyKey.RETURN);
+            if (context.hasPendingException()) {
+                if (!throwing) {
+                    vm.pendingException = context.getPendingException();
+                }
+                context.clearPendingException();
+                return null;
+            }
+            if (method.isNullOrUndefined()) {
+                return null;
+            }
+            closeResult = JSCall.call(context, method, iterator, JSValue.NO_ARGS);
+        } catch (JSVirtualMachineException error) {
+            if (!throwing) {
+                vm.capturePendingExceptionFromVmOrContext(error);
+            }
+            context.clearPendingException();
+            return null;
+        }
+        if (context.hasPendingException()) {
+            if (!throwing) {
+                vm.pendingException = context.getPendingException();
+            }
+            context.clearPendingException();
+            return null;
+        }
+        JSPromise awaited = context.createJSPromise();
+        awaited.resolve(context, closeResult);
+        JSPromise continuation = context.createJSPromise();
+        JSNativeFunction fulfilled = new JSNativeFunction(context, "", 1, (ctx, receiver, args) -> {
+            JSValue nextCompletion = completion;
+            if (!throwing && !(args[0] instanceof JSObject)) {
+                nextCompletion = ctx.throwTypeError("iterator result is not an object");
+                ctx.clearPendingException();
+            }
+            continuation.reject(nextCompletion);
+            return JSUndefined.INSTANCE;
+        });
+        JSNativeFunction rejected = new JSNativeFunction(context, "", 1, (ctx, receiver, args) -> {
+            continuation.reject(throwing ? completion : args[0]);
+            return JSUndefined.INSTANCE;
+        });
+        awaited.addReactions(new JSPromise.ReactionRecord(fulfilled, null, context),
+                new JSPromise.ReactionRecord(rejected, null, context));
+        return continuation;
+    }
+
     /**
      * Build a diagnostic message for an engine defect that escaped the interpreter loop.
      *
@@ -1846,7 +1904,22 @@ public final class VirtualMachine {
                             // A throw completion keeps its exception whatever the close does. A return
                             // completion is replaced by a close that fails, and that failure is an
                             // ordinary exception the catch handlers below may take.
-                            autoCloseIterator(executionContext, iteratorObj, exception != GENERATOR_RETURN_SIGNAL);
+                            VirtualMachine vm = executionContext.virtualMachine;
+                            if (catchOffset.isAsyncIteratorCloseMarker() && vm.awaitSuspensionEnabled
+                                    && vm.activeGeneratorState != null) {
+                                JSPromise continuation = closeAsyncIterator(executionContext, iteratorObj, exception);
+                                if (continuation != null) {
+                                    vm.awaitSuspensionPromise = continuation;
+                                    executionContext.sp = vm.valueStack.stackTop;
+                                    vm.saveActiveGeneratorSuspendedExecutionState(executionContext.frame,
+                                            executionContext.pc, vm.valueStack.stack, executionContext.sp,
+                                            executionContext.frameStackBase);
+                                    vm.requestOpcodeReturnFromExecute(executionContext, JSUndefined.INSTANCE);
+                                    return PendingExceptionAction.RETURN;
+                                }
+                            } else {
+                                autoCloseIterator(executionContext, iteratorObj, exception != GENERATOR_RETURN_SIGNAL);
+                            }
                             if (executionContext.virtualMachine.pendingException != null) {
                                 exception = executionContext.virtualMachine.pendingException;
                                 executionContext.virtualMachine.pendingException = null;

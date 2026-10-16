@@ -20,8 +20,6 @@ import com.caoccao.qjs4j.core.*;
 import com.caoccao.qjs4j.exceptions.JSRangeErrorException;
 import com.caoccao.qjs4j.exceptions.JSTypeErrorException;
 
-import java.nio.ByteBuffer;
-
 /**
  * SharedArrayBuffer.prototype methods implementation. Based on ES2024 SharedArrayBuffer specification.
  */
@@ -75,14 +73,14 @@ public final class SharedArrayBufferPrototype {
             return context.throwTypeError("SharedArrayBuffer.prototype.grow called on non-SharedArrayBuffer");
         }
 
-        int newByteLength;
+        long newByteLength;
         try {
             JSValue lengthArg = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
             long length = JSTypeConversions.toIndex(context, lengthArg);
-            if (length > Integer.MAX_VALUE) {
+            if (length > NumberPrototype.MAX_SAFE_INTEGER) {
                 return context.throwRangeError("Invalid array buffer length");
             }
-            newByteLength = (int) length;
+            newByteLength = length;
         } catch (IllegalArgumentException | JSRangeErrorException e) {
             return context.throwRangeError("Invalid array buffer length");
         }
@@ -106,41 +104,41 @@ public final class SharedArrayBufferPrototype {
             return context.throwTypeError("SharedArrayBuffer.prototype.slice called on non-SharedArrayBuffer");
         }
 
-        int len = buffer.getByteLength();
+        long len = buffer.getByteLength();
 
         // Step 4: Let relativeStart be ? ToIntegerOrInfinity(start).
-        int first;
+        long first;
         if (args.length > 0) {
             double relativeStart = JSTypeConversions.toInteger(context, args[0]);
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
             if (relativeStart < 0) {
-                first = (int) Math.max(len + relativeStart, 0);
+                first = (long) Math.max(len + relativeStart, 0);
             } else {
-                first = (int) Math.min(relativeStart, len);
+                first = (long) Math.min(relativeStart, len);
             }
         } else {
             first = 0;
         }
 
         // Step 7: If end is undefined, let relativeEnd be len; else let relativeEnd be ? ToIntegerOrInfinity(end).
-        int fin;
+        long fin;
         if (args.length > 1 && !(args[1] instanceof JSUndefined)) {
             double relativeEnd = JSTypeConversions.toInteger(context, args[1]);
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
             if (relativeEnd < 0) {
-                fin = (int) Math.max(len + relativeEnd, 0);
+                fin = (long) Math.max(len + relativeEnd, 0);
             } else {
-                fin = (int) Math.min(relativeEnd, len);
+                fin = (long) Math.min(relativeEnd, len);
             }
         } else {
             fin = len;
         }
 
-        int newLen = Math.max(fin - first, 0);
+        long newLen = Math.max(fin - first, 0);
 
         // Step 11: Let ctor be ? SpeciesConstructor(O, %SharedArrayBuffer%).
         JSValue ctor = speciesConstructor(context, buffer);
@@ -180,20 +178,7 @@ public final class SharedArrayBufferPrototype {
 
         // Step 16: Copy bytes
         if (newLen > 0) {
-            byte[] bytes = new byte[newLen];
-            ByteBuffer src = buffer.getBuffer();
-            synchronized (src) {
-                ByteBuffer source = src.duplicate();
-                source.position(first);
-                source.limit(first + newLen);
-                source.get(bytes);
-            }
-            ByteBuffer dst = newBuffer.getBuffer();
-            synchronized (dst) {
-                ByteBuffer target = dst.duplicate();
-                target.position(0);
-                target.put(bytes);
-            }
+            buffer.getBuffer().copyTo(newBuffer.getBuffer(), first, 0, newLen);
         }
 
         return newBuffer;
