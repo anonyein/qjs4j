@@ -65,11 +65,19 @@ public final class RegExpCompiler {
         this.unicodePropertyResolver = unicodePropertyResolver;
     }
 
+    /**
+     * Registers follow the stack discipline of QuickJS's loop counters: a quantifier's registers are released once its
+     * term is complete, so sibling quantifiers share them and only nesting depth consumes new ones. Backtracking
+     * restores a sibling's registers along with the captures, so reuse cannot corrupt a loop that is resumed.
+     */
     private int allocateRegister(CompileContext context) {
-        if (context.nextAdvanceCheckRegister >= RegExpBytecode.ExecutionLimits.MAX_REGISTERS) {
+        if (context.nextRegister >= RegExpBytecode.ExecutionLimits.MAX_REGISTERS) {
             throw new RegExpSyntaxException("Regular expression requires too many registers");
         }
-        return context.nextAdvanceCheckRegister++;
+        int register = context.nextRegister++;
+        context.registerPeak = Math.max(context.registerPeak, context.nextRegister);
+        context.registerCount = Math.max(context.registerCount, context.nextRegister);
+        return register;
     }
 
     private long appendDecimalDigitWithClamp(long currentValue, int digit) {
@@ -157,8 +165,7 @@ public final class RegExpCompiler {
                     // backtrack point where state changed, so reporting the real count instead of
                     // the maximum is the difference between 12 and 76 bytes of saved state per
                     // point for a typical pattern.
-                    Math.min(context.nextAdvanceCheckRegister, RegExpBytecode.ExecutionLimits.MAX_REGISTERS),
-                    compiledGroupNames);
+                    context.registerCount, compiledGroupNames);
         } catch (RegExpSyntaxException e) {
             // The reason as it was found, as V8 reports it.
             throw e;
@@ -1111,6 +1118,8 @@ public final class RegExpCompiler {
                 int loopStart = context.buffer.size();
                 context.buffer.append(atomCode);
                 emitLoop(context, register, loopStart);
+                // The counter is dead once the loop has run; the optional repetitions below can count in it.
+                context.nextRegister = register;
             } else {
                 for (int i = 0; i < min; i++) {
                     context.buffer.append(atomCode);
@@ -1162,9 +1171,17 @@ public final class RegExpCompiler {
     private void compileTerm(CompileContext context, boolean isBackwardDirection) {
         int atomStart = context.buffer.size();
         int captureCountBeforeAtom = captureCount;
+        int registerBase = context.nextRegister;
+        int enclosingPeak = context.registerPeak;
+        context.registerPeak = registerBase;
 
         // Parse the atom
         compileAtom(context, isBackwardDirection);
+
+        // The atom's own quantifiers have released their registers, but a quantifier wrapped around the atom runs
+        // them on every iteration, so its counters go above the highest register the atom reached.
+        int atomPeak = context.registerPeak;
+        context.registerPeak = Math.max(enclosingPeak, atomPeak);
 
         // Check for quantifier
         if (context.pos < context.codePoints.length) {
@@ -1176,12 +1193,15 @@ public final class RegExpCompiler {
             }
 
             if (ch == '*' || ch == '+' || ch == '?' || (ch == '{' && startsWithValidQuantifier(context))) {
+                context.nextRegister = atomPeak;
                 compileQuantifier(context, atomStart, captureCountBeforeAtom);
             } else if (ch == '{' && context.isUnicodeMode() && context.lastAtomCanRepeat) {
                 // After an atom an unparsable '{' is a broken quantifier, as V8 reports it, not a lone bracket.
                 throw new RegExpSyntaxException("Incomplete quantifier");
             }
         }
+        // The term is complete and its counters are dead: the next term starts from the same registers.
+        context.nextRegister = registerBase;
     }
 
     /**
@@ -1542,41 +1562,27 @@ public final class RegExpCompiler {
     }
 
     /**
-     * Determine whether a quantified atom needs a zero-advance check. Returns true if the atom might match without
-     * advancing the position (e.g., lookahead, anchors, word boundaries). Following QuickJS
-     * re_need_check_adv_and_capture_init.
+     * Determine whether a quantified atom needs a zero-advance check: whether it might match without advancing the
+     * position (a lookahead, an anchor, a word boundary, an optional body). Following QuickJS re_check_advance, the
+     * first opcode that settles the question decides: everything before the first branch runs on every path through the
+     * atom, so a leading character match proves the atom advances, while a branch, loop or other complex opcode met
+     * first leaves the outcome unknown. Scanning past that point would only add checks, and registers, that
+     * {@code (?:a{1,2}){1,2}} does not need.
      */
     private boolean needCheckAdvance(byte[] atomCode) {
         int pos = 0;
-        boolean needCheck = true;
         while (pos < atomCode.length) {
             int opcode = atomCode[pos] & 0xFF;
             RegExpOpcode op = RegExpOpcode.fromCode(opcode);
             switch (op) {
                 case CHAR, CHAR_I, CHAR32, CHAR32_I, DOT, ANY, SPACE, NOT_SPACE :
                     // These always advance the position
-                    needCheck = false;
-                    break;
+                    return false;
                 case PREV :
                     // PREV moves the position in backward-compiled lookbehind atoms.
-                    needCheck = false;
-                    break;
-                case RANGE, RANGE_I : {
-                    // Variable length - read the range data length
-                    pos += 5 + readRangePayloadLength(atomCode, pos);
-                    needCheck = false;
-                    continue;
-                }
-                case RANGE32, RANGE32_I : {
-                    pos += 5 + readRangePayloadLength(atomCode, pos);
-                    needCheck = false;
-                    continue;
-                }
-                case NOT_RANGE, NOT_RANGE_I : {
-                    pos += 5 + readRangePayloadLength(atomCode, pos);
-                    needCheck = false;
-                    continue;
-                }
+                    return false;
+                case RANGE, RANGE_I, RANGE32, RANGE32_I, NOT_RANGE, NOT_RANGE_I :
+                    return false;
                 case LINE_START, LINE_START_M, LINE_END, LINE_END_M, WORD_BOUNDARY, WORD_BOUNDARY_I, NOT_WORD_BOUNDARY,
                         NOT_WORD_BOUNDARY_I, SAVE_START, SAVE_END, SAVE_RESET, SET_CHAR_POS, SET_I32 :
                     // These don't advance - no effect on the check
@@ -1587,7 +1593,7 @@ public final class RegExpCompiler {
             }
             pos += op.getLength();
         }
-        return needCheck;
+        return true;
     }
 
     private ExtendedClassSet normalizeExtendedClassSet(ExtendedClassSet extendedClassSet) {
@@ -2752,9 +2758,14 @@ public final class RegExpCompiler {
         final int flags;
         boolean lastAtomCanRepeat;
         boolean lastUnicodeSetsOperandWasRange;
-        int nextAdvanceCheckRegister;
+        /** The next free register; released back to a term's base once the term is compiled. */
+        int nextRegister;
         final String pattern;
         int pos;
+        /** Registers the whole pattern needs, the high-water mark of every allocation. */
+        int registerCount;
+        /** The highest register reached while compiling the current term's atom. */
+        int registerPeak;
 
         CompileContext(String pattern, int flags, DynamicBuffer buffer) {
             this.pattern = pattern;
@@ -2767,7 +2778,9 @@ public final class RegExpCompiler {
             this.currentFlags = flags;
             this.buffer = buffer;
             this.lastAtomCanRepeat = false;
-            this.nextAdvanceCheckRegister = 0;
+            this.nextRegister = 0;
+            this.registerCount = 0;
+            this.registerPeak = 0;
             this.pos = 0;
         }
 

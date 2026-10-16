@@ -89,7 +89,7 @@ public sealed abstract class JSTypedArray extends JSObject
                 throw new JSRangeErrorException("invalid length");
             }
             this.byteLength = length * bytesPerElement;
-            if (byteOffset + this.byteLength > buffer.getByteLength()) {
+            if (this.byteLength > buffer.getByteLength() - byteOffset) {
                 throw new JSRangeErrorException("TypedArray extends beyond buffer");
             }
         }
@@ -485,7 +485,7 @@ public sealed abstract class JSTypedArray extends JSObject
             return false;
         }
         // Fixed length: check if the view exceeds the current buffer size
-        return byteOffset + byteLength > currentByteLength;
+        return byteLength > currentByteLength - byteOffset;
     }
 
     @Override

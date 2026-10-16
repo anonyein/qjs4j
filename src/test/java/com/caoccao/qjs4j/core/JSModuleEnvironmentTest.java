@@ -72,6 +72,59 @@ class JSModuleEnvironmentTest extends BaseJavetTest {
     }
 
     @Test
+    void directEvalAssignsToTheLocalThatShadowsAnImport() throws IOException {
+        Files.writeString(moduleDirectory.resolve("dep.mjs"), "export const x=10;export let y=20;");
+        assertModuleWithJavet("""
+                import {x,y} from './dep.mjs';
+                function f(){let x=1;eval('x=2');return x}
+                function g(){let x=1;eval('x+=5');return x}
+                function h(){var x=1;eval('x=3');return x}
+                function k(){let x=1;eval('[x]=[4]');return x}
+                function m(){let x=1;eval('x++');return x}
+                function n(){let y=1;eval('({y}={y:7})');return y}
+                function p(){let x=1;eval('(function(){x=8})()');return x}
+                function q(){let x=1;eval('for(x of [9]){}');return x}
+                function r(){try{eval('x=9');return 'assigned'}catch(e){return e.name}}
+                function s(){try{eval('[y]=[9]');return 'assigned'}catch(e){return e.name}}
+                globalThis.read=()=>JSON.stringify([f(),g(),h(),k(),m(),n(),p(),q(),r(),s(),x,y]);
+                """, "read()");
+    }
+
+    @Test
+    void functionsCalledFromEvalKeepTheirOwnImports() throws IOException {
+        Files.writeString(moduleDirectory.resolve("dep.mjs"), "export const x=10;");
+        assertModuleWithJavet("""
+                import {x} from './dep.mjs';
+                function write(){x=9}
+                function writeRef(){[x]=[9]}
+                function read(){return x}
+                function f(){let x=1;try{eval('write()');return 'assigned '+x}catch(e){return e.name+' '+x}}
+                function g(){let x=1;try{eval('writeRef()');return 'assigned '+x}catch(e){return e.name+' '+x}}
+                function h(){let x=1;return eval('read()')+' '+x}
+                function k(){let x=1;eval('function inner(){x=5}inner()');return x}
+                function m(){let x=1;return eval('(()=>{x=6})(),x')}
+                globalThis.read=()=>JSON.stringify([f(),g(),h(),k(),m(),x]);
+                """, "read()");
+    }
+
+    @Test
+    void functionsFromAnEarlierEvalDoNotSeeAnotherEvalsOverlay() throws IOException {
+        Files.writeString(moduleDirectory.resolve("dep.mjs"), "export const x=10;");
+        assertModuleWithJavet("""
+                import {x} from './dep.mjs';
+                const write=eval('()=>{x=9}');
+                const read=eval('()=>x');
+                function f(){let x=1;try{eval('write()');return 'assigned '+x}catch(e){return e.name+' '+x}}
+                function g(){let x=1;return eval('read()')+' '+x}
+                function h(){let x=1;return eval('(()=>{const inner=eval("()=>x");return inner()})()')}
+                function k(){let x=1;eval('(function(){eval("x=8")})()');return x}
+                function p(){let x=1;function q(){let x=2;return eval('write()')}
+                try{return eval('q()')+' '+x}catch(e){return e.name+' '+x}}
+                globalThis.read=()=>JSON.stringify([f(),g(),h(),k(),p(),x]);
+                """, "read()");
+    }
+
+    @Test
     void generatedBindingsAreNotVisibleToEval() throws IOException {
         assertModuleWithJavet("""
                 export const x=1;

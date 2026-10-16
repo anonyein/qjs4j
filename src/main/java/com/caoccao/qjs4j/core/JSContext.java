@@ -103,6 +103,7 @@ public final class JSContext implements AutoCloseable {
     // Loads, caches and orders the evaluation of modules; see ModuleLoader
     private final ModuleLoader moduleLoader;
     private JSValue nativeConstructorNewTarget;
+    private JSEvalEnvironment pendingDirectEvalEnvironment;
     // Exception state
     private JSValue pendingException;
     // Promise rejection callback
@@ -952,6 +953,11 @@ public final class JSContext implements AutoCloseable {
         return evalOverlayManager.hasBinding(name);
     }
 
+    /** Whether an eval overlay visible from {@code environment} binds {@code name}. */
+    public boolean hasEvalOverlayBinding(String name, JSEvalEnvironment environment) {
+        return evalOverlayManager.hasBinding(name, environment);
+    }
+
     public boolean hasEvalOverlayFrames() {
         return evalOverlayManager.hasFrames();
     }
@@ -1152,8 +1158,18 @@ public final class JSContext implements AutoCloseable {
         pollFinalizationRegistries();
     }
 
+    void pushEvalOverlay(Map<String, JSValue> savedGlobals, Map<String, PropertyDescriptor> savedDescriptors,
+            Set<String> absentKeys, JSEvalEnvironment environment, Set<String> constantBindings) {
+        evalOverlayManager.push(savedGlobals, savedDescriptors, absentKeys, environment, constantBindings);
+    }
+
     public void pushEvalOverlay(Map<String, JSValue> savedGlobals, Set<String> absentKeys) {
-        evalOverlayManager.push(savedGlobals, absentKeys);
+        pushEvalOverlay(savedGlobals, absentKeys, null);
+    }
+
+    public void pushEvalOverlay(Map<String, JSValue> savedGlobals, Set<String> absentKeys,
+            JSEvalEnvironment environment) {
+        evalOverlayManager.push(savedGlobals, absentKeys, environment);
     }
 
     public void pushEvalOverlayLookupSuppression() {
@@ -1283,6 +1299,18 @@ public final class JSContext implements AutoCloseable {
         moduleLinker.resolveDynamicImportReExports(moduleRecord, importResolutionStack);
     }
 
+    /** The eval overlay binding of {@code name} visible from {@code environment}, or null. */
+    public JSEvalOverlayBinding resolveEvalOverlayBinding(String name, JSEvalEnvironment environment) {
+        EvalOverlayManager.Binding binding = evalOverlayManager.resolve(name, environment);
+        if (binding == null) {
+            return null;
+        }
+        return new JSEvalOverlayBinding(this, name,
+                binding.displacer() != null ? binding.displacer().savedGlobals() : null,
+                binding.displacer() != null ? binding.displacer().savedDescriptors().get(name) : null,
+                binding.owner().constantBindings().contains(name));
+    }
+
     public void resumeEvalOverlays(JSGlobalObject.EvalOverlaySnapshot evalOverlaySnapshot) {
         evalOverlayManager.resume(evalOverlaySnapshot);
     }
@@ -1377,6 +1405,11 @@ public final class JSContext implements AutoCloseable {
         this.nativeConstructorNewTarget = newTarget;
     }
 
+    /** The environment of the direct eval about to run, for the eval runner to hand to the compiled eval code. */
+    void setPendingDirectEvalEnvironment(JSEvalEnvironment environment) {
+        pendingDirectEvalEnvironment = environment;
+    }
+
     /**
      * Set the pending exception.
      */
@@ -1414,6 +1447,12 @@ public final class JSContext implements AutoCloseable {
 
     public JSGlobalObject.EvalOverlaySnapshot suspendEvalOverlays() {
         return evalOverlayManager.suspend();
+    }
+
+    JSEvalEnvironment takePendingDirectEvalEnvironment() {
+        JSEvalEnvironment environment = pendingDirectEvalEnvironment;
+        pendingDirectEvalEnvironment = null;
+        return environment;
     }
 
     public JSError throwAggregateError(String message) {

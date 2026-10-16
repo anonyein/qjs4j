@@ -27,6 +27,8 @@ public abstract sealed class JSFunction extends JSObject
      * For code that came from {@code eval}, where it was evaluated, in V8's stack-trace form:
      * {@code eval at outer (file.js:1:27)}. Null for code that did not come from eval.
      */
+    /** The direct eval whose lexical environment this function belongs to; null outside eval code. */
+    private JSEvalEnvironment evalEnvironment;
     private String evalOrigin;
     private JSContext homeContext;
     private JSObject homeObject;
@@ -41,6 +43,10 @@ public abstract sealed class JSFunction extends JSObject
      * Call this function with the given context, this value, and arguments.
      */
     public abstract JSValue call(JSContext context, JSValue thisArg, JSValue[] args);
+
+    public JSEvalEnvironment getEvalEnvironment() {
+        return evalEnvironment;
+    }
 
     public String getEvalOrigin() {
         return evalOrigin;
@@ -141,6 +147,10 @@ public abstract sealed class JSFunction extends JSObject
                 context.transferPrototype(protoObj, JSObject.NAME);
             }
         }
+    }
+
+    public void setEvalEnvironment(JSEvalEnvironment evalEnvironment) {
+        this.evalEnvironment = evalEnvironment;
     }
 
     public void setEvalOrigin(String evalOrigin) {

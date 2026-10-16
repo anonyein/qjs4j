@@ -2938,11 +2938,11 @@ public final class OpcodeHandler {
         JSObject globalObject = context.getGlobalObject();
         boolean hasProperty = false;
         JSValue variableValue = JSUndefined.INSTANCE;
-        if (context.hasEvalOverlayBinding(variableName)) {
-            variableValue = globalObject.get(propertyKey);
-            hasProperty = !(variableValue instanceof JSUndefined) || globalObject.has(propertyKey);
-            if (hasProperty) {
-                stack[sp++] = variableValue;
+        JSEvalOverlayBinding overlayBinding = resolveVisibleEvalOverlayBinding(executionContext, variableName);
+        if (overlayBinding != null) {
+            JSValue overlayValue = overlayBinding.get();
+            if (overlayValue != null) {
+                stack[sp++] = overlayValue;
                 executionContext.sp = sp;
                 executionContext.pc = pc + op.getSize();
                 return;
@@ -3965,8 +3965,12 @@ public final class OpcodeHandler {
         PropertyKey key = PropertyKey.fromString(atomName);
         JSValue baseObject;
         JSModuleEnvironment moduleEnvironment = executionContext.frame.getFunction().getModuleEnvironment();
+        JSEvalOverlayBinding overlayBinding = resolveVisibleEvalOverlayBinding(executionContext, atomName);
         if (findDynamicVarBindingFrame(executionContext, atomName) != null) {
             baseObject = context.getGlobalObject();
+        } else if (overlayBinding != null && (overlayBinding.isDisplaced() || context.getGlobalObject().has(key))) {
+            // Inside the eval, a caller binding shadows an import of the same name, as it does for reads.
+            baseObject = overlayBinding.referenceBase();
         } else if (moduleEnvironment != null && moduleEnvironment.has(atomName)) {
             baseObject = moduleEnvironment.imports();
         } else if (context.hasGlobalLexicalBinding(atomName) || context.getGlobalObject().has(key)) {
@@ -4883,28 +4887,24 @@ public final class OpcodeHandler {
             executionContext.pc = pc + op.getSize();
             return;
         }
-        JSModuleEnvironment moduleEnvironment = executionContext.frame.getFunction().getModuleEnvironment();
-        if (moduleEnvironment != null && moduleEnvironment.has(variableName)) {
-            executionContext.virtualMachine.pendingException = context
-                    .throwTypeError("Assignment to constant variable.");
-            executionContext.pc = pc + op.getSize();
-            return;
-        }
         PropertyKey variableKey = PropertyKey.fromString(variableName);
         JSObject globalObject = context.getGlobalObject();
-        if (context.hasEvalOverlayBinding(variableName) && globalObject.has(variableKey)) {
-            // Set flag so import overlay setters can detect bare variable assignment
-            // and throw TypeError (ES2024: import bindings are immutable).
-            context.setInBareVariableAssignment(true);
-            try {
-                globalObject.set(variableKey, value);
-            } finally {
-                context.setInBareVariableAssignment(false);
-            }
+        JSEvalOverlayBinding overlayBinding = resolveVisibleEvalOverlayBinding(executionContext, variableName);
+        if (overlayBinding != null && (overlayBinding.isDisplaced() || globalObject.has(variableKey))) {
+            // Inside the eval, the caller's binding comes before the module's imports, in the order reads resolve
+            // them: a local that shadows an import takes the assignment instead of the import rejecting it.
+            overlayBinding.set(value);
             if (context.hasPendingException()) {
                 executionContext.virtualMachine.pendingException = context.getPendingException();
                 context.clearPendingException();
             }
+            executionContext.pc = pc + op.getSize();
+            return;
+        }
+        JSModuleEnvironment moduleEnvironment = executionContext.frame.getFunction().getModuleEnvironment();
+        if (moduleEnvironment != null && moduleEnvironment.has(variableName)) {
+            executionContext.virtualMachine.pendingException = context
+                    .throwTypeError("Assignment to constant variable.");
             executionContext.pc = pc + op.getSize();
             return;
         }
@@ -6310,8 +6310,10 @@ public final class OpcodeHandler {
         if (enclosingFunction != null) {
             importMetaFilename = enclosingFunction.getImportMetaFilename();
             closureFunction.setModuleEnvironment(enclosingFunction.getModuleEnvironment());
-            // A function defined by eval code is located in that eval in a stack trace.
+            // A function defined by eval code is located in that eval in a stack trace, and it belongs to the
+            // eval's lexical environment.
             closureFunction.setEvalOrigin(enclosingFunction.getEvalOrigin());
+            closureFunction.setEvalEnvironment(enclosingFunction.getEvalEnvironment());
         }
         if (importMetaFilename == null || importMetaFilename.isEmpty()) {
             JSStackFrame currentStackFrame = executionContext.virtualMachine.context.getCurrentStackFrame();
@@ -6457,6 +6459,23 @@ public final class OpcodeHandler {
             return dynamicValue != null ? dynamicValue : JSUndefined.INSTANCE;
         }
         return executionContext.frame.getVarRef(varRefIndex);
+    }
+
+    /**
+     * The binding an active direct eval overlays for {@code name} as the running function sees it, or null. The
+     * function sees an overlay when it is that eval's code, was created inside it, or runs an eval nested in it. A
+     * function the eval merely calls, or one an earlier eval created, resolves its own free names, so a module's import
+     * keeps its meaning there even while an unrelated overlay shadows the same name on the global object; and a
+     * function created in an outer eval reads the outer caller's binding even while an inner eval's overlay holds the
+     * global property for a local of its own.
+     */
+    private static JSEvalOverlayBinding resolveVisibleEvalOverlayBinding(ExecutionContext executionContext,
+            String name) {
+        JSFunction function = executionContext.frame != null ? executionContext.frame.getFunction() : null;
+        JSEvalEnvironment environment = function != null ? function.getEvalEnvironment() : null;
+        return environment == null
+                ? null
+                : executionContext.virtualMachine.context.resolveEvalOverlayBinding(name, environment);
     }
 
     private static void restoreForOfStateWithoutIteratorCloseMarker(ExecutionContext executionContext,

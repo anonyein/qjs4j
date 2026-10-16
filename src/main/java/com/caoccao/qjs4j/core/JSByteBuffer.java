@@ -84,19 +84,20 @@ public final class JSByteBuffer {
             Arrays.fill(store.bytes, (int) (base + start), (int) (base + end), (byte) 0);
             return;
         }
-        long first = base + start;
-        long last = base + end;
-        store.pages.forEach((number, bytes) -> {
-            long pageStart = number * PAGE_SIZE;
-            // Check intersection before narrowing a distant long offset.
-            if (pageStart < last && pageStart + PAGE_SIZE > first) {
-                int from = (int) Math.max(0, first - pageStart);
-                int to = (int) Math.min(PAGE_SIZE, last - pageStart);
-                Arrays.fill(bytes, from, to, (byte) 0);
+        store.forEachPage(base + start, base + end, (from, to, page) -> {
+            if (page != null) {
+                int offset = (int) (from % PAGE_SIZE);
+                Arrays.fill(page, offset, offset + (int) (to - from), (byte) 0);
             }
         });
     }
-    /** Copy only materialized source pages. Overlaps use a temporary sparse block, like memmove. */
+
+    /**
+     * Copy a range, writing each target byte exactly once: a materialized source page is copied over the target and a
+     * source hole zeroes its part of the target. A concurrent reader of a shared block therefore only ever sees bytes
+     * the source held — never a zero from a clearing pass that a later write would overwrite. Overlaps within one block
+     * go through a temporary sparse block, like memmove.
+     */
     public void copyTo(JSByteBuffer target, long sourceIndex, long targetIndex, long count) {
         check(sourceIndex, count);
         target.check(targetIndex, count);
@@ -114,19 +115,17 @@ public final class JSByteBuffer {
             temporary.copyTo(target, 0, targetIndex, count);
             return;
         }
-        target.clearRange(targetIndex, targetIndex + count);
         if (store.bytes != null) {
             target.write(targetIndex, store.bytes, (int) (base + sourceIndex), (int) count);
             return;
         }
         long start = base + sourceIndex;
-        long end = start + count;
-        store.pages.forEach((number, bytes) -> {
-            long pageStart = number * PAGE_SIZE;
-            long from = Math.max(start, pageStart);
-            long to = Math.min(end, pageStart + PAGE_SIZE);
-            if (from < to) {
-                target.write(targetIndex + from - start, bytes, (int) (from - pageStart), (int) (to - from));
+        store.forEachPage(start, start + count, (from, to, page) -> {
+            long destination = targetIndex + from - start;
+            if (page == null) {
+                target.clearRange(destination, destination + to - from);
+            } else {
+                target.write(destination, page, (int) (from % PAGE_SIZE), (int) (to - from));
             }
         });
     }
@@ -390,6 +389,12 @@ public final class JSByteBuffer {
     public static JSByteBuffer wrap(byte[] bytes) {
         return new JSByteBuffer(new Store(bytes), 0, bytes.length);
     }
+    /** Receives one page-bounded piece of a range; page is null for a hole. */
+    @FunctionalInterface
+    private interface PageVisitor {
+        void visit(long from, long to, byte[] page);
+    }
+
     private static final class Store {
         private final byte[] bytes;
         private final Map<Long, byte[]> pages;
@@ -400,6 +405,40 @@ public final class JSByteBuffer {
         Store(long capacity) {
             bytes = capacity <= PAGE_SIZE ? new byte[(int) capacity] : null;
             pages = bytes == null ? new ConcurrentHashMap<>() : null;
+        }
+
+        /**
+         * Visit the absolute range [first, last) in ascending order, one page-bounded piece at a time, with a null page
+         * for an unallocated hole. A range spanning no more pages than the table holds is walked by direct lookup, so a
+         * small copy inside a densely populated block costs its own pages rather than a scan of every page in the
+         * block. A wider, mostly unallocated range scans the table instead of probing each page.
+         */
+        void forEachPage(long first, long last, PageVisitor visitor) {
+            long firstPage = first / PAGE_SIZE;
+            long lastPage = (last - 1) / PAGE_SIZE;
+            if (lastPage - firstPage < pages.size()) {
+                for (long number = firstPage; number <= lastPage; number++) {
+                    long pageStart = number * PAGE_SIZE;
+                    visitor.visit(Math.max(first, pageStart), Math.min(last, pageStart + PAGE_SIZE), pages.get(number));
+                }
+                return;
+            }
+            long[] numbers = pages.keySet().stream().mapToLong(Long::longValue)
+                    .filter(number -> number >= firstPage && number <= lastPage).sorted().toArray();
+            long cursor = first;
+            for (long number : numbers) {
+                long pageStart = number * PAGE_SIZE;
+                long from = Math.max(first, pageStart);
+                if (cursor < from) {
+                    visitor.visit(cursor, from, null);
+                }
+                long to = Math.min(last, pageStart + PAGE_SIZE);
+                visitor.visit(from, to, pages.get(number));
+                cursor = to;
+            }
+            if (cursor < last) {
+                visitor.visit(cursor, last, null);
+            }
         }
     }
 }

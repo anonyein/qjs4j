@@ -4574,6 +4574,8 @@ public final class JSGlobalObject {
             Set<String> localVarNameSet = null;
             Map<String, Integer> capturedVarOverlaySlots = null;
             Map<String, JSValue> savedGlobals = null;
+            Map<String, PropertyDescriptor> savedDescriptors = null;
+            Set<String> constantOverlayBindingNames = new HashSet<>();
             Set<String> absentKeys = null;
             Set<String> immutableOverlayBindingNames = null;
             Set<String> touchedOverlayKeys = null;
@@ -4640,6 +4642,7 @@ public final class JSGlobalObject {
                 localVarNameSet = new HashSet<>();
                 capturedVarOverlaySlots = new LinkedHashMap<>();
                 savedGlobals = new HashMap<>();
+                savedDescriptors = new HashMap<>();
                 absentKeys = new HashSet<>();
                 immutableOverlayBindingNames = new HashSet<>();
                 touchedOverlayKeys = new HashSet<>();
@@ -4665,7 +4668,8 @@ public final class JSGlobalObject {
                     }
                     localVarNameSet.add(name);
                     localVarNameToIndex.putIfAbsent(name, i);
-                    overlayBinding(global, name, locals[i], savedGlobals, absentKeys, touchedOverlayKeys);
+                    overlayBinding(global, name, locals[i], savedGlobals, savedDescriptors, absentKeys,
+                            touchedOverlayKeys);
                     // Function name bindings are immutable: make the overlay property
                     // non-writable so PUT_VAR throws TypeError in strict mode and
                     // silently fails in sloppy mode.
@@ -4680,6 +4684,9 @@ public final class JSGlobalObject {
                         fnDesc.setConfigurable(true);
                         global.defineProperty(PropertyKey.fromString(name), fnDesc);
                         immutableOverlayBindingNames.add(name);
+                        if (isConstLexicalBinding && !isFunctionNameBinding) {
+                            constantOverlayBindingNames.add(name);
+                        }
                     }
                 }
                 if (shouldOverlayLocals) {
@@ -4691,12 +4698,12 @@ public final class JSGlobalObject {
                                 && visitedLexicalFrames.put(evalScopeFrame, Boolean.TRUE) == null) {
                             if (evalScopeFrame != callerFrame) {
                                 overlayFrameLocals(realmContext, global, evalScopeFrame, localVarNameSet, savedGlobals,
-                                        absentKeys, touchedOverlayKeys);
+                                        savedDescriptors, absentKeys, touchedOverlayKeys);
                                 Map<String, JSValue> evalScopeDynamicBindings = evalScopeFrame.getDynamicVarBindings();
                                 if (evalScopeDynamicBindings != null) {
                                     for (Map.Entry<String, JSValue> entry : evalScopeDynamicBindings.entrySet()) {
                                         overlayBinding(global, entry.getKey(), entry.getValue(), savedGlobals,
-                                                absentKeys, touchedOverlayKeys);
+                                                savedDescriptors, absentKeys, touchedOverlayKeys);
                                     }
                                 }
                             }
@@ -4715,8 +4722,8 @@ public final class JSGlobalObject {
                                 continue;
                             }
                             JSValue capturedValue = callerFrame.getVarRef(captureSlot);
-                            overlayBinding(global, capturedVarName, capturedValue, savedGlobals, absentKeys,
-                                    touchedOverlayKeys);
+                            overlayBinding(global, capturedVarName, capturedValue, savedGlobals, savedDescriptors,
+                                    absentKeys, touchedOverlayKeys);
                             capturedVarOverlaySlots.put(capturedVarName, captureSlot);
                             if (inheritedParameterScopeFunctionNames.contains(capturedVarName)) {
                                 // A closure created in a default initializer captured a named
@@ -4754,12 +4761,12 @@ public final class JSGlobalObject {
                     // frame and the name maps to the body one, so while the frame is still
                     // initializing parameters the name has to be pointed back at the function.
                     overlayParameterScopeFunctionNames(global, callerFrame, callerBytecodeFunction, savedGlobals,
-                            absentKeys, touchedOverlayKeys, immutableOverlayBindingNames);
+                            savedDescriptors, absentKeys, touchedOverlayKeys, immutableOverlayBindingNames);
                     Map<String, JSValue> dynamicVarBindings = callerFrame.getDynamicVarBindings();
                     if (dynamicVarBindings != null) {
                         for (Map.Entry<String, JSValue> entry : dynamicVarBindings.entrySet()) {
-                            overlayBinding(global, entry.getKey(), entry.getValue(), savedGlobals, absentKeys,
-                                    touchedOverlayKeys);
+                            overlayBinding(global, entry.getKey(), entry.getValue(), savedGlobals, savedDescriptors,
+                                    absentKeys, touchedOverlayKeys);
                         }
                     }
                     List<WithObjectCandidate> withObjectCandidates = new ArrayList<>();
@@ -4783,15 +4790,25 @@ public final class JSGlobalObject {
                                 continue;
                             }
                             String keyName = propertyKey.asString();
-                            overlayBinding(global, keyName, withObject.get(propertyKey), savedGlobals, absentKeys,
-                                    touchedOverlayKeys);
+                            overlayBinding(global, keyName, withObject.get(propertyKey), savedGlobals, savedDescriptors,
+                                    absentKeys, touchedOverlayKeys);
                         }
                     }
                 }
             }
 
+            constantOverlayBindingNames.remove(activeOwnParameterScopeFunctionName);
+
+            // This eval's lexical environment, nested in the caller's when the caller is itself eval code. The
+            // compiled eval code and every function created inside it carry it; only they may consult the overlay.
+            JSEvalEnvironment evalEnvironment = new JSEvalEnvironment(
+                    callerFrame != null && callerFrame.getFunction() != null
+                            ? callerFrame.getFunction().getEvalEnvironment()
+                            : null);
+            realmContext.setPendingDirectEvalEnvironment(evalEnvironment);
             if ((shouldOverlayLocals || shouldOverlayTopLevelLexicals) && savedGlobals != null && absentKeys != null) {
-                realmContext.pushEvalOverlay(savedGlobals, absentKeys);
+                realmContext.pushEvalOverlay(savedGlobals, savedDescriptors, absentKeys, evalEnvironment,
+                        constantOverlayBindingNames);
                 overlayStatePushed = true;
             }
 
@@ -4930,8 +4947,8 @@ public final class JSGlobalObject {
                                     ? global.get(declarationKey)
                                     : JSUndefined.INSTANCE;
                         }
-                        overlayBinding(global, declarationName, initialValue, savedGlobals, absentKeys,
-                                touchedOverlayKeys);
+                        overlayBinding(global, declarationName, initialValue, savedGlobals, savedDescriptors,
+                                absentKeys, touchedOverlayKeys);
                         if (!evalCodeStrict && callerFrame != null) {
                             callerFrame.setDynamicVarBinding(declarationName, initialValue);
                         }
@@ -5135,7 +5152,16 @@ public final class JSGlobalObject {
                                 && !callerContext.hasGlobalLexDeclaration(entry.getKey())) {
                             continue;
                         }
-                        global.set(PropertyKey.fromString(entry.getKey()), entry.getValue());
+                        PropertyKey key = PropertyKey.fromString(entry.getKey());
+                        PropertyDescriptor descriptor = savedDescriptors.get(entry.getKey());
+                        if (descriptor != null) {
+                            if (descriptor.isDataDescriptor()) {
+                                descriptor.setValue(entry.getValue());
+                            }
+                            global.defineProperty(key, descriptor);
+                        } else {
+                            global.set(key, entry.getValue());
+                        }
                     }
                 }
                 if (absentKeys != null) {
@@ -5304,16 +5330,24 @@ public final class JSGlobalObject {
         }
 
         private static void overlayBinding(JSObject global, String name, JSValue value,
-                Map<String, JSValue> savedGlobals, Set<String> absentKeys, Set<String> touchedOverlayKeys) {
+                Map<String, JSValue> savedGlobals, Map<String, PropertyDescriptor> savedDescriptors,
+                Set<String> absentKeys, Set<String> touchedOverlayKeys) {
             if (name == null || touchedOverlayKeys == null || savedGlobals == null || absentKeys == null) {
                 return;
             }
-            rememberOverlayKey(global, name, savedGlobals, absentKeys, touchedOverlayKeys);
-            global.set(PropertyKey.fromString(name), value != null ? value : JSUndefined.INSTANCE);
+            rememberOverlayKey(global, name, savedGlobals, savedDescriptors, absentKeys, touchedOverlayKeys);
+            PropertyKey key = PropertyKey.fromString(name);
+            JSValue overlayValue = value != null ? value : JSUndefined.INSTANCE;
+            if (global.getContext().hasEvalOverlayBinding(name)) {
+                global.defineProperty(key, overlayValue, PropertyDescriptor.DataState.All);
+            } else {
+                global.set(key, overlayValue);
+            }
         }
 
         private static void overlayFrameLocals(JSContext realmContext, JSObject global, StackFrame frame,
-                Set<String> localVarNameSet, Map<String, JSValue> savedGlobals, Set<String> absentKeys,
+                Set<String> localVarNameSet, Map<String, JSValue> savedGlobals,
+                Map<String, PropertyDescriptor> savedDescriptors, Set<String> absentKeys,
                 Set<String> touchedOverlayKeys) {
             if (frame == null || !(frame.getFunction() instanceof JSBytecodeFunction lexicalBytecodeFunction)) {
                 return;
@@ -5343,7 +5377,8 @@ public final class JSGlobalObject {
                         && "UninitializedMarker".equals(symbolValue.getDescription())) {
                     continue;
                 }
-                overlayBinding(global, localName, lexicalValue, savedGlobals, absentKeys, touchedOverlayKeys);
+                overlayBinding(global, localName, lexicalValue, savedGlobals, savedDescriptors, absentKeys,
+                        touchedOverlayKeys);
             }
         }
 
@@ -5370,7 +5405,8 @@ public final class JSGlobalObject {
          *            names the overlay makes non-writable
          */
         private static void overlayParameterScopeFunctionNames(JSObject global, StackFrame callerFrame,
-                JSBytecodeFunction callerBytecodeFunction, Map<String, JSValue> savedGlobals, Set<String> absentKeys,
+                JSBytecodeFunction callerBytecodeFunction, Map<String, JSValue> savedGlobals,
+                Map<String, PropertyDescriptor> savedDescriptors, Set<String> absentKeys,
                 Set<String> touchedOverlayKeys, Set<String> immutableOverlayBindingNames) {
             if (callerBytecodeFunction == null || !callerBytecodeFunction.isOwnParameterScopeActive(callerFrame)) {
                 return;
@@ -5382,7 +5418,7 @@ public final class JSGlobalObject {
             }
             String name = callerBytecodeFunction.getParameterScopeFunctionName();
             JSValue selfValue = locals[selfLocalIndex] != null ? locals[selfLocalIndex] : JSUndefined.INSTANCE;
-            rememberOverlayKey(global, name, savedGlobals, absentKeys, touchedOverlayKeys);
+            rememberOverlayKey(global, name, savedGlobals, savedDescriptors, absentKeys, touchedOverlayKeys);
             // ES2024 15.2.5 makes the binding immutable: assignment throws in strict mode and is
             // ignored in sloppy mode. Without this it would instead reach the body's slot.
             //
@@ -5586,7 +5622,8 @@ public final class JSGlobalObject {
          *            overlay names already saved
          */
         private static void rememberOverlayKey(JSObject global, String name, Map<String, JSValue> savedGlobals,
-                Set<String> absentKeys, Set<String> touchedOverlayKeys) {
+                Map<String, PropertyDescriptor> savedDescriptors, Set<String> absentKeys,
+                Set<String> touchedOverlayKeys) {
             if (name == null || touchedOverlayKeys == null || savedGlobals == null || absentKeys == null) {
                 return;
             }
@@ -5594,6 +5631,10 @@ public final class JSGlobalObject {
                 PropertyKey key = PropertyKey.fromString(name);
                 if (global.has(key)) {
                     savedGlobals.put(name, global.get(key));
+                    PropertyDescriptor descriptor = global.getOwnPropertyDescriptor(key);
+                    if (descriptor != null) {
+                        savedDescriptors.put(name, descriptor);
+                    }
                 } else {
                     absentKeys.add(name);
                 }
