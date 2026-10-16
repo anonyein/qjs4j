@@ -69,14 +69,16 @@ public final class MapPrototype {
             return context.throwTypeError("Map.prototype.forEach called on non-Map");
         }
 
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Map.prototype.forEach requires a function");
         }
+        JSValue callback = args[0];
 
         JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
         JSMap.IterationCursor cursor = map.createIterationCursor();
         while (true) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             JSMap.IterationEntry entry = map.nextIterationEntry(cursor);
             if (entry == null) {
                 break;
@@ -86,7 +88,7 @@ public final class MapPrototype {
 
             // Call callback with (value, key, map)
             JSValue[] callbackArgs = new JSValue[]{value, key, map};
-            callback.call(context, callbackThisArg, callbackArgs);
+            JSCall.call(context, callback, callbackThisArg, callbackArgs);
             if (context.hasPendingException()) {
                 return JSUndefined.INSTANCE;
             }
@@ -130,9 +132,10 @@ public final class MapPrototype {
         if (!(thisArg instanceof JSMap map)) {
             return context.throwTypeError("Map.prototype.getOrInsertComputed called on non-Map");
         }
-        if (args.length < 2 || !(args[1] instanceof JSFunction callback)) {
+        if (args.length < 2 || !JSTypeChecking.isCallable(args[1])) {
             return context.throwTypeError("not a function");
         }
+        JSValue callback = args[1];
         JSValue key = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
         // CanonicalizeKeyedCollectionKey: -0 → +0
         if (key instanceof JSNumber number && number.value() == 0.0) {
@@ -142,12 +145,11 @@ public final class MapPrototype {
             return map.mapGet(key);
         }
 
-        JSValue value = callback.call(context, JSUndefined.INSTANCE, new JSValue[]{key});
+        JSValue value = JSCall.call(context, callback, JSUndefined.INSTANCE, new JSValue[]{key});
         if (context.hasPendingException()) {
             return JSUndefined.INSTANCE;
         }
-        // Match QuickJS behavior: callback can mutate the map, but computed result wins.
-        map.mapDelete(key);
+        // Updating a key inserted by the callback must preserve its insertion position.
         map.mapSet(key, value);
         return value;
     }

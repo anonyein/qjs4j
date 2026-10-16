@@ -65,7 +65,7 @@ final class ObjectExpressionDestructuringAssignmentCompiler extends AstNodeCompi
         }
 
         int sourceLocalIndex = compilerContext.scopeManager.currentScope()
-                .declareLocal("$objectAssignSource" + compilerContext.emitter.currentOffset());
+                .declareLocal("#objectAssignSource" + compilerContext.emitter.currentOffset());
         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, sourceLocalIndex);
 
         // If there's a rest element with regular properties, create an exclude list
@@ -73,7 +73,7 @@ final class ObjectExpressionDestructuringAssignmentCompiler extends AstNodeCompi
         if (restTarget != null && !regularProperties.isEmpty()) {
             compilerContext.emitter.emitOpcode(Opcode.OBJECT);
             excludeListLocalIndex = compilerContext.scopeManager.currentScope()
-                    .declareLocal("$excludeList" + compilerContext.emitter.currentOffset());
+                    .declareLocal("#excludeList" + compilerContext.emitter.currentOffset());
             compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, excludeListLocalIndex);
         }
 
@@ -83,7 +83,7 @@ final class ObjectExpressionDestructuringAssignmentCompiler extends AstNodeCompi
                 compilerContext.expressionCompiler.compile(property.getKey());
                 compilerContext.emitter.emitOpcode(Opcode.TO_PROPKEY);
                 propertyKeyLocalIndex = compilerContext.scopeManager.currentScope()
-                        .declareLocal("$objectAssignKey" + compilerContext.emitter.currentOffset());
+                        .declareLocal("#objectAssignKey" + compilerContext.emitter.currentOffset());
                 compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, propertyKeyLocalIndex);
             }
 

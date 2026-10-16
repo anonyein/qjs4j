@@ -30,15 +30,15 @@ public final class DataViewPrototype {
     /**
      * Pre-validate a DataView access. Returns null on success, or a JS error value on failure.
      */
-    private static JSValue checkAccess(JSContext context, JSDataView dataView, int byteOffset, int size) {
+    private static JSValue checkAccess(JSContext context, JSDataView dataView, long byteOffset, int size) {
         if (((IJSArrayBuffer) dataView.getBuffer()).isDetached()) {
             return context.throwTypeError("ArrayBuffer is detached");
         }
         if (dataView.isOutOfBounds()) {
             return context.throwTypeError("DataView is out of bounds");
         }
-        int effectiveByteLength = dataView.getByteLength();
-        if (byteOffset < 0 || (long) byteOffset + size > effectiveByteLength) {
+        long effectiveByteLength = dataView.getByteLength();
+        if (byteOffset < 0 || byteOffset + size > effectiveByteLength) {
             return context.throwRangeError("DataView offset out of range");
         }
         return null;
@@ -155,7 +155,7 @@ public final class DataViewPrototype {
         if (dataView == null) {
             return context.getPendingException();
         }
-        Integer byteOffset = toDataViewIndex(context, args.length > 0 ? args[0] : JSUndefined.INSTANCE);
+        Long byteOffset = toDataViewIndex(context, args.length > 0 ? args[0] : JSUndefined.INSTANCE);
         if (byteOffset == null) {
             return context.getPendingException();
         }
@@ -263,7 +263,7 @@ public final class DataViewPrototype {
         if (dataView.isImmutable()) {
             return context.throwTypeError("cannot write to an immutable ArrayBuffer");
         }
-        Integer byteOffset = toDataViewIndex(context, args.length > 0 ? args[0] : JSUndefined.INSTANCE);
+        Long byteOffset = toDataViewIndex(context, args.length > 0 ? args[0] : JSUndefined.INSTANCE);
         if (byteOffset == null) {
             return context.getPendingException();
         }
@@ -305,7 +305,7 @@ public final class DataViewPrototype {
         return null;
     }
 
-    private static Integer toDataViewIndex(JSContext context, JSValue value) {
+    private static Long toDataViewIndex(JSContext context, JSValue value) {
         double index = JSTypeConversions.toInteger(context, value);
         if (context.hasPendingException()) {
             return null;
@@ -318,10 +318,7 @@ public final class DataViewPrototype {
             context.throwRangeError("byteOffset out of range");
             return null;
         }
-        if (index > Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        return (int) index;
+        return (long) index;
     }
 
     private static Long toUint32(JSContext context, JSValue value) {
@@ -334,11 +331,11 @@ public final class DataViewPrototype {
 
     @FunctionalInterface
     private interface DataViewReader {
-        JSValue read(JSDataView view, int byteOffset, boolean littleEndian);
+        JSValue read(JSDataView view, long byteOffset, boolean littleEndian);
     }
 
     @FunctionalInterface
     private interface DataViewWriter<T> {
-        void write(JSDataView view, int byteOffset, T value, boolean littleEndian);
+        void write(JSDataView view, long byteOffset, T value, boolean littleEndian);
     }
 }

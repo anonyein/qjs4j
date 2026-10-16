@@ -349,9 +349,10 @@ public final class JSPromise extends JSObject {
 
     public static JSObject create(JSContext context, JSValue... args) {
         // Promise requires an executor function
-        if (args.length == 0 || !(args[0] instanceof JSFunction executor)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Promise constructor requires an executor function");
         }
+        JSValue executor = args[0];
         // Create Promise object
         JSPromise jsPromise = context.createJSPromise();
         final ResolveState resolveState = new ResolveState();
@@ -379,7 +380,7 @@ public final class JSPromise extends JSObject {
         // Call the executor with resolve and reject
         try {
             JSValue[] executorArgs = new JSValue[]{resolveFunc, rejectFunc};
-            executor.call(context, JSUndefined.INSTANCE, executorArgs);
+            JSCall.call(context, executor, JSUndefined.INSTANCE, executorArgs);
             if (context.hasPendingException()) {
                 JSValue error = context.getPendingException();
                 context.clearPendingException();

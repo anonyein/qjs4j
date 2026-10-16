@@ -22,7 +22,6 @@ import com.caoccao.qjs4j.exceptions.*;
 import com.caoccao.qjs4j.vm.StackFrame;
 import com.caoccao.qjs4j.vm.VarRef;
 
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 
@@ -42,6 +41,7 @@ import java.util.regex.Matcher;
  */
 final class EvalRunner {
     private final JSContext context;
+    private int evaluationDepth;
     private boolean pendingClassFieldEval;
     private int pendingDirectEvalCalls;
     private final ModuleSourceTransformer transformer;
@@ -126,6 +126,7 @@ final class EvalRunner {
         EvalActivation activation = new EvalActivation(code, filename, isModule, isDirectEval,
                 predeclareProgramLexicalsAsLocals, skipGlobalDeclarationTracking, inheritedStrictModeForDirectEval,
                 useDirectEvalCallerFrame);
+        evaluationDepth++;
         try {
             return activation.run();
         } catch (JSException e) {
@@ -160,6 +161,7 @@ final class EvalRunner {
             activation.evalError = context.throwRangeError("Maximum call stack size exceeded");
             return null;
         } finally {
+            evaluationDepth--;
             activation.release();
         }
     }
@@ -181,11 +183,10 @@ final class EvalRunner {
      * Process all module imports in source order, handling side-effect, namespace, and binding imports together. This
      * ensures deferred modules' async dependencies are pre-evaluated in the correct position relative to other imports.
      */
-    EvalOverlayManager.Frame evaluateModuleImportsInOrder(String code, String filename) {
+    JSModuleEnvironment evaluateModuleImportsInOrder(String code, String filename) {
         String scanCode = transformer.maskModuleComments(code);
-        JSObject globalObject = context.getGlobalObject();
-        Map<String, JSValue> savedGlobals = new HashMap<>();
-        Set<String> absentKeys = new HashSet<>();
+        JSModuleEnvironment environment = new JSModuleEnvironment(context);
+        JSObject globalObject = environment.imports();
 
         // Collect all import matches with their positions for ordered processing
         List<int[]> importPositions = new ArrayList<>();
@@ -246,8 +247,7 @@ final class EvalRunner {
                             namespaceObject = context.moduleLoader().loadDynamicImportModule(specifier, filename,
                                     importAttributes);
                         }
-                        context.importBindingInstaller().bindImportOverlayValue(globalObject, savedGlobals, absentKeys,
-                                localName, namespaceObject);
+                        context.importBindingInstaller().bindImportValue(globalObject, localName, namespaceObject);
                     }
                 } else {
                     // Binding import
@@ -277,8 +277,8 @@ final class EvalRunner {
                         }
                         JSObject namespaceObject = context.moduleLoader().loadDynamicImportModule(specifier, filename,
                                 importAttributes);
-                        context.importBindingInstaller().applyImportClauseBindings(globalObject, savedGlobals,
-                                absentKeys, namespaceObject, importClause);
+                        context.importBindingInstaller().applyImportClauseBindings(globalObject, namespaceObject,
+                                importClause);
                     }
                 }
             }
@@ -329,7 +329,8 @@ final class EvalRunner {
 
         // Drain microtasks to settle any EVALUATING_ASYNC modules before
         // the module body runs. This ensures TLA deps complete in the right order.
-        if (!context.isSuppressingEvalMicrotasks()) {
+        if (evaluationDepth == 1 && context.getVirtualMachine().getCurrentFrame() == null
+                && !context.isSuppressingEvalMicrotasks()) {
             context.processMicrotasks();
         }
 
@@ -384,10 +385,33 @@ final class EvalRunner {
             }
         }
 
-        if (savedGlobals.isEmpty() && absentKeys.isEmpty()) {
-            return null;
+        return environment;
+    }
+
+    /** Generated locals remain addressable by bytecode slots but are absent from eval's name environment. */
+    private void hideGeneratedBindings(JSBytecodeFunction function, String prefix) {
+        String[] locals = function.getBytecode().getLocalVarNames();
+        if (locals != null) {
+            for (int index = 0; index < locals.length; index++) {
+                if (locals[index] != null && locals[index].startsWith(prefix)) {
+                    locals[index] = "#" + locals[index];
+                }
+            }
         }
-        return new EvalOverlayManager.Frame(savedGlobals, absentKeys);
+        String[] captures = function.getCapturedVarNames();
+        if (captures != null) {
+            for (int index = 0; index < captures.length; index++) {
+                if (captures[index] != null && captures[index].startsWith(prefix)) {
+                    captures[index] = "#" + captures[index];
+                }
+            }
+            function.setCapturedVarNames(captures);
+        }
+        for (JSValue constant : function.getBytecode().getConstants()) {
+            if (constant instanceof JSBytecodeFunction nested) {
+                hideGeneratedBindings(nested, prefix);
+            }
+        }
     }
 
     void scheduleClassFieldEvalCall() {
@@ -431,7 +455,7 @@ final class EvalRunner {
         private final boolean inheritedStrictModeForDirectEval;
         private final boolean isDirectEval;
         private final boolean isModule;
-        private EvalOverlayManager.Frame moduleNamespaceImportOverlay;
+        private JSModuleEnvironment moduleEnvironment;
         private final boolean predeclareProgramLexicalsAsLocals;
         private boolean removeSelfModuleRecordAfterEval;
         private JSDynamicImportModule.Status selfModulePreviousStatus;
@@ -587,7 +611,8 @@ final class EvalRunner {
                 }
                 dynamicImportEvalModuleRecord.setStatus(JSDynamicImportModule.Status.EVALUATED);
             }
-            if (!context.isSuppressingEvalMicrotasks()) {
+            if (evaluationDepth == 1 && context.getVirtualMachine().getCurrentFrame() == null
+                    && !context.isSuppressingEvalMicrotasks()) {
                 context.processMicrotasks();
             }
             if (dynamicImportEvalModuleRecord.status() == JSDynamicImportModule.Status.EVALUATED_ERROR) {
@@ -641,24 +666,6 @@ final class EvalRunner {
                     && dynamicImportEvalModuleRecord.status() == JSDynamicImportModule.Status.LOADING) {
                 dynamicImportEvalModuleRecord.namespace().finalizeNamespace();
                 dynamicImportEvalModuleRecord.setStatus(JSDynamicImportModule.Status.EVALUATED);
-            }
-        }
-
-        /**
-         * Hand the import overlay to the module's evaluation promise when the body is still running.
-         * <p>
-         * A top-level-await body has not finished when {@code execute} returns its promise, so taking its imports away
-         * now would remove them from underneath it.
-         *
-         * @param result
-         *            the body's completion value
-         */
-        private void handOverImportOverlayToAsyncModule(JSValue result) {
-            if (isModule && !isDirectEval && moduleNamespaceImportOverlay != null && evaluatingRawDynamicImportModule
-                    && dynamicImportEvalModuleRecord != null && dynamicImportEvalModuleRecord.hasExportSyntax()
-                    && result instanceof JSPromise asyncModulePromise) {
-                context.evalOverlayManager().registerDeferredRestore(asyncModulePromise, moduleNamespaceImportOverlay);
-                moduleNamespaceImportOverlay = null;
             }
         }
 
@@ -817,6 +824,12 @@ final class EvalRunner {
             // In strict mode functions called without receiver, 'this' is undefined, and
             // eval('this') must see that same undefined value, not the global object.
             // ES2024 16.2.1.6.4: Module top-level 'this' is undefined.
+            if (directEvalCallerFrame != null) {
+                StackFrame caller = directEvalCallerFrame;
+                if (caller != null && caller.getFunction().getModuleEnvironment() != null) {
+                    func.setModuleEnvironment(caller.getFunction().getModuleEnvironment().forDirectEval());
+                }
+            }
             evalThisArg = isModule && !isDirectEval ? JSUndefined.INSTANCE : context.getGlobalObject();
             evalNewTarget = JSUndefined.INSTANCE;
             if (isDirectEval && directEvalCallerFrame != null) {
@@ -832,6 +845,9 @@ final class EvalRunner {
                     // Set up new.target for super() calls: inherit from caller
                     // (including arrows that capture new.target from the constructor)
                     JSFunction callerFunction = directEvalCallerFrame.getFunction();
+                    if (callerFunction.getModuleEnvironment() != null) {
+                        func.setModuleEnvironment(callerFunction.getModuleEnvironment().forDirectEval());
+                    }
                     if (evalNewTarget == null || evalNewTarget instanceof JSUndefined) {
                         if (callerFunction instanceof JSBytecodeFunction callerBf && callerBf.isArrow()) {
                             JSValue capturedNewTarget = callerBf.getCapturedNewTarget();
@@ -954,8 +970,14 @@ final class EvalRunner {
             // Register the current module as EVALUATING in the cache so that
             // self-imports (import defer * as self from './thisFile.js')
             // can detect re-entrancy and throw TypeError instead of recursing.
-            String normalizedFilename = Paths.get(filename).normalize().toString();
-            JSDynamicImportModule existingRecord = context.moduleLoader().cachedModule(normalizedFilename);
+            // Loader keys are opaque: a virtual key may use forward slashes on Windows, contain "..", or not be a
+            // valid filesystem path at all. Reuse its exact cache entry before normalizing a host-supplied filename.
+            String moduleKey = filename;
+            JSDynamicImportModule existingRecord = context.moduleLoader().cachedModule(moduleKey);
+            if (existingRecord == null) {
+                moduleKey = context.moduleLoader().normalizeModuleSpecifier(filename);
+                existingRecord = context.moduleLoader().cachedModule(moduleKey);
+            }
             if (existingRecord != null) {
                 // Module already in cache (e.g. from loadJSDynamicImportModule).
                 // Mark it as EVALUATING so self-imports detect the re-entrancy.
@@ -963,24 +985,29 @@ final class EvalRunner {
                 existingRecord.setStatus(JSDynamicImportModule.Status.EVALUATING);
                 selfModuleRecord = existingRecord;
             } else {
-                selfModuleRecord = new JSDynamicImportModule(normalizedFilename,
+                selfModuleRecord = new JSDynamicImportModule(moduleKey,
                         context.moduleLoader().createModuleNamespaceObject());
                 selfModuleRecord.setStatus(JSDynamicImportModule.Status.EVALUATING);
                 selfModuleRecord.setRawSource(code);
-                context.moduleLoader().cacheModule(normalizedFilename, selfModuleRecord);
+                context.moduleLoader().cacheModule(moduleKey, selfModuleRecord);
                 removeSelfModuleRecordAfterEval = true;
             }
             context.importBindingInstaller().initializeHoistedFunctionExportBindings(selfModuleRecord);
-            moduleNamespaceImportOverlay = evaluateModuleImportsInOrder(code, filename);
+            moduleEnvironment = evaluateModuleImportsInOrder(code, filename);
+            func.setModuleEnvironment(moduleEnvironment);
+            if (selfModuleRecord.exportBindingName() != null) {
+                moduleEnvironment.putPrivate(selfModuleRecord.exportBindingName(), selfModuleRecord.namespace());
+                hideGeneratedBindings(func, transformer.generatedModuleNamePrefix(selfModuleRecord.rawSource()));
+            }
         }
 
         /**
          * Unwind everything this activation registered, and leave the context in a clean state.
          * <p>
          * Runs whether the body completed, threw, or left a pending exception behind: a module record registered for an
-         * evaluation that did not finish is evicted, the import overlay is taken off the global object, and the stack
-         * frame is popped. The pending exception is cleared and then re-set from {@code evalError}, so what the context
-         * holds afterwards is exactly the error this eval is reporting and nothing a nested one left over.
+         * evaluation that did not finish is evicted and the stack frame is popped. The pending exception is cleared and
+         * then re-set from {@code evalError}, so what the context holds afterwards is exactly the error this eval is
+         * reporting and nothing a nested one left over.
          */
         private void release() {
             if (evalError != null && dynamicImportEvalModuleRecord != null
@@ -998,7 +1025,6 @@ final class EvalRunner {
                     selfModuleRecord.setStatus(selfModulePreviousStatus);
                 }
             }
-            context.evalOverlayManager().restoreFrame(moduleNamespaceImportOverlay);
             context.popStackFrame();
             // Clear ALL possible dirty state to ensure clean slate for next eval()
             context.clearTransientEvalState();
@@ -1038,7 +1064,6 @@ final class EvalRunner {
 
             JSValue result = executeBody();
 
-            handOverImportOverlayToAsyncModule(result);
             defineGlobalFunctionBindingsAfterExecution();
 
             // Check if there's a pending exception
@@ -1048,7 +1073,8 @@ final class EvalRunner {
             }
 
             // Process all pending microtasks before returning
-            if (!context.isSuppressingEvalMicrotasks()) {
+            if (evaluationDepth == 1 && context.getVirtualMachine().getCurrentFrame() == null
+                    && !context.isSuppressingEvalMicrotasks()) {
                 context.processMicrotasks();
             }
 

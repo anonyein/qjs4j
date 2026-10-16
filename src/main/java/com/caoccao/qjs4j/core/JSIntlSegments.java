@@ -19,35 +19,19 @@ package com.caoccao.qjs4j.core;
 import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-/**
- * %Segments.prototype% backing object for Intl.Segmenter.prototype.segment().
- */
+/** Lazy segmentation with shared boundary caching and logarithmic containing lookups. */
 public final class JSIntlSegments extends JSObject {
-    private static final int CODE_POINT_VS_END = 0xFE0F;
-    private static final int CODE_POINT_VS_START = 0xFE00;
-    private static final int CODE_POINT_ZWJ = 0x200D;
-    private static final int EMOJI_MODIFIER_END = 0x1F3FF;
-    private static final int EMOJI_MODIFIER_START = 0x1F3FB;
-    private static final int HANGUL_JAMO_EXTENDED_A_END = 0xA97C;
-    private static final int HANGUL_JAMO_EXTENDED_A_START = 0xA960;
-    private static final int HANGUL_JAMO_EXTENDED_B_END_L = 0xD7C6;
-    private static final int HANGUL_JAMO_EXTENDED_B_END_T = 0xD7FB;
-    private static final int HANGUL_JAMO_EXTENDED_B_START_L = 0xD7B0;
-    private static final int HANGUL_JAMO_EXTENDED_B_START_T = 0xD7CB;
-    private static final int HANGUL_JAMO_L_END = 0x115F;
-    private static final int HANGUL_JAMO_L_START = 0x1100;
-    private static final int HANGUL_JAMO_T_END = 0x11FF;
-    private static final int HANGUL_JAMO_T_START = 0x11A8;
-    private static final int HANGUL_JAMO_V_END = 0x11A7;
-    private static final int HANGUL_JAMO_V_START = 0x1160;
-    private static final int HANGUL_SYLLABLE_END = 0xD7A3;
-    private static final int HANGUL_SYLLABLE_START = 0xAC00;
-    private static final int SUPPLEMENTAL_VS_END = 0xE01EF;
-    private static final int SUPPLEMENTAL_VS_START = 0xE0100;
-
+    // Java's extended grapheme matcher implements UAX #29, including GB11's pictographic ZWJ rule.
+    private static final Pattern GRAPHEME = Pattern.compile("\\X");
+    private BreakIterator breakIterator;
+    private int cursor;
+    private int graphemeEnd;
+    private Matcher graphemes;
     private final JSIntlSegmenter segmenter;
-    private List<SegmentRange> segmentRanges;
+    private final List<SegmentRange> segmentRanges = new ArrayList<>();
     private final String text;
 
     public JSIntlSegments(JSContext context, JSIntlSegmenter segmenter, String text) {
@@ -58,168 +42,96 @@ public final class JSIntlSegments extends JSObject {
 
     public JSValue containing(JSContext context, JSValue indexValue) {
         double indexNumber = JSTypeConversions.toInteger(context, indexValue);
-        if (context.hasPendingException()) {
+        if (context.hasPendingException() || indexNumber < 0 || indexNumber >= text.length()) {
             return JSUndefined.INSTANCE;
         }
-        if (indexNumber < 0 || indexNumber >= text.length()) {
-            return JSUndefined.INSTANCE;
-        }
-
         int index = (int) indexNumber;
-        ensureSegmentRanges();
-        for (SegmentRange segmentRange : segmentRanges) {
-            if (index >= segmentRange.start() && index < segmentRange.end()) {
-                return createSegmentDataObject(context, segmentRange);
+        while (cursor <= index) {
+            scanNext();
+        }
+        int low = 0;
+        int high = segmentRanges.size() - 1;
+        while (low < high) {
+            int middle = (low + high) >>> 1;
+            if (segmentRanges.get(middle).end() <= index) {
+                low = middle + 1;
+            } else {
+                high = middle;
             }
         }
-        return JSUndefined.INSTANCE;
+        return createSegmentDataObject(context, segmentRanges.get(low));
     }
 
     public JSIterator createIterator(JSContext context) {
-        ensureSegmentRanges();
-        final int[] iteratorIndex = {0};
+        final int[] index = {0};
         return new JSIterator(context, () -> {
-            if (iteratorIndex[0] >= segmentRanges.size()) {
+            if (index[0] == segmentRanges.size() && !scanNext()) {
                 return JSIterator.IteratorResult.done(context);
             }
-            SegmentRange segmentRange = segmentRanges.get(iteratorIndex[0]++);
-            JSObject value = createSegmentDataObject(context, segmentRange);
-            return JSIterator.IteratorResult.of(context, value);
+            return JSIterator.IteratorResult.of(context,
+                    createSegmentDataObject(context, segmentRanges.get(index[0]++)));
         });
     }
 
-    private JSObject createSegmentDataObject(JSContext context, SegmentRange segmentRange) {
+    private JSObject createSegmentDataObject(JSContext context, SegmentRange range) {
         JSObject result = context.createJSObject();
-        result.defineProperty(PropertyKey.fromString("segment"), new JSString(segmentRange.segment()),
-                PropertyDescriptor.DataState.All);
-        result.defineProperty(PropertyKey.fromString("index"), JSNumber.of(segmentRange.start()),
+        result.defineProperty(PropertyKey.fromString("segment"),
+                new JSString(text.substring(range.start(), range.end())), PropertyDescriptor.DataState.All);
+        result.defineProperty(PropertyKey.fromString("index"), JSNumber.of(range.start()),
                 PropertyDescriptor.DataState.All);
         result.defineProperty(PropertyKey.fromString("input"), new JSString(text), PropertyDescriptor.DataState.All);
         if (segmenter.isWordGranularity()) {
-            result.defineProperty(PropertyKey.fromString("isWordLike"), JSBoolean.valueOf(segmentRange.wordLike()),
+            result.defineProperty(PropertyKey.fromString("isWordLike"), JSBoolean.valueOf(range.wordLike()),
                     PropertyDescriptor.DataState.All);
         }
         return result;
     }
 
-    private void ensureSegmentRanges() {
-        if (segmentRanges != null) {
-            return;
-        }
-        List<SegmentRange> ranges = new ArrayList<>();
-        BreakIterator breakIterator = segmenter.createBreakIterator();
-        breakIterator.setText(text);
-        int start = breakIterator.first();
-        for (int end = breakIterator.next(); end != BreakIterator.DONE; start = end, end = breakIterator.next()) {
-            if (end <= start) {
-                continue;
-            }
-            String segment = text.substring(start, end);
-            boolean wordLike = segmenter.isWordGranularity() && isWordLikeSegment(segment);
-            ranges.add(new SegmentRange(start, end, segment, wordLike));
-        }
-
-        String granularity = segmenter.getGranularity();
-        if ("grapheme".equals(granularity) || "word".equals(granularity)) {
-            List<SegmentRange> mergedRanges = new ArrayList<>();
-            for (SegmentRange currentRange : ranges) {
-                if (mergedRanges.isEmpty()) {
-                    mergedRanges.add(currentRange);
-                    continue;
-                }
-                SegmentRange previousRange = mergedRanges.get(mergedRanges.size() - 1);
-                if (shouldMergeGrapheme(previousRange.segment(), currentRange.segment())) {
-                    String mergedSegment = previousRange.segment() + currentRange.segment();
-                    boolean mergedWordLike = segmenter.isWordGranularity() && isWordLikeSegment(mergedSegment);
-                    mergedRanges.set(mergedRanges.size() - 1,
-                            new SegmentRange(previousRange.start(), currentRange.end(), mergedSegment, mergedWordLike));
-                } else {
-                    mergedRanges.add(currentRange);
-                }
-            }
-            segmentRanges = mergedRanges;
-            return;
-        }
-        segmentRanges = ranges;
-    }
-
-    private static HangulType getHangulType(int codePoint) {
-        if ((codePoint >= HANGUL_JAMO_L_START && codePoint <= HANGUL_JAMO_L_END)
-                || (codePoint >= HANGUL_JAMO_EXTENDED_A_START && codePoint <= HANGUL_JAMO_EXTENDED_A_END)) {
-            return HangulType.L;
-        }
-        if ((codePoint >= HANGUL_JAMO_V_START && codePoint <= HANGUL_JAMO_V_END)
-                || (codePoint >= HANGUL_JAMO_EXTENDED_B_START_L && codePoint <= HANGUL_JAMO_EXTENDED_B_END_L)) {
-            return HangulType.V;
-        }
-        if ((codePoint >= HANGUL_JAMO_T_START && codePoint <= HANGUL_JAMO_T_END)
-                || (codePoint >= HANGUL_JAMO_EXTENDED_B_START_T && codePoint <= HANGUL_JAMO_EXTENDED_B_END_T)) {
-            return HangulType.T;
-        }
-        if (codePoint >= HANGUL_SYLLABLE_START && codePoint <= HANGUL_SYLLABLE_END) {
-            int tIndex = (codePoint - HANGUL_SYLLABLE_START) % 28;
-            return tIndex == 0 ? HangulType.LV : HangulType.LVT;
-        }
-        return HangulType.NONE;
-    }
-
-    private static boolean isCombiningMark(int codePoint) {
-        int characterType = Character.getType(codePoint);
-        return characterType == Character.NON_SPACING_MARK || characterType == Character.COMBINING_SPACING_MARK
-                || characterType == Character.ENCLOSING_MARK;
-    }
-
-    private static boolean isEmojiModifier(int codePoint) {
-        return codePoint >= EMOJI_MODIFIER_START && codePoint <= EMOJI_MODIFIER_END;
-    }
-
-    private static boolean isVariationSelector(int codePoint) {
-        return (codePoint >= CODE_POINT_VS_START && codePoint <= CODE_POINT_VS_END)
-                || (codePoint >= SUPPLEMENTAL_VS_START && codePoint <= SUPPLEMENTAL_VS_END);
-    }
-
-    private static boolean isWordLikeSegment(String segment) {
-        for (int offset = 0; offset < segment.length();) {
-            int codePoint = segment.codePointAt(offset);
-            if (Character.isLetterOrDigit(codePoint)) {
-                return true;
-            }
-            offset += Character.charCount(codePoint);
-        }
-        return false;
-    }
-
-    private static boolean shouldMergeGrapheme(String previousSegment, String currentSegment) {
-        if (previousSegment.isEmpty() || currentSegment.isEmpty()) {
+    private boolean scanNext() {
+        if (cursor == text.length()) {
             return false;
         }
-
-        int previousCodePoint = previousSegment.codePointBefore(previousSegment.length());
-        int currentCodePoint = currentSegment.codePointAt(0);
-
-        if (isCombiningMark(currentCodePoint) || isVariationSelector(currentCodePoint)
-                || isEmojiModifier(currentCodePoint) || currentCodePoint == CODE_POINT_ZWJ
-                || previousCodePoint == CODE_POINT_ZWJ) {
-            return true;
+        context.getVirtualMachine().checkExecutionInterruptForNative();
+        if (graphemes == null) {
+            graphemes = GRAPHEME.matcher(text);
+            if (!"grapheme".equals(segmenter.getGranularity())) {
+                breakIterator = segmenter.createBreakIterator();
+                breakIterator.setText(text);
+                breakIterator.first();
+            }
         }
-
-        HangulType previousType = getHangulType(previousCodePoint);
-        HangulType currentType = getHangulType(currentCodePoint);
-        if (previousType == HangulType.L && (currentType == HangulType.L || currentType == HangulType.V
-                || currentType == HangulType.LV || currentType == HangulType.LVT)) {
-            return true;
+        int end;
+        if (breakIterator == null) {
+            graphemes.find();
+            end = graphemes.end();
+        } else {
+            end = breakIterator.next();
+            if (segmenter.isWordGranularity()) {
+                // A word boundary must not split a grapheme (notably an emoji ZWJ sequence).
+                while (true) {
+                    while (graphemeEnd < end && graphemes.find()) {
+                        graphemeEnd = graphemes.end();
+                    }
+                    if (graphemeEnd <= end) {
+                        break;
+                    }
+                    end = breakIterator.next();
+                }
+            }
         }
-        if ((previousType == HangulType.LV || previousType == HangulType.V)
-                && (currentType == HangulType.V || currentType == HangulType.T)) {
-            return true;
+        boolean wordLike = false;
+        if (segmenter.isWordGranularity()) {
+            for (int offset = cursor; offset < end;) {
+                int codePoint = text.codePointAt(offset);
+                wordLike |= Character.isLetterOrDigit(codePoint);
+                offset += Character.charCount(codePoint);
+            }
         }
-        return (previousType == HangulType.LVT || previousType == HangulType.T) && currentType == HangulType.T;
+        segmentRanges.add(new SegmentRange(cursor, end, wordLike));
+        cursor = end;
+        return true;
     }
 
-    private enum HangulType {
-        L, LV, LVT, NONE, T, V
-    }
-
-    private record SegmentRange(int start, int end, String segment, boolean wordLike) {
+    private record SegmentRange(int start, int end, boolean wordLike) {
     }
 }

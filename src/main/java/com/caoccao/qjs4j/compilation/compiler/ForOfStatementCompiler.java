@@ -105,7 +105,7 @@ final class ForOfStatementCompiler extends AstNodeCompiler<ForOfStatement> {
         if (isUsingForOf) {
             boolean useAsyncStack = isAwaitUsingForOf || compilerContext.isInAsyncFunction;
             forOfUsingStackLocal = compilerContext.scopeManager.currentScope()
-                    .declareLocal("$forof_using_stack_" + compilerContext.emitter.currentOffset());
+                    .declareLocal("#forof_using_stack_" + compilerContext.emitter.currentOffset());
             compilerContext.scopeManager.currentScope().setUsingStackLocal(forOfUsingStackLocal, useAsyncStack);
         }
 
@@ -114,7 +114,7 @@ final class ForOfStatementCompiler extends AstNodeCompiler<ForOfStatement> {
         int asyncIteratorLocal = -1;
         if (forOfStmt.isAsync()) {
             asyncIteratorLocal = compilerContext.scopeManager.currentScope()
-                    .declareLocal("$for_await_iterator_" + compilerContext.emitter.currentOffset());
+                    .declareLocal("#for_await_iterator_" + compilerContext.emitter.currentOffset());
             compilerContext.emitter.emitOpcode(Opcode.DUP3);
             compilerContext.emitter.emitOpcode(Opcode.DROP);
             compilerContext.emitter.emitOpcode(Opcode.DROP);
@@ -132,10 +132,32 @@ final class ForOfStatementCompiler extends AstNodeCompiler<ForOfStatement> {
 
         if (forOfStmt.isAsync()) {
             compilerContext.emitter.emitOpcode(Opcode.FOR_AWAIT_OF_NEXT);
+            // An error from awaiting next(), or reading its result, does not close the iterator.
+            // Catch it above the iterator marker, discard that record, and rethrow. Body errors
+            // still reach the marker and perform AsyncIteratorClose.
+            int nextError = compilerContext.emitter.emitJump(Opcode.CATCH);
+            compilerContext.emitter.emitOpcode(Opcode.SWAP);
             compilerContext.emitter.emitOpcode(Opcode.AWAIT);
             compilerContext.emitter.emitOpcodeAtom(Opcode.GET_FIELD2, "done");
-            jumpToEnd = compilerContext.emitter.emitJump(Opcode.IF_TRUE);
+            int doneJump = compilerContext.emitter.emitJump(Opcode.IF_TRUE);
             compilerContext.emitter.emitOpcodeAtom(Opcode.GET_FIELD, "value");
+            compilerContext.emitter.emitOpcode(Opcode.NIP_CATCH);
+            int bodyJump = compilerContext.emitter.emitJump(Opcode.GOTO);
+
+            compilerContext.emitter.patchJump(nextError, compilerContext.emitter.currentOffset());
+            int errorLocal = compilerContext.scopeManager.currentScope()
+                    .declareLocal("#for_await_next_error_" + compilerContext.emitter.currentOffset());
+            compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, errorLocal);
+            compilerContext.emitter.emitOpcode(Opcode.DROP);
+            compilerContext.emitter.emitOpcode(Opcode.DROP);
+            compilerContext.emitter.emitOpcode(Opcode.DROP);
+            compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, errorLocal);
+            compilerContext.emitter.emitOpcode(Opcode.THROW);
+
+            compilerContext.emitter.patchJump(doneJump, compilerContext.emitter.currentOffset());
+            compilerContext.emitter.emitOpcode(Opcode.NIP_CATCH);
+            jumpToEnd = compilerContext.emitter.emitJump(Opcode.GOTO);
+            compilerContext.emitter.patchJump(bodyJump, compilerContext.emitter.currentOffset());
             compilerContext.statementCompiler.emitEvalReturnUndefinedIfNeeded();
         } else {
             compilerContext.emitter.emitOpcodeU8(Opcode.FOR_OF_NEXT, 0);

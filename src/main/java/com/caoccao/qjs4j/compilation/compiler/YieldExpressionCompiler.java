@@ -35,6 +35,10 @@ final class YieldExpressionCompiler extends AstNodeCompiler<YieldExpression> {
             compilerContext.emitter
                     .emitOpcode(compilerContext.isInAsyncFunction ? Opcode.ASYNC_YIELD_STAR : Opcode.YIELD_STAR);
         } else {
+            if (compilerContext.isInAsyncFunction) {
+                // Rejecting the yielded value throws at the yield expression, inside its catch/finally scope.
+                compilerContext.emitter.emitOpcode(Opcode.AWAIT);
+            }
             compilerContext.emitter.emitOpcode(Opcode.YIELD);
         }
     }

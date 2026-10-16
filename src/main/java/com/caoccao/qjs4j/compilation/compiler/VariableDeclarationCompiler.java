@@ -106,10 +106,10 @@ final class VariableDeclarationCompiler extends AstNodeCompiler<VariableDeclarat
                 // Resolve binding before evaluating initializer (ES VariableDeclaration semantics).
                 compilerContext.assignmentExpressionCompiler.emitIdentifierReference(identifier.getName());
                 int preResolvedPropertyLocalIndex = compilerContext.scopeManager.currentScope()
-                        .declareLocal("$preResolvedVarProperty_" + compilerContext.emitter.currentOffset());
+                        .declareLocal("#preResolvedVarProperty_" + compilerContext.emitter.currentOffset());
                 compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, preResolvedPropertyLocalIndex);
                 int preResolvedObjectLocalIndex = compilerContext.scopeManager.currentScope()
-                        .declareLocal("$preResolvedVarObject_" + compilerContext.emitter.currentOffset());
+                        .declareLocal("#preResolvedVarObject_" + compilerContext.emitter.currentOffset());
                 compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, preResolvedObjectLocalIndex);
 
                 compilerContext.expressionCompiler.compile(declarator.getInit());

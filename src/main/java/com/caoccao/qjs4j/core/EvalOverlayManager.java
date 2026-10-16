@@ -19,16 +19,9 @@ package com.caoccao.qjs4j.core;
 import java.util.*;
 
 /**
- * The stack of temporary global-object overlays a module's imports are installed as.
- * <p>
- * This engine has no module environment records yet: an {@code import} binding is installed as a property of the global
- * object for the duration of the module body and taken away again afterwards. A frame records what each overlay
- * displaced — the values that were there ({@code savedGlobals}) and the names that were not there at all
- * ({@code absentKeys}) — so {@link #restoreFrame} can put the realm back exactly as it was.
- * <p>
- * The suspension depth is separate from the stack. Some lookups have to see through the overlays to the realm
- * underneath (an indirect eval reaching the real global scope, for instance), and they raise the depth rather than
- * unwinding the stack, because the overlay must still be there when they finish.
+ * Temporary global-object overlays used by direct eval to expose caller bindings. Frames retain displaced values and
+ * descriptors for restoration. Lookup suppression lets indirect eval reach the realm's global scope. Module imports use
+ * {@link JSModuleEnvironment} instead.
  */
 final class EvalOverlayManager {
     private final JSContext context;
@@ -84,10 +77,9 @@ final class EvalOverlayManager {
     }
 
     /**
-     * Restore a frame once the module body it belongs to has settled, rather than when {@code eval} returns.
+     * Restore an overlay frame after an asynchronous operation settles.
      * <p>
-     * A top-level-await module's body is still running when {@code eval} returns its promise, so taking the overlay
-     * away then would remove the module's imports from underneath it.
+     * Kept as the deferred counterpart of synchronous frame restoration; module imports do not use overlays.
      *
      * @param asyncModulePromise
      *            the module's evaluation promise

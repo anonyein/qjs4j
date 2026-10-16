@@ -20,23 +20,22 @@ import com.caoccao.qjs4j.exceptions.JSException;
 import com.caoccao.qjs4j.exceptions.JSRangeErrorException;
 import com.caoccao.qjs4j.exceptions.JSTypeErrorException;
 
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Represents a JavaScript SharedArrayBuffer object. Based on ES2017 SharedArrayBuffer specification.
  * <p>
  * A SharedArrayBuffer is a raw binary data buffer that can be shared across multiple workers/agents. Unlike
- * ArrayBuffer, it cannot be detached and uses direct memory allocation for efficient sharing.
+ * ArrayBuffer, it cannot be detached. Shared byte pages keep stable identities as the visible length grows.
  * <p>
- * Key characteristics: - Fixed-length binary data buffer - Can be shared across workers/threads - Cannot be detached
- * (no transferable semantics) - Used with Atomics for thread-safe operations - Direct ByteBuffer for efficient
- * multi-threaded access
+ * Key characteristics: - Fixed-length or growable binary data buffer - Can be shared across workers/threads - Cannot be
+ * detached (no transferable semantics) - Used with Atomics for thread-safe operations - Segmented JSByteBuffer for
+ * long-indexed multi-threaded access
  */
 public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffer {
     public static final String NAME = "SharedArrayBuffer";
-    private final ByteBuffer buffer;
+    private final JSByteBuffer buffer;
     /**
      * The current length, which every agent sharing this buffer reads and any of them may grow.
      * <p>
@@ -45,9 +44,9 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
      * shrank — and an agent on another thread had no happens-before edge that made a new length visible at all. The
      * compare-and-set loop below makes growth monotonic, and the volatile read makes it visible.
      */
-    private final AtomicInteger byteLength;
+    private final AtomicLong byteLength;
     private final boolean growable;
-    private final int maxByteLength;
+    private final long maxByteLength;
 
     /**
      * Create a SharedArrayBuffer with the specified byte length.
@@ -55,7 +54,7 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
      * @param byteLength
      *            The length in bytes
      */
-    public JSSharedArrayBuffer(JSContext context, int byteLength) {
+    public JSSharedArrayBuffer(JSContext context, long byteLength) {
         this(context, byteLength, byteLength, false);
     }
 
@@ -67,21 +66,17 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
      * @param maxByteLength
      *            The maximum length in bytes
      */
-    public JSSharedArrayBuffer(JSContext context, int byteLength, int maxByteLength) {
+    public JSSharedArrayBuffer(JSContext context, long byteLength, long maxByteLength) {
         this(context, byteLength, maxByteLength, true);
     }
 
     /**
      * Allocate a shared data block.
      * <p>
-     * A growable {@code SharedArrayBuffer} allocates {@code maxByteLength} up front, unlike {@link JSArrayBuffer}, and
-     * deliberately so: the backing {@code byte[]} is handed to other agents — {@code Atomics} reaches it through
-     * {@code getBuffer().array()} — so it cannot be replaced on growth without those agents silently continuing to read
-     * a stale block. V8 reserves address space and commits lazily; the JVM has no equivalent. The size is charged to
-     * the runtime's memory accounting instead, so declaring a large {@code maxByteLength} is refused by the configured
-     * limit rather than by the heap running out.
+     * A growable buffer reserves its maximum logical capacity against the runtime budget. Large stores commit pages
+     * lazily, and each page keeps its identity for Atomics and other agents as the visible length grows.
      */
-    private JSSharedArrayBuffer(JSContext context, int byteLength, int maxByteLength, boolean growable) {
+    private JSSharedArrayBuffer(JSContext context, long byteLength, long maxByteLength, boolean growable) {
         super(context);
         if (byteLength < 0) {
             throw new JSRangeErrorException("Invalid array buffer length");
@@ -89,18 +84,21 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
         if (maxByteLength < byteLength) {
             throw new JSRangeErrorException("Invalid array buffer max length");
         }
-        // Use heap buffer so backing byte[] is accessible for VarHandle atomics
+        if (growable && maxByteLength > JSArrayBuffer.MAX_RESIZABLE_DATA_BLOCK_BYTE_LENGTH) {
+            throw new JSRangeErrorException("Invalid array buffer max length");
+        }
+        // Use heap pages so their byte[] storage is accessible for VarHandle atomics
         // Pad to multiple of 4 so VarHandle int-width CAS works for short-typed atomics
-        int capacity = JSArrayBuffer.paddedCapacity(maxByteLength);
+        long capacity = JSArrayBuffer.paddedCapacity(maxByteLength);
         JSMemoryAccounting accounting = context.getRuntime().getMemoryAccounting();
         JSMemoryAccounting.Reservation pendingReservation = accounting.reserve(this, capacity);
         if (pendingReservation == null) {
             throw new JSRangeErrorException("Shared array buffer allocation failed: the runtime memory limit of "
                     + accounting.getLimit() + " bytes would be exceeded");
         }
-        ByteBuffer allocated;
+        JSByteBuffer allocated;
         try {
-            allocated = ByteBuffer.allocate(capacity);
+            allocated = JSByteBuffer.allocate(capacity);
         } catch (RuntimeException | Error allocationFailure) {
             // Reserving before allocating is deliberate, so a failed allocation has to hand the
             // bytes back rather than leave the runtime's ceiling inflated by a block that does not
@@ -110,17 +108,17 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
         }
         this.buffer = allocated;
         this.buffer.order(ByteOrder.LITTLE_ENDIAN); // JavaScript uses little-endian
-        this.byteLength = new AtomicInteger(byteLength);
+        this.byteLength = new AtomicLong(byteLength);
         this.maxByteLength = maxByteLength;
         this.growable = growable;
     }
 
     /**
-     * Get the underlying ByteBuffer. This is for internal use by TypedArrays, DataView, and Atomics.
+     * Get the underlying JSByteBuffer. This is for internal use by TypedArrays, DataView, and Atomics.
      *
-     * @return The direct ByteBuffer
+     * @return The shared byte storage
      */
-    public ByteBuffer getBuffer() {
+    public JSByteBuffer getBuffer() {
         return buffer;
     }
 
@@ -129,7 +127,7 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
      *
      * @return The byte length
      */
-    public int getByteLength() {
+    public long getByteLength() {
         return byteLength.get();
     }
 
@@ -138,7 +136,7 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
      *
      * @return The maximum byte length
      */
-    public int getMaxByteLength() {
+    public long getMaxByteLength() {
         return maxByteLength;
     }
 
@@ -148,7 +146,7 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
      * @param newByteLength
      *            The new byte length
      */
-    public void grow(int newByteLength) {
+    public void grow(long newByteLength) {
         if (!growable) {
             throw new JSTypeErrorException("array buffer is not growable");
         }
@@ -159,7 +157,7 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
         // one. A request below the current length is rejected however the agents interleave, and
         // a request that loses the race to a larger one is rejected rather than shrinking it back.
         while (true) {
-            int currentByteLength = byteLength.get();
+            long currentByteLength = byteLength.get();
             if (newByteLength < currentByteLength) {
                 throw new JSRangeErrorException("invalid array buffer length");
             }
@@ -211,9 +209,9 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
      *            End offset (exclusive)
      * @return A new SharedArrayBuffer
      */
-    public JSSharedArrayBuffer slice(int begin, int end) {
+    public JSSharedArrayBuffer slice(long begin, long end) {
         // One read of the shared length, so both ends are normalised against the same value.
-        int currentByteLength = byteLength.get();
+        long currentByteLength = byteLength.get();
 
         // Normalize begin
         if (begin < 0) {
@@ -230,23 +228,12 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
         }
 
         // Calculate new length
-        int newLength = Math.max(end - begin, 0);
+        long newLength = Math.max(end - begin, 0);
 
         // Create new buffer and copy bytes
         JSSharedArrayBuffer newBuffer = new JSSharedArrayBuffer(context, newLength);
         if (newLength > 0) {
-            byte[] bytes = new byte[newLength];
-            synchronized (buffer) {
-                ByteBuffer source = buffer.duplicate();
-                source.position(begin);
-                source.limit(begin + newLength);
-                source.get(bytes);
-            }
-            synchronized (newBuffer.getBuffer()) {
-                ByteBuffer target = newBuffer.getBuffer().duplicate();
-                target.position(0);
-                target.put(bytes);
-            }
+            buffer.copyTo(newBuffer.getBuffer(), begin, 0, newLength);
         }
 
         return newBuffer;
@@ -259,17 +246,12 @@ public final class JSSharedArrayBuffer extends JSObject implements IJSArrayBuffe
 
     private static JSSharedArrayBuffer allocateBuffer(JSContext context, long length, long maxLength,
             boolean growable) {
-        if (length > Integer.MAX_VALUE) {
+        if (length > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH || maxLength > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH) {
             throw new JSException(context.throwRangeError("Invalid array buffer length"));
         }
-        if (maxLength > Integer.MAX_VALUE) {
-            throw new JSException(context.throwRangeError("Invalid array buffer max length"));
-        }
-        int intLength = (int) length;
-        int intMaxLength = (int) maxLength;
         return growable
-                ? new JSSharedArrayBuffer(context, intLength, intMaxLength)
-                : new JSSharedArrayBuffer(context, intLength);
+                ? new JSSharedArrayBuffer(context, length, maxLength)
+                : new JSSharedArrayBuffer(context, length);
     }
 
     public static JSObject create(JSContext context, JSValue... args) {

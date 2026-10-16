@@ -21,7 +21,6 @@ import com.caoccao.qjs4j.exceptions.JSTypeErrorException;
 import com.caoccao.qjs4j.utils.Float16;
 
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
@@ -32,8 +31,8 @@ import java.nio.ByteOrder;
 public final class JSDataView extends JSObject {
     public static final String NAME = "DataView";
     private final IJSArrayBuffer buffer;
-    private final int byteLength;
-    private final int byteOffset;
+    private final long byteLength;
+    private final long byteOffset;
     private final boolean lengthTracking;
 
     /**
@@ -46,14 +45,14 @@ public final class JSDataView extends JSObject {
     /**
      * Create a DataView for a portion of the buffer.
      */
-    public JSDataView(JSContext context, IJSArrayBuffer buffer, int byteOffset, int byteLength) {
+    public JSDataView(JSContext context, IJSArrayBuffer buffer, long byteOffset, long byteLength) {
         this(context, buffer, byteOffset, byteLength, false);
     }
 
     /**
      * Create a DataView with optional length-tracking semantics on resizable/growable buffers.
      */
-    public JSDataView(JSContext context, IJSArrayBuffer buffer, int byteOffset, int byteLength,
+    public JSDataView(JSContext context, IJSArrayBuffer buffer, long byteOffset, long byteLength,
             boolean lengthTracking) {
         super(context);
         if (buffer == null || buffer.isDetached()) {
@@ -65,7 +64,7 @@ public final class JSDataView extends JSObject {
         if (byteLength < 0) {
             throw new JSRangeErrorException("DataView byteLength out of range");
         }
-        if (!lengthTracking && (long) byteOffset + byteLength > buffer.getByteLength()) {
+        if (!lengthTracking && byteOffset + byteLength > buffer.getByteLength()) {
             throw new JSRangeErrorException("DataView byteLength out of range");
         }
 
@@ -75,22 +74,22 @@ public final class JSDataView extends JSObject {
         this.lengthTracking = lengthTracking;
     }
 
-    private void checkOffset(int offset, int size) {
+    private void checkOffset(long offset, int size) {
         if (buffer.isDetached()) {
             throw new JSTypeErrorException("ArrayBuffer is detached");
         }
         if (isOutOfBounds()) {
             throw new JSTypeErrorException("DataView is out of bounds");
         }
-        int effectiveByteLength = getByteLength();
-        if (offset < 0 || (long) offset + size > effectiveByteLength) {
+        long effectiveByteLength = getByteLength();
+        if (offset < 0 || offset + size > effectiveByteLength) {
             throw new JSRangeErrorException("DataView offset out of range");
         }
     }
 
-    public JSBigInt getBigInt64(int byteOffset, boolean littleEndian) {
+    public JSBigInt getBigInt64(long byteOffset, boolean littleEndian) {
         checkOffset(byteOffset, 8);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         long value = buf.getLong(this.byteOffset + byteOffset);
@@ -98,9 +97,9 @@ public final class JSDataView extends JSObject {
         return new JSBigInt(value);
     }
 
-    public JSBigInt getBigUint64(int byteOffset, boolean littleEndian) {
+    public JSBigInt getBigUint64(long byteOffset, boolean littleEndian) {
         checkOffset(byteOffset, 8);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         long value = buf.getLong(this.byteOffset + byteOffset);
@@ -112,12 +111,12 @@ public final class JSDataView extends JSObject {
         return (JSObject) buffer;
     }
 
-    public int getByteLength() {
+    public long getByteLength() {
         if (lengthTracking) {
             if (buffer.isDetached()) {
                 return 0;
             }
-            int currentByteLength = buffer.getByteLength();
+            long currentByteLength = buffer.getByteLength();
             if (byteOffset > currentByteLength) {
                 return 0;
             }
@@ -126,19 +125,19 @@ public final class JSDataView extends JSObject {
         return byteLength;
     }
 
-    public int getByteOffset() {
+    public long getByteOffset() {
         return byteOffset;
     }
 
     // Float32 operations
-    public float getFloat16(int byteOffset, boolean littleEndian) {
+    public float getFloat16(long byteOffset, boolean littleEndian) {
         int halfFloat = getUint16(byteOffset, littleEndian);
         return Float16.toFloat((short) halfFloat);
     }
 
-    public float getFloat32(int byteOffset, boolean littleEndian) {
+    public float getFloat32(long byteOffset, boolean littleEndian) {
         checkOffset(byteOffset, 4);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         float value = buf.getFloat(this.byteOffset + byteOffset);
@@ -147,9 +146,9 @@ public final class JSDataView extends JSObject {
     }
 
     // Float64 operations
-    public double getFloat64(int byteOffset, boolean littleEndian) {
+    public double getFloat64(long byteOffset, boolean littleEndian) {
         checkOffset(byteOffset, 8);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         double value = buf.getDouble(this.byteOffset + byteOffset);
@@ -158,9 +157,9 @@ public final class JSDataView extends JSObject {
     }
 
     // Int16 operations
-    public short getInt16(int byteOffset, boolean littleEndian) {
+    public short getInt16(long byteOffset, boolean littleEndian) {
         checkOffset(byteOffset, 2);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         short value = buf.getShort(this.byteOffset + byteOffset);
@@ -169,9 +168,9 @@ public final class JSDataView extends JSObject {
     }
 
     // Int32 operations
-    public int getInt32(int byteOffset, boolean littleEndian) {
+    public int getInt32(long byteOffset, boolean littleEndian) {
         checkOffset(byteOffset, 4);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         int value = buf.getInt(this.byteOffset + byteOffset);
@@ -180,23 +179,23 @@ public final class JSDataView extends JSObject {
     }
 
     // Int8 operations
-    public byte getInt8(int byteOffset) {
+    public byte getInt8(long byteOffset) {
         checkOffset(byteOffset, 1);
         return buffer.getBuffer().get(this.byteOffset + byteOffset);
     }
 
     // Uint16 operations
-    public int getUint16(int byteOffset, boolean littleEndian) {
+    public int getUint16(long byteOffset, boolean littleEndian) {
         return getInt16(byteOffset, littleEndian) & 0xFFFF;
     }
 
     // Uint32 operations
-    public long getUint32(int byteOffset, boolean littleEndian) {
+    public long getUint32(long byteOffset, boolean littleEndian) {
         return getInt32(byteOffset, littleEndian) & 0xFFFFFFFFL;
     }
 
     // Uint8 operations
-    public int getUint8(int byteOffset) {
+    public int getUint8(long byteOffset) {
         return getInt8(byteOffset) & 0xFF;
     }
 
@@ -208,88 +207,88 @@ public final class JSDataView extends JSObject {
         if (buffer.isDetached()) {
             return true;
         }
-        int currentByteLength = buffer.getByteLength();
+        long currentByteLength = buffer.getByteLength();
         if (byteOffset > currentByteLength) {
             return true;
         }
         if (lengthTracking) {
             return false;
         }
-        return (long) byteOffset + byteLength > currentByteLength;
+        return byteOffset + byteLength > currentByteLength;
     }
 
-    public void setBigInt64(int byteOffset, JSBigInt value, boolean littleEndian) {
+    public void setBigInt64(long byteOffset, JSBigInt value, boolean littleEndian) {
         checkOffset(byteOffset, 8);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         buf.putLong(this.byteOffset + byteOffset, value.value().longValue());
         buf.order(originalOrder);
     }
 
-    public void setBigUint64(int byteOffset, JSBigInt value, boolean littleEndian) {
+    public void setBigUint64(long byteOffset, JSBigInt value, boolean littleEndian) {
         checkOffset(byteOffset, 8);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         buf.putLong(this.byteOffset + byteOffset, value.value().longValue());
         buf.order(originalOrder);
     }
 
-    public void setFloat16(int byteOffset, double value, boolean littleEndian) {
+    public void setFloat16(long byteOffset, double value, boolean littleEndian) {
         setUint16(byteOffset, Float16.toHalf(value), littleEndian);
     }
 
-    public void setFloat32(int byteOffset, float value, boolean littleEndian) {
+    public void setFloat32(long byteOffset, float value, boolean littleEndian) {
         checkOffset(byteOffset, 4);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         buf.putFloat(this.byteOffset + byteOffset, value);
         buf.order(originalOrder);
     }
 
-    public void setFloat64(int byteOffset, double value, boolean littleEndian) {
+    public void setFloat64(long byteOffset, double value, boolean littleEndian) {
         checkOffset(byteOffset, 8);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         buf.putDouble(this.byteOffset + byteOffset, value);
         buf.order(originalOrder);
     }
 
-    public void setInt16(int byteOffset, short value, boolean littleEndian) {
+    public void setInt16(long byteOffset, short value, boolean littleEndian) {
         checkOffset(byteOffset, 2);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         buf.putShort(this.byteOffset + byteOffset, value);
         buf.order(originalOrder);
     }
 
-    public void setInt32(int byteOffset, int value, boolean littleEndian) {
+    public void setInt32(long byteOffset, int value, boolean littleEndian) {
         checkOffset(byteOffset, 4);
-        ByteBuffer buf = buffer.getBuffer();
+        JSByteBuffer buf = buffer.getBuffer();
         ByteOrder originalOrder = buf.order();
         buf.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
         buf.putInt(this.byteOffset + byteOffset, value);
         buf.order(originalOrder);
     }
 
-    public void setInt8(int byteOffset, byte value) {
+    public void setInt8(long byteOffset, byte value) {
         checkOffset(byteOffset, 1);
         buffer.getBuffer().put(this.byteOffset + byteOffset, value);
     }
 
-    public void setUint16(int byteOffset, int value, boolean littleEndian) {
+    public void setUint16(long byteOffset, int value, boolean littleEndian) {
         setInt16(byteOffset, (short) value, littleEndian);
     }
 
-    public void setUint32(int byteOffset, long value, boolean littleEndian) {
+    public void setUint32(long byteOffset, long value, boolean littleEndian) {
         setInt32(byteOffset, (int) value, littleEndian);
     }
 
-    public void setUint8(int byteOffset, int value) {
+    public void setUint8(long byteOffset, int value) {
         setInt8(byteOffset, (byte) value);
     }
 
@@ -307,12 +306,12 @@ public final class JSDataView extends JSObject {
             context.throwTypeError("ArrayBuffer is detached");
             return false;
         }
-        int currentByteLength = buffer.getByteLength();
+        long currentByteLength = buffer.getByteLength();
         if (byteOffset > currentByteLength) {
             context.throwRangeError("byteOffset out of range");
             return false;
         }
-        if (!lengthTracking && (long) byteOffset + byteLength > currentByteLength) {
+        if (!lengthTracking && byteOffset + byteLength > currentByteLength) {
             context.throwRangeError("byteOffset + byteLength out of range");
             return false;
         }
@@ -336,13 +335,13 @@ public final class JSDataView extends JSObject {
         }
 
         // Get byteOffset (optional, default 0)
-        int byteOffset = 0;
+        long byteOffset = 0;
         if (args.length > 1) {
             Double convertedByteOffset = toIndex(context, args[1], "byteOffset");
             if (convertedByteOffset == null) {
                 return getPendingExceptionAsObject(context);
             }
-            byteOffset = convertedByteOffset.intValue();
+            byteOffset = convertedByteOffset.longValue();
         }
 
         if (buffer.isDetached()) {
@@ -353,18 +352,18 @@ public final class JSDataView extends JSObject {
         }
 
         // Get byteLength (optional, default to remaining buffer)
-        int byteLength;
+        long byteLength;
         boolean lengthTracking = false;
         if (args.length > 2 && !(args[2] instanceof JSUndefined)) {
             Double convertedByteLength = toIndex(context, args[2], "byteLength");
             if (convertedByteLength == null) {
                 return getPendingExceptionAsObject(context);
             }
-            byteLength = convertedByteLength.intValue();
+            byteLength = convertedByteLength.longValue();
             if (buffer.isDetached()) {
                 return context.throwTypeError("ArrayBuffer is detached");
             }
-            if ((long) byteOffset + byteLength > buffer.getByteLength()) {
+            if (byteOffset + byteLength > buffer.getByteLength()) {
                 return context.throwRangeError("byteOffset + byteLength out of range");
             }
         } else {
@@ -378,7 +377,7 @@ public final class JSDataView extends JSObject {
         if (byteOffset > buffer.getByteLength()) {
             return context.throwRangeError("byteOffset + byteLength out of range");
         }
-        if (!lengthTracking && (long) byteOffset + byteLength > buffer.getByteLength()) {
+        if (!lengthTracking && byteOffset + byteLength > buffer.getByteLength()) {
             return context.throwRangeError("byteOffset + byteLength out of range");
         }
 
@@ -414,7 +413,7 @@ public final class JSDataView extends JSObject {
             context.throwRangeError("Invalid " + name);
             return null;
         }
-        if (index > Integer.MAX_VALUE) {
+        if (index > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH) {
             context.throwRangeError(name + " out of range");
             return null;
         }

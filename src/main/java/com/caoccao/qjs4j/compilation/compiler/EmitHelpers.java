@@ -480,7 +480,7 @@ final class EmitHelpers {
 
     void emitMethodCallWithSingleArgOnLocalObject(int localIndex, String methodName) {
         int argLocalIndex = compilerContext.scopeManager.currentScope()
-                .declareLocal("$using_arg_" + compilerContext.emitter.currentOffset());
+                .declareLocal("#using_arg_" + compilerContext.emitter.currentOffset());
         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, argLocalIndex);
 
         compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, localIndex);
@@ -568,7 +568,7 @@ final class EmitHelpers {
         // Stack: [caught_exception]
         // Save exception to a temp local so we can pass it as an argument
         int exceptionLocalIndex = compilerContext.scopeManager.currentScope()
-                .declareLocal("$using_exception_" + compilerContext.emitter.currentOffset());
+                .declareLocal("#using_exception_" + compilerContext.emitter.currentOffset());
         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, exceptionLocalIndex);
 
         // Check if the using stack was actually initialized at runtime.
@@ -648,7 +648,7 @@ final class EmitHelpers {
         boolean useAsyncStack = asyncUsingDeclaration || compilerContext.isInAsyncFunction;
         String constructorName = useAsyncStack ? JSAsyncDisposableStack.NAME : JSDisposableStack.NAME;
         int stackLocalIndex = scope
-                .declareLocal("$using_stack_" + scope.getScopeDepth() + "_" + compilerContext.emitter.currentOffset());
+                .declareLocal("#using_stack_" + scope.getScopeDepth() + "_" + compilerContext.emitter.currentOffset());
 
         compilerContext.emitter.emitOpcodeAtom(Opcode.GET_VAR, constructorName);
         compilerContext.emitter.emitOpcodeU16(Opcode.CALL_CONSTRUCTOR, 0);

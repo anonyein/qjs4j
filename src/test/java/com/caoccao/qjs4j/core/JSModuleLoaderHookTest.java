@@ -266,6 +266,44 @@ public class JSModuleLoaderHookTest extends BaseTest {
     }
 
     @Test
+    public void testLoaderKeysRemainOpaqueDuringModuleEvaluation() {
+        String moduleKey = "memory://packages/../dep.mjs";
+        List<String> loads = new ArrayList<>();
+        IJSModuleLoader loader = new IJSModuleLoader() {
+            @Override
+            public byte[] load(String key) throws IOException {
+                loads.add(key);
+                if (!key.equals(moduleKey)) {
+                    throw new IOException("unexpected key " + key);
+                }
+                return "export let value = 41; export function increment() { value++; }"
+                        .getBytes(StandardCharsets.UTF_8);
+            }
+
+            @Override
+            public String resolve(String specifier, String referrer) {
+                return specifier.equals("./dep.mjs") || specifier.equals(moduleKey) ? moduleKey : null;
+            }
+        };
+        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setModuleLoader(loader));
+                JSContext moduleContext = runtime.createContext()) {
+            assertThat(evalAndSettle(moduleContext, """
+                    import { value, increment } from './dep.mjs';
+                    increment();
+                    globalThis.readValue = () => value;
+                    globalThis.result = String(value);
+                    """, "entry.mjs")).isEqualTo("42");
+            assertThat(evalAndSettle(moduleContext, """
+                    import('./dep.mjs').then(ns => {
+                      ns.increment();
+                      globalThis.result = [ns.value, readValue()].join(',');
+                    });
+                    """, "dynamic.mjs")).isEqualTo("43,43");
+            assertThat(loads).isNotEmpty().containsOnly(moduleKey);
+        }
+    }
+
+    @Test
     public void testShadowRealmImportValueGoesThroughTheLoader() throws IOException {
         Path module = moduleDirectory.resolve("realm-module.js");
         Files.writeString(module, "export var answer = 42;\n");

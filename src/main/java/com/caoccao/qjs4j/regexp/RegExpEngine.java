@@ -500,6 +500,20 @@ public final class RegExpEngine {
                     pc += 5;
                 }
 
+                case SET_I32 -> {
+                    int register = bc[pc + 1] & 0xFF;
+                    executionContext.stateDirty = true;
+                    executionContext.registers[register] = readU32(bc, pc + 2);
+                    pc += 6;
+                }
+
+                case LOOP -> {
+                    int register = bc[pc + 1] & 0xFF;
+                    executionContext.stateDirty = true;
+                    pc += --executionContext.registers[register] != 0 ? 6 + readU32(bc, pc + 2) : 6;
+                    executionContext.pollInterrupt();
+                }
+
                 case SET_CHAR_POS -> {
                     int regIdx = bc[pc + 1] & 0xFF;
                     if (regIdx < executionContext.registers.length) {

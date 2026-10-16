@@ -86,6 +86,7 @@ public final class JSNativeFunction extends JSFunction {
             }
             return context.throwTypeError(errorMessage);
         }
+        context.getVirtualMachine().checkExecutionInterrupt();
         JSContext callbackContext = getRealmContext();
         try {
             JSValue result = callback.call(callbackContext, thisArg, args);

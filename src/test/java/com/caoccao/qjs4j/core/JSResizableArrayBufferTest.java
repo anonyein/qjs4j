@@ -29,6 +29,20 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class JSResizableArrayBufferTest extends BaseJavetTest {
     @Test
+    public void testDefaultBudgetRejectsLargeBuffersWithCatchableRangeError() {
+        // Long-indexed storage supports these lengths, but the default runtime budget is 64 MiB.
+        // Budget refusals must remain catchable by JavaScript. JSLargeBufferTest covers allocation
+        // with the host budget explicitly disabled and compares the result with V8.
+        try (JSRuntime runtime = new JSRuntime()) {
+            JSContext context = runtime.createContext();
+            for (String length : new String[]{"2147483647", "2147483646", "2147483645", "2147483644"}) {
+                assertThat(context.eval("try { new ArrayBuffer(" + length + "); 'allocated'; } catch (e) { e.name; }",
+                        "b.js", false).toString()).as(length).isEqualTo("RangeError");
+            }
+        }
+    }
+
+    @Test
     public void testGrowthPreservesContentsAndZeroesNewBytes() {
         assertStringWithJavet("""
                 var b = new ArrayBuffer(4, { maxByteLength: 64 });
@@ -38,22 +52,6 @@ public class JSResizableArrayBufferTest extends BaseJavetTest {
                 b.resize(32);
                 var w = new Uint8Array(b);
                 [w[0], w[3], w[4], w[31], b.byteLength].join(',');""");
-    }
-
-    @Test
-    public void testLengthAtTheIntegerBoundaryIsACatchableRangeError() {
-        // (byteLength + 3) & ~3 wrapped to Integer.MIN_VALUE here, and the failure surfaced as
-        // IllegalArgumentException from ByteBuffer.allocate — an internal engine error no
-        // try/catch could see. Not compared against V8: a data block is a Java byte[], so lengths
-        // within a few words of Integer.MAX_VALUE are unallocatable on any JVM, while V8 on a
-        // 64-bit host allocates them. What matters is that the refusal is a catchable RangeError.
-        try (JSRuntime runtime = new JSRuntime()) {
-            JSContext context = runtime.createContext();
-            for (String length : new String[]{"2147483647", "2147483646", "2147483645", "2147483644"}) {
-                assertThat(context.eval("try { new ArrayBuffer(" + length + "); 'allocated'; } catch (e) { e.name; }",
-                        "b.js", false).toString()).as(length).isEqualTo("RangeError");
-            }
-        }
     }
 
     @Test

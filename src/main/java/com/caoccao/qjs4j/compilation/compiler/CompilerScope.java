@@ -172,7 +172,7 @@ final class CompilerScope {
      * <p>
      * This models one environment shadowing another inside a single compiled scope: code emitted before the call keeps
      * referring to the old slot by index, while everything compiled afterwards resolves the name to the new slot. The
-     * old slot is renamed to {@code hiddenName}, which by convention starts with {@code $} so no source identifier and
+     * old slot is renamed to {@code hiddenName}, which by convention starts with {@code #} so no source identifier and
      * no name-driven lookup (direct {@code eval} overlays, capture resolution) can reach it again.
      *
      * @param name

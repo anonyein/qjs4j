@@ -46,6 +46,7 @@ public final class JSONObject {
         // Find where the cycle starts in the path
         int cycleStart = -1;
         for (int i = 0; i < stringifyContext.cyclePath.size(); i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             if (stringifyContext.cyclePath.get(i).obj == cycleTo) {
                 cycleStart = i;
                 break;
@@ -61,6 +62,7 @@ public final class JSONObject {
 
             // Add intermediate path entries between cycle start and end
             for (int i = cycleStart + 1; i < stringifyContext.cyclePath.size(); i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 CycleEntry entry = stringifyContext.cyclePath.get(i);
                 msg.append("\n    |     property '").append(entry.key).append("' -> object with constructor '");
                 msg.append(getConstructorName(entry.obj));
@@ -84,9 +86,9 @@ public final class JSONObject {
      * Safely call a JS function, catching JSVirtualMachineException and converting to a pending exception on the
      * context. Returns null if an exception occurred.
      */
-    private JSValue callSafe(JSFunction function, JSValue thisArg, JSValue[] args) {
+    private JSValue callSafe(JSValue function, JSValue thisArg, JSValue[] args) {
         try {
-            return function.call(context, thisArg, args);
+            return JSCall.call(context, function, thisArg, args);
         } catch (JSVirtualMachineException e) {
             convertVMException(e);
             return null;
@@ -134,6 +136,7 @@ public final class JSONObject {
         List<String> keys = new ArrayList<>();
         List<PropertyKey> ownKeys = obj.getOwnPropertyKeys();
         for (PropertyKey key : ownKeys) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             if (key.isSymbol()) {
                 continue;
             }
@@ -192,8 +195,7 @@ public final class JSONObject {
      * Recursive internalize operation for JSON.parse reviver. Based on ES2024 25.5.1.1 InternalizeJSONProperty and
      * QuickJS internalize_json_property. Now supports context.source (json-parse-with-source proposal).
      */
-    private JSValue internalizeJSONProperty(JSValue holder, String name, JSFunction reviver,
-            ParseContext parseContext) {
+    private JSValue internalizeJSONProperty(JSValue holder, String name, JSValue reviver, ParseContext parseContext) {
         JSValue val;
         try {
             val = ((JSObject) holder).get(PropertyKey.fromString(name));
@@ -236,6 +238,7 @@ public final class JSONObject {
                     return null;
                 }
                 for (long i = 0; i < arrayLength; i++) {
+                    context.getVirtualMachine().checkExecutionInterruptForNative();
                     JSValue newElement = internalizeJSONProperty(val, String.valueOf(i), reviver, parseContext);
                     if (context.hasPendingException()) {
                         return null;
@@ -275,6 +278,7 @@ public final class JSONObject {
                     return null;
                 }
                 for (String prop : keys) {
+                    context.getVirtualMachine().checkExecutionInterruptForNative();
                     JSValue newElement = internalizeJSONProperty(val, prop, reviver, parseContext);
                     if (context.hasPendingException()) {
                         return null;
@@ -330,6 +334,7 @@ public final class JSONObject {
             return false;
         }
         for (int i = 0; i < key.length(); i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             if (!Character.isDigit(key.charAt(i))) {
                 return false;
             }
@@ -372,7 +377,7 @@ public final class JSONObject {
     private JSValue jsonCheck(StringifyContext stringifyContext, JSValue holder, JSValue value, JSValue key) {
         // Check for toJSON method - applies to both Objects and BigInt
         if (value instanceof JSObject || value instanceof JSBigInt) {
-            if (value instanceof JSFunction) {
+            if (JSTypeChecking.isCallable(value)) {
                 // Functions don't have toJSON checked, they just become undefined
             } else {
                 JSValue toJSON = null;
@@ -400,8 +405,8 @@ public final class JSONObject {
                         }
                     }
                 }
-                if (toJSON instanceof JSFunction toJSONFunc) {
-                    value = callSafe(toJSONFunc, value, new JSValue[]{key});
+                if (JSTypeChecking.isCallable(toJSON)) {
+                    value = callSafe(toJSON, value, new JSValue[]{key});
                     if (value == null) {
                         return null;
                     }
@@ -420,7 +425,7 @@ public final class JSONObject {
         // Determine what to keep based on the tag
         // Following QuickJS js_json_check: keep objects (non-function), strings, numbers, booleans, null, bigint
         if (value instanceof JSObject) {
-            if (value instanceof JSFunction) {
+            if (JSTypeChecking.isCallable(value)) {
                 return JSUndefined.INSTANCE;
             }
             return value;
@@ -582,7 +587,7 @@ public final class JSONObject {
         JSValue jsValue;
         ParseContext parseContext;
         try {
-            parseContext = new ParseContext(text);
+            parseContext = new ParseContext(text, args.length > 1 && JSTypeChecking.isCallable(args[1]));
             ParseResult parseResult = parseValue(parseContext, 0);
             int end = skipWhitespace(parseContext.text, parseResult.endIndex);
             if (end != parseContext.text.length()) {
@@ -594,7 +599,8 @@ public final class JSONObject {
         }
 
         // If reviver function is provided, apply it
-        if (args.length > 1 && args[1] instanceof JSFunction reviver) {
+        if (args.length > 1 && JSTypeChecking.isCallable(args[1])) {
+            JSValue reviver = args[1];
             // Create root with CreateDataPropertyOrThrow (not [[Set]])
             JSObject root = context.createJSObject();
             root.defineProperty(PropertyKey.fromString(""), jsValue, PropertyDescriptor.DataState.All);
@@ -621,6 +627,7 @@ public final class JSONObject {
         }
         int value = 0;
         for (int i = 0; i < 4; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             int digit = Character.digit(hex.charAt(i), 16);
             if (digit < 0) {
                 return -1;
@@ -659,6 +666,7 @@ public final class JSONObject {
             }
         } else {
             while (i < parseContext.text.length() && Character.isDigit(parseContext.text.charAt(i))) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 i++;
             }
         }
@@ -670,6 +678,7 @@ public final class JSONObject {
                 throw new JSONParseException("Invalid number in JSON " + parseContext.getPositionInfo(i));
             }
             while (i < parseContext.text.length() && Character.isDigit(parseContext.text.charAt(i))) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 i++;
             }
         }
@@ -686,6 +695,7 @@ public final class JSONObject {
                 throw new JSONParseException("Invalid number in JSON " + parseContext.getPositionInfo(i));
             }
             while (i < parseContext.text.length() && Character.isDigit(parseContext.text.charAt(i))) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 i++;
             }
         }
@@ -725,6 +735,8 @@ public final class JSONObject {
         int i = start + 1;
 
         while (i < parseContext.text.length()) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             char ch = parseContext.text.charAt(i);
 
             if (ch == '"') {
@@ -786,6 +798,8 @@ public final class JSONObject {
         int i = start + 1;
 
         while (i < parseContext.text.length()) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             char ch = parseContext.text.charAt(i);
 
             if (ch == '"') {
@@ -855,6 +869,7 @@ public final class JSONObject {
         Deque<ParseFrame> stack = new ArrayDeque<>();
         int i = start;
         while (true) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             // Read one value; an array or object that is not empty is opened instead, and read element by element.
             i = skipWhitespace(text, i);
             if (i >= length) {
@@ -893,6 +908,7 @@ public final class JSONObject {
             }
             // Hand the completed value to the containers it closes, innermost first.
             while (true) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 ParseFrame frame = stack.peek();
                 if (frame == null) {
                     return completed;
@@ -982,7 +998,7 @@ public final class JSONObject {
             if (ch == '{' || ch == '[') {
                 return throwRawJSONUnexpectedToken(ch, text);
             }
-            ParseContext parseContext = new ParseContext(text);
+            ParseContext parseContext = new ParseContext(text, false);
             ParseResult parseResult = parseValue(parseContext, 0);
             int end = skipWhitespace(text, parseResult.endIndex);
             if (end != text.length()) {
@@ -1017,6 +1033,7 @@ public final class JSONObject {
     private int skipWhitespace(String text, int start) {
         int i = start;
         while (i < text.length()) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             char ch = text.charAt(i);
             if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') {
                 i++;
@@ -1043,8 +1060,8 @@ public final class JSONObject {
         // Process replacer parameter
         if (args.length > 1 && !(args[1] instanceof JSUndefined)) {
             JSValue replacer = args[1];
-            if (replacer instanceof JSFunction) {
-                stringifyContext.replacerFunc = (JSFunction) replacer;
+            if (JSTypeChecking.isCallable(replacer)) {
+                stringifyContext.replacerFunc = replacer;
             } else if (replacer instanceof JSObject) {
                 // Use IsArray with proxy unwrapping
                 int isReplacerArray = JSTypeChecking.isArray(context, replacer);
@@ -1053,7 +1070,7 @@ public final class JSONObject {
                 }
                 if (isReplacerArray == 1) {
                     // Build property list from array
-                    List<String> propertyList = new ArrayList<>();
+                    Set<String> propertyList = new LinkedHashSet<>();
                     long replacerLength;
                     try {
                         JSValue lengthVal = ((JSObject) replacer).get(PropertyKey.LENGTH);
@@ -1069,6 +1086,7 @@ public final class JSONObject {
                         return JSUndefined.INSTANCE;
                     }
                     for (long i = 0; i < replacerLength; i++) {
+                        context.getVirtualMachine().checkExecutionInterruptForNative();
                         JSValue item;
                         try {
                             item = ((JSObject) replacer).get(PropertyKey.fromString(Long.toString(i)));
@@ -1106,12 +1124,12 @@ public final class JSONObject {
                         }
                         // Non-string, non-number primitives are skipped
 
-                        if (propName != null && !propertyList.contains(propName)) {
+                        if (propName != null) {
                             propertyList.add(propName);
                         }
                     }
                     // Always set propertyList (even if empty) when replacer is an array
-                    stringifyContext.propertyList = propertyList;
+                    stringifyContext.propertyList = new ArrayList<>(propertyList);
                 }
             }
         }
@@ -1208,6 +1226,8 @@ public final class JSONObject {
         }
 
         for (long i = 0; i < arrayLength; i++) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             if (i > 0) {
                 sb.append(',');
             }
@@ -1274,6 +1294,8 @@ public final class JSONObject {
         }
 
         for (String key : keys) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             JSValue propValue = getSafe(object, key);
             if (context.hasPendingException()) {
                 return false;
@@ -1330,6 +1352,7 @@ public final class JSONObject {
         StringBuilder sb = new StringBuilder("\"");
         int len = str.length();
         for (int i = 0; i < len; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             char ch = str.charAt(i);
             switch (ch) {
                 case '"' -> sb.append("\\\"");
@@ -1384,10 +1407,6 @@ public final class JSONObject {
     }
 
     /**
-     * Context for JSON parsing with position tracking and source tracking for reviver.
-     */
-
-    /**
      * Custom exception for JSON parsing errors with position information
      */
     private static class JSONParseException extends RuntimeException {
@@ -1396,16 +1415,21 @@ public final class JSONObject {
         }
     }
 
+    /**
+     * Parsing positions and optional source provenance for a callable reviver.
+     */
     private static class ParseContext {
         // Source tracking for primitive values within structured types (arrays/objects)
         // Tracks both the source text and original parsed value per (parent, key) pair
-        private final IdentityHashMap<JSValue, Map<String, SourceEntry>> elementSources = new IdentityHashMap<>();
+        private final IdentityHashMap<JSValue, Map<String, SourceEntry>> elementSources;
         // Track whether a value is a structured type (object/array)
-        private final IdentityHashMap<JSValue, int[]> structuredRanges = new IdentityHashMap<>();
+        private final IdentityHashMap<JSValue, int[]> structuredRanges;
         final String text;
 
-        ParseContext(String text) {
+        ParseContext(String text, boolean trackSource) {
             this.text = text;
+            elementSources = trackSource ? new IdentityHashMap<>() : null;
+            structuredRanges = trackSource ? new IdentityHashMap<>() : null;
         }
 
         /**
@@ -1503,7 +1527,7 @@ public final class JSONObject {
 
         void recordElementSource(JSValue parent, String key, JSValue parsedValue, int sourceStart, int sourceEnd) {
             // Structured types (objects/arrays) have sourceStart=-1, skip them
-            if (sourceStart < 0 || sourceEnd < 0) {
+            if (elementSources == null || sourceStart < 0 || sourceEnd < 0) {
                 return;
             }
             elementSources.computeIfAbsent(parent, k -> new HashMap<>()).put(key,
@@ -1511,7 +1535,9 @@ public final class JSONObject {
         }
 
         void recordSourceRange(JSValue structured, int start, int end) {
-            structuredRanges.put(structured, new int[]{start, end});
+            if (structuredRanges != null) {
+                structuredRanges.put(structured, new int[]{start, end});
+            }
         }
     }
 
@@ -1556,7 +1582,7 @@ public final class JSONObject {
         List<CycleEntry> cyclePath = null;
         String gap = "";
         List<String> propertyList = null;
-        JSFunction replacerFunc = null;
+        JSValue replacerFunc = null;
         IdentityHashMap<JSValue, Boolean> stack = null;
     }
 }

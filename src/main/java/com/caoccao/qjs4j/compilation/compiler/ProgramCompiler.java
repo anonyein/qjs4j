@@ -133,7 +133,7 @@ final class ProgramCompiler extends AstNodeCompiler<Program> {
         }
 
         int programResultLocalIndex = compilerContext.scopeManager.currentScope()
-                .declareLocal("$program_result_" + compilerContext.emitter.currentOffset());
+                .declareLocal("#program_result_" + compilerContext.emitter.currentOffset());
         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, programResultLocalIndex);
         compilerContext.emitHelpers.emitCurrentScopeUsingDisposal();
         compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, programResultLocalIndex);
@@ -249,10 +249,13 @@ final class ProgramCompiler extends AstNodeCompiler<Program> {
         // nested inside blocks, if-statements, catch clauses, etc.
         compilerContext.compilerAnalysis.scanAnnexBFunctions(body, declaredFuncVarNames);
 
-        if (compilerContext.evalMode) {
-            // Eval mode: allocate a hidden local to track the eval completion value.
+        {
+            // Scripts and eval share ECMAScript statement completion semantics.
+            if (!body.isEmpty()) {
+                compilerContext.emitter.emitSourcePosition(body.get(0).getLocation());
+            }
             // Every expression statement stores its result here (like QuickJS's eval_ret_idx).
-            int evalRetLocalIndex = compilerContext.scopeManager.currentScope().declareLocal("$eval_ret");
+            int evalRetLocalIndex = compilerContext.scopeManager.currentScope().declareLocal("#eval_ret");
             compilerContext.evalReturnLocalIndex = evalRetLocalIndex;
             compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
             compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, evalRetLocalIndex);
@@ -270,46 +273,7 @@ final class ProgramCompiler extends AstNodeCompiler<Program> {
 
             compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, evalRetLocalIndex);
             int programResultLocalIndex = compilerContext.scopeManager.currentScope()
-                    .declareLocal("$program_result_" + compilerContext.emitter.currentOffset());
-            compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, programResultLocalIndex);
-            compilerContext.emitHelpers.emitCurrentScopeUsingDisposal();
-            compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, programResultLocalIndex);
-        } else {
-            // Script mode: preserve value of the last expression/try statement.
-            int effectiveLastIndex = -1;
-            for (int i = body.size() - 1; i >= 0; i--) {
-                if (body.get(i).unwrapLabeledFunctionDeclaration() == null) {
-                    effectiveLastIndex = i;
-                    break;
-                }
-            }
-            boolean lastProducesValue = false;
-
-            for (int i = 0; i < body.size(); i++) {
-                Statement stmt = body.get(i);
-                if (stmt.unwrapLabeledFunctionDeclaration() != null) {
-                    continue; // Already hoisted in Phase 1
-                }
-
-                boolean isLast = (i == effectiveLastIndex);
-
-                if (isLast && stmt instanceof ExpressionStatement) {
-                    lastProducesValue = true;
-                } else if (isLast && stmt instanceof TryStatement) {
-                    lastProducesValue = true;
-                }
-
-                compilerContext.isLastInProgram = isLast;
-                compilerContext.statementCompiler.compile(stmt);
-            }
-
-            // If last statement didn't produce a value, push undefined
-            if (!lastProducesValue) {
-                compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
-            }
-
-            int programResultLocalIndex = compilerContext.scopeManager.currentScope()
-                    .declareLocal("$program_result_" + compilerContext.emitter.currentOffset());
+                    .declareLocal("#program_result_" + compilerContext.emitter.currentOffset());
             compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, programResultLocalIndex);
             compilerContext.emitHelpers.emitCurrentScopeUsingDisposal();
             compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, programResultLocalIndex);

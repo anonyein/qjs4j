@@ -69,7 +69,7 @@ final class ReturnStatementCompiler extends AstNodeCompiler<ReturnStatement> {
         }
 
         int returnValueIndex = compilerContext.scopeManager.currentScope()
-                .declareLocal("$return_value_" + compilerContext.emitter.currentOffset());
+                .declareLocal("#return_value_" + compilerContext.emitter.currentOffset());
         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, returnValueIndex);
 
         compilerContext.emitHelpers.emitUsingDisposalsForScopeDepthGreaterThan(0);

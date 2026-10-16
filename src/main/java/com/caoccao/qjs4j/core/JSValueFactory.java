@@ -117,7 +117,7 @@ final class JSValueFactory {
      *            The length in bytes
      * @return A new JSArrayBuffer instance with prototype set
      */
-    JSArrayBuffer createJSArrayBuffer(int byteLength) {
+    JSArrayBuffer createJSArrayBuffer(long byteLength) {
         JSArrayBuffer jsArrayBuffer = new JSArrayBuffer(context, byteLength);
         context.transferPrototype(jsArrayBuffer, JSArrayBuffer.NAME);
         return jsArrayBuffer;
@@ -132,7 +132,7 @@ final class JSValueFactory {
      *            The maximum length in bytes, or -1 for non-resizable
      * @return A new JSArrayBuffer instance with prototype set
      */
-    JSArrayBuffer createJSArrayBuffer(int byteLength, int maxByteLength) {
+    JSArrayBuffer createJSArrayBuffer(long byteLength, long maxByteLength) {
         JSArrayBuffer jsArrayBuffer = new JSArrayBuffer(context, byteLength, maxByteLength);
         context.transferPrototype(jsArrayBuffer, JSArrayBuffer.NAME);
         return jsArrayBuffer;
@@ -213,7 +213,7 @@ final class JSValueFactory {
         return result;
     }
 
-    JSBigInt64Array createJSBigInt64Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSBigInt64Array createJSBigInt64Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSBigInt64Array(context, buffer, byteOffset, length), JSBigInt64Array.NAME);
     }
 
@@ -224,7 +224,7 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSBigInt64Array instance with prototype set
      */
-    JSBigInt64Array createJSBigInt64Array(int length) {
+    JSBigInt64Array createJSBigInt64Array(long length) {
         return initializeTypedArray(new JSBigInt64Array(context, length), JSBigInt64Array.NAME);
     }
 
@@ -234,7 +234,7 @@ final class JSValueFactory {
         return wrapper;
     }
 
-    JSBigUint64Array createJSBigUint64Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSBigUint64Array createJSBigUint64Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSBigUint64Array(context, buffer, byteOffset, length), JSBigUint64Array.NAME);
     }
 
@@ -245,7 +245,7 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSBigUint64Array instance with prototype set
      */
-    JSBigUint64Array createJSBigUint64Array(int length) {
+    JSBigUint64Array createJSBigUint64Array(long length) {
         return initializeTypedArray(new JSBigUint64Array(context, length), JSBigUint64Array.NAME);
     }
 
@@ -266,7 +266,7 @@ final class JSValueFactory {
      *            The length in bytes
      * @return A new JSDataView instance with prototype set
      */
-    JSDataView createJSDataView(IJSArrayBuffer buffer, int byteOffset, int byteLength) {
+    JSDataView createJSDataView(IJSArrayBuffer buffer, long byteOffset, long byteLength) {
         JSDataView jsDataView = new JSDataView(context, buffer, byteOffset, byteLength);
         context.transferPrototype(jsDataView, JSDataView.NAME);
         return jsDataView;
@@ -309,7 +309,7 @@ final class JSValueFactory {
         return jsError;
     }
 
-    JSFloat16Array createJSFloat16Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSFloat16Array createJSFloat16Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSFloat16Array(context, buffer, byteOffset, length), JSFloat16Array.NAME);
     }
 
@@ -320,11 +320,11 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSFloat16Array instance with prototype set
      */
-    JSFloat16Array createJSFloat16Array(int length) {
+    JSFloat16Array createJSFloat16Array(long length) {
         return initializeTypedArray(new JSFloat16Array(context, length), JSFloat16Array.NAME);
     }
 
-    JSFloat32Array createJSFloat32Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSFloat32Array createJSFloat32Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSFloat32Array(context, buffer, byteOffset, length), JSFloat32Array.NAME);
     }
 
@@ -335,11 +335,11 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSFloat32Array instance with prototype set
      */
-    JSFloat32Array createJSFloat32Array(int length) {
+    JSFloat32Array createJSFloat32Array(long length) {
         return initializeTypedArray(new JSFloat32Array(context, length), JSFloat32Array.NAME);
     }
 
-    JSFloat64Array createJSFloat64Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSFloat64Array createJSFloat64Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSFloat64Array(context, buffer, byteOffset, length), JSFloat64Array.NAME);
     }
 
@@ -350,11 +350,11 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSFloat64Array instance with prototype set
      */
-    JSFloat64Array createJSFloat64Array(int length) {
+    JSFloat64Array createJSFloat64Array(long length) {
         return initializeTypedArray(new JSFloat64Array(context, length), JSFloat64Array.NAME);
     }
 
-    JSInt16Array createJSInt16Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSInt16Array createJSInt16Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSInt16Array(context, buffer, byteOffset, length), JSInt16Array.NAME);
     }
 
@@ -365,11 +365,11 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSInt16Array instance with prototype set
      */
-    JSInt16Array createJSInt16Array(int length) {
+    JSInt16Array createJSInt16Array(long length) {
         return initializeTypedArray(new JSInt16Array(context, length), JSInt16Array.NAME);
     }
 
-    JSInt32Array createJSInt32Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSInt32Array createJSInt32Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSInt32Array(context, buffer, byteOffset, length), JSInt32Array.NAME);
     }
 
@@ -380,11 +380,11 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSInt32Array instance with prototype set
      */
-    JSInt32Array createJSInt32Array(int length) {
+    JSInt32Array createJSInt32Array(long length) {
         return initializeTypedArray(new JSInt32Array(context, length), JSInt32Array.NAME);
     }
 
-    JSInt8Array createJSInt8Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSInt8Array createJSInt8Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSInt8Array(context, buffer, byteOffset, length), JSInt8Array.NAME);
     }
 
@@ -395,7 +395,7 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSInt8Array instance with prototype set
      */
-    JSInt8Array createJSInt8Array(int length) {
+    JSInt8Array createJSInt8Array(long length) {
         return initializeTypedArray(new JSInt8Array(context, length), JSInt8Array.NAME);
     }
 
@@ -530,7 +530,7 @@ final class JSValueFactory {
         return jsError;
     }
 
-    JSUint16Array createJSUint16Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSUint16Array createJSUint16Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSUint16Array(context, buffer, byteOffset, length), JSUint16Array.NAME);
     }
 
@@ -541,11 +541,11 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSUint16Array instance with prototype set
      */
-    JSUint16Array createJSUint16Array(int length) {
+    JSUint16Array createJSUint16Array(long length) {
         return initializeTypedArray(new JSUint16Array(context, length), JSUint16Array.NAME);
     }
 
-    JSUint32Array createJSUint32Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSUint32Array createJSUint32Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSUint32Array(context, buffer, byteOffset, length), JSUint32Array.NAME);
     }
 
@@ -556,11 +556,11 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSUint32Array instance with prototype set
      */
-    JSUint32Array createJSUint32Array(int length) {
+    JSUint32Array createJSUint32Array(long length) {
         return initializeTypedArray(new JSUint32Array(context, length), JSUint32Array.NAME);
     }
 
-    JSUint8Array createJSUint8Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSUint8Array createJSUint8Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSUint8Array(context, buffer, byteOffset, length), JSUint8Array.NAME);
     }
 
@@ -571,11 +571,11 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSUint8Array instance with prototype set
      */
-    JSUint8Array createJSUint8Array(int length) {
+    JSUint8Array createJSUint8Array(long length) {
         return initializeTypedArray(new JSUint8Array(context, length), JSUint8Array.NAME);
     }
 
-    JSUint8ClampedArray createJSUint8ClampedArray(IJSArrayBuffer buffer, int byteOffset, int length) {
+    JSUint8ClampedArray createJSUint8ClampedArray(IJSArrayBuffer buffer, long byteOffset, long length) {
         return initializeTypedArray(new JSUint8ClampedArray(context, buffer, byteOffset, length),
                 JSUint8ClampedArray.NAME);
     }
@@ -587,7 +587,7 @@ final class JSValueFactory {
      *            The length of the array
      * @return A new JSUint8ClampedArray instance with prototype set
      */
-    JSUint8ClampedArray createJSUint8ClampedArray(int length) {
+    JSUint8ClampedArray createJSUint8ClampedArray(long length) {
         return initializeTypedArray(new JSUint8ClampedArray(context, length), JSUint8ClampedArray.NAME);
     }
 

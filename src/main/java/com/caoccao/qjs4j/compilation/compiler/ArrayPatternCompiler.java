@@ -124,7 +124,7 @@ final class ArrayPatternCompiler extends AstNodeCompiler<ArrayPattern> {
             // Iterator-based array binding semantics.
             compilerContext.emitter.emitOpcode(Opcode.FOR_OF_START);
             int iteratorDoneLocalIndex = compilerContext.scopeManager.currentScope()
-                    .declareLocal("$arrayPatternIteratorDone" + compilerContext.emitter.currentOffset());
+                    .declareLocal("#arrayPatternIteratorDone" + compilerContext.emitter.currentOffset());
             compilerContext.emitter.emitOpcode(Opcode.PUSH_FALSE);
             compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, iteratorDoneLocalIndex);
             for (Pattern element : arrPattern.getElements()) {

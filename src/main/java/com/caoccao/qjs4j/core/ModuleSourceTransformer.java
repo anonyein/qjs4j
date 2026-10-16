@@ -1002,8 +1002,8 @@ final class ModuleSourceTransformer {
     /**
      * A prefix for this module's generated bindings that the module's own source does not use.
      * <p>
-     * The transformer declares its bookkeeping bindings in the module's own scope, where they are ordinary, writable,
-     * observable names. {@code __qjs4jDefaultExport$0} is a legal identifier, so a module that happened to declare it
+     * The transformer declares its bookkeeping bindings in the module's own scope, before EvalRunner hides their
+     * runtime metadata. {@code __qjs4jDefaultExport$0} is a legal identifier, so a module that happened to declare it
      * had its value replaced by the transformer's — silently, and only for that one name. Choosing a prefix the source
      * does not contain keeps the generated names out of the author's way whatever the author writes.
      * <p>
@@ -1013,11 +1013,9 @@ final class ModuleSourceTransformer {
      * so a module that legally declared the name under an escape was rejected with a syntax error in generated source.
      * The decoded name is the one that has to be avoided, because the decoded name is what the binding is called.
      * <p>
-     * This is containment, not a fix, and it is not complete containment. The generated bindings are still declared in
-     * the module's own scope and are still observable from it: direct eval can build any name at run time —
-     * {@code eval('typeof __q' + 'js4jModuleExports')} answers {@code "object"} where it must answer
-     * {@code "undefined"} — and no choice of prefix can hide a binding from a name the source never spells. Only real
-     * module environments, which do not put bookkeeping in the author's scope at all, remove them.
+     * After compilation, generated local/capture metadata is renamed to non-JavaScript names by EvalRunner. The exports
+     * namespace lives in a private module-environment binding that direct eval does not inherit. This prefix still
+     * prevents collisions while parsing the generated source.
      *
      * @param sourceCode
      *            the module source the generated bindings will sit beside
@@ -1484,22 +1482,10 @@ final class ModuleSourceTransformer {
      * were once documented here as unsupported, and are covered by {@code JSModuleSourceTransformTest},
      * {@code JSModuleDefaultExportExtentTest} and {@code JSModuleIdentifierSpellingTest}.
      * <p>
-     * What remains wrong is not a scanning problem and cannot be fixed at this layer:
-     * <ul>
-     * <li>An import is a temporary accessor on the global object, removed when the module body finishes, rather than a
-     * binding in a module environment. A closure retained past evaluation cannot read it, and it is not live.</li>
-     * <li>The generated bindings — {@code __qjs4jDefaultExport$<n>}, {@code __qjs4jModuleExports} and the namespace
-     * binding — are declared in the module's own scope and are reachable from a direct {@code eval} in it.
-     * {@link #generatedModuleNamePrefix(String)} keeps them clear of names the author writes, which is containment, not
-     * scope.</li>
-     * <li>An import attribute naming a module type the engine does not implement is ignored, and the target is loaded
-     * as JavaScript.</li>
-     * </ul>
-     * That list is executable: each entry is a {@code testKnownLimitation*} test in {@code JSModuleKnownLimitationTest}
-     * that asserts the wrong answer on purpose, so fixing one makes its test fail. Real module environment records —
-     * {@code ImportDeclaration}/{@code Export*} AST nodes the parser keeps instead of discards, and indirect bindings
-     * the {@code BytecodeCompiler} can capture — are the fix for all three, and are a dedicated milestone rather than a
-     * patch.
+     * Live imports are installed in persistent module environments inherited by closures. Generated local metadata and
+     * private namespace bindings are hidden from direct eval, and the loader validates import attributes. Retaining
+     * import/export AST nodes would further simplify the textual transform, but runtime bindings no longer depend on
+     * temporary global properties. Correct-behavior regressions live in JSModuleEnvironmentTest.
      * <p>
      * Loading and linking are separate from evaluation: see {@link #requireModuleGraphLinks(String, String)}. Every
      * value that reaches identifier position in the generated source is validated by
@@ -1927,50 +1913,14 @@ final class ModuleSourceTransformer {
             if (!defaultExportNameFixups.isEmpty()) {
                 exportPreamble.append(defaultExportNameFixups);
             }
-            LinkedHashSet<String> importedBindingsToCapture = new LinkedHashSet<>();
-            for (JSDynamicImportModule.LocalExportBinding localExportBinding : localExportBindings) {
-                ImportBinding importBinding = importedBindings.get(localExportBinding.localName());
-                if (importBinding != null && importBinding.deferredImport()) {
-                    importedBindingsToCapture.add(localExportBinding.localName());
-                }
-            }
-            String transformedSource;
-            if (hasTLA) {
-                // For TLA export modules, capture only exportBindingName.
-                // Imported bindings from self-imports stay live to preserve TDZ behavior.
-                // Other imported bindings are captured so they remain available after
-                // import-overlay cleanup while async module evaluation continues.
-                LinkedHashSet<String> tlaImportedBindingsToCapture = new LinkedHashSet<>();
-                for (String importedBindingName : importedBindingNames) {
-                    ImportBinding importBinding = importedBindings.get(importedBindingName);
-                    if (importBinding == null || isSelfImportBinding(importBinding, moduleRecord.resolvedSpecifier())) {
-                        continue;
-                    }
-                    tlaImportedBindingsToCapture.add(importedBindingName);
-                }
-                List<String> paramNames = new ArrayList<>();
-                paramNames.add(exportBindingName);
-                paramNames.addAll(tlaImportedBindingsToCapture);
-                String paramList = String.join(", ", paramNames);
-                transformedSource = importPreambleBuilder + "(async function(" + paramList + ") {\n" + exportPreamble
-                        + transformedSourceBuilder + "})(" + paramList + ");\n";
-            } else {
-                if (importedBindingsToCapture.isEmpty()) {
-                    transformedSource = importPreambleBuilder + "(function () {\n" + exportPreamble
-                            + transformedSourceBuilder + "})();\n";
-                } else {
-                    String paramList = String.join(", ", importedBindingsToCapture);
-                    transformedSource = importPreambleBuilder + "(function (" + paramList + ") {\n" + exportPreamble
-                            + transformedSourceBuilder + "})(" + paramList + ");\n";
-                }
-            }
+            // Imports are indirect environment bindings, never snapshots passed as IIFE parameters.
+            String transformedSource = importPreambleBuilder + (hasTLA ? "(async function() {\n" : "(function() {\n")
+                    + exportPreamble + transformedSourceBuilder + "})();\n";
             moduleRecord.setTransformedSource(transformedSource);
             moduleRecord.setExportBindingName(exportBindingName);
         } else if (!importedBindingNames.isEmpty() || hasTLA) {
-            // Wrap non-export modules in an IIFE to capture imported bindings in closure.
-            String paramList = String.join(", ", importedBindingNames);
-            String transformedSource = importPreambleBuilder + (hasTLA ? "(async function(" : "(function(") + paramList
-                    + ") {\n" + transformedSourceBuilder + "})(" + paramList + ");\n";
+            String transformedSource = importPreambleBuilder + (hasTLA ? "(async function() {\n" : "(function() {\n")
+                    + transformedSourceBuilder + "})();\n";
             moduleRecord.setTransformedSource(transformedSource);
         } else {
             moduleRecord.setTransformedSource(sourceCode);

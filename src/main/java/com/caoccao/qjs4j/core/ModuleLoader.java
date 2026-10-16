@@ -166,16 +166,7 @@ final class ModuleLoader {
             linker.validateModuleScriptEarlyErrors(moduleRecord.rawSource());
             return context.eval(moduleRecord.transformedSource(), moduleRecord.resolvedSpecifier(), true);
         }
-        String exportBindingName = moduleRecord.exportBindingName();
-        JSObject globalObject = context.getGlobalObject();
-        JSObject moduleNamespace = moduleRecord.namespace();
-        globalObject.set(PropertyKey.fromString(exportBindingName), moduleNamespace);
-        try {
-            String transformedSource = moduleRecord.transformedSource();
-            return context.eval(transformedSource, moduleRecord.resolvedSpecifier(), true);
-        } finally {
-            globalObject.delete(PropertyKey.fromString(exportBindingName));
-        }
+        return context.eval(moduleRecord.transformedSource(), moduleRecord.resolvedSpecifier(), true);
     }
 
     /**
@@ -233,6 +224,15 @@ final class ModuleLoader {
     }
 
     String getDynamicImportCacheKey(String resolvedSpecifier, Map<String, String> importAttributes) {
+        if (importAttributes != null) {
+            for (Map.Entry<String, String> attribute : importAttributes.entrySet()) {
+                if (!"type".equals(attribute.getKey())
+                        || !Set.of("json", "text", "bytes").contains(attribute.getValue())) {
+                    throw new JSException(context.throwTypeError("Import attribute \"" + attribute.getKey()
+                            + "\" with value \"" + attribute.getValue() + "\" is not supported"));
+                }
+            }
+        }
         if (importAttributes == null) {
             return resolvedSpecifier;
         }

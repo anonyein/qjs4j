@@ -31,6 +31,7 @@ public abstract sealed class JSFunction extends JSObject
     private JSContext homeContext;
     private JSObject homeObject;
     private String importMetaFilename;
+    private JSModuleEnvironment moduleEnvironment;
 
     protected JSFunction(JSContext context) {
         super(context);
@@ -61,6 +62,10 @@ public abstract sealed class JSFunction extends JSObject
      * Get the number of formal parameters.
      */
     public abstract int getLength();
+
+    public JSModuleEnvironment getModuleEnvironment() {
+        return moduleEnvironment;
+    }
 
     /**
      * Get the function name.
@@ -148,6 +153,10 @@ public abstract sealed class JSFunction extends JSObject
 
     public void setImportMetaFilename(String importMetaFilename) {
         this.importMetaFilename = importMetaFilename;
+    }
+
+    public void setModuleEnvironment(JSModuleEnvironment moduleEnvironment) {
+        this.moduleEnvironment = moduleEnvironment;
     }
 
     @Override

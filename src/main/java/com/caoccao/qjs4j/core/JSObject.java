@@ -46,6 +46,7 @@ public non-sealed class JSObject implements JSValue {
     private static final int MAX_PROTOTYPE_DEPTH = 1000;
     public static final String NAME = "Object";
     protected boolean arrayObject; // Equivalent to QuickJS class_id == JS_CLASS_ARRAY
+    private JSStackTrace capturedStackTrace;
     protected boolean constantPrototypeInitialized; // Internal slot: realm prototype already transferred
     protected JSConstructorType constructorType; // Internal slot for [[Constructor]] type (not accessible from JS)
     protected final JSContext context;
@@ -224,8 +225,6 @@ public non-sealed class JSObject implements JSValue {
         return true;
     }
 
-    // Property operations
-
     /**
      * Define a new property with a descriptor. This is the internal method that always succeeds (used by freeze, seal,
      * etc.).
@@ -282,6 +281,8 @@ public non-sealed class JSObject implements JSValue {
     public boolean delete(PropertyKey key) {
         return delete(key, context.isStrictMode());
     }
+
+    // Property operations
 
     /**
      * {@code [[Delete]]}, optionally raising the {@code delete} operator's {@code TypeError}.
@@ -657,6 +658,10 @@ public non-sealed class JSObject implements JSValue {
             return JSRegExp.NAME;
         }
         return JSObject.NAME;
+    }
+
+    JSStackTrace getCapturedStackTrace() {
+        return capturedStackTrace;
     }
 
     /**
@@ -1112,9 +1117,8 @@ public non-sealed class JSObject implements JSValue {
     }
 
     /**
-     * Initialize properties in bulk on a freshly created object with no existing properties. This is more efficient
-     * than calling defineProperty repeatedly because it avoids the O(N²) cost of incremental shape growth (linear scans
-     * + array copies per property). The keys, descriptors, and values arrays must all have the same length.
+     * Initialize properties in bulk on a freshly created object with no existing properties. This avoids repeated
+     * property definition and capacity checks. The keys, descriptors, and values arrays must all have the same length.
      */
     public void initProperties(PropertyKey[] keys, PropertyDescriptor[] descriptors, JSValue[] values) {
         this.shape = new JSShape(keys, descriptors);
@@ -1550,6 +1554,10 @@ public non-sealed class JSObject implements JSValue {
      */
     public void set(String propertyName, JSValue value) {
         set(PropertyKey.fromString(propertyName), value);
+    }
+
+    void setCapturedStackTrace(JSStackTrace stackTrace) {
+        capturedStackTrace = stackTrace;
     }
 
     /**

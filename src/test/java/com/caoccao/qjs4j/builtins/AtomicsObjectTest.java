@@ -60,14 +60,17 @@ public class AtomicsObjectTest extends BaseJavetTest {
         // Test edge cases
         JSValue error = atomics().add(context, null, new JSValue[]{arr}); // too few args
         assertTypeError(error);
+        context.clearPendingException();
 
         error = atomics().add(context, null, new JSValue[]{new JSNumber(1), new JSNumber(0), new JSNumber(5)}); // not
                                                                                                                 // typed
                                                                                                                 // array
         assertTypeError(error);
+        context.clearPendingException();
 
         error = atomics().add(context, null, new JSValue[]{arr, new JSNumber(10), new JSNumber(5)}); // out of bounds
         assertRangeError(error);
+        context.clearPendingException();
     }
 
     @Test
@@ -212,14 +215,17 @@ public class AtomicsObjectTest extends BaseJavetTest {
         // Test 2: Invalid arguments
         JSValue error = atomics().notify(context, null, JSValue.NO_ARGS);
         assertTypeError(error);
+        context.clearPendingException();
 
         // Test 3: Non-TypedArray argument
         error = atomics().notify(context, null, new JSValue[]{new JSNumber(1)});
         assertTypeError(error);
+        context.clearPendingException();
 
         // Test 4: Out of bounds index
         error = atomics().notify(context, null, new JSValue[]{arr, new JSNumber(10)});
         assertRangeError(error);
+        context.clearPendingException();
 
         // Test 5: Negative count is clamped to 0; non-shared buffers still return 0
         JSValue negativeCountResult = atomics().notify(context, null,
@@ -418,14 +424,17 @@ public class AtomicsObjectTest extends BaseJavetTest {
         // Test 3: Invalid arguments
         JSValue error = atomics().wait(context, null, new JSValue[]{arr, new JSNumber(0)});
         assertTypeError(error);
+        context.clearPendingException();
 
         // Test 4: Non-TypedArray argument
         error = atomics().wait(context, null, new JSValue[]{new JSNumber(1), new JSNumber(0), new JSNumber(0)});
         assertTypeError(error);
+        context.clearPendingException();
 
         // Test 5: Out of bounds index
         error = atomics().wait(context, null, new JSValue[]{arr, new JSNumber(10), new JSNumber(0)});
         assertRangeError(error);
+        context.clearPendingException();
     }
 
     @Test
@@ -515,14 +524,17 @@ public class AtomicsObjectTest extends BaseJavetTest {
         // Test 3: Invalid arguments
         JSValue error = atomics().waitAsync(context, null, new JSValue[]{arr, new JSNumber(0)});
         assertTypeError(error);
+        context.clearPendingException();
 
         // Test 4: Non-TypedArray argument
         error = atomics().waitAsync(context, null, new JSValue[]{new JSNumber(1), new JSNumber(0), new JSNumber(0)});
         assertTypeError(error);
+        context.clearPendingException();
 
         // Test 5: Out of bounds index
         error = atomics().waitAsync(context, null, new JSValue[]{arr, new JSNumber(10), new JSNumber(0)});
         assertRangeError(error);
+        context.clearPendingException();
     }
 
     @Test

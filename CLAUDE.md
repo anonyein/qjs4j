@@ -136,10 +136,11 @@ com.caoccao.qjs4j/
 
 `JSContext` itself holds only realm identity — runtime, global object, call stack, `this`,
 `new.target`, pending exception, strict mode, lifecycle, microtask entry points — and delegates
-everything else to package-private collaborators in the same package, the way
-`BytecodeCompiler` delegates to `compilation/compiler`. Its public API is unchanged: every
-`context.createJSXxx(...)` / `context.throwXxx(...)` / `context.eval(...)` is a one-line
-delegation, so builtins, the VM and the tests are unaffected.
+other responsibilities to package-private collaborators in the same package, the way
+`BytecodeCompiler` delegates to `compilation/compiler`. The `context.createJSXxx(...)`,
+`context.throwXxx(...)` and `context.eval(...)` entry points delegate to those collaborators.
+Buffer factories and view lengths/offsets use `long`; see `docs/migration/LARGE_BUFFERS.md`
+for the Java API migration from contiguous `ByteBuffer` storage.
 
 | Collaborator | Owns |
 |---|---|
@@ -147,7 +148,7 @@ delegation, so builtins, the VM and the tests are unaffected.
 | `JSErrorReporter` | the `throwXxx` family and stack-trace capture (QuickJS `JS_ThrowError2`) |
 | `RealmIntrinsics` | cached/hidden prototypes, iterator prototypes, `%ThrowTypeError%`, `getPrototypeFromConstructor`, `getFunctionRealm` |
 | `GlobalLexicalScope` | global `let`/`const` bindings and the declaration tables (QuickJS `global_var_obj`) |
-| `EvalOverlayManager` | the temporary global-object overlays a module's imports are installed as |
+| `EvalOverlayManager` | temporary caller-binding overlays for direct eval; module imports use JSModuleEnvironment |
 | `RegExpLegacyStatics` | `RegExp.input` / `.lastMatch` / `.$1`–`.$9` |
 | `EvalRunner` | the eval pipeline (QuickJS `JS_EvalInternal`); `EvalActivation` runs it phase by phase |
 | `ModuleSourceTransformer` | the textual module rewrite, all `MODULE_*` patterns, identifier/string decoding |

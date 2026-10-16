@@ -64,7 +64,7 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
         int savedEvalReturnLocalIndex = -1;
         if (compilerContext.evalReturnLocalIndex >= 0) {
             savedEvalReturnLocalIndex = compilerContext.scopeManager.currentScope()
-                    .declareLocal("$finally_eval_ret_" + compilerContext.emitter.currentOffset());
+                    .declareLocal("#finally_eval_ret_" + compilerContext.emitter.currentOffset());
             compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, compilerContext.evalReturnLocalIndex);
             compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, savedEvalReturnLocalIndex);
             compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
@@ -205,55 +205,69 @@ final class TryStatementCompiler extends AstNodeCompiler<TryStatement> {
             compilerContext.scopeManager.currentScope().setUsingCatchJumpPosition(usingCatchJump);
         }
 
-        // Phase 3: compile non-function statements and preserve block completion value.
-        int effectiveLastIndex = -1;
-        for (int index = body.size() - 1; index >= 0; index--) {
-            if (!(body.get(index) instanceof FunctionDeclaration)) {
-                effectiveLastIndex = index;
-                break;
-            }
-        }
-
-        for (int index = 0; index < body.size(); index++) {
-            Statement statement = body.get(index);
-            if (statement instanceof FunctionDeclaration) {
-                continue;
-            }
-            boolean isLast = index == effectiveLastIndex;
-
-            if (statement instanceof ExpressionStatement expressionStatement) {
-                compilerContext.emitter.emitSourcePosition(statement.getLocation());
-                compilerContext.expressionCompiler.compile(expressionStatement.getExpression());
-                if (compilerContext.evalReturnLocalIndex >= 0) {
-                    compilerContext.emitter.emitOpcode(Opcode.DUP);
-                    compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, compilerContext.evalReturnLocalIndex);
+        if (compilerContext.evalReturnLocalIndex >= 0) {
+            // The shared completion local handles every statement kind with net-zero stack effect.
+            // Leave exactly one result above the catch marker, including when the last statement
+            // is another try. A missing result here would make NIP_CATCH corrupt the handler stack.
+            compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+            compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, compilerContext.evalReturnLocalIndex);
+            for (Statement statement : body) {
+                if (!(statement instanceof FunctionDeclaration)) {
+                    compilerContext.statementCompiler.compile(statement);
                 }
-                if (!isLast) {
-                    compilerContext.emitter.emitOpcode(Opcode.DROP);
+            }
+            compilerContext.emitter.emitOpcodeU16(Opcode.GET_LOC, compilerContext.evalReturnLocalIndex);
+        } else {
+            // Phase 3: compile non-function statements and preserve block completion value.
+            int effectiveLastIndex = -1;
+            for (int index = body.size() - 1; index >= 0; index--) {
+                if (!(body.get(index) instanceof FunctionDeclaration)) {
+                    effectiveLastIndex = index;
+                    break;
                 }
-            } else if (statement instanceof TryStatement tryStatement) {
-                boolean saved = compilerContext.isLastInProgram;
-                compilerContext.isLastInProgram = isLast;
-                compilerContext.emitter.emitSourcePosition(statement.getLocation());
-                compile(tryStatement);
-                compilerContext.isLastInProgram = saved;
-            } else {
-                compilerContext.statementCompiler.compile(statement);
-                if (isLast) {
-                    compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+            }
+
+            for (int index = 0; index < body.size(); index++) {
+                Statement statement = body.get(index);
+                if (statement instanceof FunctionDeclaration) {
+                    continue;
+                }
+                boolean isLast = index == effectiveLastIndex;
+
+                if (statement instanceof ExpressionStatement expressionStatement) {
+                    compilerContext.emitter.emitSourcePosition(statement.getLocation());
+                    compilerContext.expressionCompiler.compile(expressionStatement.getExpression());
                     if (compilerContext.evalReturnLocalIndex >= 0) {
                         compilerContext.emitter.emitOpcode(Opcode.DUP);
                         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, compilerContext.evalReturnLocalIndex);
                     }
+                    if (!isLast) {
+                        compilerContext.emitter.emitOpcode(Opcode.DROP);
+                    }
+                } else if (statement instanceof TryStatement tryStatement) {
+                    boolean saved = compilerContext.isLastInProgram;
+                    compilerContext.isLastInProgram = isLast;
+                    compilerContext.emitter.emitSourcePosition(statement.getLocation());
+                    compile(tryStatement);
+                    compilerContext.isLastInProgram = saved;
+                } else {
+                    compilerContext.statementCompiler.compile(statement);
+                    if (isLast) {
+                        compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+                        if (compilerContext.evalReturnLocalIndex >= 0) {
+                            compilerContext.emitter.emitOpcode(Opcode.DUP);
+                            compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, compilerContext.evalReturnLocalIndex);
+                        }
+                    }
                 }
             }
-        }
 
-        if (effectiveLastIndex < 0) {
-            compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
-            if (compilerContext.evalReturnLocalIndex >= 0) {
-                compilerContext.emitter.emitOpcode(Opcode.DUP);
-                compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, compilerContext.evalReturnLocalIndex);
+            if (effectiveLastIndex < 0) {
+                compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+                if (compilerContext.evalReturnLocalIndex >= 0) {
+                    compilerContext.emitter.emitOpcode(Opcode.DUP);
+                    compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, compilerContext.evalReturnLocalIndex);
+                }
             }
         }
 

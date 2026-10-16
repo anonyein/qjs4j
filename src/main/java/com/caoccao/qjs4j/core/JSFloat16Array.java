@@ -18,8 +18,6 @@ package com.caoccao.qjs4j.core;
 
 import com.caoccao.qjs4j.utils.Float16;
 
-import java.nio.ByteBuffer;
-
 /**
  * Represents a JavaScript Float16Array. 16-bit half-precision floating point array.
  */
@@ -30,26 +28,26 @@ public final class JSFloat16Array extends JSTypedArray {
     /**
      * Create a Float16Array view on an existing buffer.
      */
-    public JSFloat16Array(JSContext context, IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSFloat16Array(JSContext context, IJSArrayBuffer buffer, long byteOffset, long length) {
         super(context, buffer, byteOffset, length, BYTES_PER_ELEMENT);
     }
 
     /**
      * Create a Float16Array with a new buffer.
      */
-    public JSFloat16Array(JSContext context, int length) {
+    public JSFloat16Array(JSContext context, long length) {
         super(context, length, BYTES_PER_ELEMENT);
     }
 
     @Override
-    protected JSTypedArray createView(int byteOffset, int length) {
+    protected JSTypedArray createView(IJSArrayBuffer buffer, long byteOffset, long length) {
         return new JSFloat16Array(context, buffer, byteOffset, length);
     }
 
     @Override
-    public double getElement(int index) {
+    public double getElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         short halfFloat = buf.getShort(index * BYTES_PER_ELEMENT);
         return Float16.toFloat(halfFloat);
     }
@@ -75,9 +73,9 @@ public final class JSFloat16Array extends JSTypedArray {
     }
 
     @Override
-    public void setElement(int index, double value) {
+    public void setElement(long index, double value) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         short halfFloat = Float16.toHalf(value);
         buf.putShort(index * BYTES_PER_ELEMENT, halfFloat);
     }

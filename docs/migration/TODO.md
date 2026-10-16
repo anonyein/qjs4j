@@ -55,29 +55,16 @@ From [ASYNC_AWAIT_ENHANCEMENTS.md](ASYNC_AWAIT_ENHANCEMENTS.md):
 Open after the 2026-10 code review; each was checked against V8 and is either deferred or a
 deliberate limit.
 
-- In an `import defer` cycle whose dependency has top-level `await`, the dependency's body runs
-  twice (textual module rewriting; see the README's known limitations).
-- An async generator's `return()` at a `yield` runs its `finally` one microtask early; a `throw`
-  completion inside a `for await` body closes the iterator without awaiting `return()`.
+- An async generator's `return()` at a `yield` can run its `finally` one microtask early.
 - `Intl`: unit names are translated for English only; component date patterns follow CLDR
   skeletons on JDK 19+ and the date styles on JDK 17/18; the JDK's CLDR version differs from V8's
   ICU data.
 - `Function.prototype.caller`/`arguments` keep the specification's `%ThrowTypeError%` accessors
   (test262 checks their identity), where V8 15 uses its own accessor functions.
-- Strings are capped at 2^27 − 1 code units and data blocks below 2 GiB (see the README).
 - `JSON.parse` error messages and `console` string quoting/layout differ from V8's wording.
-- An instance private method or accessor cannot see its class's own binding
-  (`class C { #m() { return typeof C } }` gives `undefined`): private methods are installed from
-  constant templates rather than created as closures.
-- In an async generator, `yield` of a rejected promise rejects the pending `next()` instead of
-  throwing at the `yield`, where the generator could catch it.
-- `JSContext.eval` returns `undefined` as the completion value of `if`, block, loop, `switch` and
-  labelled statements (`eval()` called from JavaScript is correct).
 - `super()` with a non-constructor parent and `Reflect.construct` with a non-constructor target
   report QuickJS-style messages, not V8's `Super constructor … is not a constructor`.
-- `eval()` called from JavaScript, direct or indirect, drains the microtask queue before it
-  returns, so promise jobs run in the middle of the calling script; V8 runs them only once the
-  script has finished. `EvalRunner` drains at the end of every evaluation unless suppressed.
+
 
 ---
 

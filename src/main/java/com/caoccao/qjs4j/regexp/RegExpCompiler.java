@@ -24,8 +24,7 @@ import java.util.*;
 /**
  * Compiles regex patterns to bytecode. Based on QuickJS libregexp.c compiler.
  * <p>
- * This is a simplified initial implementation that handles basic patterns. Full ES2020 regex syntax support will be
- * added incrementally.
+ * Supports captures, lookarounds, Unicode properties and quantified subexpressions.
  */
 public final class RegExpCompiler {
 
@@ -64,6 +63,13 @@ public final class RegExpCompiler {
 
     public RegExpCompiler(UnicodePropertyResolver unicodePropertyResolver) {
         this.unicodePropertyResolver = unicodePropertyResolver;
+    }
+
+    private int allocateRegister(CompileContext context) {
+        if (context.nextAdvanceCheckRegister >= RegExpBytecode.ExecutionLimits.MAX_REGISTERS) {
+            throw new RegExpSyntaxException("Regular expression requires too many registers");
+        }
+        return context.nextAdvanceCheckRegister++;
     }
 
     private long appendDecimalDigitWithClamp(long currentValue, int digit) {
@@ -1026,22 +1032,9 @@ public final class RegExpCompiler {
             context.buffer.appendU16(captureCount - 1);
         }
 
-        if (min > MAX_UNROLLED_QUANTIFIER_REPETITIONS) {
-            min = MAX_UNROLLED_QUANTIFIER_REPETITIONS;
-            if (max < min) {
-                max = min;
-            }
-        }
-        if (max != Integer.MAX_VALUE && max > MAX_UNROLLED_QUANTIFIER_REPETITIONS) {
-            max = MAX_UNROLLED_QUANTIFIER_REPETITIONS;
-            if (max < min) {
-                max = min;
-            }
-        }
-
         // Allocate a unique register for this quantifier's advance check to avoid
         // conflicts with nested quantifiers that also use SET_CHAR_POS/CHECK_ADVANCE.
-        int advReg = addZeroAdvanceCheck ? context.nextAdvanceCheckRegister++ : 0;
+        int advReg = addZeroAdvanceCheck ? allocateRegister(context) : 0;
 
         // Implement quantifier using SPLIT opcodes
         if (min == 0 && max == 1) {
@@ -1111,9 +1104,17 @@ public final class RegExpCompiler {
                 context.buffer.appendU32(offset);
             }
         } else {
-            // {n,m} quantifier: unroll min times, then optional max-min times
-            for (int i = 0; i < min; i++) {
+            // Count large repetitions instead of changing their bounds or expanding bytecode linearly.
+            if (min > MAX_UNROLLED_QUANTIFIER_REPETITIONS) {
+                int register = allocateRegister(context);
+                emitCounter(context, register, min);
+                int loopStart = context.buffer.size();
                 context.buffer.append(atomCode);
+                emitLoop(context, register, loopStart);
+            } else {
+                for (int i = 0; i < min; i++) {
+                    context.buffer.append(atomCode);
+                }
             }
             if (max != min) {
                 if (max == Integer.MAX_VALUE) {
@@ -1137,21 +1138,22 @@ public final class RegExpCompiler {
                     context.buffer.appendU32(offset);
                 } else {
                     int remaining = max - min;
-                    for (int i = 0; i < remaining; i++) {
-                        if (addZeroAdvanceCheck) {
-                            context.buffer.appendU8(RegExpOpcode.SET_CHAR_POS.getCode());
-                            context.buffer.appendU8(advReg);
-                        }
-                        context.buffer.appendU8(greedy
-                                ? RegExpOpcode.SPLIT_NEXT_FIRST.getCode()
-                                : RegExpOpcode.SPLIT_GOTO_FIRST.getCode());
-                        context.buffer.appendU32(atomSize + (addZeroAdvanceCheck ? 2 : 0));
-                        context.buffer.append(atomCode);
-                        if (addZeroAdvanceCheck) {
-                            context.buffer.appendU8(RegExpOpcode.CHECK_ADVANCE.getCode());
-                            context.buffer.appendU8(advReg);
-                        }
+                    int register = allocateRegister(context);
+                    emitCounter(context, register, remaining);
+                    int loopStart = context.buffer.size();
+                    context.buffer.appendU8(
+                            greedy ? RegExpOpcode.SPLIT_NEXT_FIRST.getCode() : RegExpOpcode.SPLIT_GOTO_FIRST.getCode());
+                    context.buffer.appendU32(atomSize + 6 + (addZeroAdvanceCheck ? 4 : 0));
+                    if (addZeroAdvanceCheck) {
+                        context.buffer.appendU8(RegExpOpcode.SET_CHAR_POS.getCode());
+                        context.buffer.appendU8(advReg);
                     }
+                    context.buffer.append(atomCode);
+                    if (addZeroAdvanceCheck) {
+                        context.buffer.appendU8(RegExpOpcode.CHECK_ADVANCE.getCode());
+                        context.buffer.appendU8(advReg);
+                    }
+                    emitLoop(context, register, loopStart);
                 }
             }
         }
@@ -1270,6 +1272,12 @@ public final class RegExpCompiler {
         }
     }
 
+    private void emitCounter(CompileContext context, int register, int count) {
+        context.buffer.appendU8(RegExpOpcode.SET_I32.getCode());
+        context.buffer.appendU8(register);
+        context.buffer.appendU32(count);
+    }
+
     private void emitExtendedClassSet(CompileContext context, ExtendedClassSet extendedClassSet) {
         if (extendedClassSet.sequences().isEmpty()) {
             emitRanges(context, extendedClassSet.ranges(), false);
@@ -1278,6 +1286,12 @@ public final class RegExpCompiler {
         UnicodePropertyResolver.SequencePropertyResult sequencePropertyResult = new UnicodePropertyResolver.SequencePropertyResult(
                 extendedClassSet.ranges(), extendedClassSet.sequences());
         emitStringList(context, sequencePropertyResult);
+    }
+
+    private void emitLoop(CompileContext context, int register, int target) {
+        context.buffer.appendU8(RegExpOpcode.LOOP.getCode());
+        context.buffer.appendU8(register);
+        context.buffer.appendU32(target - (context.buffer.size() + 4));
     }
 
     private void emitRanges(CompileContext context, int[] ranges, boolean inverted) {

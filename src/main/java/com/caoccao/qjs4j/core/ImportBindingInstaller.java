@@ -23,21 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Puts a module's imports and exports where the running code can see them.
- * <p>
- * Two different places, for two different reasons. An <em>import</em> becomes an accessor on the global object for the
- * duration of the module body — a getter that reads through to the exporting module's namespace, so the binding stays
- * live, and a setter that throws, so assigning to it is the {@code TypeError} an immutable binding owes. What each one
- * displaced is recorded in an {@link EvalOverlayManager} frame and put back afterwards. An <em>export</em> becomes a
- * property of this module's own namespace object, either a value or a getter forwarding to whichever module a re-export
- * chain ends at.
- * <p>
- * The overlay is the part that is not really right, and it is documented as such on
- * {@link ModuleSourceTransformer#parseDynamicImportModuleSource}: a binding on the global object is not a module
- * environment record, so it is gone once the body finishes and a closure that outlives the module cannot read it. Real
- * module records are the fix, and this class is where that change would land.
- */
+/** Installs live, immutable imports in a persistent module environment and exports in its namespace. */
 final class ImportBindingInstaller {
     private final JSContext context;
     private final ModuleLinker linker;
@@ -49,37 +35,35 @@ final class ImportBindingInstaller {
         this.linker = linker;
     }
 
-    void applyImportClauseBindings(JSObject globalObject, Map<String, JSValue> savedGlobals, Set<String> absentKeys,
-            JSObject namespaceObject, String importClause) {
+    void applyImportClauseBindings(JSObject globalObject, JSObject namespaceObject, String importClause) {
         String clause = importClause.trim();
         if (clause.isEmpty()) {
             return;
         }
         if (clause.startsWith("{")) {
-            bindNamedImports(globalObject, savedGlobals, absentKeys, namespaceObject, clause);
+            bindNamedImports(globalObject, namespaceObject, clause);
             return;
         }
 
         int commaIndex = clause.indexOf(',');
         if (commaIndex < 0) {
-            bindImportOverlayLiveBinding(globalObject, savedGlobals, absentKeys, clause, namespaceObject, "default");
+            bindImportLiveBinding(globalObject, clause, namespaceObject, "default");
             return;
         }
 
         String defaultBinding = clause.substring(0, commaIndex).trim();
         if (!defaultBinding.isEmpty()) {
-            bindImportOverlayLiveBinding(globalObject, savedGlobals, absentKeys, defaultBinding, namespaceObject,
-                    "default");
+            bindImportLiveBinding(globalObject, defaultBinding, namespaceObject, "default");
         }
 
         String remainder = clause.substring(commaIndex + 1).trim();
         if (remainder.startsWith("*")) {
             String namespaceBinding = remainder.replaceFirst("^\\*\\s*as\\s+", "").trim();
             if (!namespaceBinding.isEmpty()) {
-                bindImportOverlayValue(globalObject, savedGlobals, absentKeys, namespaceBinding, namespaceObject);
+                bindImportValue(globalObject, namespaceBinding, namespaceObject);
             }
         } else if (remainder.startsWith("{")) {
-            bindNamedImports(globalObject, savedGlobals, absentKeys, namespaceObject, remainder);
+            bindNamedImports(globalObject, namespaceObject, remainder);
         }
     }
 
@@ -87,9 +71,8 @@ final class ImportBindingInstaller {
      * Bind an import as a live binding using a getter that reads from the namespace. This ensures that changes to the
      * exported value are reflected in the import.
      */
-    void bindImportOverlayLiveBinding(JSObject globalObject, Map<String, JSValue> savedGlobals, Set<String> absentKeys,
-            String localName, JSObject namespaceObject, String importedName) {
-        // The overlay key is the decoded name, because that is what module code writes to reach
+    void bindImportLiveBinding(JSObject globalObject, String localName, JSObject namespaceObject, String importedName) {
+        // The environment key is the decoded name, because that is what module code writes to reach
         // this binding: `import { x as \\u0079 }` binds `y`, and a key spelled `\\u0079` is a
         // property nothing in the module can name.
         String bindingName = transformer.decodeIdentifierEscapes(localName.trim());
@@ -97,14 +80,6 @@ final class ImportBindingInstaller {
             return;
         }
         PropertyKey key = PropertyKey.fromString(bindingName);
-        if (globalObject.has(key)) {
-            if (!savedGlobals.containsKey(bindingName)) {
-                JSValue currentValue = globalObject.get(key);
-                savedGlobals.put(bindingName, currentValue);
-            }
-        } else {
-            absentKeys.add(bindingName);
-        }
         PropertyKey importKey = PropertyKey.fromString(importedName);
         JSNativeFunction getter = new JSNativeFunction(context, "get " + bindingName, 0, (context, thisArg, args) -> {
             JSValue val = namespaceObject.get(importKey);
@@ -122,19 +97,8 @@ final class ImportBindingInstaller {
             return val != null ? val : JSUndefined.INSTANCE;
         });
         getter.initializePrototypeChain(context);
-        // Setter distinguishes bare variable assignment (PUT_VAR, e.g., check = true)
-        // from property-based writes (PUT_FIELD, e.g., globalThis.check = true).
-        // Bare variable assignment to an import binding throws TypeError (ES2024 immutable binding).
-        // Property-based writes update savedGlobals for correct value restoration.
-        JSNativeFunction setter = new JSNativeFunction(context, "set " + bindingName, 1, (ctx, thisArg, args) -> {
-            if (ctx != null && ctx.isInBareVariableAssignment()) {
-                ctx.throwTypeError("Assignment to constant variable.");
-                return JSUndefined.INSTANCE;
-            }
-            JSValue val = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-            savedGlobals.put(bindingName, val);
-            return JSUndefined.INSTANCE;
-        });
+        JSNativeFunction setter = new JSNativeFunction(context, "set " + bindingName, 1,
+                (ctx, thisArg, args) -> ctx.throwTypeError("Assignment to constant variable."));
         setter.initializePrototypeChain(context);
         PropertyDescriptor descriptor = new PropertyDescriptor();
         descriptor.setGetter(getter);
@@ -144,9 +108,8 @@ final class ImportBindingInstaller {
         globalObject.defineProperty(key, descriptor);
     }
 
-    void bindImportOverlayValue(JSObject globalObject, Map<String, JSValue> savedGlobals, Set<String> absentKeys,
-            String localName, JSValue value) {
-        // The overlay key is the decoded name, because that is what module code writes to reach
+    void bindImportValue(JSObject globalObject, String localName, JSValue value) {
+        // The environment key is the decoded name, because that is what module code writes to reach
         // this binding: `import { x as \\u0079 }` binds `y`, and a key spelled `\\u0079` is a
         // property nothing in the module can name.
         String bindingName = transformer.decodeIdentifierEscapes(localName.trim());
@@ -154,13 +117,6 @@ final class ImportBindingInstaller {
             return;
         }
         PropertyKey key = PropertyKey.fromString(bindingName);
-        if (globalObject.has(key)) {
-            if (!savedGlobals.containsKey(bindingName)) {
-                savedGlobals.put(bindingName, globalObject.get(key));
-            }
-        } else {
-            absentKeys.add(bindingName);
-        }
         PropertyDescriptor descriptor = new PropertyDescriptor();
         descriptor.setValue(value != null ? value : JSUndefined.INSTANCE);
         descriptor.setWritable(false);
@@ -169,8 +125,7 @@ final class ImportBindingInstaller {
         globalObject.defineProperty(key, descriptor);
     }
 
-    void bindNamedImports(JSObject globalObject, Map<String, JSValue> savedGlobals, Set<String> absentKeys,
-            JSObject namespaceObject, String namedClause) {
+    void bindNamedImports(JSObject globalObject, JSObject namespaceObject, String namedClause) {
         String clause = namedClause.trim();
         if (!clause.startsWith("{") || !clause.endsWith("}")) {
             return;
@@ -203,8 +158,7 @@ final class ImportBindingInstaller {
                             "The requested module does not provide an export named '" + importedName + "'");
                 }
             }
-            bindImportOverlayLiveBinding(globalObject, savedGlobals, absentKeys, localName, namespaceObject,
-                    importedName);
+            bindImportLiveBinding(globalObject, localName, namespaceObject, importedName);
         }
     }
 

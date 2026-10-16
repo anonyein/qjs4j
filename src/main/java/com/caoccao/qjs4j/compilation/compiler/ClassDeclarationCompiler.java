@@ -38,250 +38,8 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
 
     @Override
     void compile(ClassDeclaration classDecl) {
-        // Following QuickJS implementation in quickjs.c:24700-25200
-
-        String className = classDecl.getId() != null ? classDecl.getId().getName() : "";
-        int classNameLocalIndex = -1;
-        boolean hasClassNameScope = classDecl.getId() != null;
-        boolean classNameWasTDZ = hasClassNameScope && compilerContext.tdzLocals.contains(className);
-        if (hasClassNameScope) {
-            compilerContext.scopeManager.enterScope();
-            classNameLocalIndex = compilerContext.scopeManager.currentScope().declareConstLocal(className);
-            compilerContext.emitter.emitOpcodeU16(Opcode.SET_LOC_UNINITIALIZED, classNameLocalIndex);
-            compilerContext.tdzLocals.add(className);
-        }
-
-        // Per ES2024 10.2.1, all parts of a class are strict mode code.
-        // Set inClassBody so computed key expressions are compiled into strict
-        // wrapper functions when the enclosing function is non-strict.
-        compilerContext.pushState();
-        compilerContext.inClassBody = true;
-
-        // Compile superclass expression or emit undefined.
-        // Per ES2024 10.2.1, heritage expressions are strict mode code.
-        if (classDecl.getSuperClass() != null) {
-            compilerContext.functionExpressionCompiler.emitStrictClassBodyExpression(classDecl.getSuperClass());
-        } else {
-            compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
-        }
-        // Stack: superClass
-
-        // Separate class elements by type and collect private symbols in a single pass
-        List<MethodDefinition> methods = new ArrayList<>();
-        List<MethodDefinition> privateInstanceMethods = new ArrayList<>();
-        List<MethodDefinition> privateStaticMethods = new ArrayList<>();
-        List<PropertyDefinition> instanceFields = new ArrayList<>();
-        List<ClassElement> staticInitializers = new ArrayList<>();
-        List<PropertyDefinition> computedFieldsInDefinitionOrder = new ArrayList<>();
-        IdentityHashMap<PropertyDefinition, JSSymbol> computedFieldSymbols = new IdentityHashMap<>();
-        IdentityHashMap<PropertyDefinition, String> autoAccessorBackingNames = new IdentityHashMap<>();
-        MethodDefinition constructor = null;
-        LinkedHashMap<String, String> privateNameKinds = new LinkedHashMap<>();
-
-        for (ClassElement element : classDecl.getBody()) {
-            if (element instanceof MethodDefinition method) {
-                // Check if it's a constructor (handles both identifier and string literal "constructor")
-                if (method.isConstructor()) {
-                    constructor = method;
-                } else if (method.isPrivate()) {
-                    if (method.isStatic()) {
-                        privateStaticMethods.add(method);
-                    } else {
-                        privateInstanceMethods.add(method);
-                    }
-                    if (method.getKey() instanceof PrivateIdentifier privateId) {
-                        registerPrivateName(privateNameKinds, privateId.getName(), method.getKind(), privateId);
-                    }
-                } else {
-                    methods.add(method);
-                }
-            } else if (element instanceof PropertyDefinition field) {
-                if (field.isStatic()) {
-                    staticInitializers.add(field);
-                } else {
-                    instanceFields.add(field);
-                }
-
-                if (field.isPrivate() && field.getKey() instanceof PrivateIdentifier privateId) {
-                    registerPrivateName(privateNameKinds, privateId.getName(), "field", privateId);
-                }
-
-                if (field.isAutoAccessor() && !field.isPrivate()) {
-                    String backingName = PropertyDefinition.createAutoAccessorBackingName(
-                            autoAccessorBackingNames.size() + 1, privateNameKinds.keySet());
-                    autoAccessorBackingNames.put(field, backingName);
-                    registerPrivateName(privateNameKinds, backingName, "field", field);
-                    methods.add(field.toAutoAccessorMethod(JSKeyword.GET, backingName));
-                    methods.add(field.toAutoAccessorMethod(JSKeyword.SET, backingName));
-                }
-
-                if (field.isComputed() && !field.isPrivate()) {
-                    computedFieldsInDefinitionOrder.add(field);
-                    computedFieldSymbols.put(field,
-                            new JSSymbol("__computed_field_" + computedFieldsInDefinitionOrder.size()));
-                }
-            } else if (element instanceof StaticBlock block) {
-                staticInitializers.add(block);
-            }
-        }
-
-        // Create symbols for all private names collected during the scan above.
-        // Merge with outer class's private symbols so nested classes can access outer private members.
-        LinkedHashMap<String, JSSymbol> ownPrivateSymbols = new LinkedHashMap<>();
-        for (String privateName : privateNameKinds.keySet()) {
-            ownPrivateSymbols.put(privateName, new JSSymbol("#" + privateName));
-        }
-        Map<String, JSSymbol> privateSymbols = new LinkedHashMap<>(compilerContext.privateSymbols);
-        privateSymbols.putAll(ownPrivateSymbols);
-        IdentityHashMap<PropertyDefinition, JSSymbol> autoAccessorBackingSymbols = new IdentityHashMap<>();
-        for (Map.Entry<PropertyDefinition, String> entry : autoAccessorBackingNames.entrySet()) {
-            JSSymbol backingSymbol = privateSymbols.get(entry.getValue());
-            if (backingSymbol != null) {
-                autoAccessorBackingSymbols.put(entry.getKey(), backingSymbol);
-            }
-        }
-        List<PrivateMethodEntry> privateInstanceMethodFunctions = compilePrivateMethodFunctions(privateInstanceMethods,
-                privateSymbols, computedFieldSymbols);
-        List<PrivateMethodEntry> privateStaticMethodFunctions = compilePrivateMethodFunctions(privateStaticMethods,
-                privateSymbols, computedFieldSymbols);
-
-        // Compile constructor function (or create default) with field initialization
-        JSBytecodeFunction constructorFunc;
-        if (constructor != null) {
-            constructorFunc = compileMethodAsFunction(constructor, className, classDecl.getSuperClass() != null,
-                    instanceFields, privateSymbols, computedFieldSymbols, autoAccessorBackingSymbols,
-                    privateInstanceMethodFunctions, true);
-        } else {
-            // Create default constructor with field initialization
-            constructorFunc = createDefaultConstructor(className, classDecl.getSuperClass() != null, instanceFields,
-                    privateSymbols, computedFieldSymbols, autoAccessorBackingSymbols, privateInstanceMethodFunctions,
-                    classDecl.getLocation());
-        }
-
-        // Set the source code for the constructor to be the entire class definition
-        // This matches JavaScript behavior where class.toString() returns the class source
-        if (compilerContext.sourceCode != null && classDecl.getLocation() != null) {
-            int startPos = classDecl.getLocation().offset();
-            int endPos = classDecl.getLocation().endOffset();
-            if (startPos >= 0 && endPos <= compilerContext.sourceCode.length()) {
-                String classSource = compilerContext.sourceCode.substring(startPos, endPos);
-                constructorFunc.setSourceCode(classSource);
-            }
-        }
-        constructorFunc.setClassPrivateSymbols(ownPrivateSymbols.values());
-
-        // Class definitions must allocate a fresh constructor function per evaluation.
-        compilerContext.emitter.emitOpcodeConstant(Opcode.FCLOSURE, constructorFunc);
-        // Stack: superClass constructor
-
-        // Emit DEFINE_CLASS opcode with class name
-        compilerContext.emitter.emitOpcodeAtom(Opcode.DEFINE_CLASS, className);
-        // Stack: proto constructor
-
-        // Now compile methods and add them to the prototype.
-        // The class name binding is NOT yet initialized — computed property keys
-        // that reference the class name must see it as TDZ (ReferenceError).
-        // After DEFINE_CLASS: Stack is proto constructor (constructor on TOP)
-        // For simplicity, swap so proto is on top: constructor proto
-        compilerContext.emitter.emitOpcode(Opcode.SWAP);
-        // Stack: constructor proto
-
-        for (MethodDefinition method : methods) {
-            // Stack before each iteration: constructor proto
-
-            if (method.isStatic()) {
-                // For static methods, constructor is the target
-                // Current: constructor proto
-                // Need to add method to constructor, so swap to get constructor on top
-                compilerContext.emitter.emitOpcode(Opcode.SWAP);
-                // Stack: proto constructor
-
-                // Compile method. Static methods share the same private name scope.
-                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, method.getSimpleName(), false,
-                        List.of(), privateSymbols, computedFieldSymbols, autoAccessorBackingSymbols, List.of(), false);
-
-                String methodName = method.getSimpleName();
-                compilerContext.emitHelpers.emitClassMethodDefinition(method, methodFunc, methodName);
-                // Stack: proto constructor (method added to constructor)
-
-                // Swap back to restore order: constructor proto
-                compilerContext.emitter.emitOpcode(Opcode.SWAP);
-                // Stack: constructor proto
-            } else {
-                // For instance methods, proto is the target
-                // Current: constructor proto
-                // Compile method (no field initialization for regular methods)
-                // Pass private symbols to methods so they can access private fields
-                JSBytecodeFunction methodFunc = compileMethodAsFunction(method, method.getSimpleName(), false,
-                        List.of(), privateSymbols, computedFieldSymbols, autoAccessorBackingSymbols, List.of(), false);
-
-                String methodName = method.getSimpleName();
-                compilerContext.emitHelpers.emitClassMethodDefinition(method, methodFunc, methodName);
-                // Stack: constructor proto (method added to proto)
-            }
-        }
-
-        installPrivateStaticMethods(privateStaticMethodFunctions, privateSymbols);
-
-        // Evaluate all computed field names once at class definition time.
-        // This matches QuickJS behavior and avoids re-evaluating key side effects per instance.
-        for (PropertyDefinition field : computedFieldsInDefinitionOrder) {
-            compileComputedFieldNameCache(field, computedFieldSymbols, privateSymbols);
-        }
-
-        // Swap back to original order: proto constructor
-        compilerContext.emitter.emitOpcode(Opcode.SWAP);
-        // Stack: proto constructor
-
-        // Drop prototype, keep constructor (following QuickJS: proto is dropped before
-        // the class name is initialized and before static initializers run).
-        compilerContext.emitter.emitOpcode(Opcode.NIP);
-        // Stack: constructor
-
-        // Initialize inner immutable class-name binding. This must happen AFTER all
-        // method definitions and computed property key evaluation (so those see TDZ),
-        // but BEFORE static initializers (which need to access the class name).
-        if (hasClassNameScope) {
-            compilerContext.emitter.emitOpcode(Opcode.DUP);
-            compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, classNameLocalIndex);
-        }
-
-        // Execute static initializers (static fields and static blocks) in source order.
-        // Each initializer runs with class constructor as `this`.
-        for (ClassElement staticInitializer : staticInitializers) {
-            JSBytecodeFunction staticInitializerFunc;
-            if (staticInitializer instanceof PropertyDefinition staticField) {
-                staticInitializerFunc = compileStaticFieldInitializer(staticField, computedFieldSymbols, privateSymbols,
-                        autoAccessorBackingSymbols, className);
-            } else if (staticInitializer instanceof StaticBlock staticBlock) {
-                staticInitializerFunc = compileStaticBlock(staticBlock, className, privateSymbols);
-            } else {
-                continue;
-            }
-
-            // Stack: constructor
-            compilerContext.emitter.emitOpcode(Opcode.DUP);
-            // Stack: constructor constructor
-
-            compilerContext.emitter.emitOpcodeConstant(Opcode.FCLOSURE, staticInitializerFunc);
-            // Stack: constructor constructor func
-
-            compilerContext.emitter.emitOpcode(Opcode.SWAP);
-            // Stack: constructor func constructor
-
-            compilerContext.emitter.emitOpcodeU16(Opcode.CALL, 0);
-            // Stack: constructor returnValue
-
-            compilerContext.emitter.emitOpcode(Opcode.DROP);
-            // Stack: constructor
-        }
-
-        if (hasClassNameScope) {
-            compilerContext.scopeManager.exitScope();
-            if (!classNameWasTDZ) {
-                compilerContext.tdzLocals.remove(className);
-            }
-        }
+        compilerContext.classExpressionCompiler.compile(new ClassExpression(classDecl.getId(),
+                classDecl.getSuperClass(), classDecl.getBody(), classDecl.getLocation()));
 
         // Store the class constructor in a variable
         if (classDecl.getId() != null) {
@@ -316,7 +74,6 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
             // For class declarations, we always have a name, so this shouldn't happen
         }
 
-        compilerContext.popState();
     }
 
     /**
@@ -554,7 +311,7 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
         if (bodyStatements.isEmpty() || !(bodyStatements.get(bodyStatements.size() - 1) instanceof ReturnStatement)) {
             functionContext.emitter.emitOpcode(Opcode.UNDEFINED);
             int returnValueIndex = functionContext.scopeManager.currentScope()
-                    .declareLocal("$method_return_" + functionContext.emitter.currentOffset());
+                    .declareLocal("#method_return_" + functionContext.emitter.currentOffset());
             functionContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, returnValueIndex);
             functionContext.emitHelpers.emitCurrentScopeUsingDisposal();
             functionContext.emitter.emitOpcodeU16(Opcode.GET_LOC, returnValueIndex);
@@ -601,7 +358,12 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
             String methodName = method.getSimpleName();
             JSBytecodeFunction methodFunc = compileMethodAsFunction(method, methodName, false, List.of(),
                     privateSymbols, computedFieldSymbols, new IdentityHashMap<>(), List.of(), false);
-            privateMethodEntries.add(new PrivateMethodEntry(methodName, methodFunc, method.getKind(), method));
+            String bindingName = "#private_method_" + method.getLocation().offset();
+            if (!method.isStatic()) {
+                compilerContext.scopeManager.currentScope().declareConstLocal(bindingName);
+            }
+            privateMethodEntries
+                    .add(new PrivateMethodEntry(methodName, methodFunc, method.getKind(), method, bindingName));
         }
         return privateMethodEntries;
     }
@@ -619,7 +381,8 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
                 int methodKind = JSKeyword.GET.equals(entry.kind()) ? 1 : 2;
                 compilerContext.emitter.emitOpcode(Opcode.PUSH_THIS);
                 compilerContext.emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
-                compilerContext.emitter.emitOpcodeConstant(Opcode.PUSH_CONST, entry.function());
+                int capture = compilerContext.captureResolver.resolveCapturedBindingIndex(entry.bindingName());
+                compilerContext.emitter.emitOpcodeU16(Opcode.GET_VAR_REF, capture);
                 compilerContext.emitter.emitOpcodeU8(Opcode.DEFINE_METHOD_COMPUTED, methodKind);
                 compilerContext.emitter.emitOpcode(Opcode.DROP);
             } else {
@@ -628,7 +391,8 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
                 // Stack: [this, symbol, func] → [this]
                 compilerContext.emitter.emitOpcode(Opcode.PUSH_THIS);
                 compilerContext.emitter.emitOpcodeConstant(Opcode.PUSH_CONST, symbol);
-                compilerContext.emitter.emitOpcodeConstant(Opcode.PUSH_CONST, entry.function());
+                int capture = compilerContext.captureResolver.resolveCapturedBindingIndex(entry.bindingName());
+                compilerContext.emitter.emitOpcodeU16(Opcode.GET_VAR_REF, capture);
                 compilerContext.emitter.emitOpcodeU8(Opcode.DEFINE_METHOD_COMPUTED, 8);
                 compilerContext.emitter.emitOpcode(Opcode.DROP);
             }
@@ -669,7 +433,7 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
         // Static blocks always return undefined
         blockCtx.emitter.emitOpcode(Opcode.UNDEFINED);
         int returnValueIndex = blockCtx.scopeManager.currentScope()
-                .declareLocal("$static_block_return_" + blockCtx.emitter.currentOffset());
+                .declareLocal("#static_block_return_" + blockCtx.emitter.currentOffset());
         blockCtx.emitter.emitOpcodeU16(Opcode.PUT_LOC, returnValueIndex);
         blockCtx.emitHelpers.emitCurrentScopeUsingDisposal();
         blockCtx.emitter.emitOpcodeU16(Opcode.GET_LOC, returnValueIndex);
@@ -944,6 +708,7 @@ final class ClassDeclarationCompiler extends AstNodeCompiler<ClassDeclaration> {
         throw new JSCompilerException("private class field is already defined", ast);
     }
 
-    record PrivateMethodEntry(String name, JSBytecodeFunction function, String kind, MethodDefinition ast) {
+    record PrivateMethodEntry(String name, JSBytecodeFunction function, String kind, MethodDefinition ast,
+            String bindingName) {
     }
 }
