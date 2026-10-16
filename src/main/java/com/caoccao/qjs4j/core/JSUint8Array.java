@@ -16,8 +16,6 @@
 
 package com.caoccao.qjs4j.core;
 
-import java.nio.ByteBuffer;
-
 /**
  * Represents a JavaScript Uint8Array. 8-bit unsigned integer array.
  */
@@ -28,26 +26,26 @@ public final class JSUint8Array extends JSTypedArray {
     /**
      * Create a Uint8Array view on an existing buffer.
      */
-    public JSUint8Array(JSContext context, IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSUint8Array(JSContext context, IJSArrayBuffer buffer, long byteOffset, long length) {
         super(context, buffer, byteOffset, length, BYTES_PER_ELEMENT);
     }
 
     /**
      * Create a Uint8Array with a new buffer.
      */
-    public JSUint8Array(JSContext context, int length) {
+    public JSUint8Array(JSContext context, long length) {
         super(context, length, BYTES_PER_ELEMENT);
     }
 
     @Override
-    protected JSTypedArray createView(int byteOffset, int length) {
+    protected JSTypedArray createView(IJSArrayBuffer buffer, long byteOffset, long length) {
         return new JSUint8Array(context, buffer, byteOffset, length);
     }
 
     @Override
-    public double getElement(int index) {
+    public double getElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         return buf.get(index) & 0xFF; // Convert to unsigned
     }
 
@@ -72,9 +70,9 @@ public final class JSUint8Array extends JSTypedArray {
     }
 
     @Override
-    public void setElement(int index, double value) {
+    public void setElement(long index, double value) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         buf.put(index, (byte) JSTypeConversions.toInt32(value));
     }
 

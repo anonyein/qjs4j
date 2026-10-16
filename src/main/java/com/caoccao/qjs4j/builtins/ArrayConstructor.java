@@ -143,6 +143,7 @@ public final class ArrayConstructor {
 
             long k = 0;
             while (true) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 JSValue nextResultValue = nextFunction.call(context, iteratorObject, JSValue.NO_ARGS);
                 if (context.hasPendingException()) {
                     return context.getPendingException();
@@ -211,6 +212,7 @@ public final class ArrayConstructor {
             return context.getPendingException();
         }
         for (long k = 0; k < sourceLength; k++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             JSValue sourceValue = itemsObject.get(PropertyKey.fromString(Long.toString(k)));
             if (context.hasPendingException()) {
                 return context.getPendingException();
@@ -691,6 +693,7 @@ public final class ArrayConstructor {
 
         // Step 4-5: CreateDataPropertyOrThrow for each item.
         for (int index = 0; index < len; index++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             if (!array.defineProperty(PropertyKey.fromString(Integer.toString(index)), args[index],
                     PropertyDescriptor.DataState.All)) {
                 if (context.hasPendingException()) {

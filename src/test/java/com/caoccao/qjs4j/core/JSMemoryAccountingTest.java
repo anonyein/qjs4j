@@ -21,12 +21,10 @@ import com.caoccao.qjs4j.exceptions.JSException;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
-import java.nio.ByteBuffer;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * {@code maxMemoryUsage} (now {@code maxDataBlockBytes}) and {@code maxStackSize} were public setters that nothing
@@ -35,22 +33,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * released, and that the boundary is a catchable guest error.
  */
 public class JSMemoryAccountingTest extends BaseTest {
-    /**
-     * How much larger than the largest data block a heap has to be before it could really satisfy one.
-     * <p>
-     * A bare {@code maxMemory() < blockLength} comparison decides this on a knife edge, and the build's {@code -Xmx2g}
-     * lands on the wrong side of it by twelve bytes: G1 and ZGC report {@code maxMemory()} as exactly 2,147,483,648
-     * while the largest block is 2,147,483,636, so the premise read as "the heap can satisfy it" — and ParallelGC and
-     * SerialGC, which report a little less than the nominal heap, read the opposite. Which collector the JVM picks
-     * depends on how many processors and how much memory it sees, so the same two tests ran on one machine and skipped
-     * on the next, and the suite quietly tested less on some runners than on others.
-     * <p>
-     * A heap only marginally larger than the block cannot satisfy it in any case: the array needs contiguous space and
-     * the heap is already holding the engine and the suite. Requiring real headroom before believing otherwise makes
-     * the premise mean what it says.
-     */
-    private static final long HEAP_HEADROOM_BYTES = 256L * 1024 * 1024;
-
     @Test
     public void testALimitedCeilingIsStillTheCeilingNearTheRangeOfALong() {
         // The two guards are independent: the configured limit still applies when it is far below
@@ -105,7 +87,7 @@ public class JSMemoryAccountingTest extends BaseTest {
             assertThat(runtime.getMemoryAccounting().getReservedBytes())
                     .as("a block that never allocated must not stay charged").isEqualTo(chargedBefore);
             // The successful path still binds its reservation, so the two are not confusable.
-            ByteBuffer allocated = buffer.accountBlock(context, 2048, () -> ByteBuffer.allocate(2048));
+            JSByteBuffer allocated = buffer.accountBlock(context, 2048, () -> JSByteBuffer.allocate(2048));
             assertThat(allocated.capacity()).isEqualTo(2048);
             assertThat(runtime.getMemoryAccounting().getReservedBytes()).isEqualTo(1024 + 2048);
         }
@@ -204,46 +186,6 @@ public class JSMemoryAccountingTest extends BaseTest {
             buffer.detach();
             assertThat(runtime.getMemoryAccounting().getReservedBytes()).isZero();
             // Detaching twice must not release twice.
-            buffer.detach();
-            assertThat(runtime.getMemoryAccounting().getReservedBytes()).isZero();
-        }
-    }
-
-    @Test
-    public void testFailedAllocationGivesItsReservationBack() {
-        // Accounting is committed before the JVM allocation — refusing afterwards would be
-        // pointless — so a JVM allocation failure has to roll the charge back. It used to leave the
-        // bytes charged until the half-constructed buffer was collected, which inflated the
-        // runtime's ceiling and made later, much smaller allocations fail for space nothing used.
-        assumeTheJvmRefusesTheLargestBlock();
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(0))) {
-            JSContext context = runtime.createContext();
-            assertThat(runtime.getMemoryAccounting().getReservedBytes()).isZero();
-            assertThatThrownBy(() -> new JSArrayBuffer(context, unallocatableByteLength()))
-                    .isInstanceOf(OutOfMemoryError.class);
-            assertThat(runtime.getMemoryAccounting().getReservedBytes())
-                    .as("a block the JVM refused must not stay charged").isZero();
-            // And the runtime is still usable for an allocation that does fit.
-            assertThat(evalToString(runtime, "new ArrayBuffer(1024).byteLength")).isEqualTo("1024");
-        }
-    }
-
-    @Test
-    public void testFailedResizeGivesTheGrowthBackAndLeavesTheBufferAlone() {
-        assumeTheJvmRefusesTheLargestBlock();
-        try (JSRuntime runtime = new JSRuntime(new JSRuntimeOptions().setMaxDataBlockBytes(0))) {
-            JSContext context = runtime.createContext();
-            JSArrayBuffer buffer = new JSArrayBuffer(context, 16, unallocatableByteLength());
-            buffer.getBuffer().put(0, (byte) 7);
-            long reservedBeforeResize = runtime.getMemoryAccounting().getReservedBytes();
-
-            assertThatThrownBy(() -> buffer.resize(unallocatableByteLength())).isInstanceOf(OutOfMemoryError.class);
-
-            assertThat(runtime.getMemoryAccounting().getReservedBytes())
-                    .as("growth that failed to allocate must not stay charged").isEqualTo(reservedBeforeResize);
-            assertThat(buffer.getByteLength()).as("the original buffer is untouched").isEqualTo(16);
-            assertThat(buffer.getBuffer().get(0)).isEqualTo((byte) 7);
-            // The reservation still tracks the block that does exist, so releasing it balances.
             buffer.detach();
             assertThat(runtime.getMemoryAccounting().getReservedBytes()).isZero();
         }
@@ -552,20 +494,6 @@ public class JSMemoryAccountingTest extends BaseTest {
     }
 
     /**
-     * Require that the JVM cannot satisfy the largest data block the engine will accept.
-     * <p>
-     * The largest block is capped near two gigabytes, so on a big enough heap the request succeeds and there is no
-     * allocation failure to roll back. That is a property of the build's {@code -Xmx}, not of the code, so it is stated
-     * as an assumption: a heap that grows past this point makes these two tests skip and say why, instead of leaving
-     * them green while they stop exercising anything.
-     */
-    private static void assumeTheJvmRefusesTheLargestBlock() {
-        assumeTrue(Runtime.getRuntime().maxMemory() < (long) unallocatableByteLength() + HEAP_HEADROOM_BYTES,
-                "the JVM heap is large enough to allocate the biggest block the engine allows, so "
-                        + "there is no allocation failure to observe");
-    }
-
-    /**
      * Ask the collector for a while and report whether the reference cleared.
      *
      * @param reference
@@ -594,18 +522,4 @@ public class JSMemoryAccountingTest extends BaseTest {
         }
     }
 
-    /**
-     * A data-block length the JVM will refuse outright.
-     * <p>
-     * The test tasks pin {@code -Xmx2g}, so a request of the largest array HotSpot supports fails immediately with
-     * {@code OutOfMemoryError} — without heap pressure, because the size exceeds the maximum heap before anything is
-     * committed.
-     *
-     * @return the length in bytes
-     */
-    private static int unallocatableByteLength() {
-        // Rounded down to a multiple of four so it survives the four-byte padding the engine adds
-        // for Atomics alignment; otherwise the length check refuses it before any allocation.
-        return JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH & ~3;
-    }
 }

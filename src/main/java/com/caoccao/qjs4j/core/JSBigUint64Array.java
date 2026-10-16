@@ -20,7 +20,6 @@ import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 import com.caoccao.qjs4j.exceptions.JSTypeErrorException;
 
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 
 /**
  * Represents a JavaScript BigUint64Array. 64-bit unsigned integer array.
@@ -32,26 +31,26 @@ public final class JSBigUint64Array extends JSTypedArray {
     /**
      * Create a BigUint64Array view on an existing buffer.
      */
-    public JSBigUint64Array(JSContext context, IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSBigUint64Array(JSContext context, IJSArrayBuffer buffer, long byteOffset, long length) {
         super(context, buffer, byteOffset, length, BYTES_PER_ELEMENT);
     }
 
     /**
      * Create a BigUint64Array with a new buffer.
      */
-    public JSBigUint64Array(JSContext context, int length) {
+    public JSBigUint64Array(JSContext context, long length) {
         super(context, length, BYTES_PER_ELEMENT);
     }
 
     @Override
-    protected JSTypedArray createView(int byteOffset, int length) {
+    protected JSTypedArray createView(IJSArrayBuffer buffer, long byteOffset, long length) {
         return new JSBigUint64Array(context, buffer, byteOffset, length);
     }
 
     @Override
-    public double getElement(int index) {
+    public double getElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         long value = buf.getLong(index * BYTES_PER_ELEMENT);
         // Convert unsigned long to double (may lose precision for very large values)
         return Long.compareUnsigned(value, 0) < 0
@@ -60,9 +59,9 @@ public final class JSBigUint64Array extends JSTypedArray {
     }
 
     @Override
-    public JSValue getJSElement(int index) {
+    public JSValue getJSElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         long value = buf.getLong(index * BYTES_PER_ELEMENT);
         // Convert unsigned long to unsigned BigInteger
         BigInteger unsigned = value >= 0
@@ -82,7 +81,7 @@ public final class JSBigUint64Array extends JSTypedArray {
     }
 
     @Override
-    protected void integerIndexedElementSet(int index, JSValue value) {
+    protected void integerIndexedElementSet(long index, JSValue value) {
         long longVal;
         try {
             longVal = JSTypeConversions.toBigInt64(context, value);
@@ -94,7 +93,7 @@ public final class JSBigUint64Array extends JSTypedArray {
             return;
         }
         if (!buffer.isDetached() && index >= 0 && index < getLength()) {
-            ByteBuffer buf = getByteBuffer();
+            JSByteBuffer buf = getByteBuffer();
             buf.putLong(index * BYTES_PER_ELEMENT, longVal);
         }
     }
@@ -110,19 +109,19 @@ public final class JSBigUint64Array extends JSTypedArray {
     }
 
     @Override
-    public void setElement(int index, double value) {
+    public void setElement(long index, double value) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         // Convert double to unsigned long
         long longValue = (long) value;
         buf.putLong(index * BYTES_PER_ELEMENT, longValue);
     }
 
     @Override
-    protected void setJSElement(int index, JSValue value) {
+    protected void setJSElement(long index, JSValue value) {
         long longVal = JSTypeConversions.toBigInt64(context, value);
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         // Write raw 64-bit modulo value directly to avoid precision loss via double.
         buf.putLong(index * BYTES_PER_ELEMENT, longVal);
     }

@@ -554,8 +554,8 @@ public final class JSConsole {
 
     private String formatTypedArray(JSTypedArray typedArray) {
         String className = getClassName(typedArray);
-        int length = typedArray.getLength();
-        int max = Math.min(length, MAX_PRINT_ITEM_COUNT);
+        long length = typedArray.getLength();
+        int max = (int) Math.min(length, MAX_PRINT_ITEM_COUNT);
         List<String> items = new ArrayList<>(max + 1);
         for (int i = 0; i < max; i++) {
             double element = typedArray.getElement(i);

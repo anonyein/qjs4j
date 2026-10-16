@@ -446,7 +446,7 @@ public final class Uint8ArrayBase64Hex {
         }
 
         int[] decodeTable = "base64url".equals(alphabet) ? BASE64URL_DECODE : BASE64_DECODE;
-        int maxLength = uint8Array.getLength();
+        int maxLength = (int) Math.min(uint8Array.getLength(), Integer.MAX_VALUE);
         DecodeResult result = fromBase64Core(inputStr.value(), decodeTable, lastChunkHandling, maxLength);
 
         // Write decoded bytes to the array (even if there's an error, partial data is written)
@@ -481,7 +481,7 @@ public final class Uint8ArrayBase64Hex {
             return context.throwTypeError("expected first argument to be a string");
         }
 
-        int maxLength = uint8Array.getLength();
+        int maxLength = (int) Math.min(uint8Array.getLength(), Integer.MAX_VALUE);
         DecodeResult result = fromHexCore(inputStr.value(), maxLength);
 
         // Write decoded bytes to the array (even if there's an error, partial data is written)
@@ -541,7 +541,11 @@ public final class Uint8ArrayBase64Hex {
         }
 
         String chars = "base64url".equals(alphabet) ? BASE64URL_CHARS : BASE64_CHARS;
-        int length = uint8Array.getLength();
+        long sourceLength = uint8Array.getLength();
+        if (((sourceLength + 2) / 3 * 4 - (omitPadding ? (3 - sourceLength % 3) % 3 : 0)) > JSString.MAX_LENGTH) {
+            return context.throwRangeError("Invalid string length");
+        }
+        int length = (int) sourceLength;
         StringBuilder sb = new StringBuilder();
 
         int i = 0;
@@ -589,7 +593,11 @@ public final class Uint8ArrayBase64Hex {
             return context.throwTypeError("cannot perform toHex on a detached or out-of-bounds buffer");
         }
 
-        int length = uint8Array.getLength();
+        long sourceLength = uint8Array.getLength();
+        if (sourceLength > JSString.MAX_LENGTH / 2L) {
+            return context.throwRangeError("Invalid string length");
+        }
+        int length = (int) sourceLength;
         StringBuilder sb = new StringBuilder(length * 2);
         for (int i = 0; i < length; i++) {
             int byteValue = (int) uint8Array.getElement(i) & 0xFF;

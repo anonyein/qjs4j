@@ -886,7 +886,7 @@ public final class RegExpPrototype {
         String inputString = inputStringValue.value();
         JSValue replaceValue = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
-        boolean functionalReplace = replaceValue instanceof JSFunction;
+        boolean functionalReplace = JSTypeChecking.isCallable(replaceValue);
         if (!functionalReplace) {
             replaceValue = JSTypeConversions.toString(context, replaceValue);
             if (context.hasPendingException()) {
@@ -960,7 +960,7 @@ public final class RegExpPrototype {
             return inputStringValue;
         }
 
-        StringBuilder accumulated = new StringBuilder(inputString.length() + 16);
+        StringResultBuilder accumulated = new StringResultBuilder(context);
         int nextSourcePosition = 0;
         for (JSObject resultObject : results) {
             // ES2024 22.2.5.11 step 14a: nCaptures = ToLength(Get(result, "length"))
@@ -1023,7 +1023,7 @@ public final class RegExpPrototype {
                 return context.throwTypeError("Cannot convert undefined or null to object");
             }
 
-            String replacement = StringPrototype.applyRegExpReplacementWithNamedCapturesObject(context, replaceValue,
+            JSString replacement = StringPrototype.applyRegExpReplacementWithNamedCapturesObject(context, replaceValue,
                     inputString, position, tailPosition, captures, groupsValue);
             if (context.hasPendingException()) {
                 return JSUndefined.INSTANCE;
@@ -1047,7 +1047,7 @@ public final class RegExpPrototype {
         if (nextSourcePosition < inputString.length()) {
             accumulated.append(inputString.substring(nextSourcePosition));
         }
-        return new JSString(accumulated.toString());
+        return accumulated.build();
     }
 
     /**

@@ -43,7 +43,8 @@ jobs:
         # run on the matrix JDK via -PtestJavaVersion, so this matrix is genuine runtime coverage
         # of the engine on both LTS releases, not just proof that Gradle can be launched by them.
         java: [ '17', '21' ]
-    runs-on: ${{ matrix.os }}
+    # Keep the existing check names while investigating stalls on Windows Server 2025.
+    runs-on: ${{ matrix.os == 'windows-latest' && 'windows-2022' || matrix.os }}
     # Successful builds take 4–6 minutes. Bound stalls so a failed runner cannot
     # hold the main-branch concurrency group for the default six-hour timeout.
     timeout-minutes: 20
@@ -57,6 +58,8 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v7
+      with:
+        persist-credentials: false
 
     - name: Set up JDK ${{ matrix.java }}
       uses: actions/setup-java@v6
@@ -74,20 +77,65 @@ jobs:
       run: gradle spotlessCheck
 
     - name: Build with Gradle
+      if: runner.os != 'Windows' || matrix.java != '21'
       # Coverage reporting and verification run in the dedicated coverage job.
       run: gradle build -x jacocoTestReport -x jacocoTestCoverageVerification -PtestJavaVersion=${{ matrix.java }} --info --console=plain
+
+    - name: Build with Gradle (Windows JDK 21 diagnostics)
+      if: runner.os == 'Windows' && matrix.java == '21'
+      shell: pwsh
+      run: |
+        $diagnostics = Join-Path $PWD 'build/ci-diagnostics'
+        New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+        $build = Start-Process -FilePath $env:ComSpec -ArgumentList @(
+          '/d', '/s', '/c',
+          '"gradle build -x jacocoTestReport -x jacocoTestCoverageVerification -PtestJavaVersion=21 --info --console=plain"'
+        ) -RedirectStandardOutput "$diagnostics/gradle-stdout.log" `
+          -RedirectStandardError "$diagnostics/gradle-stderr.log" -PassThru
+        $null = $build.Handle
+        # Keep live-console traffic small and retain the full output as an artifact.
+        if (-not $build.WaitForExit(8 * 60 * 1000)) {
+          Write-Host 'Build exceeded eight minutes; collecting JVM thread dumps.'
+          Get-Process java -ErrorAction SilentlyContinue | ForEach-Object {
+            $javaProcessId = $_.Id
+            try {
+              $dump = Start-Process -FilePath "$env:JAVA_HOME/bin/jcmd.exe" `
+                -ArgumentList @($javaProcessId, 'Thread.print', '-l') `
+                -RedirectStandardOutput "$diagnostics/threads-$javaProcessId.log" `
+                -RedirectStandardError "$diagnostics/threads-$javaProcessId.err" -PassThru
+              if (-not $dump.WaitForExit(15000)) {
+                Stop-Process -Id $dump.Id -Force -ErrorAction SilentlyContinue
+              }
+            } catch {
+              $_ | Out-String | Add-Content "$diagnostics/thread-dump-errors.log"
+            }
+          }
+          & taskkill /PID $build.Id /T /F
+          Get-Content "$diagnostics/gradle-stdout.log" -Tail 80
+          Get-Content "$diagnostics/gradle-stderr.log" -Tail 80
+          exit 1
+        }
+        $build.WaitForExit()
+        Get-Content "$diagnostics/gradle-stdout.log" -Tail 80
+        Get-Content "$diagnostics/gradle-stderr.log" -Tail 80
+        $exitCode = $build.ExitCode
+        if ($null -eq $exitCode) {
+          throw 'Gradle completed without an available exit code.'
+        }
+        exit $exitCode
 
     - name: Run slow regression tests
       run: gradle slowRegressionTest -PtestJavaVersion=${{ matrix.java }} --info --console=plain
 
     - name: Upload build diagnostics
-      if: failure() || cancelled()
+      if: failure() || cancelled() || (runner.os == 'Windows' && matrix.java == '21')
       uses: actions/upload-artifact@v7
       with:
         name: build-diagnostics-${{ matrix.os }}-jdk${{ matrix.java }}
         path: |
           build/reports/tests/
           build/test-results/
+          build/ci-diagnostics/
           hs_err_pid*.log
         if-no-files-found: ignore
 

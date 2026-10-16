@@ -49,181 +49,192 @@ final class ClassExpressionCompiler extends AstNodeCompiler<ClassExpression> {
         }
 
         compilerContext.pushState();
-        compilerContext.inClassBody = true;
+        try {
+            compilerContext.inClassBody = true;
 
-        if (classExpr.getSuperClass() != null) {
-            compilerContext.functionExpressionCompiler.emitStrictClassBodyExpression(classExpr.getSuperClass());
-        } else {
-            compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
-        }
+            if (classExpr.getSuperClass() != null) {
+                compilerContext.functionExpressionCompiler.emitStrictClassBodyExpression(classExpr.getSuperClass());
+            } else {
+                compilerContext.emitter.emitOpcode(Opcode.UNDEFINED);
+            }
 
-        List<MethodDefinition> methods = new ArrayList<>();
-        List<MethodDefinition> privateInstanceMethods = new ArrayList<>();
-        List<MethodDefinition> privateStaticMethods = new ArrayList<>();
-        List<PropertyDefinition> instanceFields = new ArrayList<>();
-        List<ClassElement> staticInitializers = new ArrayList<>();
-        List<PropertyDefinition> computedFieldsInDefinitionOrder = new ArrayList<>();
-        IdentityHashMap<PropertyDefinition, JSSymbol> computedFieldSymbols = new IdentityHashMap<>();
-        IdentityHashMap<PropertyDefinition, String> autoAccessorBackingNames = new IdentityHashMap<>();
-        MethodDefinition constructor = null;
-        LinkedHashMap<String, String> privateNameKinds = new LinkedHashMap<>();
+            List<MethodDefinition> methods = new ArrayList<>();
+            List<MethodDefinition> privateInstanceMethods = new ArrayList<>();
+            List<MethodDefinition> privateStaticMethods = new ArrayList<>();
+            List<PropertyDefinition> instanceFields = new ArrayList<>();
+            List<ClassElement> staticInitializers = new ArrayList<>();
+            List<PropertyDefinition> computedFieldsInDefinitionOrder = new ArrayList<>();
+            IdentityHashMap<PropertyDefinition, JSSymbol> computedFieldSymbols = new IdentityHashMap<>();
+            IdentityHashMap<PropertyDefinition, String> autoAccessorBackingNames = new IdentityHashMap<>();
+            MethodDefinition constructor = null;
+            LinkedHashMap<String, String> privateNameKinds = new LinkedHashMap<>();
 
-        for (ClassElement element : classExpr.getBody()) {
-            if (element instanceof MethodDefinition method) {
-                if (method.isConstructor()) {
-                    constructor = method;
-                } else if (method.isPrivate()) {
-                    if (method.isStatic()) {
-                        privateStaticMethods.add(method);
+            for (ClassElement element : classExpr.getBody()) {
+                if (element instanceof MethodDefinition method) {
+                    if (method.isConstructor()) {
+                        constructor = method;
+                    } else if (method.isPrivate()) {
+                        if (method.isStatic()) {
+                            privateStaticMethods.add(method);
+                        } else {
+                            privateInstanceMethods.add(method);
+                        }
+                        if (method.getKey() instanceof PrivateIdentifier privateId) {
+                            compilerContext.classDeclarationCompiler.registerPrivateName(privateNameKinds,
+                                    privateId.getName(), method.getKind(), privateId);
+                        }
                     } else {
-                        privateInstanceMethods.add(method);
+                        methods.add(method);
                     }
-                    if (method.getKey() instanceof PrivateIdentifier privateId) {
+                } else if (element instanceof PropertyDefinition field) {
+                    if (field.isStatic()) {
+                        staticInitializers.add(field);
+                    } else {
+                        instanceFields.add(field);
+                    }
+
+                    if (field.isPrivate() && field.getKey() instanceof PrivateIdentifier privateId) {
                         compilerContext.classDeclarationCompiler.registerPrivateName(privateNameKinds,
-                                privateId.getName(), method.getKind(), privateId);
+                                privateId.getName(), "field", privateId);
                     }
-                } else {
-                    methods.add(method);
-                }
-            } else if (element instanceof PropertyDefinition field) {
-                if (field.isStatic()) {
-                    staticInitializers.add(field);
-                } else {
-                    instanceFields.add(field);
-                }
 
-                if (field.isPrivate() && field.getKey() instanceof PrivateIdentifier privateId) {
-                    compilerContext.classDeclarationCompiler.registerPrivateName(privateNameKinds, privateId.getName(),
-                            "field", privateId);
-                }
+                    if (field.isAutoAccessor() && !field.isPrivate()) {
+                        String backingName = PropertyDefinition.createAutoAccessorBackingName(
+                                autoAccessorBackingNames.size() + 1, privateNameKinds.keySet());
+                        autoAccessorBackingNames.put(field, backingName);
+                        compilerContext.classDeclarationCompiler.registerPrivateName(privateNameKinds, backingName,
+                                "field", field);
+                        methods.add(field.toAutoAccessorMethod(JSKeyword.GET, backingName));
+                        methods.add(field.toAutoAccessorMethod(JSKeyword.SET, backingName));
+                    }
 
-                if (field.isAutoAccessor() && !field.isPrivate()) {
-                    String backingName = PropertyDefinition.createAutoAccessorBackingName(
-                            autoAccessorBackingNames.size() + 1, privateNameKinds.keySet());
-                    autoAccessorBackingNames.put(field, backingName);
-                    compilerContext.classDeclarationCompiler.registerPrivateName(privateNameKinds, backingName, "field",
-                            field);
-                    methods.add(field.toAutoAccessorMethod(JSKeyword.GET, backingName));
-                    methods.add(field.toAutoAccessorMethod(JSKeyword.SET, backingName));
+                    if (field.isComputed() && !field.isPrivate()) {
+                        computedFieldsInDefinitionOrder.add(field);
+                        computedFieldSymbols.put(field,
+                                new JSSymbol("__computed_field_" + computedFieldsInDefinitionOrder.size()));
+                    }
+                } else if (element instanceof StaticBlock block) {
+                    staticInitializers.add(block);
                 }
-
-                if (field.isComputed() && !field.isPrivate()) {
-                    computedFieldsInDefinitionOrder.add(field);
-                    computedFieldSymbols.put(field,
-                            new JSSymbol("__computed_field_" + computedFieldsInDefinitionOrder.size()));
-                }
-            } else if (element instanceof StaticBlock block) {
-                staticInitializers.add(block);
             }
-        }
 
-        LinkedHashMap<String, JSSymbol> ownPrivateSymbols = new LinkedHashMap<>();
-        for (String privateName : privateNameKinds.keySet()) {
-            ownPrivateSymbols.put(privateName, new JSSymbol("#" + privateName));
-        }
-        Map<String, JSSymbol> privateSymbols = new LinkedHashMap<>(compilerContext.privateSymbols);
-        privateSymbols.putAll(ownPrivateSymbols);
-        IdentityHashMap<PropertyDefinition, JSSymbol> autoAccessorBackingSymbols = new IdentityHashMap<>();
-        for (Map.Entry<PropertyDefinition, String> entry : autoAccessorBackingNames.entrySet()) {
-            JSSymbol backingSymbol = privateSymbols.get(entry.getValue());
-            if (backingSymbol != null) {
-                autoAccessorBackingSymbols.put(entry.getKey(), backingSymbol);
+            LinkedHashMap<String, JSSymbol> ownPrivateSymbols = new LinkedHashMap<>();
+            for (String privateName : privateNameKinds.keySet()) {
+                ownPrivateSymbols.put(privateName, new JSSymbol("#" + privateName));
             }
-        }
-        List<ClassDeclarationCompiler.PrivateMethodEntry> privateInstanceMethodFunctions = compilerContext.classDeclarationCompiler
-                .compilePrivateMethodFunctions(privateInstanceMethods, privateSymbols, computedFieldSymbols);
-        List<ClassDeclarationCompiler.PrivateMethodEntry> privateStaticMethodFunctions = compilerContext.classDeclarationCompiler
-                .compilePrivateMethodFunctions(privateStaticMethods, privateSymbols, computedFieldSymbols);
-
-        JSBytecodeFunction constructorFunc;
-        if (constructor != null) {
-            constructorFunc = compilerContext.classDeclarationCompiler.compileMethodAsFunction(constructor, className,
-                    classExpr.getSuperClass() != null, instanceFields, privateSymbols, computedFieldSymbols,
-                    autoAccessorBackingSymbols, privateInstanceMethodFunctions, true);
-        } else {
-            constructorFunc = compilerContext.classDeclarationCompiler.createDefaultConstructor(className,
-                    classExpr.getSuperClass() != null, instanceFields, privateSymbols, computedFieldSymbols,
-                    autoAccessorBackingSymbols, privateInstanceMethodFunctions, classExpr.getLocation());
-        }
-
-        if (compilerContext.sourceCode != null && classExpr.getLocation() != null) {
-            int startPos = classExpr.getLocation().offset();
-            int endPos = classExpr.getLocation().endOffset();
-            if (startPos >= 0 && endPos <= compilerContext.sourceCode.length()) {
-                String classSource = compilerContext.sourceCode.substring(startPos, endPos);
-                constructorFunc.setSourceCode(classSource);
+            Map<String, JSSymbol> privateSymbols = new LinkedHashMap<>(compilerContext.privateSymbols);
+            privateSymbols.putAll(ownPrivateSymbols);
+            IdentityHashMap<PropertyDefinition, JSSymbol> autoAccessorBackingSymbols = new IdentityHashMap<>();
+            for (Map.Entry<PropertyDefinition, String> entry : autoAccessorBackingNames.entrySet()) {
+                JSSymbol backingSymbol = privateSymbols.get(entry.getValue());
+                if (backingSymbol != null) {
+                    autoAccessorBackingSymbols.put(entry.getKey(), backingSymbol);
+                }
             }
-        }
-        constructorFunc.setClassPrivateSymbols(ownPrivateSymbols.values());
+            List<ClassDeclarationCompiler.PrivateMethodEntry> privateInstanceMethodFunctions = compilerContext.classDeclarationCompiler
+                    .compilePrivateMethodFunctions(privateInstanceMethods, privateSymbols, computedFieldSymbols);
+            List<ClassDeclarationCompiler.PrivateMethodEntry> privateStaticMethodFunctions = compilerContext.classDeclarationCompiler
+                    .compilePrivateMethodFunctions(privateStaticMethods, privateSymbols, computedFieldSymbols);
 
-        compilerContext.emitter.emitOpcodeConstant(Opcode.FCLOSURE, constructorFunc);
-        compilerContext.emitter.emitOpcodeAtom(Opcode.DEFINE_CLASS, className);
-
-        compilerContext.emitter.emitOpcode(Opcode.SWAP);
-
-        for (MethodDefinition method : methods) {
-            if (method.isStatic()) {
-                compilerContext.emitter.emitOpcode(Opcode.SWAP);
-
-                JSBytecodeFunction methodFunc = compilerContext.classDeclarationCompiler.compileMethodAsFunction(method,
-                        method.getSimpleName(), false, List.of(), privateSymbols, computedFieldSymbols,
-                        autoAccessorBackingSymbols, List.of(), false);
-
-                String methodName = method.getSimpleName();
-                compilerContext.emitHelpers.emitClassMethodDefinition(method, methodFunc, methodName);
-                compilerContext.emitter.emitOpcode(Opcode.SWAP);
+            JSBytecodeFunction constructorFunc;
+            if (constructor != null) {
+                constructorFunc = compilerContext.classDeclarationCompiler.compileMethodAsFunction(constructor,
+                        className, classExpr.getSuperClass() != null, instanceFields, privateSymbols,
+                        computedFieldSymbols, autoAccessorBackingSymbols, privateInstanceMethodFunctions, true);
             } else {
-                JSBytecodeFunction methodFunc = compilerContext.classDeclarationCompiler.compileMethodAsFunction(method,
-                        method.getSimpleName(), false, List.of(), privateSymbols, computedFieldSymbols,
-                        autoAccessorBackingSymbols, List.of(), false);
-
-                String methodName = method.getSimpleName();
-                compilerContext.emitHelpers.emitClassMethodDefinition(method, methodFunc, methodName);
-            }
-        }
-
-        compilerContext.classDeclarationCompiler.installPrivateStaticMethods(privateStaticMethodFunctions,
-                privateSymbols);
-
-        for (PropertyDefinition field : computedFieldsInDefinitionOrder) {
-            compilerContext.classDeclarationCompiler.compileComputedFieldNameCache(field, computedFieldSymbols,
-                    privateSymbols);
-        }
-
-        compilerContext.emitter.emitOpcode(Opcode.SWAP);
-        compilerContext.emitter.emitOpcode(Opcode.NIP);
-
-        if (hasClassNameScope) {
-            compilerContext.emitter.emitOpcode(Opcode.DUP);
-            compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, classNameLocalIndex);
-        }
-
-        for (ClassElement staticInitializer : staticInitializers) {
-            JSBytecodeFunction staticInitializerFunc;
-            if (staticInitializer instanceof PropertyDefinition staticField) {
-                staticInitializerFunc = compilerContext.classDeclarationCompiler.compileStaticFieldInitializer(
-                        staticField, computedFieldSymbols, privateSymbols, autoAccessorBackingSymbols, className);
-            } else if (staticInitializer instanceof StaticBlock staticBlock) {
-                staticInitializerFunc = compilerContext.classDeclarationCompiler.compileStaticBlock(staticBlock,
-                        className, privateSymbols);
-            } else {
-                continue;
+                constructorFunc = compilerContext.classDeclarationCompiler.createDefaultConstructor(className,
+                        classExpr.getSuperClass() != null, instanceFields, privateSymbols, computedFieldSymbols,
+                        autoAccessorBackingSymbols, privateInstanceMethodFunctions, classExpr.getLocation());
             }
 
-            compilerContext.emitter.emitOpcode(Opcode.DUP);
-            compilerContext.emitter.emitOpcodeConstant(Opcode.FCLOSURE, staticInitializerFunc);
+            if (compilerContext.sourceCode != null && classExpr.getLocation() != null) {
+                int startPos = classExpr.getLocation().offset();
+                int endPos = classExpr.getLocation().endOffset();
+                if (startPos >= 0 && endPos <= compilerContext.sourceCode.length()) {
+                    String classSource = compilerContext.sourceCode.substring(startPos, endPos);
+                    constructorFunc.setSourceCode(classSource);
+                }
+            }
+            constructorFunc.setClassPrivateSymbols(ownPrivateSymbols.values());
+
+            compilerContext.emitter.emitOpcodeConstant(Opcode.FCLOSURE, constructorFunc);
+            compilerContext.emitter.emitOpcodeAtom(Opcode.DEFINE_CLASS, className);
+
+            // The constructor now carries this evaluation's private-brand remapping. Close methods
+            // while it is on the stack, so they share both that brand and the lexical environment.
+            for (ClassDeclarationCompiler.PrivateMethodEntry entry : privateInstanceMethodFunctions) {
+                compilerContext.emitter.emitOpcodeConstant(Opcode.FCLOSURE, entry.function());
+                compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC,
+                        compilerContext.scopeManager.currentScope().getLocal(entry.bindingName()));
+            }
+
             compilerContext.emitter.emitOpcode(Opcode.SWAP);
-            compilerContext.emitter.emitOpcodeU16(Opcode.CALL, 0);
-            compilerContext.emitter.emitOpcode(Opcode.DROP);
-        }
 
-        if (hasClassNameScope) {
-            compilerContext.scopeManager.exitScope();
-            if (!classNameWasTDZ) {
-                compilerContext.tdzLocals.remove(className);
+            for (MethodDefinition method : methods) {
+                if (method.isStatic()) {
+                    compilerContext.emitter.emitOpcode(Opcode.SWAP);
+
+                    JSBytecodeFunction methodFunc = compilerContext.classDeclarationCompiler.compileMethodAsFunction(
+                            method, method.getSimpleName(), false, List.of(), privateSymbols, computedFieldSymbols,
+                            autoAccessorBackingSymbols, List.of(), false);
+
+                    String methodName = method.getSimpleName();
+                    compilerContext.emitHelpers.emitClassMethodDefinition(method, methodFunc, methodName);
+                    compilerContext.emitter.emitOpcode(Opcode.SWAP);
+                } else {
+                    JSBytecodeFunction methodFunc = compilerContext.classDeclarationCompiler.compileMethodAsFunction(
+                            method, method.getSimpleName(), false, List.of(), privateSymbols, computedFieldSymbols,
+                            autoAccessorBackingSymbols, List.of(), false);
+
+                    String methodName = method.getSimpleName();
+                    compilerContext.emitHelpers.emitClassMethodDefinition(method, methodFunc, methodName);
+                }
             }
-        }
 
-        compilerContext.popState();
+            compilerContext.classDeclarationCompiler.installPrivateStaticMethods(privateStaticMethodFunctions,
+                    privateSymbols);
+
+            for (PropertyDefinition field : computedFieldsInDefinitionOrder) {
+                compilerContext.classDeclarationCompiler.compileComputedFieldNameCache(field, computedFieldSymbols,
+                        privateSymbols);
+            }
+
+            compilerContext.emitter.emitOpcode(Opcode.SWAP);
+            compilerContext.emitter.emitOpcode(Opcode.NIP);
+
+            if (hasClassNameScope) {
+                compilerContext.emitter.emitOpcode(Opcode.DUP);
+                compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, classNameLocalIndex);
+            }
+
+            for (ClassElement staticInitializer : staticInitializers) {
+                JSBytecodeFunction staticInitializerFunc;
+                if (staticInitializer instanceof PropertyDefinition staticField) {
+                    staticInitializerFunc = compilerContext.classDeclarationCompiler.compileStaticFieldInitializer(
+                            staticField, computedFieldSymbols, privateSymbols, autoAccessorBackingSymbols, className);
+                } else if (staticInitializer instanceof StaticBlock staticBlock) {
+                    staticInitializerFunc = compilerContext.classDeclarationCompiler.compileStaticBlock(staticBlock,
+                            className, privateSymbols);
+                } else {
+                    continue;
+                }
+
+                compilerContext.emitter.emitOpcode(Opcode.DUP);
+                compilerContext.emitter.emitOpcodeConstant(Opcode.FCLOSURE, staticInitializerFunc);
+                compilerContext.emitter.emitOpcode(Opcode.SWAP);
+                compilerContext.emitter.emitOpcodeU16(Opcode.CALL, 0);
+                compilerContext.emitter.emitOpcode(Opcode.DROP);
+            }
+
+        } finally {
+            if (hasClassNameScope) {
+                compilerContext.scopeManager.exitScope();
+                if (!classNameWasTDZ) {
+                    compilerContext.tdzLocals.remove(className);
+                }
+            }
+
+            compilerContext.popState();
+        }
     }
 }

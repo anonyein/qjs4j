@@ -53,7 +53,7 @@ final class ThrowStatementCompiler extends AstNodeCompiler<ThrowStatement> {
 
         // Legacy path: when no block-level CATCH protects using declarations
         int throwValueIndex = compilerContext.scopeManager.currentScope()
-                .declareLocal("$throw_value_" + compilerContext.emitter.currentOffset());
+                .declareLocal("#throw_value_" + compilerContext.emitter.currentOffset());
         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, throwValueIndex);
 
         int disposalCatchJump = compilerContext.emitter.emitJump(Opcode.CATCH);
@@ -66,7 +66,7 @@ final class ThrowStatementCompiler extends AstNodeCompiler<ThrowStatement> {
         compilerContext.emitter.patchJump(disposalCatchJump, compilerContext.emitter.currentOffset());
 
         int disposalErrorIndex = compilerContext.scopeManager.currentScope()
-                .declareLocal("$disposal_error_" + compilerContext.emitter.currentOffset());
+                .declareLocal("#disposal_error_" + compilerContext.emitter.currentOffset());
         compilerContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, disposalErrorIndex);
 
         compilerContext.emitter.emitOpcodeAtom(Opcode.GET_VAR, "SuppressedError");

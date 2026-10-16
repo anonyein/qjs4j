@@ -44,30 +44,19 @@ qjs4j includes features not present in the original QuickJS:
 
 ### Known limitations
 
-- **Module source is transformed textually, not parsed.** The parser validates `import`/`export`
-  syntax and then discards it, so modules are implemented by rewriting module source into ordinary
-  script source: imports become temporary accessors on the global object, and exports become
-  generated bindings declared beside the author's own code. Three consequences are known to be
-  wrong, and each is pinned as a `testKnownLimitation*` test in
-  `src/test/java/com/caoccao/qjs4j/core/JSModuleKnownLimitationTest.java`, which is the
-  authoritative list — those tests assert the wrong answer on purpose, so fixing a defect makes one
-  fail:
-  - an imported binding is not usable from a closure retained after `JSContext.eval()` returns, and
-    is not live;
-  - the transformer's generated bookkeeping bindings are visible to a direct `eval` inside the
-    module;
-  - an import attribute naming an unsupported module type is ignored rather than refused.
-
-  Real module environment records, with indirect bindings the compiler can capture, are the fix for
-  all three, and are a dedicated milestone. Loading and linking are otherwise separated from
-  evaluation: a graph that names a module it cannot load, or a name nothing exports, fails before
-  any module body runs.
+- **Module exports still use a textual transform.** The parser validates module syntax before
+  normalization and rewriting. Imports live in persistent module environments, remain live after
+  evaluation, and are inherited by closures. Generated bindings are hidden from direct eval.
+  The loader rejects unsupported import attributes before running a body. These behaviors are
+  covered by `JSModuleEnvironmentTest`; retaining import/export AST nodes remains an architectural
+  simplification rather than a prerequisite for those fixes.
 - **Resource limits bound data blocks, not the heap.**
   `JSRuntimeOptions.setMaxDataBlockBytes(long)` (formerly `setMaxMemoryUsage`, now deprecated)
-  counts every byte allocated for an `ArrayBuffer` or `SharedArrayBuffer` and refuses an allocation
-  past the ceiling with a catchable `RangeError`. The default ceiling is 64 MiB, and a single data
-  block is one Java `byte[]`, so no buffer or typed array exceeds `Integer.MAX_VALUE - 8` bytes even
-  with the ceiling disabled; V8 allocates `new ArrayBuffer(2 ** 31)`, qjs4j refuses it.
+  charges logical buffer capacity and refuses allocations beyond the budget with a catchable
+  `RangeError`. The default budget is 64 MiB. Raising or disabling it permits segmented buffers
+  above 2 GiB, up to the sandboxed 64-bit V8 limit of 32 GiB - 1. Large buffers commit pages on
+  first write; their full logical capacity still counts against the budget. See
+  [the large-buffer Java API migration](docs/migration/LARGE_BUFFERS.md).
   Objects, arrays, strings and bytecode are ordinary Java allocations bounded by `-Xmx`.
   `setMaxCallDepth(int)` bounds the interpreter's call depth — 10,000 frames by default, about V8's — not
   the JVM's own stack. Each frame also occupies Java stack (about 1.4 KiB for a plain call), so the full
@@ -77,11 +66,9 @@ qjs4j includes features not present in the original QuickJS:
   `TextEncoder`, `URL` and the like are host functions, not ECMAScript, and an embedder provides the
   ones it wants. The command-line interpreter adds `queueMicrotask`, `setTimeout`, `setInterval`,
   `clearTimeout` and `clearInterval` with Node's ordering, and runs timers until none is left.
-- **Strings are at most 2<sup>27</sup> − 1 code units** (`JSString.MAX_LENGTH`, 134 million), a
-  quarter of V8's 2<sup>29</sup> − 24; longer results raise `RangeError: Invalid string length`. A
-  string at V8's limit is over a gigabyte of `char` data on the Java heap, and building one needs
-  about twice that, so on an ordinary heap the JVM would run out of memory first — the failure the
-  limit exists to turn into a catchable error.
+- **Strings use V8's 2<sup>29</sup> - 24 code-unit limit** (`JSString.MAX_LENGTH`, 536,870,888).
+  Repetition, concatenation, joining and replacement preserve ropes. Operations that need flat
+  characters still require sufficient Java heap; the length limit is not a total heap budget.
 - **`WeakMap`/`WeakSet` are ephemeron-correct but not enumerable**, as the specification requires;
   a collection that dies while its keys live leaves entries to be pruned lazily.
 

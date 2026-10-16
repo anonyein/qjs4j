@@ -77,6 +77,20 @@ public class CommandLineHostTest extends BaseTest {
     }
 
     @Test
+    public void testCancelledTimersAreRemovedImmediately() throws ReflectiveOperationException {
+        CommandLineHost host = new CommandLineHost(context);
+        host.install();
+        context.eval("for(let i=0;i<1000;i++)clearTimeout(setTimeout(()=>{},2147483647,{payload:i}));");
+        java.lang.reflect.Field queue = CommandLineHost.class.getDeclaredField("timerQueue");
+        queue.setAccessible(true);
+        assertThat((java.util.Collection<?>) queue.get(host)).isEmpty();
+        assertThat(host.runTimers(() -> true)).isTrue();
+        context.eval("let timer=setInterval(()=>clearInterval(timer),1);");
+        assertThat(host.runTimers(() -> true)).isTrue();
+        assertThat((java.util.Collection<?>) queue.get(host)).isEmpty();
+    }
+
+    @Test
     public void testTimersDueTogetherRunInCreationOrder() {
         CommandLineHost host = new CommandLineHost(context, () -> 0L);
         host.install();

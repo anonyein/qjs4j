@@ -16,25 +16,23 @@
 
 package com.caoccao.qjs4j.core;
 
-import java.nio.ByteBuffer;
-
 /**
  * Interface for ArrayBuffer objects (ArrayBuffer and SharedArrayBuffer).
  */
 public sealed interface IJSArrayBuffer permits JSArrayBuffer, JSSharedArrayBuffer {
     /**
-     * Get the underlying ByteBuffer.
+     * Get the underlying JSByteBuffer.
      *
-     * @return The ByteBuffer
+     * @return The JSByteBuffer
      */
-    ByteBuffer getBuffer();
+    JSByteBuffer getBuffer();
 
     /**
      * Get the byte length of the buffer.
      *
      * @return The byte length
      */
-    int getByteLength();
+    long getByteLength();
 
     /**
      * Check if the buffer is detached.

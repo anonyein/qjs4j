@@ -37,7 +37,7 @@ public final class SetPrototype {
     }
 
     private static Boolean callHas(JSContext context, SetRecord setRecord, JSValue key) {
-        JSValue result = setRecord.hasFunction.call(context, setRecord.objectValue, new JSValue[]{key});
+        JSValue result = JSCall.call(context, setRecord.hasFunction, setRecord.objectValue, new JSValue[]{key});
         if (context.hasPendingException()) {
             return null;
         }
@@ -61,16 +61,17 @@ public final class SetPrototype {
         if (context.hasPendingException()) {
             return;
         }
-        if (!(returnMethod instanceof JSFunction returnFunction)) {
+        if (!JSTypeChecking.isCallable(returnMethod)) {
             return;
         }
-        returnFunction.call(context, iteratorObject, JSValue.NO_ARGS);
+        JSCall.call(context, returnMethod, iteratorObject, JSValue.NO_ARGS);
     }
 
     private static JSSet copySet(JSContext context, JSSet sourceSet) {
         JSSet newSet = context.createJSSet();
         JSSet.IterationCursor cursor = sourceSet.createIterationCursor();
         while (true) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             JSValue value = sourceSet.nextIterationValue(cursor);
             if (value == null) {
                 break;
@@ -109,6 +110,7 @@ public final class SetPrototype {
         if (set.size() <= record.size) {
             JSSet.IterationCursor cursor = newSet.createIterationCursor();
             while (true) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 JSValue item = newSet.nextIterationValue(cursor);
                 if (item == null) {
                     break;
@@ -127,6 +129,7 @@ public final class SetPrototype {
                 return JSUndefined.INSTANCE;
             }
             while (true) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 IteratorStep step = iteratorStep(context, iteratorRecord);
                 if (step == null) {
                     return JSUndefined.INSTANCE;
@@ -161,20 +164,22 @@ public final class SetPrototype {
             return context.throwTypeError("Set.prototype.forEach called on non-Set");
         }
 
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Set.prototype.forEach requires a function");
         }
+        JSValue callback = args[0];
 
         JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
         JSSet.IterationCursor cursor = set.createIterationCursor();
         while (true) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             JSValue value = set.nextIterationValue(cursor);
             if (value == null) {
                 break;
             }
             JSValue[] callbackArgs = new JSValue[]{value, value, set};
-            callback.call(context, callbackThisArg, callbackArgs);
+            JSCall.call(context, callback, callbackThisArg, callbackArgs);
             if (context.hasPendingException()) {
                 return JSUndefined.INSTANCE;
             }
@@ -184,7 +189,7 @@ public final class SetPrototype {
     }
 
     private static IteratorRecord getKeysIteratorRecord(JSContext context, SetRecord setRecord) {
-        JSValue iteratorValue = setRecord.keysFunction.call(context, setRecord.objectValue, JSValue.NO_ARGS);
+        JSValue iteratorValue = JSCall.call(context, setRecord.keysFunction, setRecord.objectValue, JSValue.NO_ARGS);
         if (context.hasPendingException()) {
             return null;
         }
@@ -197,11 +202,11 @@ public final class SetPrototype {
         if (context.hasPendingException()) {
             return null;
         }
-        if (!(nextMethod instanceof JSFunction nextFunction)) {
+        if (!JSTypeChecking.isCallable(nextMethod)) {
             context.throwTypeError("Iterator next is not a function");
             return null;
         }
-        return new IteratorRecord(iteratorObject, nextFunction);
+        return new IteratorRecord(iteratorObject, nextMethod);
     }
 
     private static SetRecord getSetRecord(JSContext context, JSValue value) {
@@ -246,7 +251,7 @@ public final class SetPrototype {
             context.throwTypeError(".has is undefined");
             return null;
         }
-        if (!(hasValue instanceof JSFunction hasFunction)) {
+        if (!JSTypeChecking.isCallable(hasValue)) {
             context.throwTypeError(".has is not a function");
             return null;
         }
@@ -259,11 +264,11 @@ public final class SetPrototype {
             context.throwTypeError(".keys is undefined");
             return null;
         }
-        if (!(keysValue instanceof JSFunction keysFunction)) {
+        if (!JSTypeChecking.isCallable(keysValue)) {
             context.throwTypeError(".keys is not a function");
             return null;
         }
-        return new SetRecord(value, size, hasFunction, keysFunction);
+        return new SetRecord(value, size, hasValue, keysValue);
     }
 
     /**
@@ -308,6 +313,7 @@ public final class SetPrototype {
                 return JSUndefined.INSTANCE;
             }
             while (true) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 IteratorStep step = iteratorStep(context, iteratorRecord);
                 if (step == null) {
                     return JSUndefined.INSTANCE;
@@ -322,6 +328,7 @@ public final class SetPrototype {
         } else {
             JSSet.IterationCursor cursor = set.createIterationCursor();
             while (true) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 JSValue item = set.nextIterationValue(cursor);
                 if (item == null) {
                     break;
@@ -353,6 +360,7 @@ public final class SetPrototype {
         if (set.size() <= record.size) {
             JSSet.IterationCursor cursor = set.createIterationCursor();
             while (true) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 JSValue item = set.nextIterationValue(cursor);
                 if (item == null) {
                     break;
@@ -371,6 +379,7 @@ public final class SetPrototype {
                 return JSUndefined.INSTANCE;
             }
             while (true) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 IteratorStep step = iteratorStep(context, iteratorRecord);
                 if (step == null) {
                     return JSUndefined.INSTANCE;
@@ -404,6 +413,7 @@ public final class SetPrototype {
         }
         JSSet.IterationCursor cursor = set.createIterationCursor();
         while (true) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             JSValue item = set.nextIterationValue(cursor);
             if (item == null) {
                 break;
@@ -439,6 +449,7 @@ public final class SetPrototype {
             return JSUndefined.INSTANCE;
         }
         while (true) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             IteratorStep step = iteratorStep(context, iteratorRecord);
             if (step == null) {
                 return JSUndefined.INSTANCE;
@@ -456,7 +467,8 @@ public final class SetPrototype {
 
     private static IteratorStep iteratorStep(JSContext context, IteratorRecord iteratorRecord) {
         // Call the cached next method
-        JSValue nextResult = iteratorRecord.nextFunction.call(context, iteratorRecord.iteratorObject, JSValue.NO_ARGS);
+        JSValue nextResult = JSCall.call(context, iteratorRecord.nextFunction, iteratorRecord.iteratorObject,
+                JSValue.NO_ARGS);
         if (context.hasPendingException()) {
             return null;
         }
@@ -507,6 +519,7 @@ public final class SetPrototype {
         }
         JSSet newSet = copySet(context, set);
         while (true) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             IteratorStep step = iteratorStep(context, iteratorRecord);
             if (step == null) {
                 return JSUndefined.INSTANCE;
@@ -545,6 +558,7 @@ public final class SetPrototype {
         }
         JSSet newSet = copySet(context, set);
         while (true) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             IteratorStep step = iteratorStep(context, iteratorRecord);
             if (step == null) {
                 return JSUndefined.INSTANCE;
@@ -568,12 +582,12 @@ public final class SetPrototype {
         return JSIterator.setValuesIterator(context, set);
     }
 
-    private record IteratorRecord(JSObject iteratorObject, JSFunction nextFunction) {
+    private record IteratorRecord(JSObject iteratorObject, JSValue nextFunction) {
     }
 
     private record IteratorStep(JSValue value, boolean done) {
     }
 
-    private record SetRecord(JSValue objectValue, long size, JSFunction hasFunction, JSFunction keysFunction) {
+    private record SetRecord(JSValue objectValue, long size, JSValue hasFunction, JSValue keysFunction) {
     }
 }

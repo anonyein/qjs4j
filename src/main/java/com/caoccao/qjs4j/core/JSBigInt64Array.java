@@ -20,7 +20,6 @@ import com.caoccao.qjs4j.exceptions.JSSyntaxErrorException;
 import com.caoccao.qjs4j.exceptions.JSTypeErrorException;
 
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 
 /**
  * Represents a JavaScript BigInt64Array. 64-bit signed integer array.
@@ -32,33 +31,33 @@ public final class JSBigInt64Array extends JSTypedArray {
     /**
      * Create a BigInt64Array view on an existing buffer.
      */
-    public JSBigInt64Array(JSContext context, IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSBigInt64Array(JSContext context, IJSArrayBuffer buffer, long byteOffset, long length) {
         super(context, buffer, byteOffset, length, BYTES_PER_ELEMENT);
     }
 
     /**
      * Create a BigInt64Array with a new buffer.
      */
-    public JSBigInt64Array(JSContext context, int length) {
+    public JSBigInt64Array(JSContext context, long length) {
         super(context, length, BYTES_PER_ELEMENT);
     }
 
     @Override
-    protected JSTypedArray createView(int byteOffset, int length) {
+    protected JSTypedArray createView(IJSArrayBuffer buffer, long byteOffset, long length) {
         return new JSBigInt64Array(context, buffer, byteOffset, length);
     }
 
     @Override
-    public double getElement(int index) {
+    public double getElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         return buf.getLong(index * BYTES_PER_ELEMENT);
     }
 
     @Override
-    public JSValue getJSElement(int index) {
+    public JSValue getJSElement(long index) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         return new JSBigInt(BigInteger.valueOf(buf.getLong(index * BYTES_PER_ELEMENT)));
     }
 
@@ -73,7 +72,7 @@ public final class JSBigInt64Array extends JSTypedArray {
     }
 
     @Override
-    protected void integerIndexedElementSet(int index, JSValue value) {
+    protected void integerIndexedElementSet(long index, JSValue value) {
         long longVal;
         try {
             longVal = JSTypeConversions.toBigInt64(context, value);
@@ -85,7 +84,7 @@ public final class JSBigInt64Array extends JSTypedArray {
             return;
         }
         if (!buffer.isDetached() && index >= 0 && index < getLength()) {
-            ByteBuffer buf = getByteBuffer();
+            JSByteBuffer buf = getByteBuffer();
             buf.putLong(index * BYTES_PER_ELEMENT, longVal);
         }
     }
@@ -101,17 +100,17 @@ public final class JSBigInt64Array extends JSTypedArray {
     }
 
     @Override
-    public void setElement(int index, double value) {
+    public void setElement(long index, double value) {
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         buf.putLong(index * BYTES_PER_ELEMENT, (long) value);
     }
 
     @Override
-    protected void setJSElement(int index, JSValue value) {
+    protected void setJSElement(long index, JSValue value) {
         long longVal = JSTypeConversions.toBigInt64(context, value);
         checkIndex(index);
-        ByteBuffer buf = getByteBuffer();
+        JSByteBuffer buf = getByteBuffer();
         // Write raw signed 64-bit value directly to avoid precision loss via double.
         buf.putLong(index * BYTES_PER_ELEMENT, longVal);
     }

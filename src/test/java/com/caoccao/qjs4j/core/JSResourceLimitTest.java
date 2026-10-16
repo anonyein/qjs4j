@@ -39,10 +39,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <ul>
  * <li>The ReDoS step budget. V8 runs {@code /(a+)+$/} against 64 characters to completion; qjs4j stops it. Bounding it
  * is the whole point.</li>
- * <li>The exact string-length boundary. V8's {@code String::kMaxLength} is {@code (1 << 29) - 24}; qjs4j's is
- * {@code (1 << 27) - 1}, four times lower, because a Java {@code String} is two bytes per character unconditionally —
- * V8's ceiling would put a single string over a gigabyte of heap. Both engines reject anything past their own ceiling,
- * and that shared behaviour is what the compared assertions check.</li>
  * <li>The host interrupt and execution deadline, which are Java API with no JavaScript surface.</li>
  * </ul>
  */
@@ -201,29 +197,21 @@ public class JSResourceLimitTest extends BaseJavetTest {
                     'a'.repeat(2 ** 17).replace(/a/g, 'b'.repeat(2 ** 13));
                     'NO ERROR';
                 } catch (e) { 'CAUGHT ' + e.name + ': ' + e.message }""");
-        // The unmatched tail is counted too. Not compared with V8, whose ceiling is four times higher.
-        assertThat(evalToString("""
+        // Count the unmatched tail without materializing a half-gigabyte replacement.
+        assertStringWithJavet("""
                 try {
-                    ('x' + 'a'.repeat(1000)).replace(/x/, 'b'.repeat((2 ** 27 - 1) - 500));
+                    ('x' + 'a'.repeat(1000)).replace(/x/, () => 'b'.repeat(536870888 - 500));
                     'NO ERROR';
-                } catch (e) { 'CAUGHT ' + e.name + ': ' + e.message }"""))
-                .isEqualTo("CAUGHT RangeError: Invalid string length");
+                } catch (e) { 'CAUGHT ' + e.name + ': ' + e.message }""");
     }
 
     @Test
     @Timeout(60)
     public void testRepeatAtTheExactLengthBoundary() {
-        // The boundary the division has to get right: exactly MAX_LENGTH is allowed, one more is
-        // not. MAX_LENGTH is 2^27 - 1, which is odd, so a two-character string cannot reach it.
-        //
-        // Not compared with V8: V8's String::kMaxLength is (1 << 29) - 24, four times higher, so V8
-        // accepts both of these. A Java String is two bytes per character unconditionally, where
-        // V8 uses one for Latin-1, so matching V8's ceiling would put a single string past a
-        // gigabyte of heap. What both engines do share — anything past either ceiling is a
-        // RangeError — is asserted by the repeat and pad tests that do go through V8.
-        assertThat(evalToString("'ab'.repeat(67108863).length")).isEqualTo("134217726");
-        assertThat(evalToString("try { 'ab'.repeat(67108864); 'NO ERROR' } catch (e) { 'CAUGHT ' + e.name }"))
-                .isEqualTo("CAUGHT RangeError");
+        assertIntegerWithJavet("'ab'.repeat(268435444).length", "'a'.repeat(536870888).length",
+                "'abc'.repeat(178956962).length");
+        assertStringWithJavet("try { 'a'.repeat(536870889); 'NO ERROR' } catch (e) { e.name }",
+                "try { 'ab'.repeat(268435445); 'NO ERROR' } catch (e) { e.name }");
     }
 
     @Test
@@ -297,14 +285,13 @@ public class JSResourceLimitTest extends BaseJavetTest {
                   attempt(() => s.replaceAll('a', "$'".repeat(1024))),
                   attempt(() => s.replace('a', '$&'.repeat(1024))),
                 ].join('\\n')""");
-        // The head, replacement and tail are counted together. Not compared with V8, whose ceiling is four times
-        // higher.
-        assertThat(evalToString("""
+        assertStringWithJavet("""
                 try {
-                    ('a' + 'b'.repeat(2 ** 26)).replace('a', 'c'.repeat(2 ** 26 + 1));
+                    ('a' + 'b'.repeat(1000)).replace('a', () => 'c'.repeat(536870888 - 500));
                     'NO ERROR';
-                } catch (e) { 'CAUGHT ' + e.name + ': ' + e.message }"""))
-                .isEqualTo("CAUGHT RangeError: Invalid string length");
+                } catch (e) { 'CAUGHT ' + e.name + ': ' + e.message }""");
+        assertIntegerWithJavet("'x'.replace('x', () => 'c'.repeat(536870888)).length",
+                "'xx'.replaceAll('x', () => 'c'.repeat(268435444)).length");
     }
 
     @Test

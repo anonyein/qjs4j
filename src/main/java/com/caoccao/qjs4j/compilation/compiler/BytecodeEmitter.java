@@ -30,10 +30,7 @@ public final class BytecodeEmitter {
     private static final int INITIAL_CODE_CAPACITY = 256;
     private final Map<String, Integer> atomIndexCache;
     private final List<String> atomPool;
-    /**
-     * QuickJS's {@code pc2line} table, as flattened (pc, line, column) triples in ascending pc order: the source
-     * position of the instructions from each pc up to the next entry's.
-     */
+    /** Callee descriptions indexed by call instruction position, for diagnostics. */
     private Map<Integer, String> callDescriptions;
     /**
      * Growable code buffer, written and patched in place.
@@ -48,6 +45,10 @@ public final class BytecodeEmitter {
     private int codeSize;
     private final Map<JSValue, Integer> constantIndexCache;
     private final List<JSValue> constantPool;
+    /**
+     * QuickJS's {@code pc2line} table, as flattened (pc, line, column) triples in ascending pc order: the source
+     * position of the instructions from each pc up to the next entry's.
+     */
     private int[] sourcePositions;
     private int sourcePositionsSize;
 

@@ -1498,11 +1498,6 @@ record StatementParser(ParserContext parserContext, ParserDelegates delegates) {
         return new WithStatement(object, body, location);
     }
 
-    private boolean shouldApplyUsingSwitchCaseEarlyError() {
-        String source = parserContext.lexer.getSource();
-        return source != null && source.contains("$DONOTEVALUATE");
-    }
-
     private boolean shouldParseLetAsLexicalDeclarationInForHead() {
         if (!parserContext.match(TokenType.LET)) {
             return true;
@@ -1805,7 +1800,7 @@ record StatementParser(ParserContext parserContext, ParserDelegates delegates) {
             for (Statement statement : switchCase.getConsequent()) {
                 if (statement instanceof VariableDeclaration variableDeclaration
                         && variableDeclaration.getKind() != VariableKind.VAR) {
-                    if (hasUsingInitializer(variableDeclaration) && shouldApplyUsingSwitchCaseEarlyError()) {
+                    if (hasUsingInitializer(variableDeclaration)) {
                         throw new JSSyntaxErrorException(
                                 "using declarations are not allowed directly in case/default clauses");
                     }

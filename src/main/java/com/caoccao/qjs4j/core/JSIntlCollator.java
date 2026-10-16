@@ -25,6 +25,7 @@ import java.util.Locale;
  */
 public final class JSIntlCollator extends JSObject {
     public static final String NAME = "Intl.Collator";
+    private final Collator accentCollator;
     private JSFunction boundCompareFunction;
     private final String caseFirst;
     private final String collation;
@@ -33,6 +34,7 @@ public final class JSIntlCollator extends JSObject {
     private final Locale locale;
     private final boolean numeric;
     private final boolean phonebookMode;
+    private final Collator primaryCollator;
     private final String resolvedLocaleTag;
     private final String sensitivity;
     private final String usage;
@@ -61,11 +63,15 @@ public final class JSIntlCollator extends JSObject {
         }
         // Enable decomposition for canonical equivalence
         collator.setDecomposition(Collator.CANONICAL_DECOMPOSITION);
+        accentCollator = (Collator) collator.clone();
+        accentCollator.setStrength(Collator.SECONDARY);
+        primaryCollator = (Collator) collator.clone();
+        primaryCollator.setStrength(Collator.PRIMARY);
     }
 
     public int compare(String left, String right) {
-        String effectiveLeft = left;
-        String effectiveRight = right;
+        String effectiveLeft = normalizeDigits(left);
+        String effectiveRight = normalizeDigits(right);
         if (ignorePunctuation) {
             effectiveLeft = stripPunctuation(effectiveLeft);
             effectiveRight = stripPunctuation(effectiveRight);
@@ -78,7 +84,85 @@ public final class JSIntlCollator extends JSObject {
             effectiveLeft = stripAccents(effectiveLeft);
             effectiveRight = stripAccents(effectiveRight);
         }
-        return Integer.signum(collator.compare(effectiveLeft, effectiveRight));
+        if (numeric) {
+            return compareNumeric(effectiveLeft, effectiveRight);
+        }
+        return compareText(effectiveLeft, effectiveRight);
+    }
+
+    private int compareNumeric(String left, String right) {
+        int i = 0;
+        int j = 0;
+        int secondaryResult = 0;
+        while (i < left.length() && j < right.length()) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
+            if (Character.isDigit(left.codePointAt(i)) && Character.isDigit(right.codePointAt(j))) {
+                int leftEnd = digitEnd(left, i);
+                int rightEnd = digitEnd(right, j);
+                while (i < leftEnd && Character.digit(left.codePointAt(i), 10) == 0) {
+                    i += Character.charCount(left.codePointAt(i));
+                }
+                while (j < rightEnd && Character.digit(right.codePointAt(j), 10) == 0) {
+                    j += Character.charCount(right.codePointAt(j));
+                }
+                int lengthComparison = Integer.compare(left.codePointCount(i, leftEnd),
+                        right.codePointCount(j, rightEnd));
+                if (lengthComparison != 0) {
+                    return lengthComparison;
+                }
+                while (i < leftEnd) {
+                    int a = left.codePointAt(i);
+                    int b = right.codePointAt(j);
+                    int comparison = Integer.compare(Character.digit(a, 10), Character.digit(b, 10));
+                    if (comparison != 0) {
+                        return comparison;
+                    }
+                    i += Character.charCount(a);
+                    j += Character.charCount(b);
+                }
+                i = leftEnd;
+                j = rightEnd;
+            } else {
+                int leftEnd = textEnd(left, i);
+                int rightEnd = textEnd(right, j);
+                String a = left.substring(i, leftEnd);
+                String b = right.substring(j, rightEnd);
+                int comparison = compareText(a, b);
+                if (comparison != 0) {
+                    if (primaryCollator.compare(a, b) != 0) {
+                        return comparison;
+                    }
+                    if (secondaryResult == 0) {
+                        secondaryResult = comparison;
+                    }
+                }
+                i = leftEnd;
+                j = rightEnd;
+            }
+        }
+        int lengthComparison = Integer.compare(left.length() - i, right.length() - j);
+        return lengthComparison != 0 ? lengthComparison : secondaryResult;
+    }
+
+    private int compareText(String left, String right) {
+        int result = Integer.signum(collator.compare(left, right));
+        if (result == 0 || "false".equals(caseFirst) || "base".equals(sensitivity) || "accent".equals(sensitivity)) {
+            return result;
+        }
+        // Case is a tertiary distinction: accents and base letters retain their locale ordering.
+        if (accentCollator.compare(left, right) != 0) {
+            return result;
+        }
+        for (int i = 0, j = 0; i < left.length() && j < right.length();) {
+            int a = left.codePointAt(i);
+            int b = right.codePointAt(j);
+            if (Character.isUpperCase(a) != Character.isUpperCase(b)) {
+                return Character.isUpperCase(a) == "upper".equals(caseFirst) ? -1 : 1;
+            }
+            i += Character.charCount(a);
+            j += Character.charCount(b);
+        }
+        return result;
     }
 
     public JSFunction getBoundCompareFunction() {
@@ -121,6 +205,14 @@ public final class JSIntlCollator extends JSObject {
         this.boundCompareFunction = boundCompareFunction;
     }
 
+    private static int digitEnd(String value, int start) {
+        int end = start;
+        while (end < value.length() && Character.isDigit(value.codePointAt(end))) {
+            end += Character.charCount(value.codePointAt(end));
+        }
+        return end;
+    }
+
     /**
      * Expand German umlauts for phonebook collation (DIN 5007-2). ä→ae, ö→oe, ü→ue, Ä→Ae, Ö→Oe, Ü→Ue, ß→ss
      */
@@ -149,6 +241,24 @@ public final class JSIntlCollator extends JSObject {
             }
         }
         return result != null ? result.toString() : input;
+    }
+
+    private static String normalizeDigits(String text) {
+        StringBuilder result = null;
+        for (int offset = 0; offset < text.length();) {
+            int point = text.codePointAt(offset);
+            int digit = Character.digit(point, 10);
+            if (digit >= 0 && point > '9') {
+                if (result == null) {
+                    result = new StringBuilder(text.length()).append(text, 0, offset);
+                }
+                result.append((char) ('0' + digit));
+            } else if (result != null) {
+                result.appendCodePoint(point);
+            }
+            offset += Character.charCount(point);
+        }
+        return result == null ? text : result.toString();
     }
 
     /**
@@ -191,5 +301,13 @@ public final class JSIntlCollator extends JSObject {
             }
         }
         return result.toString();
+    }
+
+    private static int textEnd(String value, int start) {
+        int end = start + Character.charCount(value.codePointAt(start));
+        while (end < value.length() && !Character.isDigit(value.codePointAt(end))) {
+            end += Character.charCount(value.codePointAt(end));
+        }
+        return end;
     }
 }

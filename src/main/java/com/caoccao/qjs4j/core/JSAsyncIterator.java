@@ -170,6 +170,22 @@ public class JSAsyncIterator extends JSObject {
                 JSTypeConversions.toBoolean(done) == JSBoolean.TRUE);
     }
 
+    private static void closeSyncIteratorAfterRejection(JSContext context, JSObject iterator) {
+        if (iterator == null) {
+            return;
+        }
+        try {
+            JSValue method = iterator.get(PropertyKey.RETURN);
+            if (!context.hasPendingException() && !method.isNullOrUndefined()) {
+                JSCall.call(context, method, iterator, JSValue.NO_ARGS);
+            }
+        } catch (JSException | JSVirtualMachineException ignored) {
+            // IteratorClose with a throw completion preserves the original rejection.
+        } finally {
+            context.clearAllPendingExceptions();
+        }
+    }
+
     static JSValue consumePendingException(JSContext context) {
         JSValue reason = context.getPendingException();
         context.clearAllPendingExceptions();
@@ -230,19 +246,33 @@ public class JSAsyncIterator extends JSObject {
      * @return A promise that resolves to the iterator result (with resolved value)
      */
     public static JSPromise createAsyncFromSyncResultPromise(JSContext context, JSValue value, boolean done) {
+        return createAsyncFromSyncResultPromise(context, value, done, null);
+    }
+
+    /** The next() continuation closes a non-completed sync iterator if awaiting its value rejects. */
+    public static JSPromise createAsyncFromSyncResultPromise(JSContext context, JSValue value, boolean done,
+            JSObject syncIterator) {
         JSPromise valueWrapperPromise;
         if (value instanceof JSPromise promiseValue) {
             // PromiseResolve(%Promise%, value) performs observable constructor access.
             promiseValue.get(PropertyKey.CONSTRUCTOR);
             if (context.hasPendingException()) {
-                return createRejectedPromise(context, consumePendingException(context));
+                JSValue reason = consumePendingException(context);
+                if (!done) {
+                    closeSyncIteratorAfterRejection(context, syncIterator);
+                }
+                return createRejectedPromise(context, reason);
             }
             valueWrapperPromise = promiseValue;
         } else {
             valueWrapperPromise = context.createJSPromise();
             valueWrapperPromise.resolve(context, value);
             if (context.hasPendingException()) {
-                return createRejectedPromise(context, consumePendingException(context));
+                JSValue reason = consumePendingException(context);
+                if (!done) {
+                    closeSyncIteratorAfterRejection(context, syncIterator);
+                }
+                return createRejectedPromise(context, reason);
             }
         }
 
@@ -258,6 +288,9 @@ public class JSAsyncIterator extends JSObject {
                 }), null, context), new JSPromise.ReactionRecord(new JSNativeFunction(context, "onReject", 1,
                         (callbackContext, callbackThisArg, callbackArgs) -> {
                             JSValue reason = callbackArgs.length > 0 ? callbackArgs[0] : JSUndefined.INSTANCE;
+                            if (!done) {
+                                closeSyncIteratorAfterRejection(context, syncIterator);
+                            }
                             resultPromise.reject(reason);
                             return JSUndefined.INSTANCE;
                         }), null, context));

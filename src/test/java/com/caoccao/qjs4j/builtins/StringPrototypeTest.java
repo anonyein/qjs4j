@@ -695,6 +695,22 @@ public class StringPrototypeTest extends BaseJavetTest {
     }
 
     @Test
+    public void testReplacementLiteralRuns() {
+        assertStringWithJavet("""
+                (() => {
+                  const literal = 'xyz'.repeat(1000);
+                  const templates = ['', literal, literal + '$', literal + '$1' + literal,
+                    '$$' + literal + '$&' + literal + '$<word>' + literal + '$q'];
+                  return JSON.stringify(templates.map(template => [
+                    'xay'.replace('a', template),
+                    'xayaz'.replaceAll('a', template),
+                    'xayaz'.replace(/(?<word>a)/g, template)
+                  ]));
+                })()
+                """);
+    }
+
+    @Test
     public void testReplacementNamedGroupAccessOrder() {
         assertStringWithJavet("""
                 (() => {

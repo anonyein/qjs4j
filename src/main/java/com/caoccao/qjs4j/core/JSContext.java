@@ -330,11 +330,11 @@ public final class JSContext implements AutoCloseable {
         return valueFactory.createJSArray(length, capacity);
     }
 
-    public JSArrayBuffer createJSArrayBuffer(int byteLength) {
+    public JSArrayBuffer createJSArrayBuffer(long byteLength) {
         return valueFactory.createJSArrayBuffer(byteLength);
     }
 
-    public JSArrayBuffer createJSArrayBuffer(int byteLength, int maxByteLength) {
+    public JSArrayBuffer createJSArrayBuffer(long byteLength, long maxByteLength) {
         return valueFactory.createJSArrayBuffer(byteLength, maxByteLength);
     }
 
@@ -342,11 +342,11 @@ public final class JSContext implements AutoCloseable {
         return valueFactory.createJSArraySpecies(originalArray, length);
     }
 
-    public JSBigInt64Array createJSBigInt64Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSBigInt64Array createJSBigInt64Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSBigInt64Array(buffer, byteOffset, length);
     }
 
-    public JSBigInt64Array createJSBigInt64Array(int length) {
+    public JSBigInt64Array createJSBigInt64Array(long length) {
         return valueFactory.createJSBigInt64Array(length);
     }
 
@@ -354,11 +354,11 @@ public final class JSContext implements AutoCloseable {
         return valueFactory.createJSBigIntObject(value);
     }
 
-    public JSBigUint64Array createJSBigUint64Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSBigUint64Array createJSBigUint64Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSBigUint64Array(buffer, byteOffset, length);
     }
 
-    public JSBigUint64Array createJSBigUint64Array(int length) {
+    public JSBigUint64Array createJSBigUint64Array(long length) {
         return valueFactory.createJSBigUint64Array(length);
     }
 
@@ -366,7 +366,7 @@ public final class JSContext implements AutoCloseable {
         return valueFactory.createJSBooleanObject(value);
     }
 
-    public JSDataView createJSDataView(IJSArrayBuffer buffer, int byteOffset, int byteLength) {
+    public JSDataView createJSDataView(IJSArrayBuffer buffer, long byteOffset, long byteLength) {
         return valueFactory.createJSDataView(buffer, byteOffset, byteLength);
     }
 
@@ -386,51 +386,51 @@ public final class JSContext implements AutoCloseable {
         return valueFactory.createJSEvalError(message);
     }
 
-    public JSFloat16Array createJSFloat16Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSFloat16Array createJSFloat16Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSFloat16Array(buffer, byteOffset, length);
     }
 
-    public JSFloat16Array createJSFloat16Array(int length) {
+    public JSFloat16Array createJSFloat16Array(long length) {
         return valueFactory.createJSFloat16Array(length);
     }
 
-    public JSFloat32Array createJSFloat32Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSFloat32Array createJSFloat32Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSFloat32Array(buffer, byteOffset, length);
     }
 
-    public JSFloat32Array createJSFloat32Array(int length) {
+    public JSFloat32Array createJSFloat32Array(long length) {
         return valueFactory.createJSFloat32Array(length);
     }
 
-    public JSFloat64Array createJSFloat64Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSFloat64Array createJSFloat64Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSFloat64Array(buffer, byteOffset, length);
     }
 
-    public JSFloat64Array createJSFloat64Array(int length) {
+    public JSFloat64Array createJSFloat64Array(long length) {
         return valueFactory.createJSFloat64Array(length);
     }
 
-    public JSInt16Array createJSInt16Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSInt16Array createJSInt16Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSInt16Array(buffer, byteOffset, length);
     }
 
-    public JSInt16Array createJSInt16Array(int length) {
+    public JSInt16Array createJSInt16Array(long length) {
         return valueFactory.createJSInt16Array(length);
     }
 
-    public JSInt32Array createJSInt32Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSInt32Array createJSInt32Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSInt32Array(buffer, byteOffset, length);
     }
 
-    public JSInt32Array createJSInt32Array(int length) {
+    public JSInt32Array createJSInt32Array(long length) {
         return valueFactory.createJSInt32Array(length);
     }
 
-    public JSInt8Array createJSInt8Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSInt8Array createJSInt8Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSInt8Array(buffer, byteOffset, length);
     }
 
-    public JSInt8Array createJSInt8Array(int length) {
+    public JSInt8Array createJSInt8Array(long length) {
         return valueFactory.createJSInt8Array(length);
     }
 
@@ -490,35 +490,35 @@ public final class JSContext implements AutoCloseable {
         return valueFactory.createJSTypeError(message);
     }
 
-    public JSUint16Array createJSUint16Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSUint16Array createJSUint16Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSUint16Array(buffer, byteOffset, length);
     }
 
-    public JSUint16Array createJSUint16Array(int length) {
+    public JSUint16Array createJSUint16Array(long length) {
         return valueFactory.createJSUint16Array(length);
     }
 
-    public JSUint32Array createJSUint32Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSUint32Array createJSUint32Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSUint32Array(buffer, byteOffset, length);
     }
 
-    public JSUint32Array createJSUint32Array(int length) {
+    public JSUint32Array createJSUint32Array(long length) {
         return valueFactory.createJSUint32Array(length);
     }
 
-    public JSUint8Array createJSUint8Array(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSUint8Array createJSUint8Array(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSUint8Array(buffer, byteOffset, length);
     }
 
-    public JSUint8Array createJSUint8Array(int length) {
+    public JSUint8Array createJSUint8Array(long length) {
         return valueFactory.createJSUint8Array(length);
     }
 
-    public JSUint8ClampedArray createJSUint8ClampedArray(IJSArrayBuffer buffer, int byteOffset, int length) {
+    public JSUint8ClampedArray createJSUint8ClampedArray(IJSArrayBuffer buffer, long byteOffset, long length) {
         return valueFactory.createJSUint8ClampedArray(buffer, byteOffset, length);
     }
 
-    public JSUint8ClampedArray createJSUint8ClampedArray(int length) {
+    public JSUint8ClampedArray createJSUint8ClampedArray(long length) {
         return valueFactory.createJSUint8ClampedArray(length);
     }
 

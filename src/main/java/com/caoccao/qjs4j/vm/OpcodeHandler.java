@@ -1997,7 +1997,8 @@ public final class OpcodeHandler {
                             rejectedPromise.reject(reason);
                             return rejectedPromise;
                         }
-                        return JSAsyncIterator.createAsyncFromSyncResultPromise(childContext, syncValue, syncDone);
+                        return JSAsyncIterator.createAsyncFromSyncResultPromise(childContext, syncValue, syncDone,
+                                syncIteratorObject);
                     });
         }
 
@@ -2951,6 +2952,13 @@ public final class OpcodeHandler {
         if (localBinding != null) {
             JSValue localValue = localBinding.value() != null ? localBinding.value() : JSUndefined.INSTANCE;
             stack[sp++] = readNamedBindingValue(executionContext, variableName, localValue);
+            executionContext.sp = sp;
+            executionContext.pc = pc + op.getSize();
+            return;
+        }
+        JSModuleEnvironment moduleEnvironment = executionContext.frame.getFunction().getModuleEnvironment();
+        if (moduleEnvironment != null && moduleEnvironment.has(variableName)) {
+            stack[sp++] = moduleEnvironment.get(variableName);
             executionContext.sp = sp;
             executionContext.pc = pc + op.getSize();
             return;
@@ -3956,8 +3964,12 @@ public final class OpcodeHandler {
         JSContext context = executionContext.virtualMachine.context;
         PropertyKey key = PropertyKey.fromString(atomName);
         JSValue baseObject;
-        if (findDynamicVarBindingFrame(executionContext, atomName) != null || context.hasGlobalLexicalBinding(atomName)
-                || context.getGlobalObject().has(key)) {
+        JSModuleEnvironment moduleEnvironment = executionContext.frame.getFunction().getModuleEnvironment();
+        if (findDynamicVarBindingFrame(executionContext, atomName) != null) {
+            baseObject = context.getGlobalObject();
+        } else if (moduleEnvironment != null && moduleEnvironment.has(atomName)) {
+            baseObject = moduleEnvironment.imports();
+        } else if (context.hasGlobalLexicalBinding(atomName) || context.getGlobalObject().has(key)) {
             baseObject = context.getGlobalObject();
         } else {
             baseObject = JSUndefined.INSTANCE;
@@ -4868,6 +4880,13 @@ public final class OpcodeHandler {
                     context.clearPendingException();
                 }
             }
+            executionContext.pc = pc + op.getSize();
+            return;
+        }
+        JSModuleEnvironment moduleEnvironment = executionContext.frame.getFunction().getModuleEnvironment();
+        if (moduleEnvironment != null && moduleEnvironment.has(variableName)) {
+            executionContext.virtualMachine.pendingException = context
+                    .throwTypeError("Assignment to constant variable.");
             executionContext.pc = pc + op.getSize();
             return;
         }
@@ -6290,6 +6309,7 @@ public final class OpcodeHandler {
         JSFunction enclosingFunction = executionContext.frame.getFunction();
         if (enclosingFunction != null) {
             importMetaFilename = enclosingFunction.getImportMetaFilename();
+            closureFunction.setModuleEnvironment(enclosingFunction.getModuleEnvironment());
             // A function defined by eval code is located in that eval in a stack trace.
             closureFunction.setEvalOrigin(enclosingFunction.getEvalOrigin());
         }

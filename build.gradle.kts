@@ -564,10 +564,30 @@ tasks {
     withType<Test> {
         javaLauncher.set(testJavaLauncher)
         systemProperty("file.encoding", "UTF-8")
-        // With --info, retain the last started test even if its worker never finishes.
+        // Keep progress visible without streaming two messages for every test to CI. Large
+        // live-console streams can leave affected Actions runners stuck during log shutdown
+        // (actions/runner#4767). Per-case results remain in the XML and HTML reports.
         testLogging.info {
-            events("started", "passed", "skipped", "failed")
+            events("skipped", "failed")
         }
+        addTestListener(object : TestListener {
+            override fun beforeSuite(suite: TestDescriptor) {
+                if (suite.className != null && suite.parent?.className == null) {
+                    logger.info("Starting test class {}", suite.className)
+                }
+            }
+
+            override fun afterSuite(suite: TestDescriptor, result: TestResult) {
+                if (suite.className != null && suite.parent?.className == null) {
+                    logger.info("Finished test class {}: {} ({} tests, {} failed, {} skipped)",
+                        suite.className, result.resultType, result.testCount,
+                        result.failedTestCount, result.skippedTestCount)
+                }
+            }
+
+            override fun beforeTest(testDescriptor: TestDescriptor) {}
+            override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {}
+        })
         // Javet's i18n runtime loads this external data file, so replacing it must rerun the tests.
         inputs.file(layout.projectDirectory.file("icu/icudtl.dat")).withPropertyName("icuData")
         // The one authoritative test heap. Gradle's default of 512 MB is below what the engine's

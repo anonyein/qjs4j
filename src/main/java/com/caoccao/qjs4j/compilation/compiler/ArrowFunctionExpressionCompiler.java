@@ -182,7 +182,7 @@ final class ArrowFunctionExpressionCompiler extends AstNodeCompiler<ArrowFunctio
                             || !(bodyStatements.get(bodyStatements.size() - 1) instanceof ReturnStatement)) {
                         functionContext.emitter.emitOpcode(Opcode.UNDEFINED);
                         int returnValueIndex = functionContext.scopeManager.currentScope()
-                                .declareLocal("$arrow_return_" + functionContext.emitter.currentOffset());
+                                .declareLocal("#arrow_return_" + functionContext.emitter.currentOffset());
                         functionContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, returnValueIndex);
                         functionContext.emitHelpers.emitCurrentScopeUsingDisposal();
                         functionContext.emitter.emitOpcodeU16(Opcode.GET_LOC, returnValueIndex);
@@ -198,7 +198,7 @@ final class ArrowFunctionExpressionCompiler extends AstNodeCompiler<ArrowFunctio
                 // Expression body - implicitly returns the expression value
                 functionContext.expressionCompiler.compile(expr);
                 int returnValueIndex = functionContext.scopeManager.currentScope()
-                        .declareLocal("$arrow_return_" + functionContext.emitter.currentOffset());
+                        .declareLocal("#arrow_return_" + functionContext.emitter.currentOffset());
                 functionContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, returnValueIndex);
                 functionContext.emitHelpers.emitCurrentScopeUsingDisposal();
                 functionContext.emitter.emitOpcodeU16(Opcode.GET_LOC, returnValueIndex);

@@ -181,11 +181,11 @@ final class FunctionExpressionCompiler extends AstNodeCompiler<FunctionExpressio
             // transition is recorded in a slot of its own — false for the whole of parameter
             // initialization, true from the first instruction of the body.
             bodyScopeEnteredLocalIndex = functionContext.scopeManager.currentScope()
-                    .declareLocal("$function_expression_body_entered_" + selfName);
+                    .declareLocal("#function_expression_body_entered_" + selfName);
             functionContext.emitter.emitOpcode(Opcode.PUSH_TRUE);
             functionContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, bodyScopeEnteredLocalIndex);
             functionContext.scopeManager.currentScope().shadowLocalWithFreshSlot(selfName,
-                    "$function_expression_name_" + selfName);
+                    "#function_expression_name_" + selfName);
         }
 
         // Phase 0: Pre-declare all var bindings as locals before function hoisting.
@@ -237,7 +237,7 @@ final class FunctionExpressionCompiler extends AstNodeCompiler<FunctionExpressio
             }
             functionContext.emitter.emitOpcode(Opcode.UNDEFINED);
             int returnValueIndex = functionContext.scopeManager.currentScope()
-                    .declareLocal("$function_return_" + functionContext.emitter.currentOffset());
+                    .declareLocal("#function_return_" + functionContext.emitter.currentOffset());
             functionContext.emitter.emitOpcodeU16(Opcode.PUT_LOC, returnValueIndex);
             functionContext.emitHelpers.emitCurrentScopeUsingDisposal();
             functionContext.emitter.emitOpcodeU16(Opcode.GET_LOC, returnValueIndex);
@@ -342,7 +342,7 @@ final class FunctionExpressionCompiler extends AstNodeCompiler<FunctionExpressio
                 parameterSlotIndexes.add(slotIndex);
             } else {
                 // Destructuring parameter: declare a synthetic slot for the argument
-                int slotIndex = functionContext.scopeManager.currentScope().declareParameter("$param_" + i);
+                int slotIndex = functionContext.scopeManager.currentScope().declareParameter("#param_" + i);
                 parameterSlotIndexes.add(slotIndex);
                 // Declare local variables for all bound names in the pattern
                 functionContext.patternCompiler.declarePatternVariables(param);
@@ -475,7 +475,7 @@ final class FunctionExpressionCompiler extends AstNodeCompiler<FunctionExpressio
         Set<String> visibleOuterBindingNames = new LinkedHashSet<>();
         for (CompilerScope compilerScope : compilerContext.scopeManager) {
             for (String localName : compilerScope.getLocals().keySet()) {
-                if (localName == null || localName.startsWith("$")) {
+                if (localName == null || localName.startsWith("#")) {
                     continue;
                 }
                 visibleOuterBindingNames.add(localName);

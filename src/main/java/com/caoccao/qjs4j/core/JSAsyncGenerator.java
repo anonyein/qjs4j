@@ -55,27 +55,7 @@ public final class JSAsyncGenerator extends JSObject {
         this.returnValue = JSUndefined.INSTANCE;
         this.thrownValue = null;
 
-        // Add next() method
-        this.set(PropertyKey.NEXT, new JSNativeFunction(context, "next", 1, (childContext, thisArg, args) -> {
-            JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-            return next(value);
-        }));
-
-        // Add return() method
-        this.set(PropertyKey.RETURN, new JSNativeFunction(context, "return", 1, (childContext, thisArg, args) -> {
-            JSValue value = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-            return return_(value);
-        }));
-
-        // Add throw() method
-        this.set(PropertyKey.THROW, new JSNativeFunction(context, "throw", 1, (childContext, thisArg, args) -> {
-            JSValue exception = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
-            return throw_(exception);
-        }));
-
-        // Make this an async iterable via Symbol.asyncIterator
-        this.set(PropertyKey.SYMBOL_ASYNC_ITERATOR,
-                new JSNativeFunction(context, "[Symbol.asyncIterator]", 0, (childContext, thisArg, args) -> thisArg));
+        setPrototype(context.getAsyncGeneratorPrototype());
     }
 
     /**
@@ -89,7 +69,9 @@ public final class JSAsyncGenerator extends JSObject {
             pendingRequestPromise = null;
             processResult(result);
             reqPromise.fulfill(result);
-            scheduleDrainRequestQueue();
+            // Yield's AWAIT already supplied its microtask boundary. Process queued requests
+            // immediately in this reaction, and leave an empty queue ready for the next host call.
+            drainRequestQueue();
         }
     }
 

@@ -19,7 +19,7 @@ package com.caoccao.qjs4j.builtins;
 import com.caoccao.qjs4j.core.*;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -73,9 +73,6 @@ public final class ArrayPrototype {
         }
 
         // Step 7: Return ? Get(O, ! ToString(k)).
-        if (obj instanceof JSArray arr) {
-            return arr.get((int) index);
-        }
         return obj.get(PropertyKey.fromString(Long.toString(index)));
     }
 
@@ -121,6 +118,7 @@ public final class ArrayPrototype {
 
         // Steps 3-4: Process O (this) and each argument
         for (int i = -1; i < args.length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             JSValue element = (i < 0) ? obj : args[i];
 
             // Step 4a: Let spreadable be ? IsConcatSpreadable(E)
@@ -151,6 +149,8 @@ public final class ArrayPrototype {
                 }
 
                 for (long k = 0; k < elementLength; k++, resultIndex++) {
+
+                    context.getVirtualMachine().checkExecutionInterruptForNative();
                     PropertyKey indexKey = PropertyKey.fromString(Long.toString(k));
                     // JS_TryGetPropertyInt64: only define property if it exists (preserve holes)
                     boolean present = elementObj.has(indexKey);
@@ -270,6 +270,7 @@ public final class ArrayPrototype {
         // Copy direction depends on overlap (per spec step 12)
         int dir = (start < target && target < start + count) ? -1 : 1;
         for (long i = 0; i < count; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             final long from = dir < 0 ? (start + count - i - 1) : (start + i);
             final long to = dir < 0 ? (target + count - i - 1) : (target + i);
             final PropertyKey fromKey = PropertyKey.fromString(Long.toString(from));
@@ -398,6 +399,7 @@ public final class ArrayPrototype {
 
         // Step 8: Repeat, while k < final
         for (long i = start; i < end; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             if (!setOrThrow(context, obj, key, value)) {
                 return context.getPendingException();
@@ -428,9 +430,10 @@ public final class ArrayPrototype {
         }
 
         // Step 3: If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Callback must be a function");
         }
+        JSValue callback = args[0];
 
         JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
         // Step 5: Let A be ? ArraySpeciesCreate(O, 0).
@@ -445,6 +448,7 @@ public final class ArrayPrototype {
         // Step 7: Repeat, while k < len
         long resultIndex = 0;
         for (long i = 0; i < length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             // Step 7.a: Let kPresent be ? HasProperty(O, Pk).
             if (!obj.has(key)) {
@@ -460,7 +464,7 @@ public final class ArrayPrototype {
             }
             // Step 7.c.ii: Let selected be ! ToBoolean(? Call(callbackfn, thisArg, ...)).
             JSValue[] callbackArgs = {element, JSNumber.of(i), obj};
-            JSValue keep = callback.call(context, callbackThis, callbackArgs);
+            JSValue keep = JSCall.call(context, callback, callbackThis, callbackArgs);
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
@@ -522,19 +526,21 @@ public final class ArrayPrototype {
         if (context.hasPendingException()) {
             return context.getPendingException();
         }
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Callback must be a function");
         }
+        JSValue callback = args[0];
         JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
         long end = fromEnd ? -1 : length;
         long step = fromEnd ? -1 : 1;
         for (long i = fromEnd ? length - 1 : 0; i != end; i += step) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             // Find visits holes with Get, without the HasProperty used by every/some/reduce.
             JSValue element = obj.get(PropertyKey.fromString(Long.toString(i)));
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
-            JSValue result = callback.call(context, callbackThis, new JSValue[]{element, JSNumber.of(i), obj});
+            JSValue result = JSCall.call(context, callback, callbackThis, new JSValue[]{element, JSNumber.of(i), obj});
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
@@ -610,9 +616,10 @@ public final class ArrayPrototype {
             return context.getPendingException();
         }
 
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Array.prototype.flatMap requires a callback function");
         }
+        JSValue callback = args[0];
 
         JSValue callbackThisArg = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
@@ -628,6 +635,7 @@ public final class ArrayPrototype {
         // Step 6: Perform ? FlattenIntoArray(A, O, sourceLen, 0, 1, mapperFunction, thisArg).
         long resultIndex = 0;
         for (long i = 0; i < length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             if (!obj.has(key)) {
                 if (context.hasPendingException()) {
@@ -642,7 +650,7 @@ public final class ArrayPrototype {
 
             // Call the callback with (element, index, array)
             JSValue[] callbackArgs = new JSValue[]{element, JSNumber.of(i), obj};
-            JSValue mapped = callback.call(context, callbackThisArg, callbackArgs);
+            JSValue mapped = JSCall.call(context, callback, callbackThisArg, callbackArgs);
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
@@ -659,6 +667,7 @@ public final class ArrayPrototype {
                         return context.getPendingException();
                     }
                     for (long j = 0; j < mappedLen; j++) {
+                        context.getVirtualMachine().checkExecutionInterruptForNative();
                         PropertyKey jKey = PropertyKey.fromString(Long.toString(j));
                         boolean jPresent = mappedObj.has(jKey);
                         if (context.hasPendingException()) {
@@ -706,13 +715,16 @@ public final class ArrayPrototype {
             return context.getPendingException();
         }
 
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Callback must be a function");
         }
+        JSValue callback = args[0];
 
         JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
         for (long i = 0; i < length; i++) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             if (!obj.has(key)) {
                 if (context.hasPendingException()) {
@@ -725,7 +737,7 @@ public final class ArrayPrototype {
                 return context.getPendingException();
             }
             JSValue[] callbackArgs = {element, JSNumber.of(i), obj};
-            callback.call(context, callbackThis, callbackArgs);
+            JSCall.call(context, callback, callbackThis, callbackArgs);
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
@@ -797,6 +809,7 @@ public final class ArrayPrototype {
             int startIndex = (int) fromIndex;
             int endIndex = (int) length;
             for (int index = startIndex; index < endIndex; index++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 JSValue element = jsArray.get(index);
                 if (context.hasPendingException()) {
                     return context.getPendingException();
@@ -814,6 +827,8 @@ public final class ArrayPrototype {
         }
 
         for (long i = fromIndex; i < length; i++) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             JSValue element = obj.get(key);
             if (context.hasPendingException()) {
@@ -873,6 +888,8 @@ public final class ArrayPrototype {
         }
 
         for (long i = fromIndex; i < length; i++) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             if (!obj.has(key)) {
                 if (context.hasPendingException()) {
@@ -895,6 +912,7 @@ public final class ArrayPrototype {
     private static void internalFlattenIntoObject(JSContext context, JSObject source, long sourceLen, int depth,
             JSObject target, long[] targetIndex) {
         for (long i = 0; i < sourceLen; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             if (!source.has(key)) {
                 if (context.hasPendingException()) {
@@ -968,9 +986,9 @@ public final class ArrayPrototype {
         if (context.hasPendingException()) {
             return context.getPendingException();
         }
-        String separator = args.length > 0 && !(args[0] instanceof JSUndefined)
-                ? JSTypeConversions.toString(context, args[0]).value()
-                : ",";
+        JSString separator = args.length > 0 && !(args[0] instanceof JSUndefined)
+                ? JSTypeConversions.toString(context, args[0])
+                : new JSString(",");
         if (context.hasPendingException()) {
             return context.getPendingException();
         }
@@ -982,8 +1000,9 @@ public final class ArrayPrototype {
             return new JSString("");
         }
         try {
-            StringBuilder result = new StringBuilder();
+            StringResultBuilder result = new StringResultBuilder(context);
             for (long i = 0; i < length; i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 if (i > 0) {
                     result.append(separator);
                 }
@@ -994,7 +1013,7 @@ public final class ArrayPrototype {
                     return context.getPendingException();
                 }
                 if (!(element instanceof JSNull) && !(element instanceof JSUndefined)) {
-                    String elementString = JSTypeConversions.toString(context, element).value();
+                    JSString elementString = JSTypeConversions.toString(context, element);
                     if (context.hasPendingException()) {
                         return context.getPendingException();
                     }
@@ -1004,7 +1023,7 @@ public final class ArrayPrototype {
                     return context.throwRangeError("Invalid string length");
                 }
             }
-            return new JSString(result.toString());
+            return result.build();
         } finally {
             joinStack.remove(jsObject);
         }
@@ -1046,6 +1065,8 @@ public final class ArrayPrototype {
         }
 
         for (long i = fromIndex; i >= 0; i--) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             if (!obj.has(key)) {
                 if (context.hasPendingException()) {
@@ -1102,9 +1123,10 @@ public final class ArrayPrototype {
             return context.getPendingException();
         }
 
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Callback must be a function");
         }
+        JSValue callback = args[0];
 
         JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
 
@@ -1118,6 +1140,8 @@ public final class ArrayPrototype {
         }
 
         for (long i = 0; i < length; i++) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             if (!obj.has(key)) {
                 if (context.hasPendingException()) {
@@ -1130,7 +1154,7 @@ public final class ArrayPrototype {
                 return context.getPendingException();
             }
             JSValue[] callbackArgs = {element, JSNumber.of(i), obj};
-            JSValue mapped = callback.call(context, callbackThis, callbackArgs);
+            JSValue mapped = JSCall.call(context, callback, callbackThis, callbackArgs);
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
@@ -1217,6 +1241,8 @@ public final class ArrayPrototype {
         }
 
         for (int i = 0; i < args.length; i++) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(length));
             if (!setOrThrow(context, obj, key, args[i])) {
                 return context.getPendingException();
@@ -1251,15 +1277,17 @@ public final class ArrayPrototype {
         if (context.hasPendingException()) {
             return context.getPendingException();
         }
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Callback must be a function");
         }
+        JSValue callback = args[0];
         // An explicit undefined initial value is different from omitting the argument.
         boolean hasAccumulator = args.length >= 2;
         JSValue accumulator = hasAccumulator ? args[1] : JSUndefined.INSTANCE;
         long end = fromEnd ? -1 : length;
         long step = fromEnd ? -1 : 1;
         for (long i = fromEnd ? length - 1 : 0; i != end; i += step) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             boolean present = obj.has(key);
             if (context.hasPendingException()) {
@@ -1276,7 +1304,7 @@ public final class ArrayPrototype {
                 accumulator = element;
                 hasAccumulator = true;
             } else {
-                accumulator = callback.call(context, JSUndefined.INSTANCE,
+                accumulator = JSCall.call(context, callback, JSUndefined.INSTANCE,
                         new JSValue[]{accumulator, element, JSNumber.of(i), obj});
                 if (context.hasPendingException()) {
                     return context.getPendingException();
@@ -1314,6 +1342,8 @@ public final class ArrayPrototype {
         }
 
         for (long lower = 0, upper = length - 1; lower < upper; lower++, upper--) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey lowerKey = PropertyKey.fromString(Long.toString(lower));
             PropertyKey upperKey = PropertyKey.fromString(Long.toString(upper));
 
@@ -1422,6 +1452,8 @@ public final class ArrayPrototype {
         }
 
         for (long k = 1; k < length; k++) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey from = PropertyKey.fromString(Long.toString(k));
             PropertyKey to = PropertyKey.fromString(Long.toString(k - 1));
             boolean fromPresent = obj.has(from);
@@ -1508,6 +1540,7 @@ public final class ArrayPrototype {
 
         long resultIndex = 0;
         for (long i = begin; i < end; i++, resultIndex++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             boolean kPresent = obj.has(key);
             if (context.hasPendingException()) {
@@ -1550,9 +1583,8 @@ public final class ArrayPrototype {
         JSValue compareFunction = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
         if (!(compareFunction instanceof JSUndefined) && !JSTypeChecking.isCallable(compareFunction)) {
             return context.throwTypeError("The comparison function must be either a function or undefined: "
-                    + JSTypeConversions.toString(context, args[0]).value());
+                    + (compareFunction instanceof JSObject ? "#<Object>" : compareFunction.toString()));
         }
-        final JSValue compareCallable = compareFunction instanceof JSUndefined ? null : compareFunction;
 
         if (thisArg instanceof JSNull || thisArg instanceof JSUndefined) {
             return context.throwTypeError("Array.prototype.sort called on null or undefined");
@@ -1572,6 +1604,7 @@ public final class ArrayPrototype {
         List<JSValue> sortableElements = new ArrayList<>();
         int undefinedCount = 0;
         for (long i = 0; i < length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             boolean present = obj.has(key);
             if (context.hasPendingException()) {
@@ -1592,24 +1625,19 @@ public final class ArrayPrototype {
         }
 
         // Phase 2: Sort only the defined, present elements.
-        Collections.sort(sortableElements, (a, b) -> {
-            if (compareCallable != null) {
-                JSValue[] compareArgs = {a, b};
-                JSValue result = callCallableForSort(context, compareCallable, JSUndefined.INSTANCE, compareArgs);
-                return JSTypeConversions.toInt32(context, result);
-            } else {
-                // Default: convert to strings and compare
-                String aStr = JSTypeConversions.toString(context, a).value();
-                String bStr = JSTypeConversions.toString(context, b).value();
-                return aStr.compareTo(bStr);
-            }
-        });
+        JSValue[] sorted = sortableElements.toArray(JSValue[]::new);
+        if (!SortOperations.stableSort(context, sorted,
+                (a, b) -> SortOperations.compareArrayElements(context, compareFunction, a, b))) {
+            return context.getPendingException();
+        }
+        sortableElements = Arrays.asList(sorted);
 
         // Phase 3: Write back sorted elements, then undefined values, then delete holes.
         long writeIndex = 0;
 
         // Write sorted elements
         for (int i = 0; i < sortableElements.size(); i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(writeIndex));
             if (!setOrThrow(context, obj, key, sortableElements.get(i))) {
                 return context.getPendingException();
@@ -1619,6 +1647,7 @@ public final class ArrayPrototype {
 
         // Write undefined values after sorted elements
         for (int i = 0; i < undefinedCount; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(writeIndex));
             if (!setOrThrow(context, obj, key, JSUndefined.INSTANCE)) {
                 return context.getPendingException();
@@ -1628,6 +1657,7 @@ public final class ArrayPrototype {
 
         // Delete remaining holes
         for (long i = writeIndex; i < length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             if (!deleteOrThrow(context, obj, key)) {
                 return context.getPendingException();
@@ -1698,6 +1728,7 @@ public final class ArrayPrototype {
 
         // Step 10: Collect deleted elements
         for (long i = 0; i < deleteCount; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(start + i));
             boolean kPresent = obj.has(key);
             if (context.hasPendingException()) {
@@ -1732,6 +1763,7 @@ public final class ArrayPrototype {
         if (insertCount < deleteCount) {
             // Shift elements left
             for (long k = start; k < length - deleteCount; k++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 PropertyKey from = PropertyKey.fromString(Long.toString(k + deleteCount));
                 PropertyKey to = PropertyKey.fromString(Long.toString(k + insertCount));
                 boolean fromPresent = obj.has(from);
@@ -1754,6 +1786,7 @@ public final class ArrayPrototype {
             }
             // Delete trailing elements
             for (long k = newLen; k < length; k++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 if (!deleteOrThrow(context, obj, PropertyKey.fromString(Long.toString(k)))) {
                     return context.getPendingException();
                 }
@@ -1761,6 +1794,7 @@ public final class ArrayPrototype {
         } else if (insertCount > deleteCount) {
             // Shift elements right
             for (long k = length - deleteCount - 1; k >= start; k--) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 PropertyKey from = PropertyKey.fromString(Long.toString(k + deleteCount));
                 PropertyKey to = PropertyKey.fromString(Long.toString(k + insertCount));
                 boolean fromPresent = obj.has(from);
@@ -1785,6 +1819,7 @@ public final class ArrayPrototype {
 
         // Insert new elements
         for (int i = 0; i < insertCount; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(start + i));
             if (!setOrThrow(context, obj, key, args[i + 2])) {
                 return context.getPendingException();
@@ -1811,12 +1846,14 @@ public final class ArrayPrototype {
         if (context.hasPendingException()) {
             return context.getPendingException();
         }
-        if (args.length == 0 || !(args[0] instanceof JSFunction callback)) {
+        if (args.length == 0 || !JSTypeChecking.isCallable(args[0])) {
             return context.throwTypeError("Callback must be a function");
         }
+        JSValue callback = args[0];
         JSValue callbackThis = args.length > 1 ? args[1] : JSUndefined.INSTANCE;
         JSBoolean stopResult = every ? JSBoolean.FALSE : JSBoolean.TRUE;
         for (long i = 0; i < length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             boolean present = obj.has(key);
             if (context.hasPendingException()) {
@@ -1829,7 +1866,7 @@ public final class ArrayPrototype {
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
-            JSValue result = callback.call(context, callbackThis, new JSValue[]{element, JSNumber.of(i), obj});
+            JSValue result = JSCall.call(context, callback, callbackThis, new JSValue[]{element, JSNumber.of(i), obj});
             if (context.hasPendingException()) {
                 return context.getPendingException();
             }
@@ -1873,6 +1910,8 @@ public final class ArrayPrototype {
         StringBuilder sb = new StringBuilder();
 
         for (long i = 0; i < length; i++) {
+
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             if (i > 0) {
                 sb.append(",");
             }
@@ -1950,6 +1989,7 @@ public final class ArrayPrototype {
 
         // Copy elements in reverse order
         for (long i = length - 1; i >= 0; i--) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             JSValue element = obj.get(key);
             if (context.hasPendingException()) {
@@ -1970,9 +2010,8 @@ public final class ArrayPrototype {
         JSValue compareFunction = args.length > 0 ? args[0] : JSUndefined.INSTANCE;
         if (!(compareFunction instanceof JSUndefined) && !JSTypeChecking.isCallable(compareFunction)) {
             return context.throwTypeError("The comparison function must be either a function or undefined: "
-                    + JSTypeConversions.toString(context, args[0]).value());
+                    + (compareFunction instanceof JSObject ? "#<Object>" : compareFunction.toString()));
         }
-        final JSValue compareCallable = compareFunction instanceof JSUndefined ? null : compareFunction;
 
         if (thisArg instanceof JSNull || thisArg instanceof JSUndefined) {
             return context.throwTypeError("Array.prototype.toSorted called on null or undefined");
@@ -1995,6 +2034,7 @@ public final class ArrayPrototype {
         // Create a copy of the elements
         List<JSValue> elements = new ArrayList<>();
         for (long i = 0; i < length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             PropertyKey key = PropertyKey.fromString(Long.toString(i));
             elements.add(obj.get(key));
             if (context.hasPendingException()) {
@@ -2003,22 +2043,17 @@ public final class ArrayPrototype {
         }
 
         // Sort the copy
-        elements.sort((a, b) -> {
-            if (compareCallable != null) {
-                JSValue[] compareArgs = {a, b};
-                JSValue result = callCallableForSort(context, compareCallable, JSUndefined.INSTANCE, compareArgs);
-                return JSTypeConversions.toInt32(context, result);
-            } else {
-                // Default: convert to strings and compare
-                String aStr = JSTypeConversions.toString(context, a).value();
-                String bStr = JSTypeConversions.toString(context, b).value();
-                return aStr.compareTo(bStr);
-            }
-        });
+        JSValue[] sorted = elements.toArray(JSValue[]::new);
+        if (!SortOperations.stableSort(context, sorted,
+                (a, b) -> SortOperations.compareArrayElements(context, compareFunction, a, b))) {
+            return context.getPendingException();
+        }
+        elements = Arrays.asList(sorted);
 
         // Create new array with sorted elements
         JSArray result = context.createJSArray(0, elements.size());
         for (JSValue element : elements) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             result.push(element);
         }
 
@@ -2092,15 +2127,18 @@ public final class ArrayPrototype {
             JSValue[] elements = new JSValue[(int) newLen];
             int resultIndex = 0;
             for (long i = 0; i < start; i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 elements[resultIndex++] = getElement(context, obj, i);
                 if (context.hasPendingException()) {
                     return context.getPendingException();
                 }
             }
             for (int i = 2; i < args.length; i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 elements[resultIndex++] = args[i];
             }
             for (long i = start + deleteCount; i < length; i++) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 elements[resultIndex++] = getElement(context, obj, i);
                 if (context.hasPendingException()) {
                     return context.getPendingException();
@@ -2114,6 +2152,7 @@ public final class ArrayPrototype {
 
         // Copy elements before start
         for (long i = 0; i < start; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             result.push(getElement(context, obj, i));
             if (context.hasPendingException()) {
                 return context.getPendingException();
@@ -2122,11 +2161,13 @@ public final class ArrayPrototype {
 
         // Insert new elements
         for (int i = 2; i < args.length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             result.push(args[i]);
         }
 
         // Copy elements after deleted portion
         for (long i = start + deleteCount; i < length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             result.push(getElement(context, obj, i));
             if (context.hasPendingException()) {
                 return context.getPendingException();
@@ -2186,6 +2227,7 @@ public final class ArrayPrototype {
         if (argCount > 0) {
             // Shift existing elements right
             for (long k = length - 1; k >= 0; k--) {
+                context.getVirtualMachine().checkExecutionInterruptForNative();
                 PropertyKey from = PropertyKey.fromString(Long.toString(k));
                 PropertyKey to = PropertyKey.fromString(Long.toString(k + argCount));
                 boolean fromPresent = obj.has(from);
@@ -2209,6 +2251,7 @@ public final class ArrayPrototype {
         }
         // Insert new elements at the beginning
         for (int j = 0; j < argCount; j++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             if (!setOrThrow(context, obj, PropertyKey.fromString(Long.toString(j)), args[j])) {
                 return context.getPendingException();
             }
@@ -2269,6 +2312,7 @@ public final class ArrayPrototype {
         // Create a copy of the array
         JSArray result = context.createJSArray(0, (int) length);
         for (long i = 0; i < length; i++) {
+            context.getVirtualMachine().checkExecutionInterruptForNative();
             if (i == index) {
                 result.push(newValue);
             } else {

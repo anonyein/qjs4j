@@ -20,11 +20,10 @@ import com.caoccao.qjs4j.exceptions.JSRangeErrorException;
 import com.caoccao.qjs4j.exceptions.JSTypeErrorException;
 import com.caoccao.qjs4j.utils.DtoaConverter;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.IntFunction;
+import java.util.function.LongFunction;
 
 /**
  * Base class for JavaScript TypedArray objects. Based on ES2020 TypedArray specification.
@@ -34,23 +33,24 @@ import java.util.function.IntFunction;
 public sealed abstract class JSTypedArray extends JSObject
         permits JSUint8Array, JSUint8ClampedArray, JSUint16Array, JSUint32Array, JSInt8Array, JSInt16Array,
         JSInt32Array, JSFloat16Array, JSFloat32Array, JSFloat64Array, JSBigInt64Array, JSBigUint64Array {
-    private static final int CANONICAL_NUMERIC_INDEX_INVALID = -1;
-    private static final int CANONICAL_NUMERIC_INDEX_NOT_CANONICAL = Integer.MIN_VALUE;
+    private static final long CANONICAL_NUMERIC_INDEX_INVALID = -1;
+    private static final long CANONICAL_NUMERIC_INDEX_NOT_CANONICAL = Long.MIN_VALUE;
     public static final String NAME = "TypedArray";
     protected final IJSArrayBuffer buffer;
-    protected final int byteLength;
-    protected final int byteOffset;
+    protected final long byteLength;
+    protected final long byteOffset;
     protected final int bytesPerElement;
-    private ByteBuffer cachedBackingBuffer;
-    private ByteBuffer cachedByteBuffer;
-    private int cachedByteLength = -1;
-    protected final int length;
+    private JSByteBuffer cachedBackingBuffer;
+    private long cachedByteLength = -1;
+    private JSByteBuffer cachedJSByteBuffer;
+    protected final long length;
     protected final boolean trackRab;
 
     /**
      * Create a TypedArray view on an existing ArrayBuffer or SharedArrayBuffer.
      */
-    protected JSTypedArray(JSContext context, IJSArrayBuffer buffer, int byteOffset, int length, int bytesPerElement) {
+    protected JSTypedArray(JSContext context, IJSArrayBuffer buffer, long byteOffset, long length,
+            int bytesPerElement) {
         super(context);
         if (buffer == null) {
             throw new JSTypeErrorException("Cannot create TypedArray on null buffer");
@@ -76,7 +76,7 @@ public sealed abstract class JSTypedArray extends JSObject
             boolean resizable = (buffer instanceof JSArrayBuffer jsArrayBuffer && jsArrayBuffer.isResizable())
                     || (buffer instanceof JSSharedArrayBuffer jsSharedArrayBuffer && jsSharedArrayBuffer.isGrowable());
             this.trackRab = resizable;
-            int remainingBytes = buffer.getByteLength() - byteOffset;
+            long remainingBytes = buffer.getByteLength() - byteOffset;
             if (!resizable && remainingBytes % bytesPerElement != 0) {
                 throw new JSRangeErrorException("Buffer byte length must be a multiple of element size");
             }
@@ -85,11 +85,11 @@ public sealed abstract class JSTypedArray extends JSObject
         } else {
             this.trackRab = false;
             this.length = length;
-            if (length > Integer.MAX_VALUE / bytesPerElement) {
+            if (length > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH / bytesPerElement) {
                 throw new JSRangeErrorException("invalid length");
             }
             this.byteLength = length * bytesPerElement;
-            if ((long) byteOffset + this.byteLength > buffer.getByteLength()) {
+            if (byteOffset + this.byteLength > buffer.getByteLength()) {
                 throw new JSRangeErrorException("TypedArray extends beyond buffer");
             }
         }
@@ -100,12 +100,12 @@ public sealed abstract class JSTypedArray extends JSObject
     /**
      * Create a TypedArray with a new buffer of the given length.
      */
-    protected JSTypedArray(JSContext context, int length, int bytesPerElement) {
+    protected JSTypedArray(JSContext context, long length, int bytesPerElement) {
         super(context);
         if (length < 0) {
             throw new JSRangeErrorException("invalid length");
         }
-        if (length > Integer.MAX_VALUE / bytesPerElement) {
+        if (length > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH / bytesPerElement) {
             throw new JSRangeErrorException("invalid array buffer length");
         }
         this.bytesPerElement = bytesPerElement;
@@ -119,7 +119,7 @@ public sealed abstract class JSTypedArray extends JSObject
     /**
      * Check if an index is valid.
      */
-    protected void checkIndex(int index) {
+    protected void checkIndex(long index) {
         if (buffer.isDetached()) {
             throw new JSTypeErrorException("TypedArray buffer is detached");
         }
@@ -131,7 +131,14 @@ public sealed abstract class JSTypedArray extends JSObject
     /**
      * Create a raw view of this array's concrete type on the same buffer.
      */
-    protected abstract JSTypedArray createView(int byteOffset, int length);
+    /** Snapshot raw data for overlapping set operations without invoking guest constructors. */
+    public final JSTypedArray copyStorage() {
+        JSArrayBuffer copy = context.createJSArrayBuffer(getByteLength());
+        buffer.getBuffer().copyTo(copy.getBuffer(), byteOffset, 0, getByteLength());
+        return createView(copy, 0, getLength());
+    }
+
+    protected abstract JSTypedArray createView(IJSArrayBuffer buffer, long byteOffset, long length);
 
     /**
      * Integer-Indexed exotic object [[DefineOwnProperty]]. Following QuickJS JS_DefineProperty for typed arrays (lines
@@ -140,14 +147,14 @@ public sealed abstract class JSTypedArray extends JSObject
      */
     @Override
     public boolean defineProperty(PropertyKey key, PropertyDescriptor descriptor) {
-        int canonicalNumericIndex = resolveCanonicalNumericIndex(key);
+        long canonicalNumericIndex = resolveCanonicalNumericIndex(key);
         if (canonicalNumericIndex == CANONICAL_NUMERIC_INDEX_NOT_CANONICAL) {
             return super.defineProperty(key, descriptor);
         }
         if (canonicalNumericIndex < 0) {
             return false;
         }
-        int index = canonicalNumericIndex;
+        long index = canonicalNumericIndex;
         // Check bounds and detachment
         if (buffer.isDetached() || index >= getLength()) {
             return false;
@@ -181,14 +188,14 @@ public sealed abstract class JSTypedArray extends JSObject
      */
     @Override
     public boolean delete(PropertyKey key, boolean throwOnFailure) {
-        int canonicalNumericIndex = resolveCanonicalNumericIndex(key);
+        long canonicalNumericIndex = resolveCanonicalNumericIndex(key);
         if (canonicalNumericIndex == CANONICAL_NUMERIC_INDEX_NOT_CANONICAL) {
             return super.delete(key, throwOnFailure);
         }
         if (canonicalNumericIndex < 0) {
             return true;
         }
-        int index = canonicalNumericIndex;
+        long index = canonicalNumericIndex;
         if (index >= 0) {
             // In-bounds element: not deletable
             if (index < getLength() && !buffer.isDetached()) {
@@ -208,9 +215,9 @@ public sealed abstract class JSTypedArray extends JSObject
     public PropertyKey[] enumerableKeys() {
         List<PropertyKey> result = new ArrayList<>();
         if (!buffer.isDetached() && !isOutOfBounds()) {
-            int len = getLength();
-            for (int i = 0; i < len; i++) {
-                result.add(PropertyKey.fromString(Integer.toString(i)));
+            long len = getLength();
+            for (long i = 0; i < len; i++) {
+                result.add(PropertyKey.fromString(Long.toString(i)));
             }
         }
         Collections.addAll(result, super.enumerableKeys());
@@ -242,43 +249,43 @@ public sealed abstract class JSTypedArray extends JSObject
     }
 
     /**
-     * Get the ByteBuffer for direct access.
+     * Get the JSByteBuffer for direct access.
      */
-    protected ByteBuffer getByteBuffer() {
+    protected JSByteBuffer getByteBuffer() {
         if (buffer.isDetached()) {
             throw new JSTypeErrorException("TypedArray buffer is detached");
         }
-        ByteBuffer backingBuffer = buffer.getBuffer();
-        int currentByteLength = getByteLength();
+        JSByteBuffer backingBuffer = buffer.getBuffer();
+        long currentByteLength = getByteLength();
         if (cachedBackingBuffer == backingBuffer && cachedByteLength == currentByteLength) {
-            return cachedByteBuffer;
+            return cachedJSByteBuffer;
         }
-        ByteBuffer buf = backingBuffer.duplicate();
+        JSByteBuffer buf = backingBuffer.duplicate();
         buf.position(byteOffset);
         buf.limit(byteOffset + currentByteLength);
-        ByteBuffer slice = buf.slice();
+        JSByteBuffer slice = buf.slice();
         slice.order(backingBuffer.order());
         cachedBackingBuffer = backingBuffer;
         cachedByteLength = currentByteLength;
-        cachedByteBuffer = slice;
-        return cachedByteBuffer;
+        cachedJSByteBuffer = slice;
+        return cachedJSByteBuffer;
     }
 
     /**
      * Get the byte length of this view. For length-tracking typed arrays on resizable buffers, returns the current
      * effective byte length.
      */
-    public int getByteLength() {
+    public long getByteLength() {
         if (trackRab) {
             if (buffer.isDetached()) {
                 return 0;
             }
-            int currentByteLength = buffer.getByteLength();
+            long currentByteLength = buffer.getByteLength();
             if (byteOffset > currentByteLength) {
                 return 0;
             }
             // Round down to element boundary for partial elements
-            int remainingBytes = currentByteLength - byteOffset;
+            long remainingBytes = currentByteLength - byteOffset;
             return (remainingBytes / bytesPerElement) * bytesPerElement;
         }
         return byteLength;
@@ -287,7 +294,7 @@ public sealed abstract class JSTypedArray extends JSObject
     /**
      * Get the byte offset within the buffer.
      */
-    public int getByteOffset() {
+    public long getByteOffset() {
         return byteOffset;
     }
 
@@ -301,13 +308,13 @@ public sealed abstract class JSTypedArray extends JSObject
     /**
      * Get an element as a number.
      */
-    public abstract double getElement(int index);
+    public abstract double getElement(long index);
 
     /**
      * Get an element as the appropriate JSValue type. Regular typed arrays return JSNumber, BigInt typed arrays
      * override to return JSBigInt.
      */
-    public JSValue getJSElement(int index) {
+    public JSValue getJSElement(long index) {
         return JSNumber.of(getElement(index));
     }
 
@@ -315,12 +322,12 @@ public sealed abstract class JSTypedArray extends JSObject
      * Get the number of elements. For length-tracking typed arrays on resizable buffers, returns the current effective
      * length.
      */
-    public int getLength() {
+    public long getLength() {
         if (trackRab) {
             if (buffer.isDetached()) {
                 return 0;
             }
-            int currentByteLength = buffer.getByteLength();
+            long currentByteLength = buffer.getByteLength();
             if (byteOffset > currentByteLength) {
                 return 0;
             }
@@ -343,14 +350,14 @@ public sealed abstract class JSTypedArray extends JSObject
      */
     @Override
     protected PropertyDescriptor getOwnPropertyDescriptorRaw(PropertyKey key) {
-        int canonicalNumericIndex = resolveCanonicalNumericIndex(key);
+        long canonicalNumericIndex = resolveCanonicalNumericIndex(key);
         if (canonicalNumericIndex == CANONICAL_NUMERIC_INDEX_NOT_CANONICAL) {
             return super.getOwnPropertyDescriptorRaw(key);
         }
         if (canonicalNumericIndex < 0) {
             return null;
         }
-        int index = canonicalNumericIndex;
+        long index = canonicalNumericIndex;
         if (buffer.isDetached() || index >= getLength()) {
             return null;
         }
@@ -366,9 +373,9 @@ public sealed abstract class JSTypedArray extends JSObject
         List<PropertyKey> result = new ArrayList<>();
         // Add integer indices for buffer elements (only if not detached and not OOB)
         if (!buffer.isDetached() && !isOutOfBounds()) {
-            int len = getLength();
-            for (int i = 0; i < len; i++) {
-                result.add(PropertyKey.fromString(Integer.toString(i)));
+            long len = getLength();
+            for (long i = 0; i < len; i++) {
+                result.add(PropertyKey.fromString(Long.toString(i)));
             }
         }
         // Add non-index own properties from the shape (string keys, then symbols)
@@ -390,14 +397,14 @@ public sealed abstract class JSTypedArray extends JSObject
      */
     @Override
     protected JSValue getWithReceiver(PropertyKey key, JSValue receiver, int depth) {
-        int canonicalNumericIndex = resolveCanonicalNumericIndex(key);
+        long canonicalNumericIndex = resolveCanonicalNumericIndex(key);
         if (canonicalNumericIndex == CANONICAL_NUMERIC_INDEX_NOT_CANONICAL) {
             return super.getWithReceiver(key, receiver, depth);
         }
         if (canonicalNumericIndex < 0) {
             return JSUndefined.INSTANCE;
         }
-        int index = canonicalNumericIndex;
+        long index = canonicalNumericIndex;
         if (buffer.isDetached() || isOutOfBounds() || index >= getLength()) {
             return JSUndefined.INSTANCE;
         }
@@ -406,7 +413,7 @@ public sealed abstract class JSTypedArray extends JSObject
 
     @Override
     protected boolean has(PropertyKey key, int depth) {
-        int canonicalNumericIndex = resolveCanonicalNumericIndex(key);
+        long canonicalNumericIndex = resolveCanonicalNumericIndex(key);
         if (canonicalNumericIndex == CANONICAL_NUMERIC_INDEX_NOT_CANONICAL) {
             return super.has(key, depth);
         }
@@ -422,7 +429,7 @@ public sealed abstract class JSTypedArray extends JSObject
      * ToNumber/ToBigInt detaches the buffer as a side effect. BigInt typed arrays override to use ToBigInt instead of
      * ToNumber.
      */
-    protected void integerIndexedElementSet(int index, JSValue value) {
+    protected void integerIndexedElementSet(long index, JSValue value) {
         double numValue = JSTypeConversions.toNumber(context, value).value();
         if (context.hasPendingException()) {
             return;
@@ -470,7 +477,7 @@ public sealed abstract class JSTypedArray extends JSObject
         if (buffer.isDetached()) {
             return true;
         }
-        int currentByteLength = buffer.getByteLength();
+        long currentByteLength = buffer.getByteLength();
         if (byteOffset > currentByteLength) {
             return true;
         }
@@ -478,7 +485,7 @@ public sealed abstract class JSTypedArray extends JSObject
             return false;
         }
         // Fixed length: check if the view exceeds the current buffer size
-        return (long) byteOffset + byteLength > currentByteLength;
+        return byteOffset + byteLength > currentByteLength;
     }
 
     @Override
@@ -499,7 +506,7 @@ public sealed abstract class JSTypedArray extends JSObject
 
     @Override
     public void set(PropertyKey key, JSValue value) {
-        int canonicalNumericIndex = resolveCanonicalNumericIndex(key);
+        long canonicalNumericIndex = resolveCanonicalNumericIndex(key);
         if (canonicalNumericIndex == CANONICAL_NUMERIC_INDEX_NOT_CANONICAL) {
             super.set(key, value);
             return;
@@ -518,18 +525,18 @@ public sealed abstract class JSTypedArray extends JSObject
     /**
      * TypedArray.prototype.set(array, offset) Copy values from array into this TypedArray.
      */
-    public void setArray(JSValue source, int offset) {
-        int currentLength = getLength();
+    public void setArray(JSValue source, long offset) {
+        long currentLength = getLength();
         if (offset < 0 || offset > currentLength) {
             throw new JSRangeErrorException("TypedArray offset out of range");
         }
 
         if (source instanceof JSArray srcArray) {
-            int srcLength = toArrayLikeLength(context, JSNumber.of(srcArray.getLength()));
+            long srcLength = toArrayLikeLength(context, JSNumber.of(srcArray.getLength()));
             if (offset + srcLength > currentLength) {
                 throw new JSRangeErrorException("Source array too large");
             }
-            for (int i = 0; i < srcLength; i++) {
+            for (long i = 0; i < srcLength; i++) {
                 JSValue value = srcArray.get(i);
                 if (context.hasPendingException()) {
                     return;
@@ -540,11 +547,11 @@ public sealed abstract class JSTypedArray extends JSObject
                 }
             }
         } else if (source instanceof JSTypedArray srcTyped) {
-            int srcLength = srcTyped.getLength();
+            long srcLength = srcTyped.getLength();
             if (offset + srcLength > currentLength) {
                 throw new JSRangeErrorException("Source array too large");
             }
-            for (int i = 0; i < srcLength; i++) {
+            for (long i = 0; i < srcLength; i++) {
                 setJSElement(offset + i, srcTyped.getJSElement(i));
                 if (context.hasPendingException()) {
                     return;
@@ -561,14 +568,14 @@ public sealed abstract class JSTypedArray extends JSObject
             if (context.hasPendingException()) {
                 return;
             }
-            int srcLength = toArrayLikeLength(context, lengthValue);
+            long srcLength = toArrayLikeLength(context, lengthValue);
             if (context.hasPendingException()) {
                 return;
             }
             if (offset + srcLength > currentLength) {
                 throw new JSRangeErrorException("Source array too large");
             }
-            for (int i = 0; i < srcLength; i++) {
+            for (long i = 0; i < srcLength; i++) {
                 JSValue value = srcObject.get(PropertyKey.fromIndex(i));
                 if (context.hasPendingException()) {
                     return;
@@ -584,13 +591,13 @@ public sealed abstract class JSTypedArray extends JSObject
     /**
      * Set an element from a number.
      */
-    public abstract void setElement(int index, double value);
+    public abstract void setElement(long index, double value);
 
     /**
      * Set an element from a JSValue, performing the appropriate type conversion. Regular typed arrays convert to
      * Number, BigInt typed arrays override to convert to BigInt.
      */
-    protected void setJSElement(int index, JSValue value) {
+    protected void setJSElement(long index, JSValue value) {
         setElement(index, JSTypeConversions.toNumber(context, value).value());
     }
 
@@ -609,7 +616,7 @@ public sealed abstract class JSTypedArray extends JSObject
      */
     @Override
     public boolean setWithResult(PropertyKey key, JSValue value, JSValue receiver) {
-        int canonicalNumericIndex = resolveCanonicalNumericIndex(key);
+        long canonicalNumericIndex = resolveCanonicalNumericIndex(key);
         if (canonicalNumericIndex == CANONICAL_NUMERIC_INDEX_NOT_CANONICAL) {
             return super.setWithResult(key, value, receiver);
         }
@@ -654,9 +661,9 @@ public sealed abstract class JSTypedArray extends JSObject
     /**
      * TypedArray.prototype.subarray(begin, end) Returns a new TypedArray view on the same buffer.
      */
-    public JSTypedArray subarray(int begin, int end) {
+    public JSTypedArray subarray(long begin, long end) {
         // Normalize indices
-        int currentLength = getLength();
+        long currentLength = getLength();
         if (begin < 0) {
             begin = Math.max(currentLength + begin, 0);
         } else {
@@ -669,20 +676,20 @@ public sealed abstract class JSTypedArray extends JSObject
             end = Math.min(end, currentLength);
         }
 
-        int newLength = Math.max(end - begin, 0);
-        int newByteOffset = byteOffset + begin * bytesPerElement;
+        long newLength = Math.max(end - begin, 0);
+        long newByteOffset = byteOffset + begin * bytesPerElement;
 
-        return createView(newByteOffset, newLength);
+        return createView(buffer, newByteOffset, newLength);
     }
 
     @Override
     public String toString() {
-        int currentLength = getLength();
+        long currentLength = getLength();
         if (currentLength == 0) {
             return "";
         }
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < currentLength; i++) {
+        for (long i = 0; i < currentLength; i++) {
             if (i > 0) {
                 sb.append(',');
             }
@@ -696,8 +703,8 @@ public sealed abstract class JSTypedArray extends JSObject
      * while conversions run in source order.
      */
     protected static JSTypedArray createFromArguments(JSContext context, int bytesPerElement,
-            IntFunction<? extends JSTypedArray> lengthFactory, BufferFactory bufferFactory, JSValue... args) {
-        int length = 0;
+            LongFunction<? extends JSTypedArray> lengthFactory, BufferFactory bufferFactory, JSValue... args) {
+        long length = 0;
         if (args.length >= 1) {
             JSValue firstArg = normalizeConstructorSource(context, args[0]);
             if (context.hasPendingException()) {
@@ -706,7 +713,7 @@ public sealed abstract class JSTypedArray extends JSObject
             if (firstArg instanceof JSNumber lengthNum) {
                 length = toTypedArrayIndex(context, lengthNum, bytesPerElement);
             } else if (firstArg instanceof IJSArrayBuffer jsArrayBuffer) {
-                int byteOffset = 0;
+                long byteOffset = 0;
                 if (args.length >= 2) {
                     byteOffset = resolveAndValidateByteOffset(context, args[1], bytesPerElement);
                     if (context.hasPendingException()) {
@@ -853,8 +860,8 @@ public sealed abstract class JSTypedArray extends JSObject
      * ES2024 InitializeTypedArrayFromArrayBuffer steps 2-3: Resolve byteOffset via ToIndex, then check alignment before
      * ToIndex(length). Returns the validated byteOffset, or -1 if a pending exception was set.
      */
-    protected static int resolveAndValidateByteOffset(JSContext context, JSValue value, int bytesPerElement) {
-        int byteOffset = toTypedArrayByteOffset(context, value);
+    protected static long resolveAndValidateByteOffset(JSContext context, JSValue value, int bytesPerElement) {
+        long byteOffset = toTypedArrayByteOffset(context, value);
         if (context.hasPendingException()) {
             return -1;
         }
@@ -871,8 +878,8 @@ public sealed abstract class JSTypedArray extends JSObject
      * @return non-negative integer index when canonical and valid; {@link #CANONICAL_NUMERIC_INDEX_INVALID} when
      *         canonical numeric but invalid integer index; {@link #CANONICAL_NUMERIC_INDEX_NOT_CANONICAL} otherwise.
      */
-    private static int resolveCanonicalNumericIndex(PropertyKey key) {
-        int typedArrayIndex = toTypedArrayIndex(key);
+    private static long resolveCanonicalNumericIndex(PropertyKey key) {
+        long typedArrayIndex = toTypedArrayIndex(key);
         if (typedArrayIndex >= 0) {
             return typedArrayIndex;
         }
@@ -901,34 +908,34 @@ public sealed abstract class JSTypedArray extends JSObject
         if (!Double.isFinite(numericIndex) || numericIndex != Math.floor(numericIndex) || numericIndex < 0) {
             return CANONICAL_NUMERIC_INDEX_INVALID;
         }
-        int integerIndex = (int) numericIndex;
+        long integerIndex = (long) numericIndex;
         if (integerIndex != numericIndex) {
             return CANONICAL_NUMERIC_INDEX_INVALID;
         }
         return integerIndex;
     }
 
-    protected static int toArrayLikeLength(JSContext context, JSValue value) {
+    protected static long toArrayLikeLength(JSContext context, JSValue value) {
         long length = JSTypeConversions.toLength(context, JSTypeConversions.toNumber(context, value));
-        if (length > Integer.MAX_VALUE) {
+        if (length > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH) {
             throw new JSRangeErrorException("invalid array length");
         }
-        return (int) length;
+        return length;
     }
 
-    protected static int toTypedArrayBufferLength(JSContext context, JSValue value, int bytesPerElement) {
+    protected static long toTypedArrayBufferLength(JSContext context, JSValue value, int bytesPerElement) {
         return toTypedArrayLength(JSTypeConversions.toIndex(context, value), bytesPerElement);
     }
 
-    protected static int toTypedArrayByteOffset(JSContext context, JSValue value) {
+    protected static long toTypedArrayByteOffset(JSContext context, JSValue value) {
         long offset = JSTypeConversions.toIndex(context, value);
-        if (offset > Integer.MAX_VALUE) {
+        if (offset > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH) {
             throw new JSRangeErrorException("invalid offset");
         }
-        return (int) offset;
+        return offset;
     }
 
-    protected static int toTypedArrayIndex(JSContext context, JSValue value, int bytesPerElement) {
+    protected static long toTypedArrayIndex(JSContext context, JSValue value, int bytesPerElement) {
         return toTypedArrayLength(JSTypeConversions.toIndex(context, value), bytesPerElement);
     }
 
@@ -936,7 +943,7 @@ public sealed abstract class JSTypedArray extends JSObject
      * Try to interpret a PropertyKey as a typed array integer index. Returns the index if it's a valid canonical
      * numeric index string, or -1 otherwise.
      */
-    private static int toTypedArrayIndex(PropertyKey key) {
+    private static long toTypedArrayIndex(PropertyKey key) {
         int fastIndex = key.toIndex();
         if (fastIndex >= 0) {
             return fastIndex;
@@ -968,27 +975,27 @@ public sealed abstract class JSTypedArray extends JSObject
                 return -1;
             }
             int digit = character - '0';
-            if (parsedValue > (Integer.MAX_VALUE - digit) / 10L) {
+            if (parsedValue > (JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH - digit) / 10L) {
                 return -1;
             }
             parsedValue = parsedValue * 10 + digit;
         }
-        return (int) parsedValue;
+        return parsedValue;
     }
 
-    protected static int toTypedArrayLength(JSContext context, JSValue value, int bytesPerElement) {
+    protected static long toTypedArrayLength(JSContext context, JSValue value, int bytesPerElement) {
         return toTypedArrayLength(JSTypeConversions.toLength(context, JSTypeConversions.toNumber(context, value)),
                 bytesPerElement);
     }
 
-    protected static int toTypedArrayLength(long length, int bytesPerElement) {
-        if (length < 0 || length > Integer.MAX_VALUE) {
+    protected static long toTypedArrayLength(long length, int bytesPerElement) {
+        if (length < 0 || length > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH) {
             throw new JSRangeErrorException("invalid length");
         }
-        if (length > Integer.MAX_VALUE / (long) bytesPerElement) {
+        if (length > JSArrayBuffer.MAX_DATA_BLOCK_BYTE_LENGTH / (long) bytesPerElement) {
             throw new JSRangeErrorException("invalid array buffer length");
         }
-        return (int) length;
+        return length;
     }
 
     protected static void validateTypedArrayBufferNotDetached(IJSArrayBuffer buffer) {
@@ -999,6 +1006,6 @@ public sealed abstract class JSTypedArray extends JSObject
 
     @FunctionalInterface
     protected interface BufferFactory {
-        JSTypedArray create(IJSArrayBuffer buffer, int byteOffset, int length);
+        JSTypedArray create(IJSArrayBuffer buffer, long byteOffset, long length);
     }
 }
